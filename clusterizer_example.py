@@ -2,8 +2,8 @@
 from tables import dtype_from_descr
 import numpy as np
 
-from pyHitClusterizer.data_clusterizer import PyDataClusterizer
-from pyHitClusterizer import data_struct
+from pyTestbeamAnalysis.clusterizer.hit_clusterizer import HitClusterizer
+from pyTestbeamAnalysis.clusterizer import data_struct
 
 
 def pprint_array(array):
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     cluster = np.zeros_like(hits, dtype=dtype_from_descr(data_struct.ClusterInfoTable))
 
     # create clusterizer object
-    clusterizer = PyDataClusterizer()
+    clusterizer = HitClusterizer()
 
     # all working settings are listed here, the std. values are used here
     clusterizer.set_debug_output(False)
