@@ -12,12 +12,14 @@ python setup.py develop
 
 # Example usage 
 # Clusterizer
+from clusterizer_example.py:
 ```python
 from pyHitClusterizer.data_clusterizer import PyDataClusterizer
 from pyHitClusterizer import data_struct
 
 if __name__ == "__main__":
-hits = np.ones(shape=(10, ), dtype=dtype_from_descr(data_struct.HitInfoTable))
+# create some fake data
+    hits = np.ones(shape=(10, ), dtype=dtype_from_descr(data_struct.HitInfoTable))
     for i, hit in enumerate(hits):
         hit[0] = i / 2
         hit[1] = i / 2
@@ -50,13 +52,6 @@ hits = np.ones(shape=(10, ), dtype=dtype_from_descr(data_struct.HitInfoTable))
     clusterizer.set_cluster_hit_info_array(cluster_hits)  # tell the array to be filled
     clusterizer.set_cluster_info_array(cluster)  # tell the array to be filled
     clusterizer.add_hits(hits)  # cluster hits
-
-    # print input / output histograms
-    print 'INPUT:'
-    pprint_array(hits)
-    print 'OUTPUT:'
-    pprint_array(cluster_hits)
-    pprint_array(cluster[:clusterizer.get_n_clusters()])
 ```
 
 ## Full Analysis
