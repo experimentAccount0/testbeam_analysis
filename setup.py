@@ -44,7 +44,8 @@ class build_ext_opt(build_ext):
 
 
 extensions = [
-    Extension('pyTestbeamAnalysis.clusterizer.hit_clusterizer', ['pyTestbeamAnalysis/clusterizer/hit_clusterizer.pyx', 'pyTestbeamAnalysis/clusterizer/Clusterizer.cpp', 'pyTestbeamAnalysis/clusterizer/Basis.cpp']),
+    Extension('pyTestbeamAnalysis.hit_clusterizer', ['pyTestbeamAnalysis/clusterizer/hit_clusterizer.pyx', 'pyTestbeamAnalysis/clusterizer/Clusterizer.cpp', 'pyTestbeamAnalysis/clusterizer/Basis.cpp']),
+    Extension('pyTestbeamAnalysis.analysis_functions', ['pyTestbeamAnalysis/clusterizer/analysis_functions.pyx'])
 ]
 
 
@@ -66,7 +67,7 @@ setup(
     maintainer=author,
     author_email=author_email,
     maintainer_email=author_email,
-    install_requires=['cython', ],
+    install_requires=['cython', 'pandas', 'tables', 'scipy', 'matplotlib'],
     packages=find_packages(),  # exclude=['*.tests', '*.test']),
     include_package_data=True,  # accept all data files and directories matched by MANIFEST.in or found in source control
     package_data={'': ['*.txt', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
@@ -77,7 +78,8 @@ setup(
 )
 
 try:
-    from pyTestbeamAnalysis.clusterizer.hit_clusterizer import HitClusterizer
+    from pyTestbeamAnalysis.hit_clusterizer import HitClusterizer
+    import pyTestbeamAnalysis.analysis_functions
     clusterizer = HitClusterizer()
     print "STATUS: SUCCESS!"
 except Exception, e:
