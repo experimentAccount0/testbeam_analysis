@@ -487,21 +487,21 @@ void Clusterizer::initHitMap()
 
 void Clusterizer::addClusterToResults()
 {
-	if(!_abortCluster){
-		//histogramming of the results
-		if(_actualClusterSize<__MAXCLUSTERHITSBINS)
-			_clusterHits[_actualClusterSize]++;
-		else
-			throw std::out_of_range("Clusterizer::addClusterToResults: cluster size does not fit into cluster size histogram");
-		if(_actualClusterCharge<__MAXCHARGEBINS && _actualClusterSize<__MAXCLUSTERHITSBINS){
-			_clusterCharges[(long)(_actualClusterCharge) + (long)_actualClusterSize*(long)__MAXCHARGEBINS]++;
-			_clusterCharges[(long)_actualClusterCharge]++;	//cluster size = 0 contains all cluster sizes
-		}
-		else{
-			std::stringstream tInfo;
-			tInfo<<"Clusterizer::addClusterToResults: cluster Charge "<<_actualClusterCharge<<" with cluster size "<<_actualClusterSize<<" does not fit into cluster Charge histogram.";
-			throw std::out_of_range(tInfo.str());
-		}
+//	if(!_abortCluster){
+//		//histogramming of the results
+//		if(_actualClusterSize<__MAXCLUSTERHITSBINS)
+//			_clusterHits[_actualClusterSize]++;
+//		else
+//			throw std::out_of_range("Clusterizer::addClusterToResults: cluster size does not fit into cluster size histogram");
+//		if(_actualClusterCharge<__MAXCHARGEBINS && _actualClusterSize<__MAXCLUSTERHITSBINS){
+//			_clusterCharges[(long)(_actualClusterCharge) + (long)_actualClusterSize*(long)__MAXCHARGEBINS]++;
+//			_clusterCharges[(long)_actualClusterCharge]++;	//cluster size = 0 contains all cluster sizes
+//		}
+//		else{
+//			std::stringstream tInfo;
+//			tInfo<<"Clusterizer::addClusterToResults: cluster Charge "<<_actualClusterCharge<<" with cluster size "<<_actualClusterSize<<" does not fit into cluster Charge histogram.";
+//			throw std::out_of_range(tInfo.str());
+//		}
 
 //		if((int) _actualClusterCharge<__MAXCHARGEBINS && _actualClusterSize<__MAXCLUSTERHITSBINS){
 //			_clusterCharges[(int) _actualClusterCharge][0]++;
@@ -513,7 +513,7 @@ void Clusterizer::addClusterToResults()
 //			if(tActualClusterXbin < __MAXPOSXBINS && tActualClusterYbin < __MAXPOSYBINS)
 //				_clusterPosition[tActualClusterXbin][tActualClusterYbin]++;
 //		}
-	}
+//	}
 }
 
 void Clusterizer::allocateHitMap()
