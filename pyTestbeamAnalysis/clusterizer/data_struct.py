@@ -6,7 +6,7 @@ class HitInfoTable(tb.IsDescription):
     frame = tb.UInt8Col(pos=1)
     column = tb.UInt16Col(pos=2)
     row = tb.UInt16Col(pos=3)
-    charge = tb.UInt8Col(pos=4)
+    charge = tb.UInt16Col(pos=4)
 
 
 class MetaInfoEventTable(tb.IsDescription):
@@ -20,7 +20,7 @@ class ClusterHitInfoTable(tb.IsDescription):
     frame = tb.UInt8Col(pos=1)
     column = tb.UInt16Col(pos=2)
     row = tb.UInt16Col(pos=3)
-    charge = tb.UInt8Col(pos=4)
+    charge = tb.UInt16Col(pos=4)
     cluster_id = tb.UInt16Col(pos=5)
     is_seed = tb.UInt8Col(pos=6)
     cluster_size = tb.UInt16Col(pos=7)
@@ -31,7 +31,7 @@ class ClusterInfoTable(tb.IsDescription):
     event_number = tb.Int64Col(pos=0)
     id = tb.UInt16Col(pos=1)
     size = tb.UInt16Col(pos=2)
-    charge = tb.UInt8Col(pos=3)
+    charge = tb.UInt16Col(pos=3)
     seed_column = tb.UInt16Col(pos=4)
     seed_row = tb.UInt16Col(pos=5)
     mean_column = tb.Float32Col(pos=6)
