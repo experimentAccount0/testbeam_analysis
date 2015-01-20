@@ -2,7 +2,7 @@
 from tables import dtype_from_descr
 import numpy as np
 
-from pyTestbeamAnalysis.clusterizer.hit_clusterizer import HitClusterizer
+from pyTestbeamAnalysis.hit_clusterizer import HitClusterizer
 from pyTestbeamAnalysis.clusterizer import data_struct
 
 
