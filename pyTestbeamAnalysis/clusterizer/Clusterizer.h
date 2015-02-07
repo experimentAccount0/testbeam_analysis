@@ -37,7 +37,7 @@
 class Clusterizer: public Basis
 {
 public:
-	Clusterizer(void);
+	Clusterizer(unsigned int maxCol = 1000, unsigned int maxRow=1000);
 	~Clusterizer(void);
 
 	void createClusterHitInfoArray(bool toggle = true){_createClusterHitInfoArray = toggle;};
@@ -56,7 +56,7 @@ public:
 	void setMinClusterHits(const unsigned int&  pMinNclusterHits);		//minimum hits per cluster allowed, otherwise cluster omitted
 	void setMaxClusterHits(const unsigned int&  pMaxNclusterHits);		//maximal hits per cluster allowed, otherwise cluster omitted
 	void setMaxClusterHitCharge(const unsigned int&  pMaxClusterHitCharge);	//maximal Charge for a cluster hit, otherwise cluster omitted
-	void setMaxHitCharge(const unsigned int&  pMaxHitCharge);					//minimum Charge a hit is considered to be a hit
+	void setMaxHitCharge(const unsigned int&  pMaxHitCharge);			//minimum Charge a hit is considered to be a hit
 
 	void addHits(HitInfo*& rHitInfo, const unsigned int& rNhits);		//add hits to cluster, starts clustering, warning hits have to be aligned at events
 
@@ -120,6 +120,8 @@ private:
 	float* _chargeMap;													//array containing the lookup charge values for each pixel and charge setting (e.g. TOT)
 
 	//cluster settings
+	unsigned int _maxColumn;											//maximum column number
+	unsigned int _maxRow;												//maximum row number
 	unsigned short _dx;													//max distance in x between two hits that they belong to a cluster
 	unsigned short _dy;													//max distance in y between two hits that they belong to a cluster
 	unsigned short _dFrame; 											//time window the clustering is done in

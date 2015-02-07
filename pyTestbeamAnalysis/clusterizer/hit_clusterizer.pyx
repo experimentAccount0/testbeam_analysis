@@ -20,7 +20,7 @@ cdef extern from "Clusterizer.h":
     cdef cppclass ClusterInfo:
         ClusterInfo()
     cdef cppclass Clusterizer(Basis):
-        Clusterizer() except +
+        Clusterizer(unsigned int maxCol, unsigned int maxRow) except +
         void setErrorOutput(cpp_bool pToggle)
         void setWarningOutput(cpp_bool pToggle)
         void setInfoOutput(cpp_bool pToggle)
@@ -54,8 +54,8 @@ cdef extern from "Clusterizer.h":
 
 cdef class HitClusterizer:
     cdef Clusterizer * thisptr  # hold a C++ instance which we're wrapping
-    def __cinit__(self):
-        self.thisptr = new Clusterizer()
+    def __cinit__(self, n_columns=1000, n_rows=1000):
+        self.thisptr = new Clusterizer(<unsigned int> n_columns, <unsigned int> n_rows)
     def __dealloc__(self):
         del self.thisptr
     def set_debug_output(self, toggle):

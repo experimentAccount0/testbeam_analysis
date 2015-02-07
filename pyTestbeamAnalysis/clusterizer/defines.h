@@ -52,7 +52,6 @@ typedef struct ClusterInfo{
 #define __MAXPOSYBINS 1000
 #define __MAX_COLUMN 3000
 #define __MAX_ROW 2500
-#define __MAX_ROW 2500
 #define __MAXFRAME 16
 
 #pragma pack(pop)  // pop needed to suppress VS C4103 compiler warning

@@ -50,7 +50,7 @@ def analyze_raw_data(input_file):  # FE-I4 raw data analysis
 
 
 def process_dut(raw_data_file):
-    ''' Process the raw data and create cluster.'''
+    ''' Process and formate the raw data.'''
     analyze_raw_data(raw_data_file)
     align_events(raw_data_file[:-3] + '_interpreted.h5', raw_data_file[:-3] + '_event_aligned.h5')
     format_hit_table(raw_data_file[:-3] + '_event_aligned.h5', raw_data_file[:-3] + '_aligned.h5')
@@ -71,7 +71,7 @@ def align_events(input_file, output_file, chunk_size=10000000):
     '''
     logging.info('Align events to trigger number in %s' % input_file)
 
-    with tb.open_file(input_file, 'r+') as in_file_h5:
+    with tb.open_file(input_file, 'r') as in_file_h5:
         hit_table = in_file_h5.root.Hits
         jumps = []  # variable to determine the jumps in the event-number to trigger-number offset
         n_fixed_events = 0  # events that were fixed
