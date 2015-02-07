@@ -1,13 +1,15 @@
 # pyTestbeamAnalysis
-A simple analysis of testbeam pixel-sensor data. Based on a fast hit clusterizer written in C++ and straight line track fits.
+A _very_ simple analysis of pixel-sensor data from testbeams. It is highly simplified at the cost of performance. Nevertheless all steps of a full analysis are included in one file in only 1000 lines of Python code.
+Thus if you want to understand the basics of telescope reconstruction this code might help. If you want to have something fancy with good performance use e.g. " EUTelescope":http://eutelescope.web.cern.ch/.
 
 # Installation
 ```bash
 python setup.py install
 ```
-or develop:
+
+Uninstall:
 ```bash
-python setup.py develop
+pip uninstall pyTestbeamAnalysis
 ```
 
 # Example usage 
