@@ -1,7 +1,7 @@
 # pyTestbeamAnalysis
 A _very_ simple analysis of pixel-sensor data from testbeams. All steps of a full analysis are included in one file in only 1000 lines of Python code.
 If you you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. 
-If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. "EUTelescope":http://eutelescope.web.cern.ch/. Depending on the setup and the devices a resolution that is only ~ 15% worse can be archieved with this code.
+If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. _EUTelescope_. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code.
 
 # Installation
 Since it is recommended to change the one and only file according to your needs you should install the module with
