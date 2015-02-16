@@ -14,7 +14,9 @@ Uninstall:
 pip uninstall pyTestbeamAnalysis
 ```
 
-# Example usage 
+# Example usage
+Check the examples folder with data and examples of a Mimosa26 and a FE-I4 telescope setup analysis.
+
 # Telescope test beam recontruction
 Run eutelescope_example.py in the example folder and check the text output to the console and the plot and data files that are created to understand what is going on.
 In the examples folder type:
