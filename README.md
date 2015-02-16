@@ -10,8 +10,8 @@ You have to have Python 2.7 and the following modules installed:
 - tables
 - scipy
 - matplotlib
-If you are new to Python please look at the installation guide in the wiki.
 
+If you are new to Python please look at the installation guide in the wiki.
 Since it is recommended to change the one and only file according to your needs you should install the module with
 ```bash
 python setup.py develop
