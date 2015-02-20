@@ -156,15 +156,36 @@ def correlate_hits(hit_files, alignment_file, fraction=1):
                     n_col_dut, n_row_dut = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
                     col_corr = analysis_utils.hist_2d_index(df['column_0'] - 1, df['column_1'] - 1, shape=(n_col_reference, n_col_dut))
                     row_corr = analysis_utils.hist_2d_index(df['row_0'] - 1, df['row_1'] - 1, shape=(n_row_reference, n_row_dut))
-                    out = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_0_%d' % index, title='Column Correlation between DUT %d and %d' % (0, index), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    out_2 = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_0_%d' % index, title='Row Correlation between DUT %d and %d' % (0, index), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_0_%d' % index, title='Column Correlation between DUT %d and %d' % (0, index), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out_2 = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_0_%d' % index, title='Row Correlation between DUT %d and %d' % (0, index), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     out.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
                     out_2.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
-                    out[:] = col_corr.T
-                    out_2[:] = row_corr.T
+                    out[:] = col_corr
+                    out_2[:] = row_corr
 
 
-def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_error_cut=(2.0, 2.0)):
+def correlate_corr_hits(tracklets_files):
+    with tb.open_file(tracklets_files, mode="r") as in_file_h5:
+        particles = in_file_h5.root.Tracklets[:10000]
+        plt.plot(particles[:]['column_dut_0'], particles[:]['column_dut_1'], '.')
+#         plt.show()
+        select = np.logical_and(np.isfinite(particles[:]['column_dut_0']), np.isfinite(particles[:]['column_dut_2']))
+#         particles[np.isinf(particles['column_dut_0'])]
+        heatmap, xedges, yedges = np.histogram2d(x=particles[select]['column_dut_0'], y=particles[select]['column_dut_2'], bins=100)
+        
+#         heatmap, xedges, yedges = np.histogram2d(x=particles[select]['column_dut_0'], y=particles[select]['column_dut_2'], bins=(80, 80), range=[[1, 80], [1, 80]])
+        extent = [yedges[0] - 0.5, yedges[-1] + 0.5, xedges[-1] + 0.5, xedges[0] - 0.5]
+#             extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+        cmap = cm.get_cmap('hot', 40)
+        plt.imshow(heatmap, extent=extent, cmap=cmap, interpolation='nearest')
+#         ax.set_xlabel(colName[0])
+#         ax.set_ylabel(colName[1])
+#         ax.set_title('Correlation plot(' + corName + ')')
+#         
+        plt.show()
+
+
+def align_hits(alignment_file, output_pdf, fit_error_cut=(2.0, 2.0)):
     '''Takes the correlation histograms, determines usefull ranges with valid data, fits the correlations and stores the correlation parameters. With the
     correlation parameters one can calculate the hit position of each DUT in the master reference coordinate system. The fits are
     also plotted.
@@ -200,77 +221,60 @@ def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_
                     continue
                 logging.info('Align %s' % node.name)
 
-                data = node[:]
-                if combine_bins > 1:
-                    rebinned_data = data[::combine_bins, ::combine_bins]
-                    for i in range(1, combine_bins):
-                        rebinned_data += data[::combine_bins, i::combine_bins]
-                    rebinned_data /= combine_bins
-                    data = rebinned_data
-                x = np.arange(data.shape[0])  # The column/row index
+                data = node[:].T
 
                 # Start values for fitting
                 mus = np.argmax(data, axis=1)
                 As = np.max(data, axis=1)
 
-                # Determine boundaries of pixels that do not overlap at all
-                select_min, select_max = 0, np.amax(x)
-                select_data = np.where(np.sum(data, axis=0) > no_data_cut * np.mean(np.sum(data, axis=0)))[0]
-                if len(select_data) > 1:
-                    try:
-                        select_min, select_max = np.amin(select_data), np.amax(select_data)
-                    except IndexError:
-                        pass
-
                 # Fit result arrays have -1 for bad fit
-                mean_fitted = np.array([-1. for _ in x])
-                mean_error_fitted = np.array([-1. for _ in x])
-                sigma_fitted = np.array([-1. for _ in x])
+                mean_fitted = np.array([-1. for _ in range(data.shape[0])])
+                mean_error_fitted = np.array([-1. for _ in range(data.shape[0])])
+                sigma_fitted = np.array([-1. for _ in range(data.shape[0])])
+                chi2 = np.array([-1. for _ in range(data.shape[0])])
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
-                for index in range(select_min, min(select_max + 1, As.shape[0])):
+                channel_indices = np.arange(data.shape[0])
+                for index in channel_indices:
                     p0 = [As[index], mus[index], 1., 1.]
                     try:
-                        x = np.arange(data[index, :].shape[0])
+                        x = np.arange(data.shape[1])
                         coeff, var_matrix = curve_fit(gauss, x, data[index, :], p0=p0)
-                        if coeff[1] - 5 * coeff[2] > select_min and coeff[1] + 5 * coeff[2] < select_max:  # Only take data of pixels that overlap
-                            mean_fitted[index] = coeff[1]
-                            mean_error_fitted[index] = np.sqrt(np.diag(var_matrix))[1]
-                            sigma_fitted[index] = coeff[2]
-                            # Plot example fit
-                            if index == (select_max - select_min) / 2:
-                                plt.clf()
-                                gauss_fit_legend_entry = 'gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-                                plt.bar(x, data[index, :], label='data')
-                                plt.plot(np.arange(np.amin(x), np.amax(x), 0.1), gauss(np.arange(np.amin(x), np.amax(x), 0.1), *coeff), '-', label=gauss_fit_legend_entry)
-                                plt.plot([select_min, select_min], [np.amax(data[index, :]), np.amax(data[index, :])], "-")
-                                plt.plot([select_max, select_max], [np.amax(data[index, :]), np.amax(data[index, :])], "-")
-                                plt.legend(loc=0)
-                                plt.title(node.title)
-                                plt.xlabel('DUT %s at DUT0 = %d' % (result[node_index]['dut_x'], index))
-                                plt.ylabel('#')
-                                plt.grid()
-                                output_fig.savefig()
+                        mean_fitted[index] = coeff[1]
+                        mean_error_fitted[index] = np.sqrt(np.diag(var_matrix))[1]
+                        sigma_fitted[index] = coeff[2]
+                        if index == data.shape[0] / 2:
+                            plt.clf()
+                            gauss_fit_legend_entry = 'gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+                            plt.bar(x, data[index, :], label='data')
+                            plt.plot(np.arange(np.amin(x), np.amax(x), 0.1), gauss(np.arange(np.amin(x), np.amax(x), 0.1), *coeff), '-', label=gauss_fit_legend_entry)
+    #                         plt.plot(channel_indices, [np.amax(data[index, :]), np.amax(data[index, :])], "-")
+    #                         plt.plot(channel_indices, [np.amax(data[index, :]), np.amax(data[index, :])], "-")
+                            plt.legend(loc=0)
+                            plt.title(node.title)
+                            plt.xlabel('DUT %s at DUT0 = %d' % (result[node_index]['dut_x'], index))
+                            plt.ylabel('#')
+                            plt.grid()
+#                             plt.show()
+                            output_fig.savefig()
                     except RuntimeError:
                         pass
 
-                # Select only good data points for fitting
-                y, y_err = mean_fitted, mean_error_fitted
-                actual_fit_error_cut = fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]  # different col/row dimensions demand different cut values
-                selected_data = np.logical_and(y >= 0., y_err < actual_fit_error_cut)  # only select data where the gaus fit is fine
-
                 # Fit data and create fit result function
                 f = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-                fit, pcov = curve_fit(f, x[selected_data], y[selected_data], sigma=y_err[selected_data], absolute_sigma=True)
+                fit, pcov = curve_fit(f, np.arange(data.shape[0]), mean_fitted, sigma=mean_error_fitted, absolute_sigma=True)
                 fit_fn = np.poly1d(fit[::-1])
                 # Refit fithout outliers
-                selected_data = np.logical_and(selected_data, (np.abs(fit_fn(x[:y.shape[0]]) - y) < 5 * y_err))  # remove outliers (offset >  5 sigma) from selection
-                fit, pcov = curve_fit(f, x[selected_data], y[selected_data], sigma=y_err[selected_data], absolute_sigma=True)
+                print node.title, fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]
+                limit = fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]
+                selected_data = np.where(np.abs(fit_fn(np.arange(data.shape[0])) - mean_fitted) < limit)  # remove outliers (offset >  5 sigma) from selection
+                print selected_data
+                fit, pcov = curve_fit(f, np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
                 fit_fn = np.poly1d(fit[::-1])
 
                 # Calculate mean sigma (is somwhat a residual) and store the actual data in result array
                 mean_sigma = np.mean(np.array(sigma_fitted)[selected_data])
-                mean_sigma_error = np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(x[selected_data].shape[0])
+                mean_sigma_error = np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(channel_indices[selected_data].shape[0])
                 result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
                 result[node_index]['c1'], result[node_index]['c1_error'] = fit[1], np.absolute(pcov[1][1]) ** 0.5
                 result[node_index]['c2'], result[node_index]['c2_error'] = fit[2], np.absolute(pcov[2][2]) ** 0.5
@@ -278,18 +282,20 @@ def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
                 result[node_index]['description'] = node.title
 
-                # Plot selected data with fit
+#                 # Plot selected data with fit
                 plt.clf()
-                plt.errorbar(x[selected_data], y[selected_data], yerr=y_err[selected_data], fmt='.')
+                plt.errorbar(np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
                 fit_legend_entry = 'line fit: c0 + c1x\nc0=$%1.1e\pm%1.1e$\nc1=$%1.1e\pm%1.1e$\nc2=$%1.1e\pm%1.1e$\nc3=$%1.1e\pm%1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5, fit[3], np.absolute(pcov[3][3]) ** 0.5)
-                plt.plot(x[selected_data], fit_fn(x[selected_data]), '-', label=fit_legend_entry)
+                plt.plot(np.arange(data.shape[0]), fit_fn(np.arange(data.shape[0])), '-', label=fit_legend_entry)
+                plt.plot(np.arange(data.shape[0])[selected_data], chi2[selected_data] / 1.e7)
                 plt.legend(loc=0)
                 plt.title(node.title)
                 plt.xlabel('DUT %s' % result[node_index]['dut_y'])
                 plt.ylabel('DUT %s' % result[node_index]['dut_x'])
-                plt.xlim((0, np.amax(x[selected_data])))
-                plt.ylim((0, np.amax(fit_fn(x[selected_data]))))
+                plt.xlim((0, np.amax(np.arange(data.shape[0]))))
+                plt.ylim((0, np.amax(fit_fn(np.arange(data.shape[0])))))
                 plt.grid()
+#                 plt.show()
                 output_fig.savefig()
 
             try:
@@ -387,13 +393,13 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file):
                 selection = actual_cluster['mean_column'] != 0
                 actual_mean_column = actual_cluster['mean_column'][selection]  # correct only hits, 0 is no hit
                 actual_mean_row = actual_cluster['mean_row'][selection]  # correct only hits, 0 is no hit
-#                 print c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
-#                 print 'actual_mean_column, actual_mean_row',
-#                 print actual_mean_column[0], actual_mean_row[0]
-# print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
-#                 print 'corrected_mean_column, corrected_mean_row',
-#                 print c3[0] * actual_mean_column[0] ** 3 + c2[0] * actual_mean_column[0] ** 2 + c1[0] * actual_mean_column[0] + c0[0],
-#                 print c3[1] * actual_mean_row[0] ** 3 + c2[1] * actual_mean_row[0] ** 2 + c1[1] * actual_mean_row[0] + c0[1]
+                print c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
+                print 'actual_mean_column, actual_mean_row',
+                print actual_mean_column[0], actual_mean_row[0]
+                print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
+                print 'corrected_mean_column, corrected_mean_row',
+                print c3[0] * actual_mean_column[0] ** 3 + c2[0] * actual_mean_column[0] ** 2 + c1[0] * actual_mean_column[0] + c0[0],
+                print c3[1] * actual_mean_row[0] ** 3 + c2[1] * actual_mean_row[0] ** 2 + c1[1] * actual_mean_row[0] + c0[1]
                 tracklets_array['column_dut_%d' % index][selection] = c3[0] * actual_mean_column ** 3 + c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0]
                 tracklets_array['row_dut_%d' % index][selection] = c3[1] * actual_mean_row ** 3 + c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1]
                 tracklets_array['charge_dut_%d' % index][selection] = actual_cluster['charge'][selection]
@@ -912,7 +918,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minim
                 plt.ylabel('#')
                 plt.yscale('log')
                 plt.title('Efficiency for DUT %d' % actual_dut)
-                plt.hist(efficiency.ravel(), bins=100, range=(90, 104))
+                plt.hist(efficiency.ravel(), bins=100, range=(80, 104))
                 output_fig.savefig()
                 logging.info('Efficiency =  %1.4f' % np.ma.mean(efficiency[efficiency > 90].ravel()))
 
