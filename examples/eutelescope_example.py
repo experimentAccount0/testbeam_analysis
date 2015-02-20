@@ -32,7 +32,7 @@ if __name__ == '__main__':
     atb.plot_correlations(alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Correlations.pdf')
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
-    atb.align_hits(alignment_file=output_folder + '\\Alignment.h5', combine_bins=1, no_data_cut=0.7, fit_error_cut=2.0, output_pdf=output_folder + '\\Alignment.pdf')
+    atb.align_hits(alignment_file=output_folder + '\\Alignment.h5', combine_bins=1, no_data_cut=0.7, fit_error_cut=(2.0, 2.0), output_pdf=output_folder + '\\Alignment.pdf')
 
     # Cluster hits off all DUTs
     Pool().map(atb.cluster_hits, data_files)  # find cluster on all DUT data files in parallel on multiple cores

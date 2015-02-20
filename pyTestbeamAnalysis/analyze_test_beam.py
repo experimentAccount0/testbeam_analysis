@@ -164,7 +164,7 @@ def correlate_hits(hit_files, alignment_file, fraction=1):
                     out_2[:] = row_corr.T
 
 
-def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_error_cut=2.0):
+def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_error_cut=(2.0, 2.0)):
     '''Takes the correlation histograms, determines usefull ranges with valid data, fits the correlations and stores the correlation parameters. With the
     correlation parameters one can calculate the hit position of each DUT in the master reference coordinate system. The fits are
     also plotted.
@@ -181,7 +181,7 @@ def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_
     fit_error_cut : float
         Omit channels where the fit has an error > fit_error_cut
         Happens e.g. if there is no clear correlation due to noise, isufficient statistics
-    output_pdf : PdfPager file object
+    output_pdf : pdf file name object
     '''
     logging.info('Align hit coordinates')
 
@@ -228,7 +228,7 @@ def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_
                 sigma_fitted = np.array([-1. for _ in x])
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
-                for index in range(select_min, select_max + 1):
+                for index in range(select_min, min(select_max + 1, As.shape[0])):
                     p0 = [As[index], mus[index], 1., 1.]
                     try:
                         x = np.arange(data[index, :].shape[0])
@@ -256,7 +256,8 @@ def align_hits(alignment_file, output_pdf, combine_bins=1, no_data_cut=0.7, fit_
 
                 # Select only good data points for fitting
                 y, y_err = mean_fitted, mean_error_fitted
-                selected_data = np.logical_and(y >= 0., y_err < fit_error_cut)  # only select data where the gaus fit is fine
+                actual_fit_error_cut = fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]  # different col/row dimensions demand different cut values
+                selected_data = np.logical_and(y >= 0., y_err < actual_fit_error_cut)  # only select data where the gaus fit is fine
 
                 # Fit data and create fit result function
                 f = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
@@ -305,7 +306,7 @@ def plot_correlations(alignment_file, output_pdf):
     ----------
     alignment_file : pytables file
         The input file with the correlation histograms and also the output file for correlation data.
-    output_pdf : PdfPager file object
+    output_pdf : pdf file name object
     '''
     logging.info('Plotting Correlations')
     with PdfPages(output_pdf) as output_fig:
@@ -389,7 +390,7 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file):
 #                 print c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
 #                 print 'actual_mean_column, actual_mean_row',
 #                 print actual_mean_column[0], actual_mean_row[0]
-#                 # print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
+# print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
 #                 print 'corrected_mean_column, corrected_mean_row',
 #                 print c3[0] * actual_mean_column[0] ** 3 + c2[0] * actual_mean_column[0] ** 2 + c1[0] * actual_mean_column[0] + c0[0],
 #                 print c3[1] * actual_mean_row[0] ** 3 + c2[1] * actual_mean_row[0] ** 2 + c1[1] * actual_mean_row[0] + c0[1]
@@ -458,7 +459,7 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
     ----------
     track_candidates_file : pytables file
     alignment_file : pytables file
-    output_pdf : PdfPager file object
+    output_pdf : pdf file name object
     track_quality : int
         0: All tracks with hits in DUT and references are taken
         1: The track hits in DUT and reference are within 5-sigma of the correlation
@@ -473,18 +474,18 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
         with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
             n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
             track_candidates = in_file_h5.root.TrackCandidates[::10]  # take only every 10th track
-    
+
             results = np.zeros((n_duts - 2,), dtype=[('DUT', np.uint8), ('z_position_column', np.float32), ('z_position_row', np.float32)])
-    
+
             for dut_index in range(1, n_duts - 1):
                 logging.info('Find best z-position for DUT %d' % dut_index)
                 dut_selection = (1 << (n_duts - 1)) | 1 | ((1 << (n_duts - 1)) >> dut_index)
                 good_track_selection = np.logical_and((track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8)), track_candidates['n_tracks'] <= max_tracks)
                 good_track_candidates = track_candidates[good_track_selection]
-    
+
                 first_reference_row, last_reference_row = good_track_candidates['row_dut_0'], good_track_candidates['row_dut_%d' % (n_duts - 1)]
                 first_reference_col, last_reference_col = good_track_candidates['column_dut_0'], good_track_candidates['column_dut_%d' % (n_duts - 1)]
-    
+
                 z = np.arange(0, 1., 0.01)
                 dut_row = good_track_candidates['row_dut_%d' % dut_index]
                 dut_col = good_track_candidates['column_dut_%d' % dut_index]
@@ -494,7 +495,7 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
                 results[dut_index - 1]['DUT'] = dut_index
                 results[dut_index - 1]['z_position_column'] = dut_z_col.x
                 results[dut_index - 1]['z_position_row'] = dut_z_row.x
-    
+
                 # Plot actual DUT data
                 plt.clf()
                 plt.plot([dut_z_col.x, dut_z_col.x], [0., 1.], "--", label="DUT%d, col, z=%1.4f" % (dut_index, dut_z_col.x))
@@ -622,7 +623,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
     include_duts : iterable
         the relative dut positions of dut to use in the track fit. The position is relative to the actual dut the tracks are fitted for
         e.g. actual track fit dut = 2, include_duts = [-3, -2, -1, 1] means that duts 0, 1, 3 are used for the track fit
-    output_pdf : PdfPager file object
+    output_pdf : pdf file name object
         if None plots are printed to screen
     max_tracks : int
         only events with tracks <= max tracks are taken
@@ -671,7 +672,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                 fit_duts = fit_duts if fit_duts else range(n_duts)
                 for fit_dut in fit_duts:  # loop over the duts to fit the tracks for
                     logging.info('Fit tracks for DUT %d' % fit_dut)
-    
+
                     # Select track candidates
                     dut_selection = 0
                     for include_dut in include_duts:  # calculate mask to select DUT hits for fitting
@@ -681,13 +682,13 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                             dut_selection |= ((1 << (n_duts - 1)) >> fit_dut) >> include_dut
                         else:
                             dut_selection |= ((1 << (n_duts - 1)) >> fit_dut) << abs(include_dut)
-    
+
                     if bin(dut_selection).count("1") < 2:
                         logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d' % fit_dut)
                         continue
                     good_track_selection = np.logical_and((track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8)), track_candidates['n_tracks'] <= max_tracks)
                     good_track_candidates = track_candidates[good_track_selection]
-    
+
                     # Prepare track hits array to be fitted
                     n_fit_duts = n_duts - len(ignore_duts) - 1 if ignore_duts else n_duts - 1
                     n_fit_duts += 1 if ignore_duts and fit_dut in ignore_duts else 0
@@ -700,7 +701,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         xyz = np.column_stack((good_track_candidates['column_dut_%s' % dut_index], good_track_candidates['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks)))
                         track_hits[:, tmp_dut_index, :] = xyz
                         tmp_dut_index += 1
-    
+
                     # Split data and fit on all available cores
                     n_slices = cpu_count() - 1
                     slice_length = n_tracks / n_slices
@@ -709,7 +710,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                     arg = [(one_slice, pixel_size) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
                     results = pool.map(_function_wrapper_fit_tracks_loop, arg)
                     del track_hits
-    
+
                     # Store results
                     offsets = np.concatenate([i[0] for i in results])  # merge offsets from all cores in results
                     slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
@@ -717,7 +718,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                     tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts)
                     tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     tracklets_table.append(tracks_array)
-    
+
                     # Plot track chi2 and angular distribution
                     plt.clf()
                     plot_range = (0, 40000)
@@ -753,7 +754,7 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(50, 50), use_duts=
     def gauss(x, *p):
         A, mu, sigma = p
         return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
-    
+
     output_fig = PdfPages(output_pdf) if output_pdf else None
 
     with tb.open_file(tracks_file, mode='r') as in_file_h5:
@@ -778,10 +779,12 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(50, 50), use_duts=
             for i in range(2):  # col / row
                 pixel_dim = pixel_size[i]
                 hist, edges = np.histogram(difference[:, i], range=(-4. * pixel_dim, 4. * pixel_dim), bins=200)
+                fit_ok = False
                 try:
                     coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), 0., pixel_dim])
+                    fit_ok = True
                 except:
-                    pass
+                    fit_ok = False
                 for plot_log in [False, True]:  # plot with log y or not
                     plt.clf()
                     plot_range = (-i - 4.5 * pixel_dim, i + 4.5 * pixel_dim)
@@ -791,10 +794,11 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(50, 50), use_duts=
                     plt.xlabel('Residual Column [um]' if i == 0 else 'Residual Row [um]')
                     plt.ylabel('#')
                     plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
-                    plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
-                    gauss_fit_legend_entry = 'gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-                    plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r-', label=gauss_fit_legend_entry, linewidth=2)
-                    plt.legend(loc=0)
+                    if fit_ok:
+                        plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
+                        gauss_fit_legend_entry = 'gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+                        plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r-', label=gauss_fit_legend_entry, linewidth=2)
+                        plt.legend(loc=0)
                     if output_fig is not None:
                         output_fig.savefig()
                     else:
@@ -804,7 +808,7 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(50, 50), use_duts=
         output_fig.close()
 
 
-def plot_track_density(tracks_file, output_pdf, use_duts=None, max_chi2=None):
+def plot_track_density(tracks_file, output_pdf, z_positions, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
     Parameters
     ----------
@@ -812,7 +816,7 @@ def plot_track_density(tracks_file, output_pdf, use_duts=None, max_chi2=None):
         file name with the tracks table
     use_duts : iterable
         the duts to calculate residuals for. If None all duts are used
-    output_pdf : PdfPager file object
+    output_pdf : pdf file name object
     max_chi2 : int
         only use track with a chi2 <= max_chi2
     '''
@@ -831,7 +835,8 @@ def plot_track_density(tracks_file, output_pdf, use_duts=None, max_chi2=None):
                 if max_chi2:
                     intersection = intersection[track_array['track_chi2'] <= max_chi2]
 
-                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(80, 336), range=[[1, 80], [1, 336]])
+                dim_x, dim_y = int(np.amax(intersection[:, 0])), int(np.amax(intersection[:, 1]))
+                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
 
                 fig = Figure()
                 fig.patch.set_facecolor('white')
@@ -841,15 +846,17 @@ def plot_track_density(tracks_file, output_pdf, use_duts=None, max_chi2=None):
                 output_fig.savefig(fig)
 
 
-def calculate_efficiency(tracks_file, output_pdf, use_duts=None, max_chi2=None):
+def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minimum_track_density, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
     tracks_file : string
         file name with the tracks table
+    minimum_track_density : int
+        minimum track density required to consider bin for efficiency calculation
     use_duts : iterable
         the duts to calculate residuals for. If None all duts are used
-    output_pdf : PdfPager file object
+    output_pdf : pdf file name object
     max_chi2 : int
         only use track with a chi2 <= max_chi2
     '''
@@ -869,11 +876,12 @@ def calculate_efficiency(tracks_file, output_pdf, use_duts=None, max_chi2=None):
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
 
                 # Calculate distance between track hit and DUT hit
-                scale = np.square(np.array((250, 50, 0)))
+                scale = np.square(np.array((pixel_size[0], pixel_size[1], 0)))
                 distance = np.sqrt(np.dot(np.square(intersection - hits), scale))
                 col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                distance_array = np.histogramdd(col_row_distance, bins=(80, 336, 500), range=[[1, 80], [1, 336], [0, 500]])[0]
-                hh, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(80, 336), range=[[1, 80], [1, 336]])
+                dim_x, dim_y = int(np.amax(intersection[:, 0])), int(np.amax(intersection[:, 1]))
+                distance_array = np.histogramdd(col_row_distance, bins=(dim_x, dim_y, 500), range=[[1, dim_x], [1, dim_y], [0, 500]])[0]
+                hh, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
                 distance_mean_array = np.average(distance_array, axis=2, weights=range(0, 500)) * sum(range(0, 500)) / hh.astype(np.float)
                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
                 fig = Figure()
@@ -881,19 +889,22 @@ def calculate_efficiency(tracks_file, output_pdf, use_duts=None, max_chi2=None):
                 ax = fig.add_subplot(111)
                 analysis_utils.create_2d_pixel_hist(fig, ax, distance_mean_array.T, title='Distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=150)
                 fig.tight_layout()
-                output_pdf.savefig(fig)
+                output_fig.savefig(fig)
 
                 # Calculate efficiency
-                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(80, 336), range=[[1, 80], [1, 336]])
-                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection[charge != 0][:, 0], intersection[charge != 0][:, 1], bins=(80, 336), range=[[1, 80], [1, 336]])
+                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
+                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection[charge != 0][:, 0], intersection[charge != 0][:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
-                efficiency = track_density_with_DUT_hit.astype(np.float) / track_density.astype(np.float) * 100.
-                efficiency = np.ma.array(efficiency, mask=track_density < 10)
-                analysis_utils.create_2d_pixel_hist(fig, ax, efficiency.T, title='Efficiency for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=94., z_max=100.)
+
+                efficiency = np.zeros_like(track_density_with_DUT_hit)
+                efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
+
+                efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
+                analysis_utils.create_2d_pixel_hist(fig, ax, efficiency.T, title='Efficiency for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=90., z_max=100.)
                 fig.tight_layout()
-                output_pdf.savefig(fig)
+                output_fig.savefig(fig)
                 plt.clf()
                 plt.grid()
                 plt.title('Efficiency per pixel')
@@ -901,8 +912,9 @@ def calculate_efficiency(tracks_file, output_pdf, use_duts=None, max_chi2=None):
                 plt.ylabel('#')
                 plt.yscale('log')
                 plt.title('Efficiency for DUT %d' % actual_dut)
-                plt.hist(efficiency.ravel(), bins=100, range=(94, 104))
+                plt.hist(efficiency.ravel(), bins=100, range=(90, 104))
                 output_fig.savefig()
+                logging.info('Efficiency =  %1.4f' % np.ma.mean(efficiency[efficiency > 90].ravel()))
 
 
 # Helper functions that are not ment to be called during analysis
@@ -1005,18 +1017,10 @@ def _fit_tracks_loop(track_hits, pixel_dimension):
     scale = np.square(np.array((pixel_dimension[0], pixel_dimension[-1], 0)))
 
     for index, actual_hits in enumerate(track_hits):  # loop over selected track candidate hits and fit
-        offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits, scale)
-#         if chi2[index] < 1e1:
-#             print chi2[index]
-#             ax = m3d.Axes3D(plt.figure())
-#             ax.set_xlim(0, 80)
-#             ax.set_ylim(0, 336)
-#             ax.set_zlim(0, 13)
-#             plot_hits = np.column_stack(actual_hits)
-#             ax.plot3D(plot_hits[0], plot_hits[1], plot_hits[2], 'o')
-#             linepts = offset[index] + slope[index] * np.mgrid[-10:10:2j][:, np.newaxis]
-#             ax.plot3D(*linepts.T)
-#             plt.show()
+        try:
+            offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits, scale)
+        except np.linalg.linalg.LinAlgError:
+            chi2[index] = 1e9
 
     return offset, slope, chi2
 
@@ -1029,115 +1033,5 @@ def _function_wrapper_fit_tracks_loop(args):  # needed for multiprocessing call 
     return _fit_tracks_loop(*args)
 
 
-def realign_hits(tracks_file, fraction=1):
-    logging.info('Correlate the position from fitted tracks')
-    with tb.open_file(tracks_file, 'r') as in_file_h5:
-        track_table = in_file_h5.root.Tracks_DUT_0[:]
-        selection = track_table['column_dut_0'] != 0
-        max_col_0, max_col_1 = np.amax(track_table[selection]['column_dut_0']), np.amax(track_table[selection]['column_dut_1'])
-        max_row_0, max_row_1 = np.amax(track_table[selection]['row_dut_0']), np.amax(track_table[selection]['row_dut_1'])
-        col_corr = np.histogram2d(track_table[selection]['column_dut_0'], track_table[selection]['column_dut_1'], bins=(max_col_0, max_col_1), range=((0, max_col_0), (0, max_col_1)))[0]
-        row_corr = np.histogram2d(track_table[selection]['row_dut_0'], track_table[selection]['row_dut_1'], bins=(max_row_0, max_row_1), range=((0, max_row_0), (0, max_row_1)))[0]
-        plt.clf()
-        cmap = cm.get_cmap('jet', 200)
-        cmap.set_bad('w')
-        norm = colors.LogNorm()
-        z_max = np.amax(row_corr)
-        im = plt.imshow(row_corr, cmap=cmap, norm=norm, aspect='equal', interpolation='nearest')
-        divider = make_axes_locatable(plt.gca())
-        plt.gca().invert_yaxis()
-#         plt.title(node.title)
-#         plt.xlabel('DUT %s' % first)
-#         plt.ylabel('DUT %s' % second)
-        cax = divider.append_axes("right", size="5%", pad=0.1)
-        plt.colorbar(im, cax=cax, ticks=np.linspace(start=0, stop=z_max, num=9, endpoint=True))
-        plt.show()
-#         row_corr = analysis_utils.hist_2d_index(df['row_0'] - 1, df['row_1'] - 1, shape=(n_row_reference, n_row_dut))
-#         out = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_0_%d' % index, title='Column Correlation between DUT %d and %d' % (0, index), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-#         out_2 = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_0_%d' % index, title='Row Correlation between DUT %d and %d' % (0, index), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-#         out.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
-#         out_2.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
-#         out[:] = col_corr.T
-#         out_2[:] = row_corr.T
-
-
 if __name__ == "__main__":
-    # Input file names
-    # data_files = ['C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_132_SCC_29_3.4_GeV_0_aligned.h5',  # the first DUT is the master reference DUT
-    #                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_213_SCC_99_3.4_GeV_0_aligned.h5',
-    #                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_214_SCC_146_3.4_GeV_0_aligned.h5',
-    #                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_201_SCC_166_3.4_GeV_0_aligned.h5',
-    #                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_207_SCC_112_3.4_GeV_0_aligned.h5',
-    # 'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_216_SCC_45_3.4_GeV_0_aligned.h5']  # the last DUT is the second reference DUT
-    #
-    # Output file names
-    #         alignment_file = 'C:\\Users\\DavidLP\\Desktop\\tb\\Alignment.h5'
-    #         tracklets_file = 'C:\\Users\\DavidLP\\Desktop\\tb\\Tracklets.h5'
-    #         track_candidates_file = 'C:\\Users\\DavidLP\\Desktop\\tb\\TrackCandidates.h5'
-    #         tracks_file = 'C:\\Users\\DavidLP\\Desktop\\tb\\Tracks.h5'
-    #         pdf_file = 'C:\\Users\\DavidLP\\Desktop\\tb\\Plots_2.pdf'
-
-    # data_files = ['D:\\TestBeamDataElsa_149_DUT0.h5',  # the first DUT is the master reference DUT
-    #                   'D:\\TestBeamDataElsa_149_DUT1.h5',
-    #                   'D:\\TestBeamDataElsa_149_DUT2.h5',
-    # 'D:\\TestBeamData_DUT6.h5',
-    #                   'D:\\TestBeamDataElsa_149_DUT3.h5',
-    #                   'D:\\TestBeamDataElsa_149_DUT4.h5',
-    #                   'D:\\TestBeamDataElsa_149_DUT5.h5'
-    # ]  # the last DUT is the second reference DUT
-
-    data_files = ['D:\TestBeamData15cm\\TestBeamData_DUT0.h5',  # the first DUT is the master reference DUT
-                  'D:\TestBeamData15cm\\TestBeamData_DUT1.h5',
-                  'D:\TestBeamData15cm\\TestBeamData_DUT2.h5',
-                  'D:\TestBeamData15cm\\TestBeamData_DUT3.h5',
-                  'D:\TestBeamData15cm\\TestBeamData_DUT4.h5',
-                  'D:\TestBeamData15cm\\TestBeamData_DUT5.h5'
-                  ]  # the last DUT is the second reference DUT
-
-    # Measured z positions (optional)
-# z_positions = [0., 2.5, 4.5, 15., 17., 19.]  # in cm
-    pixel_size = (18.4, 18.4)  # um
-    z_positions = [0., 15., 30., 45., 60., 75.]  # in cm
-    warn_at = 0.5  # difference in cm between measure / reconstructed z position
-
-    # The following shows a complete test beam analysis by calling the seperate function in correct order
-    output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data is stored
-    # Remove hot pixels, only needed for noisy devices like Mimosa
-# Pool().map(remove_hot_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
-    data_files = [data_file[:-3] + '_hot_pixel.h5' for data_file in data_files]
-    cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
-
-# Correlate the row/col of each DUT
-#     correlate_hits(data_files, alignment_file=output_folder + '\\Alignment.h5', fraction=4)
-#     plot_correlations(alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Correlations.pdf')
-#
-# Create alignment data for the DUT positions to the first DUT from the correlation data
-#     align_hits(alignment_file=output_folder + '\\Alignment.h5', combine_bins=1, no_data_cut=0.7, fit_error_cut=2.0, output_pdf=output_folder + '\\Alignment.pdf')
-#
-# Cluster hits off all DUTs
-# Pool().map(cluster_hits, data_files)  # find cluster on all DUT data files in parallel on multiple cores
-#     plot_cluster_size(cluster_files, output_pdf=output_folder + '\\Cluster_Size.pdf')
-#
-# Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-#     merge_cluster_data(cluster_files, alignment_file=output_folder + '\\Alignment.h5', tracklets_file=output_folder + '\\Tracklets.h5')
-#
-# Find tracks from the tracklets and stores the with quality indicator into track candidates table
-#     find_tracks(tracklets_file=output_folder + '\\Tracklets.h5', alignment_file=output_folder + '\\Alignment.h5', track_candidates_file=output_folder + '\\TrackCandidates.h5')
-#
-# optional: try to deduce the devices z positions. Difficult for parallel tracks / bad resolution and does actually not really help here. Still good for cross check.
-    align_z(track_candidates_file=output_folder + '\\TrackCandidates.h5', alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Z_positions.pdf', z_positions=z_positions, track_quality=2, max_tracks=3)
-#
-# Fit the track candidates and create new track table
-#     fit_tracks(track_candidates_file=output_folder + '\\TrackCandidates.h5', tracks_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Tracks.pdf', z_positions=z_positions, fit_duts=[0, 1, 2], include_duts=[-1, 1, 2], ignore_duts=None, max_tracks=4, track_quality=2, pixel_size=pixel_size)
-#
-# optional: plot some tracks (or track candidates) of a selected event ragnge
-#     event_display(track_file=output_folder + '\\Tracks.h5', z_positions=z_positions, event_range=(6493424, 6493425), pixel_size=pixel_size, dut=1, output_pdf=None)
-#
-# Calculate the residuals to check the alignment
-#     calculate_residuals(tracks_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Residuals.pdf', z_positions=z_positions, pixel_size=pixel_size, use_duts=[0, 1, 2], track_quality=0, max_chi2=3e3)
-#
-# Plot the track density on selected DUT planes
-#     plot_track_density(tracks_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Track_density.pdf', use_duts=None, max_chi2=3e3)
-#
-# Calculate the efficiency and mean hit/track hit distance
-#     calculate_efficiency(tracks_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Efficiency.pdf', use_duts=None, max_chi2=3e3)
+    print 'Check examples how to use the code'
