@@ -181,11 +181,11 @@ def correlate_corr_hits(tracklets_files):
 #         ax.set_xlabel(colName[0])
 #         ax.set_ylabel(colName[1])
 #         ax.set_title('Correlation plot(' + corName + ')')
-#         
+
         plt.show()
 
 
-def align_hits(alignment_file, output_pdf, fit_error_cut=(2.0, 2.0)):
+def align_hits(alignment_file, output_pdf, fit_offset_cut=(1.0, 1.0), fit_error_cut=(0.1, 0.1)):
     '''Takes the correlation histograms, determines usefull ranges with valid data, fits the correlations and stores the correlation parameters. With the
     correlation parameters one can calculate the hit position of each DUT in the master reference coordinate system. The fits are
     also plotted.
@@ -245,31 +245,41 @@ def align_hits(alignment_file, output_pdf, fit_error_cut=(2.0, 2.0)):
                         sigma_fitted[index] = coeff[2]
                         if index == data.shape[0] / 2:
                             plt.clf()
-                            gauss_fit_legend_entry = 'gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+                            gauss_fit_legend_entry = 'Gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
                             plt.bar(x, data[index, :], label='data')
                             plt.plot(np.arange(np.amin(x), np.amax(x), 0.1), gauss(np.arange(np.amin(x), np.amax(x), 0.1), *coeff), '-', label=gauss_fit_legend_entry)
-    #                         plt.plot(channel_indices, [np.amax(data[index, :]), np.amax(data[index, :])], "-")
-    #                         plt.plot(channel_indices, [np.amax(data[index, :]), np.amax(data[index, :])], "-")
                             plt.legend(loc=0)
                             plt.title(node.title)
                             plt.xlabel('DUT %s at DUT0 = %d' % (result[node_index]['dut_x'], index))
                             plt.ylabel('#')
                             plt.grid()
-#                             plt.show()
                             output_fig.savefig()
                     except RuntimeError:
                         pass
 
-                # Fit data and create fit result function
-                f = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-                fit, pcov = curve_fit(f, np.arange(data.shape[0]), mean_fitted, sigma=mean_error_fitted, absolute_sigma=True)
-                fit_fn = np.poly1d(fit[::-1])
-                # Refit fithout outliers
-                print node.title, fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]
-                limit = fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]
-                selected_data = np.where(np.abs(fit_fn(np.arange(data.shape[0])) - mean_fitted) < limit)  # remove outliers (offset >  5 sigma) from selection
-                print selected_data
-                fit, pcov = curve_fit(f, np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
+                # Fit data with a straigth line 3 times to remove outliers
+                selected_data = range(data.shape[0])
+                for i in range(3):
+                    f = lambda x, c0, c1: c0 + c1 * x
+                    if not np.any(selected_data):
+                        raise RuntimeError('The cuts are too tight, there is no point to fit. Release cuts and rerun alignment.')
+                    offset_limit, error_limit = fit_offset_cut[0] if 'Col' in node.title else fit_offset_cut[1], fit_error_cut[0] if 'Col' in node.title else fit_error_cut[1]
+                    fit, pcov = curve_fit(f, np.arange(data.shape[0])[selected_data], mean_fitted[selected_data])
+                    fit_fn = np.poly1d(fit[::-1])
+                    selected_data = np.where(np.logical_and(np.abs(fit_fn(np.arange(data.shape[0])) - mean_fitted) < offset_limit, mean_error_fitted < error_limit))
+                    plt.clf()
+                    plt.title(node.title + ', Fit %d' % i)
+                    plt.plot(np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
+                    plt.plot(np.arange(data.shape[0])[selected_data], fit_fn(np.arange(data.shape[0]))[selected_data], '-', label='Prefit')
+                    plt.plot(np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
+                    plt.plot(np.arange(data.shape[0])[selected_data], (fit_fn(np.arange(data.shape[0])[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
+                    plt.ylim((np.amin(mean_fitted), np.amax(mean_fitted)))
+                    plt.legend(loc=0)
+                    plt.show()
+
+                # Refit with higher polynomial
+                g = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
+                fit, pcov = curve_fit(g, np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
                 fit_fn = np.poly1d(fit[::-1])
 
                 # Calculate mean sigma (is somwhat a residual) and store the actual data in result array
@@ -282,10 +292,12 @@ def align_hits(alignment_file, output_pdf, fit_error_cut=(2.0, 2.0)):
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
                 result[node_index]['description'] = node.title
 
-#                 # Plot selected data with fit
+                # Plot selected data with fit
                 plt.clf()
                 plt.errorbar(np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
-                fit_legend_entry = 'line fit: c0 + c1x\nc0=$%1.1e\pm%1.1e$\nc1=$%1.1e\pm%1.1e$\nc2=$%1.1e\pm%1.1e$\nc3=$%1.1e\pm%1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5, fit[3], np.absolute(pcov[3][3]) ** 0.5)
+                plt.plot(np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
+                plt.plot(np.arange(data.shape[0])[selected_data], (fit_fn(np.arange(data.shape[0])[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
+                fit_legend_entry = 'fit: c0+c1x+c2x^2+c3x^3\nc0=$%1.1e\pm%1.1e$\nc1=$%1.1e\pm%1.1e$\nc2=$%1.1e\pm%1.1e$\nc3=$%1.1e\pm%1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5, fit[3], np.absolute(pcov[3][3]) ** 0.5)
                 plt.plot(np.arange(data.shape[0]), fit_fn(np.arange(data.shape[0])), '-', label=fit_legend_entry)
                 plt.plot(np.arange(data.shape[0])[selected_data], chi2[selected_data] / 1.e7)
                 plt.legend(loc=0)
@@ -293,16 +305,14 @@ def align_hits(alignment_file, output_pdf, fit_error_cut=(2.0, 2.0)):
                 plt.xlabel('DUT %s' % result[node_index]['dut_y'])
                 plt.ylabel('DUT %s' % result[node_index]['dut_x'])
                 plt.xlim((0, np.amax(np.arange(data.shape[0]))))
-                plt.ylim((0, np.amax(fit_fn(np.arange(data.shape[0])))))
                 plt.grid()
-#                 plt.show()
                 output_fig.savefig()
 
             try:
                 result_table = in_file_h5.create_table(in_file_h5.root, name='Correlation', description=result.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 result_table.append(result)
             except tb.exceptions.NodeError:
-                logging.info('Correlation table exists already. Do not create new.')
+                logging.warning('Correlation table exists already. Do not create new.')
 
 
 def plot_correlations(alignment_file, output_pdf):
