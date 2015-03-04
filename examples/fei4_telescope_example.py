@@ -9,10 +9,10 @@ import pyTestbeamAnalysis.analyze_test_beam as atb
 
 if __name__ == '__main__':
     # The location of the datafiles, one file per DUT
-    data_files = ['data\\TestBeamData_FEI4_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
-                  'data\\TestBeamData_FEI4_DUT1.h5',
-                  'data\\TestBeamData_FEI4_DUT4.h5',
-                  'data\\TestBeamData_FEI4_DUT5.h5'
+    data_files = ['data/TestBeamData_FEI4_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
+                  'data/TestBeamData_FEI4_DUT1.h5',
+                  'data/TestBeamData_FEI4_DUT4.h5',
+                  'data/TestBeamData_FEI4_DUT5.h5'
                   ]
 
     # Dimesions
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     atb.plot_correlations(alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Correlations.pdf')
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
-    atb.align_hits(alignment_file=output_folder + '\\Alignment.h5', combine_bins=1, no_data_cut=0.7, fit_error_cut=(2.0, 2.0), output_pdf=output_folder + '\\Alignment.pdf')
+    atb.align_hits(alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Alignment.pdf', fit_offset_cut=(2. / 10., 5.0), fit_error_cut=(10. / 1000., 30. / 1000.))
 
     # Cluster hits off all DUTs
     Pool().map(atb.cluster_hits, data_files)  # find cluster on all DUT data files in parallel on multiple cores
