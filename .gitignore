@@ -43,14 +43,23 @@ coverage.xml
 docs/_build/
 # PyBuilder
 target/
-#  pyBAR cython files
+#  Cython files
 analysis_functions.cpp
 data_clusterizer.cpp
-data_histograming.cpp
-data_interpreter.cpp
-# some pyBAR scan data folders, how to get all new folders?
-module_*/
-scc_*/
 # PyDev files
 .project
 .pydevproject
+# Example data
+TestBeamData_FEI4_DUT0_cluster.h5
+TestBeamData_FEI4_DUT1_cluster.h5
+TestBeamData_FEI4_DUT4_cluster.h5
+TestBeamData_FEI4_DUT5_cluster.h5
+TestBeamData_Mimosa26_DUT0_hot_pixel.h5
+TestBeamData_Mimosa26_DUT0_hot_pixel_cluster.h5
+TestBeamData_Mimosa26_DUT1_hot_pixel.h5
+TestBeamData_Mimosa26_DUT1_hot_pixel_cluster.h5
+TestBeamData_Mimosa26_DUT2_hot_pixel.h5
+TestBeamData_Mimosa26_DUT2_hot_pixel_cluster.h5
+TestBeamData_Mimosa26_DUT0_hot_pixel.pdf
+TestBeamData_Mimosa26_DUT1_hot_pixel.pdf
+TestBeamData_Mimosa26_DUT2_hot_pixel.pdf
