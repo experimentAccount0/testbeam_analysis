@@ -164,25 +164,44 @@ def correlate_hits(hit_files, alignment_file, fraction=1):
                     out_2[:] = row_corr
 
 
-def correlate_corr_hits(tracklets_files):
+def check_hit_alignment(tracklets_files, output_pdf, combine_n_events=100000):
     with tb.open_file(tracklets_files, mode="r") as in_file_h5:
-        particles = in_file_h5.root.Tracklets[:10000]
-        plt.plot(particles[:]['column_dut_0'], particles[:]['column_dut_1'], '.')
-#         plt.show()
-        select = np.logical_and(np.isfinite(particles[:]['column_dut_0']), np.isfinite(particles[:]['column_dut_2']))
-#         particles[np.isinf(particles['column_dut_0'])]
-        heatmap, xedges, yedges = np.histogram2d(x=particles[select]['column_dut_0'], y=particles[select]['column_dut_2'], bins=100)
-        
-#         heatmap, xedges, yedges = np.histogram2d(x=particles[select]['column_dut_0'], y=particles[select]['column_dut_2'], bins=(80, 80), range=[[1, 80], [1, 80]])
-        extent = [yedges[0] - 0.5, yedges[-1] + 0.5, xedges[-1] + 0.5, xedges[0] - 0.5]
-#             extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-        cmap = cm.get_cmap('hot', 40)
-        plt.imshow(heatmap, extent=extent, cmap=cmap, interpolation='nearest')
-#         ax.set_xlabel(colName[0])
-#         ax.set_ylabel(colName[1])
-#         ax.set_title('Correlation plot(' + corName + ')')
-
-        plt.show()
+        with PdfPages(output_pdf) as output_fig:
+            for table_column in in_file_h5.root.Tracklets.dtype.names:
+                if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
+                    median, mean, std = [], [], []
+                    ref_dut_column = table_column[:-1] + '0'
+                    logging.info('Check alignment for % s', table_column)
+                    progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Tracklets.shape[0], term_width=80)
+                    progress_bar.start()
+                    for index in range(0, in_file_h5.root.Tracklets.shape[0], combine_n_events):
+                        particles = in_file_h5.root.Tracklets[index:index + combine_n_events]
+                        particles = particles[np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)]  # only select events with hits in both DUTs
+                        plt.clf()
+                        plt.hist(particles[:][ref_dut_column] - particles[:][table_column], bins=100, range=(-np.amax(particles[:][ref_dut_column]) / 10., np.amax(particles[:][ref_dut_column]) / 10.))
+                        plt.xlabel(ref_dut_column)
+                        plt.ylabel(table_column)
+                        plt.title('Aligned position difference for events %d - %d' % (index, index + combine_n_events))
+                        plt.grid()
+                        actual_median, actual_mean, actual_rms = np.median(particles[:][ref_dut_column] - particles[:][table_column]), np.mean(particles[:][ref_dut_column] - particles[:][table_column]), np.std(particles[:][ref_dut_column] - particles[:][table_column])
+                        median.append(actual_median)
+                        mean.append(actual_mean)
+                        std.append(actual_rms)
+                        plt.plot([actual_median, actual_median], [0, plt.ylim()[1]], '-', linewidth=2.0, label='Median %1.1f' % actual_median)
+                        plt.plot([actual_mean, actual_mean], [0, plt.ylim()[1]], '-', linewidth=2.0, label='Mean %1.1f' % actual_mean)
+                        plt.legend(loc=0)
+                        output_fig.savefig()
+                        progress_bar.update(index)
+                    plt.clf()
+                    plt.xlabel('Event')
+                    plt.ylabel('Offset')
+                    plt.grid()
+                    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_events), median, linewidth=2.0, label='Median')
+                    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_events), mean, linewidth=2.0, label='Mean')
+                    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_events), std, linewidth=2.0, label='RMS')
+                    plt.legend(loc=0)
+                    output_fig.savefig()
+                    progress_bar.finish()
 
 
 def align_hits(alignment_file, output_pdf, fit_offset_cut=(1.0, 1.0), fit_error_cut=(0.1, 0.1)):
@@ -403,13 +422,13 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file):
                 selection = actual_cluster['mean_column'] != 0
                 actual_mean_column = actual_cluster['mean_column'][selection]  # correct only hits, 0 is no hit
                 actual_mean_row = actual_cluster['mean_row'][selection]  # correct only hits, 0 is no hit
-                print c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
-                print 'actual_mean_column, actual_mean_row',
-                print actual_mean_column[0], actual_mean_row[0]
-                print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
-                print 'corrected_mean_column, corrected_mean_row',
-                print c3[0] * actual_mean_column[0] ** 3 + c2[0] * actual_mean_column[0] ** 2 + c1[0] * actual_mean_column[0] + c0[0],
-                print c3[1] * actual_mean_row[0] ** 3 + c2[1] * actual_mean_row[0] ** 2 + c1[1] * actual_mean_row[0] + c0[1]
+#                 print c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
+#                 print 'actual_mean_column, actual_mean_row',
+#                 print actual_mean_column[0], actual_mean_row[0]
+#                 print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
+#                 print 'corrected_mean_column, corrected_mean_row',
+#                 print c3[0] * actual_mean_column[0] ** 3 + c2[0] * actual_mean_column[0] ** 2 + c1[0] * actual_mean_column[0] + c0[0],
+#                 print c3[1] * actual_mean_row[0] ** 3 + c2[1] * actual_mean_row[0] ** 2 + c1[1] * actual_mean_row[0] + c0[1]
                 tracklets_array['column_dut_%d' % index][selection] = c3[0] * actual_mean_column ** 3 + c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0]
                 tracklets_array['row_dut_%d' % index][selection] = c3[1] * actual_mean_row ** 3 + c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1]
                 tracklets_array['charge_dut_%d' % index][selection] = actual_cluster['charge'][selection]

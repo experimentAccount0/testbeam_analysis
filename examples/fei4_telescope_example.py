@@ -38,6 +38,9 @@ if __name__ == '__main__':
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     atb.merge_cluster_data(cluster_files, alignment_file=output_folder + '\\Alignment.h5', tracklets_file=output_folder + '\\Tracklets.h5')
 
+    # Check alignment of hits in position and time
+    atb.check_hit_alignment('Tracklets.h5', 'Alignment_Check.pdf')
+
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
     atb.find_tracks(tracklets_file=output_folder + '\\Tracklets.h5', alignment_file=output_folder + '\\Alignment.h5', track_candidates_file=output_folder + '\\TrackCandidates.h5')
 
