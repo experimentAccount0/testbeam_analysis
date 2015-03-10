@@ -28,30 +28,33 @@ if __name__ == '__main__':
     cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
 
     # Correlate the row/col of each DUT
-    atb.correlate_hits(data_files, alignment_file=output_folder + '\\Alignment.h5', fraction=1)
-    atb.plot_correlations(alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Correlations.pdf')
+    atb.correlate_hits(data_files, alignment_file=output_folder + r'/Alignment.h5', fraction=1)
+    atb.plot_correlations(alignment_file=output_folder + r'/Alignment.h5', output_pdf=output_folder + r'/Correlations.pdf')
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
-    atb.align_hits(alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Alignment.pdf', fit_offset_cut=(40. / 10., 10. / 10.), fit_error_cut=(500. / 1000., 500. / 1000.))
+    atb.align_hits(alignment_file=output_folder + r'/Alignment.h5', output_pdf=output_folder + r'/Alignment.pdf', fit_offset_cut=(40. / 10., 10. / 10.), fit_error_cut=(500. / 1000., 500. / 1000.))
 
     # Cluster hits off all DUTs
     Pool().map(atb.cluster_hits, data_files)  # find cluster on all DUT data files in parallel on multiple cores
-    atb.plot_cluster_size(cluster_files, output_pdf=output_folder + '\\Cluster_Size.pdf')
+    atb.plot_cluster_size(cluster_files, output_pdf=output_folder + r'/Cluster_Size.pdf')
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    atb.merge_cluster_data(cluster_files, alignment_file=output_folder + '\\Alignment.h5', tracklets_file=output_folder + '\\Tracklets.h5')
+    atb.merge_cluster_data(cluster_files, alignment_file=output_folder + r'/Alignment.h5', tracklets_file=output_folder + r'/Tracklets.h5')
+
+    # Check alignment of hits in position and time
+    atb.check_hit_alignment(output_folder + r'/Tracklets.h5', output_folder + r'/Alignment_Check.pdf')
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
-    atb.find_tracks(tracklets_file=output_folder + '\\Tracklets.h5', alignment_file=output_folder + '\\Alignment.h5', track_candidates_file=output_folder + '\\TrackCandidates.h5')
+    atb.find_tracks(tracklets_file=output_folder + r'/Tracklets.h5', alignment_file=output_folder + r'/Alignment.h5', track_candidates_file=output_folder + r'/TrackCandidates.h5')
 
     # optional: try to deduce the devices z positions. Difficult for parallel tracks / bad resolution and does actually not really help here. Still good for cross check.
-    atb.align_z(track_candidates_file=output_folder + '\\TrackCandidates.h5', alignment_file=output_folder + '\\Alignment.h5', output_pdf=output_folder + '\\Z_positions.pdf', z_positions=z_positions, track_quality=2, max_tracks=1, warn_at=0.5)
+    atb.align_z(track_candidates_file=output_folder + r'/TrackCandidates.h5', alignment_file=output_folder + r'/Alignment.h5', output_pdf=output_folder + r'/Z_positions.pdf', z_positions=z_positions, track_quality=2, max_tracks=1, warn_at=0.5)
 
     # Fit the track candidates and create new track table
-    atb.fit_tracks(track_candidates_file=output_folder + '\\TrackCandidates.h5', tracks_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Tracks.pdf', z_positions=z_positions, fit_duts=[0, 1, 2], include_duts=[-2, -1, 1, 2], ignore_duts=None, max_tracks=4, track_quality=2, pixel_size=pixel_size)
-
-    # optional: plot some tracks (or track candidates) of a selected event ragnge
-    atb.event_display(track_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Event.pdf', z_positions=z_positions, event_range=(6493424, 6493425), pixel_size=pixel_size, plot_lim=(2, 2), dut=1)
+    atb.fit_tracks(track_candidates_file=output_folder + r'/TrackCandidates.h5', tracks_file=output_folder + r'/Tracks.h5', output_pdf=output_folder + r'/Tracks.pdf', z_positions=z_positions, fit_duts=[0, 1, 2], include_duts=[-2, -1, 1, 2], ignore_duts=None, max_tracks=4, track_quality=2, pixel_size=pixel_size)
+#
+# optional: plot some tracks (or track candidates) of a selected event ragnge
+#     atb.event_display(track_file=output_folder + r'/Tracks.h5', output_pdf=output_folder + r'/Event.pdf', z_positions=z_positions, event_range=(6493424, 6493425), pixel_size=pixel_size, plot_lim=(2, 2), dut=1)
 
     # Calculate the residuals to check the alignment
-    atb.calculate_residuals(tracks_file=output_folder + '\\Tracks.h5', output_pdf=output_folder + '\\Residuals.pdf', z_positions=z_positions, pixel_size=pixel_size, use_duts=None, track_quality=2, max_chi2=3e3)
+    atb.calculate_residuals(tracks_file=output_folder + r'/Tracks.h5', output_pdf=output_folder + r'/Residuals.pdf', z_positions=z_positions, pixel_size=pixel_size, use_duts=None, track_quality=2, max_chi2=3e3)
