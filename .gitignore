@@ -63,3 +63,4 @@ TestBeamData_Mimosa26_DUT2_hot_pixel_cluster.h5
 TestBeamData_Mimosa26_DUT0_hot_pixel.pdf
 TestBeamData_Mimosa26_DUT1_hot_pixel.pdf
 TestBeamData_Mimosa26_DUT2_hot_pixel.pdf
+hit_clusterizer.cpp
