@@ -20,7 +20,6 @@ The analysis flow is (also mentioned again in the __main__ section):
 import logging
 import progressbar
 import re
-import os
 import numpy as np
 from math import sqrt
 import pandas as pd
@@ -391,7 +390,7 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file):
                     c2 = correlation[correlation['dut_x'] == index]['c2']
                     c3 = correlation[correlation['dut_x'] == index]['c3']
 
-                print index, c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
+#                 print index, c0[0], c1[0], c2[0], c3[0], ',', c0[1], c1[1], c2[1], c3[1]
 #                 print 'actual_mean_column, actual_mean_row',
 #                 print actual_mean_column[0], actual_mean_row[0]
 #                 print c1[0] * actual_mean_column[0] + c0[1], c1[1] * actual_mean_row[0] + c0[1]
@@ -401,9 +400,38 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file):
                 tracklets_array['column_dut_%d' % index][selection] = c3[0] * actual_mean_column ** 3 + c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0]
                 tracklets_array['row_dut_%d' % index][selection] = c3[1] * actual_mean_row ** 3 + c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1]
                 tracklets_array['charge_dut_%d' % index][selection] = actual_cluster['charge'][selection]
- 
+
+#         np.nan_to_num(tracklets_array)
         tracklets_array['event_number'] = common_event_number
         tracklets_table.append(tracklets_array)
+
+
+def optimize_hit_alignment(tracklets_files, use_fraction=0.1):
+    '''This step should not be needed but alignment checks showed an offset between the hit positions after alignment
+    especially for DUTs that have a flipped orientation. This function corrects for the offset (c0 in the alignment).
+
+    Parameters
+    ----------
+    tracklets_file : string
+        Input file name with merged cluster hit table from all DUTs
+    use_fraction : float
+        The fraction of hits to used for the alignment correction. For speed up. 1 means all hits are used
+    '''
+    logging.info('Optimize hit alignment')
+    with tb.open_file(tracklets_files, mode="r+") as in_file_h5:
+        particles = in_file_h5.root.Tracklets[:]
+        for table_column in in_file_h5.root.Tracklets.dtype.names:
+            if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
+                ref_dut_column = table_column[:-1] + '0'
+                logging.info('Optimize alignment for % s', table_column)
+                every_nth_hit = int(1. / use_fraction)
+                particle_selection = particles[::every_nth_hit][np.logical_and(particles[::every_nth_hit][ref_dut_column] > 0, particles[::every_nth_hit][table_column] > 0)]  # only select events with hits in both DUTs
+                difference = particle_selection[ref_dut_column] - particle_selection[table_column]
+                selection = np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)  # select all hits from events with hits in both DUTs
+                particles[table_column][selection] += np.median(difference)
+        in_file_h5.removeNode(in_file_h5.root, 'Tracklets')
+        corrected_tracklets_table = in_file_h5.create_table(in_file_h5.root, name='Tracklets', description=particles.dtype, title='Tracklets', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+        corrected_tracklets_table.append(particles)
 
 
 def check_hit_alignment(tracklets_files, output_pdf, combine_n_events=100000):
@@ -961,7 +989,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minim
                 efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
 
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
-                analysis_utils.create_2d_pixel_hist(fig, ax, efficiency.T, title='Efficiency for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=90., z_max=100.)
+                analysis_utils.create_2d_pixel_hist(fig, ax, efficiency.T, title='Efficiency for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=50., z_max=100.)
                 fig.tight_layout()
                 output_fig.savefig(fig)
                 plt.clf()
@@ -971,9 +999,9 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minim
                 plt.ylabel('#')
                 plt.yscale('log')
                 plt.title('Efficiency for DUT %d' % actual_dut)
-                plt.hist(efficiency.ravel(), bins=100, range=(80, 104))
+                plt.hist(efficiency.ravel(), bins=100, range=(50, 104))
                 output_fig.savefig()
-                logging.info('Efficiency =  %1.4f' % np.ma.mean(efficiency[efficiency > 90].ravel()))
+                logging.info('Efficiency =  %1.4f' % np.ma.mean(efficiency[efficiency > 50].ravel()))
 
 
 # Helper functions that are not ment to be called during analysis
