@@ -367,8 +367,8 @@ void Clusterizer::searchNextHits(const unsigned short& pCol, const unsigned shor
 		_abortCluster = true;
 
 	_actualClusterCharge+=_chargeMap[(long)pCol + (long)pRow * (long)_maxColumn + (long)tCharge * (long)_maxColumn * (long)_maxRow];	//add charge of the hit to the cluster Charge
-	_actualClusterX+=(float)((float) pCol+0.5) * _chargeMap[(long)pCol + (long)pRow * (long)_maxColumn + (long)tCharge * (long)_maxColumn * (long)_maxRow];	//add x position of actual cluster weigthed by the charge
-	_actualClusterY+=(float)((float) pRow+0.5) * _chargeMap[(long)pCol + (long)pRow * (long)_maxColumn + (long)tCharge * (long)_maxColumn * (long)_maxRow];	//add y position of actual cluster weigthed by the charge
+	_actualClusterX+=(float)((float) pCol+0.5) * (_chargeMap[(long)pCol + (long)pRow * (long)_maxColumn + (long)tCharge * (long)_maxColumn * (long)_maxRow] + 1);	//add x position of actual cluster weigthed by the charge
+	_actualClusterY+=(float)((float) pRow+0.5) * (_chargeMap[(long)pCol + (long)pRow * (long)_maxColumn + (long)tCharge * (long)_maxColumn * (long)_maxRow] + 1);	//add y position of actual cluster weigthed by the charge
 
 	if(Basis::debugSet()){
 //		std::cout<<"Clusterizer::searchNextHits"<<std::endl;
@@ -696,8 +696,8 @@ void Clusterizer::showHits()
 
 void Clusterizer::addCluster()
 {
-	_actualClusterX/=(_actualClusterCharge + 1);  // normalize cluster x position
-	_actualClusterY/=(_actualClusterCharge + 1);  // normalize cluster y position
+	_actualClusterX/=(_actualClusterCharge + _actualClusterSize);  // normalize cluster x position
+	_actualClusterY/=(_actualClusterCharge + _actualClusterSize);  // normalize cluster y position
 	if(_createClusterInfoArray){
 		if (_clusterInfo == 0)
 			throw std::runtime_error("Cluster info array is not defined and cannot be filled");
