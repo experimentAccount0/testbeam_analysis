@@ -720,6 +720,8 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
         0: All tracks with hits in DUT and references are taken
         1: The track hits in DUT and reference are within 5-sigma of the correlation
         2: The track hits in DUT and reference are within 2-sigma of the correlation
+        Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each 'quality stage', one digit per DUT.
+        E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     '''
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
