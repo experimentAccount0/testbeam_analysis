@@ -897,14 +897,14 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(50, 50), use_duts=
         output_fig.close()
 
 
-def plot_track_density(tracks_file, output_pdf, z_positions, use_duts=None, max_chi2=None):
+def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
     Parameters
     ----------
     tracks_file : string
         file name with the tracks table
     use_duts : iterable
-        the duts to calculate residuals for. If None all duts are used
+        the duts to plot track density for. If None all duts are used
     output_pdf : pdf file name object
     max_chi2 : int
         only use track with a chi2 <= max_chi2
@@ -919,12 +919,13 @@ def plot_track_density(tracks_file, output_pdf, z_positions, use_duts=None, max_
                 logging.info('Plot track density for DUT %d' % actual_dut)
 
                 track_array = node[:]
+                track_array = track_array[track_array['track_chi2'] != 1000000000] # use tracks with converged fit only
+
                 offset, slope = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
                 if max_chi2:
                     intersection = intersection[track_array['track_chi2'] <= max_chi2]
-
-                dim_x, dim_y = int(np.amax(intersection[:, 0])), int(np.amax(intersection[:, 1]))
+                
                 heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
 
                 fig = Figure()
@@ -935,7 +936,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, use_duts=None, max_
                 output_fig.savefig(fig)
 
 
-def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minimum_track_density, use_duts=None, max_chi2=None):
+def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -944,7 +945,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minim
     minimum_track_density : int
         minimum track density required to consider bin for efficiency calculation
     use_duts : iterable
-        the duts to calculate residuals for. If None all duts are used
+        the duts to calculate efficiency for. If None all duts are used
     output_pdf : pdf file name object
     max_chi2 : int
         only use track with a chi2 <= max_chi2
@@ -959,6 +960,8 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minim
                 logging.info('Calculate efficiency for DUT %d' % actual_dut)
 
                 track_array = node[:]
+                track_array = track_array[track_array['track_chi2'] != 1000000000] # use tracks with converged fit only
+
                 if max_chi2:
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
                 hits, charge, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), track_array['charge_dut_%d' % actual_dut], np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
@@ -968,7 +971,6 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, pixel_size, minim
                 scale = np.square(np.array((pixel_size[0], pixel_size[1], 0)))
                 distance = np.sqrt(np.dot(np.square(intersection - hits), scale))
                 col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                dim_x, dim_y = int(np.amax(intersection[:, 0])), int(np.amax(intersection[:, 1]))
                 distance_array = np.histogramdd(col_row_distance, bins=(dim_x, dim_y, 500), range=[[1, dim_x], [1, dim_y], [0, 500]])[0]
                 hh, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
                 distance_mean_array = np.average(distance_array, axis=2, weights=range(0, 500)) * sum(range(0, 500)) / hh.astype(np.float)
