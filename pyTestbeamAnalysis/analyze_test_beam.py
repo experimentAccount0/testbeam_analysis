@@ -179,7 +179,7 @@ def align_hits(alignment_file, output_pdf, fit_offset_cut=(1.0, 1.0), fit_error_
         Happens e.g. if the device is not fully illuminated
     fit_error_cut : float
         Omit channels where the fit has an error > fit_error_cut
-        Happens e.g. if there is no clear correlation due to noise, isufficient statistics
+        Happens e.g. if there is no clear correlation due to noise, insufficient statistics
     output_pdf : pdf file name object
     '''
     logging.info('Align hit coordinates')
@@ -223,7 +223,7 @@ def align_hits(alignment_file, output_pdf, fit_offset_cut=(1.0, 1.0), fit_error_
                         sigma_fitted[index] = coeff[2]
                         if index == data.shape[0] / 2:
                             plt.clf()
-                            gauss_fit_legend_entry = 'Gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+                            gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
                             plt.bar(x, data[index, :], label='data')
                             plt.plot(np.arange(np.amin(x), np.amax(x), 0.1), gauss(np.arange(np.amin(x), np.amax(x), 0.1), *coeff), '-', label=gauss_fit_legend_entry)
                             plt.legend(loc=0)
@@ -237,7 +237,7 @@ def align_hits(alignment_file, output_pdf, fit_offset_cut=(1.0, 1.0), fit_error_
 
                 mean_error_fitted = np.abs(mean_error_fitted)
 
-                # Fit data with a straigth line 3 times to remove outliers
+                # Fit data with a straight line 3 times to remove outliers
                 selected_data = range(data.shape[0])
                 for i in range(3):
                     f = lambda x, c0, c1: c0 + c1 * x
@@ -611,9 +611,9 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
         z_positions_rec_abs = [i * z_positions[-1] for i in z_positions_rec]
         z_differences = [abs(i - j) for i, j in zip(z_positions, z_positions_rec_abs)]
         failing_duts = [j for (i, j) in zip(z_differences, range(5)) if i >= warn_at]
-        logging.info('Absoulte reconstructed z-positions %s' % str(z_positions_rec_abs))
+        logging.info('Absolute reconstructed z-positions %s' % str(z_positions_rec_abs))
         if failing_duts:
-            logging.warning('The reconstructed z postions is more than %1.1f cm off for DUTS %s' % (warn_at, str(failing_duts)))
+            logging.warning('The reconstructed z positions are more than %1.1f cm off for DUTS %s' % (warn_at, str(failing_duts)))
         else:
             logging.info('Difference between measured and reconstructed z-positions %s' % str(z_differences))
 
@@ -885,7 +885,7 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(50, 50), use_duts=
                     plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
                     if fit_ok:
                         plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
-                        gauss_fit_legend_entry = 'gaus fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+                        gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
                         plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r-', label=gauss_fit_legend_entry, linewidth=2)
                         plt.legend(loc=0)
                     if output_fig is not None:
@@ -903,6 +903,8 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, use_d
     ----------
     tracks_file : string
         file name with the tracks table
+    dim_x, dim_y : integer
+        front end dimensions of device
     use_duts : iterable
         the duts to plot track density for. If None all duts are used
     output_pdf : pdf file name object
@@ -936,12 +938,14 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, use_d
                 output_fig.savefig(fig)
 
 
-def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, use_duts=None, max_chi2=None):
+def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, use_duts=None, max_chi2=None, max_distance=500):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
     tracks_file : string
         file name with the tracks table
+    dim_x, dim_y : integer
+        front end dimensions of device
     minimum_track_density : int
         minimum track density required to consider bin for efficiency calculation
     use_duts : iterable
@@ -949,6 +953,8 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
     output_pdf : pdf file name object
     max_chi2 : int
         only use track with a chi2 <= max_chi2
+    max_distance : int
+        expected maximum distance, distances greater than max_distance will not be considered in evalutation 
     '''
     logging.info('Calculate efficiency')
     with PdfPages(output_pdf) as output_fig:
@@ -966,19 +972,43 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
                 hits, charge, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), track_array['charge_dut_%d' % actual_dut], np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
-
+                
                 # Calculate distance between track hit and DUT hit
-                scale = np.square(np.array((pixel_size[0], pixel_size[1], 0)))
-                distance = np.sqrt(np.dot(np.square(intersection - hits), scale))
-                col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                distance_array = np.histogramdd(col_row_distance, bins=(dim_x, dim_y, 500), range=[[1, dim_x], [1, dim_y], [0, 500]])[0]
+                scale = np.square(np.array((pixel_size[0], pixel_size[1], 0))) # regard pixel size for calculating distances
+                distance = np.sqrt(np.dot(np.square(intersection - hits), scale)) # array with distances between DUT hit and track hit for each event. Values in um 
+                
+                col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))                
+                distance_array = np.histogramdd(col_row_distance, bins=(dim_x, dim_y, max_distance), range=[[1, dim_x], [1, dim_y], [0, max_distance]])[0]
                 hh, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
-                distance_mean_array = np.average(distance_array, axis=2, weights=range(0, 500)) * sum(range(0, 500)) / hh.astype(np.float)
+                distance_mean_array = np.average(distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / hh.astype(np.float)
                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
-                analysis_utils.create_2d_pixel_hist(fig, ax, distance_mean_array.T, title='Distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=150)
+                analysis_utils.create_2d_pixel_hist(fig, ax, distance_mean_array.T, title='Weighted distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=150)
+                fig.tight_layout()
+                output_fig.savefig(fig)
+                
+                # maximum and minimum distance between track hit and DUT hit                
+                distance_max_array = np.amax(distance_array, axis=2) * sum(range(0, max_distance)) / hh.astype(np.float)
+                distance_min_array = np.amin(distance_array, axis=2) * sum(range(0, max_distance)) / hh.astype(np.float)
+                distance_max_array = np.ma.masked_invalid(distance_max_array)
+                distance_min_array = np.ma.masked_invalid(distance_min_array)
+                
+                print np.amax(distance_max_array)
+                print np.amin(distance_min_array)
+                
+                fig = Figure()
+                fig.patch.set_facecolor('white')
+                ax = fig.add_subplot(111)
+                analysis_utils.create_2d_pixel_hist(fig, ax, distance_max_array.T, title='Maximal distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=125000)
+                fig.tight_layout()
+                output_fig.savefig(fig)
+                
+                fig = Figure()
+                fig.patch.set_facecolor('white')
+                ax = fig.add_subplot(111)
+                analysis_utils.create_2d_pixel_hist(fig, ax, distance_min_array.T, title='Minimal distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=125000)
                 fig.tight_layout()
                 output_fig.savefig(fig)
 
