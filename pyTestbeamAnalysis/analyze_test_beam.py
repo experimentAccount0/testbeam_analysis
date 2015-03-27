@@ -527,6 +527,8 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
         arg = [(one_slice, correlations, n_duts, column_sigma, row_sigma) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
         results = pool.map(_function_wrapper_find_tracks_loop, arg)
         result = np.concatenate(results)
+        pool.close()
+        pool.join()
 
 # _find_tracks_loop_compiled = jit((numpy_support.from_dtype(tracklets.dtype)[:], types.int32, types.float64, types.float64), nopython=True)(_find_tracks_loop)  # maybe in 1 year this will help, when numba works with structured arrays
 #         _find_tracks_loop(tracklets, correlations, n_duts, column_sigma, row_sigma)
@@ -798,6 +800,8 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                     pool = Pool(n_slices)
                     arg = [(one_slice, pixel_size) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
                     results = pool.map(_function_wrapper_fit_tracks_loop, arg)
+                    pool.close()
+                    pool.join()
                     del track_hits
 
                     # Store results
@@ -921,13 +925,13 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, use_d
                 logging.info('Plot track density for DUT %d' % actual_dut)
 
                 track_array = node[:]
-                track_array = track_array[track_array['track_chi2'] != 1000000000] # use tracks with converged fit only
+                track_array = track_array[track_array['track_chi2'] != 1000000000]  # use tracks with converged fit only
 
                 offset, slope = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
                 if max_chi2:
                     intersection = intersection[track_array['track_chi2'] <= max_chi2]
-                
+
                 heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
 
                 fig = Figure()
@@ -966,18 +970,18 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 logging.info('Calculate efficiency for DUT %d' % actual_dut)
 
                 track_array = node[:]
-                track_array = track_array[track_array['track_chi2'] != 1000000000] # use tracks with converged fit only
+                track_array = track_array[track_array['track_chi2'] != 1000000000]  # use tracks with converged fit only
 
                 if max_chi2:
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
                 hits, charge, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), track_array['charge_dut_%d' % actual_dut], np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
-                
+
                 # Calculate distance between track hit and DUT hit
-                scale = np.square(np.array((pixel_size[0], pixel_size[1], 0))) # regard pixel size for calculating distances
-                distance = np.sqrt(np.dot(np.square(intersection - hits), scale)) # array with distances between DUT hit and track hit for each event. Values in um 
-                
-                col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))                
+                scale = np.square(np.array((pixel_size[0], pixel_size[1], 0)))  # regard pixel size for calculating distances
+                distance = np.sqrt(np.dot(np.square(intersection - hits), scale))  # array with distances between DUT hit and track hit for each event. Values in um
+
+                col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
                 distance_array = np.histogramdd(col_row_distance, bins=(dim_x, dim_y, max_distance), range=[[1, dim_x], [1, dim_y], [0, max_distance]])[0]
                 hh, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(dim_x, dim_y), range=[[1, dim_x], [1, dim_y]])
                 distance_mean_array = np.average(distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / hh.astype(np.float)
@@ -988,23 +992,23 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 analysis_utils.create_2d_pixel_hist(fig, ax, distance_mean_array.T, title='Weighted distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=150)
                 fig.tight_layout()
                 output_fig.savefig(fig)
-                
-                # maximum and minimum distance between track hit and DUT hit                
+
+                # maximum and minimum distance between track hit and DUT hit
                 distance_max_array = np.amax(distance_array, axis=2) * sum(range(0, max_distance)) / hh.astype(np.float)
                 distance_min_array = np.amin(distance_array, axis=2) * sum(range(0, max_distance)) / hh.astype(np.float)
                 distance_max_array = np.ma.masked_invalid(distance_max_array)
                 distance_min_array = np.ma.masked_invalid(distance_min_array)
-                
+
                 print np.amax(distance_max_array)
                 print np.amin(distance_min_array)
-                
+
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
                 analysis_utils.create_2d_pixel_hist(fig, ax, distance_max_array.T, title='Maximal distance for DUT %d' % actual_dut, x_axis_title="column", y_axis_title="row", z_min=0, z_max=125000)
                 fig.tight_layout()
                 output_fig.savefig(fig)
-                
+
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
