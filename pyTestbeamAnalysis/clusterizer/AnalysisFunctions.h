@@ -236,5 +236,37 @@ void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, Clus
 	}
 }
 
+// Fix the event alignment with hit position information
+void fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents)
+{
+	int64_t tEventNumber = 0;
+	unsigned int tBadEvents = 0;  // consecutive not correlated events
+	bool isCorrelated = false;
+	for (unsigned int i=0; i < nHits; ++i){
+		if (tEventNumber != rEventArray[i]){
+//			if (rEventArray[i] < 2500)
+//				std::cout<<rEventArray[i]<<"\t"<<isCorrelated<<"\t"<<tBadEvents<<"\n";
+//			if (!isCorrelated && rEventArray[i] < 25)
+//				std::cout<<rEventArray[i]<<"\t"<<isCorrelated<<"!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+			tEventNumber = rEventArray[i];
+			if (!isCorrelated)
+				tBadEvents++;
+			else
+				tBadEvents = 0;
+			if (tBadEvents > nBadEvents)
+				std::cout<<rEventArray[i]<<"\t"<<isCorrelated<<"\t"<<tBadEvents<<"\n";
+			isCorrelated = false;
+		}
+		if (rEventArray[i] > 20356 && rEventArray[i] < 20386)
+			std::cout<<rEventArray[i]<<"\t"<<rRefCol[i]<<" / "<<rCol[i]<<"\t"<<rRefRow[i]<<" / "<<rRow[i]<<"\t"<<tBadEvents<<"\n";
+		if (rRefCol[i] == 0 || rCol[i] == 0 || rRefRow[i] == 0 || rRow[i] == 0)
+			continue;
+		if (std::fabs(rRefCol[i] - rCol[i]) < rError && std::fabs(rRefRow[i] - rRow[i]) < rError)
+			isCorrelated = true;
+
+	}
+
+}
+
 
 
