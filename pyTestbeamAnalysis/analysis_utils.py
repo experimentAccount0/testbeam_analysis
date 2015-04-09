@@ -209,17 +209,29 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
 
 
-def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=10):
+def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=5):
     analysis_functions.fix_event_alignment(np.ascontiguousarray(event_numbers), np.ascontiguousarray(ref_column), np.ascontiguousarray(column), np.ascontiguousarray(ref_row), np.ascontiguousarray(row), error, n_bad_events)
 
 
 if __name__ == '__main__':
     print 'MAIN'
-    with tb.open_file(r'C:\Users\DavidLP\git\pyTestbeamAnalysis\examples\data\Tracklets.h5', 'r') as in_file_h5:
-        event_numbers = in_file_h5.root.Tracklets[:]['event_number']
-        ref_column, ref_row = in_file_h5.root.Tracklets[:]['column_dut_0'], in_file_h5.root.Tracklets[:]['row_dut_0']
-        column, row = in_file_h5.root.Tracklets[:]['column_dut_3'], in_file_h5.root.Tracklets[:]['row_dut_3']
-        fix_event_alignment(event_numbers, ref_column, column, ref_row, row)
+#     with tb.open_file(r'C:\Users\DavidLP\git\pyTestbeamAnalysis\pyTestbeamAnalysis\converter\Tracklets.h5', 'r') as in_file_h5:
+#         event_numbers = in_file_h5.root.Tracklets[:]['event_number']
+#         ref_column, ref_row = in_file_h5.root.Tracklets[:]['column_dut_0'], in_file_h5.root.Tracklets[:]['row_dut_0']
+#         column, row = in_file_h5.root.Tracklets[:]['column_dut_1'], in_file_h5.root.Tracklets[:]['row_dut_1']
+#         print in_file_h5.root.Tracklets.dtype.names
+#     fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=10)
 
-        print in_file_h5.root.Tracklets[:][np.logical_and(in_file_h5.root.Tracklets[:]['event_number'] > 20356, in_file_h5.root.Tracklets[:]['event_number'] < 20376)]
-#         rEventArray[i] > 7140 && rEventArray[i] < 7180
+    size = 50
+    np.random.seed(0)
+    event_numbers = np.arange(size, dtype=np.int64).repeat(4)[:50]
+    ref_column, ref_row = np.random.uniform(high=80, size=size), np.random.uniform(high=336, size=size)
+    column, row = ref_column.copy(), ref_row.copy()
+    
+    column[22:] = column[20:-2]
+    row[22:] = row[20:-2]
+     
+    for index, (event, hit_1, hit_2) in enumerate(np.column_stack((event_numbers, ref_row, row))):
+        print index, int(event), hit_1, hit_2
+    print '___________________'
+    fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1)

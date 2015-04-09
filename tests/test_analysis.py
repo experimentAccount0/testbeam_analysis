@@ -193,6 +193,21 @@ class TestAnalysis(unittest.TestCase):
                 pass
             self.assertTrue(exception_ok & np.all(array == array_fast))
 
+    def test_fix_event_alignment(self):
+        size = 50
+        np.random.seed(0)
+        event_numbers = np.arange(size, dtype=np.int64).repeat(4)[:50]
+        ref_column, ref_row = np.random.uniform(high=80, size=size), np.random.uniform(high=336, size=size)
+        column, row = ref_column.copy(), ref_row.copy()
+
+        column[24:] = column[20:-4]
+        row[24:] = row[20:-4]
+
+        for index, (event, hit_1, hit_2) in enumerate(np.column_stack((event_numbers, ref_row, row))):
+            print index, int(event), hit_1, hit_2
+        print '___________________'
+        analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1)
+
 
 if __name__ == '__main__':
     tests_data_folder = 'test_analysis//'
