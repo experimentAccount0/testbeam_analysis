@@ -10,6 +10,8 @@ import logging
 import numpy as np
 import tables as tb
 from multiprocessing import Pool
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 
 from pybar.analysis import analysis_utils
 from pybar.analysis.analyze_raw_data import AnalyzeRawData
@@ -19,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 
 def analyze_raw_data(input_file):  # FE-I4 raw data analysis
-    '''Std. raw data analysis of FE-I4 data. A hit table is ceated for further analysis.
+    '''Std. raw data analysis of FE-I4 data. A hit table is created for further analysis.
 
     Parameters
     ----------
@@ -27,7 +29,7 @@ def analyze_raw_data(input_file):  # FE-I4 raw data analysis
     output_file_hits : pytables file
     '''
     with AnalyzeRawData(raw_data_file=input_file, create_pdf=True) as analyze_raw_data:
-        analyze_raw_data.use_trigger_number = False
+        analyze_raw_data.use_trigger_number = False  # if trigger number is at the beginning of each event activate this for event alignment
         analyze_raw_data.interpreter.use_tdc_word(False)
         analyze_raw_data.create_hit_table = True
         analyze_raw_data.create_meta_event_index = True
@@ -38,28 +40,42 @@ def analyze_raw_data(input_file):  # FE-I4 raw data analysis
         analyze_raw_data.create_occupancy_hist = False
         analyze_raw_data.create_tot_hist = False
         analyze_raw_data.n_bcid = 16
-        analyze_raw_data.n_injections = 100
         analyze_raw_data.max_tot_value = 13
+        analyze_raw_data.interpreter.create_empty_event_hits(True)
         analyze_raw_data.interpreter.set_debug_output(False)
         analyze_raw_data.interpreter.set_info_output(False)
         analyze_raw_data.interpreter.set_warning_output(False)
         analyze_raw_data.clusterizer.set_warning_output(False)
+        analyze_raw_data.interpreter.debug_events(106060, 106065, True)
         analyze_raw_data.interpret_word_table()
         analyze_raw_data.interpreter.print_summary()
         analyze_raw_data.plot_histograms()
 
 
-def process_dut(raw_data_file):
-    ''' Process and formate the raw data.'''
+def process_dut(raw_data_file, fix_trigger_number=True):
+    ''' Process and format raw data.
+    Parameters
+    ----------
+    raw_data_file : string
+        file with raw data
+    fix_trigger_number : bool
+        activate trigger number fixing
+
+    Returns
+    -------
+    Tuple: (event_number, trigger_number, hits['trigger_number'])
+    or None if not fix_trigger_number
+    '''
     analyze_raw_data(raw_data_file)
-    align_events(raw_data_file[:-3] + '_interpreted.h5', raw_data_file[:-3] + '_event_aligned.h5')
+    ret_value = align_events(raw_data_file[:-3] + '_interpreted.h5', raw_data_file[:-3] + '_event_aligned.h5', fix_trigger_number=fix_trigger_number)
     format_hit_table(raw_data_file[:-3] + '_event_aligned.h5', raw_data_file[:-3] + '_aligned.h5')
+#     return ret_value
 
 
-def align_events(input_file, output_file, chunk_size=10000000):
+def align_events(input_file, output_file, fix_event_number=True, fix_trigger_number=True, chunk_size=20000000):
     ''' Selects only hits from good events and checks the distance between event number and trigger number for each hit.
-    If the FE data allowed a successfull event recognizion the distance is always constant (besides the fact that the trigger number overflows).
-    Otherwise the event number is corrected by the trigger number. How often an inconstistency occurs is counted as well as the number of events that had to be corrected.
+    If the FE data allowed a successful event recognition the distance is always constant (besides the fact that the trigger number overflows).
+    Otherwise the event number is corrected by the trigger number. How often an inconsistency occurs is counted as well as the number of events that had to be corrected.
     Remark: Only one event analyzed wrong shifts all event numbers leading to no correlation! But usually data does not have to be corrected.
 
     Parameters
@@ -74,21 +90,54 @@ def align_events(input_file, output_file, chunk_size=10000000):
     with tb.open_file(input_file, 'r') as in_file_h5:
         hit_table = in_file_h5.root.Hits
         jumps = []  # variable to determine the jumps in the event-number to trigger-number offset
-        n_fixed_events = 0  # events that were fixed
+        n_fixed_hits = 0  # events that were fixed
+
         with tb.open_file(output_file, 'w') as out_file_h5:
             hit_table_description = data_struct.HitInfoTable().columns.copy()
             hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hit_table_description, title='Selected hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False), chunkshape=(chunk_size,))
             # Correct hit event number
             for hits, _ in analysis_utils.data_aligned_at_events(hit_table, chunk_size=chunk_size):
-                selected_hits = hits[(hits['event_status'] & 0b0000011111111111) == 0b0000000000000000]  # no error at all
-                selector = np.array((np.mod(selected_hits['event_number'], 32768) - selected_hits['trigger_number']), dtype=np.int32)
-                jumps.extend(np.unique(selector).tolist())
-                n_fixed_events += np.count_nonzero(selector)
-                selected_hits['event_number'] = np.divide(selected_hits['event_number'], 32768) * 32768 + selected_hits['trigger_number']
+                if fix_trigger_number is True:
+                    selection = np.logical_or((hits['trigger_status'] & 0b00000001) == 0b00000001,
+                                              (hits['event_status'] & 0b0000000000000010) == 0b0000000000000010)
+                    selected_te_hits = np.where(selection)[0]  # select both events with and without hit that have trigger error flag set
+
+                    assert selected_te_hits[0] > 0
+                    tmp_trigger_number = hits['trigger_number'].astype(np.int32)
+
+                    # save trigger and event number for plotting correlation between trigger number and event number
+                    event_number, trigger_number = hits['event_number'].copy(), hits['trigger_number'].copy()
+
+                    offset = (hits['trigger_number'][selected_te_hits] - hits['trigger_number'][selected_te_hits - 1] - hits['event_number'][selected_te_hits] + hits['event_number'][selected_te_hits - 1]).astype(np.int32)  # save jumps in trigger number
+                    offset_tot = np.cumsum(offset)
+
+                    offset_tot[offset_tot > 32768] = np.mod(offset_tot[offset_tot > 32768], 32768)
+                    offset_tot[offset_tot < -32768] = np.mod(offset_tot[offset_tot < -32768], 32768)
+
+                    for start_hit_index in range(len(selected_te_hits)):
+                        start_hit = selected_te_hits[start_hit_index]
+                        stop_hit = selected_te_hits[start_hit_index + 1] if start_hit_index < (len(selected_te_hits) - 1) else None
+                        tmp_trigger_number[start_hit:stop_hit] -= offset_tot[start_hit_index]
+
+                    tmp_trigger_number[tmp_trigger_number >= 32768] = np.mod(tmp_trigger_number[tmp_trigger_number >= 32768], 32768)
+                    tmp_trigger_number[tmp_trigger_number < 0] = 32768 - np.mod(np.abs(tmp_trigger_number[tmp_trigger_number < 0]), 32768)
+
+                    hits['trigger_number'] = tmp_trigger_number
+
+                selected_hits = hits[(hits['event_status'] & 0b0000111111111111) == 0b0000000000000000]  # no error at all
+
+                if fix_event_number is True:
+                    selector = (selected_hits['event_number'] != (np.divide(selected_hits['event_number'] + 1, 32768) * 32768 + selected_hits['trigger_number'] - 1))
+                    n_fixed_hits += np.count_nonzero(selector)
+                    selected_hits['event_number'] = np.divide(selected_hits['event_number'] + 1, 32768) * 32768 + selected_hits['trigger_number'] - 1
+
                 hit_table_out.append(selected_hits)
 
         jumps = np.unique(np.array(jumps))
-        logging.info('Found %d inconsistencies in the event number. %d events had to be corrected.' % (jumps[jumps != 0].shape[0], n_fixed_events))
+        logging.info('Found %d inconsistencies in the event number. %d hits had to be corrected.' % (jumps[jumps != 0].shape[0], n_fixed_hits))
+
+        if fix_trigger_number is True:
+            return (output_file, event_number, trigger_number, hits['trigger_number'])
 
 
 def format_hit_table(input_file, output_file):
@@ -120,7 +169,8 @@ if __name__ == "__main__":
                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_201_SCC_166_3.4_GeV_0.h5',
                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_207_SCC_112_3.4_GeV_0.h5',
                       'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_216_SCC_45_3.4_GeV_0.h5']  # the last DUT is the second reference DUT
-
     # Do seperate DUT data processing in parallel. The output is a formatted hit table.
     pool = Pool()
-    pool.map(process_dut, raw_data_files)
+    results = pool.map(process_dut, raw_data_files)
+    pool.close()
+    pool.join()
