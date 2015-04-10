@@ -224,14 +224,24 @@ if __name__ == '__main__':
 
     size = 50
     np.random.seed(0)
-    event_numbers = np.arange(size, dtype=np.int64).repeat(4)[:50]
+    event_numbers = np.arange(size, dtype=np.int64).repeat(2)[:50]
     ref_column, ref_row = np.random.uniform(high=80, size=size), np.random.uniform(high=336, size=size)
     column, row = ref_column.copy(), ref_row.copy()
+
+    column, row = np.zeros_like(column), np.zeros_like(row)
+    column[10:] = ref_column[:-10]
+    row[10:] = ref_row[:-10]
     
-    column[22:] = column[20:-2]
-    row[22:] = row[20:-2]
-     
+    event_numbers[13:-1] = event_numbers[14:]
+    ref_column[13:-1] = ref_column[14:]
+    ref_row[13:-1] = ref_row[14:]
+    column[13:-1] = column[14:]
+    row[13:-1] = row[14:]
+
     for index, (event, hit_1, hit_2) in enumerate(np.column_stack((event_numbers, ref_row, row))):
         print index, int(event), hit_1, hit_2
     print '___________________'
-    fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1)
+    
+    fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3)
+ 
+    print 'DONE'
