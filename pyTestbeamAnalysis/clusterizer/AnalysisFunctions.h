@@ -13,7 +13,7 @@
 #include "Basis.h"
 #include "defines.h"
 
-bool _debug = true;
+bool _debug = false;
 bool _info = true;
 
 // counts from the event number column of the cluster table how often a cluster occurs in every event
@@ -441,26 +441,31 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 }
 
 // Fix the event alignment with hit position information, crazy...
-void fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
+unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
 {
 	// traverse both hit arrays starting from 0
 	unsigned int iRefHit = 0;
 	unsigned int iHit = 0;
 
-	for (unsigned int i = 0; i <10 ; ++i){
+	unsigned int tNfixes = 0;
+
+	for (iRefHit; iRefHit < nHits ; ++iRefHit){
+		iHit = iRefHit;
 		if (_checkForCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, nHits, rError, nBadEvents)) // if true all hits are correlated, nothing to do
-			return;
+			return tNfixes;
 		if (_info) std::cout << "No correlation starting at index (event) " << iRefHit << " (" << rEventArray[iRefHit] << ")\n";
 
 		if (!_findCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits, rError, nGoodEvents, goodEventsSearchRange)) {
 			if (_info) std::cout << "Found no correlation up to reference hit " << iRefHit - 1 << "\n";
-			return;
+			return tNfixes;
 		}
 		else {
 			if (_info) std::cout << "Start fixing correlation for " <<iRefHit<< ": "<< rRefCol[iRefHit] << "/" << rRefRow[iRefHit] << " = " << iHit<< ": "<< rCol[iHit] << "/" << rRow[iHit] << "\n";
 			_fixAlignment(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits);
-			iHit = iRefHit;
+			tNfixes++;
 		}
 	}
+
+	return tNfixes;
 }
 

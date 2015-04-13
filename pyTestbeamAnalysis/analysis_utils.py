@@ -216,8 +216,8 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3
     column = np.ascontiguousarray(column)
     ref_row = np.ascontiguousarray(ref_row)
     row = np.ascontiguousarray(row)
-    analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, correlated, error, n_bad_events, n_good_events, search_range)
-    return correlated
+    n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, correlated, error, n_bad_events, n_good_events, search_range)
+    return correlated, n_fixes
 
 if __name__ == '__main__':
     print 'MAIN'
@@ -233,9 +233,9 @@ if __name__ == '__main__':
       
         print '___________________'
 #      
-        corr = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=20, n_good_events=5, search_range=20)
+        corr, n_fixes = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=20, n_good_events=5, search_range=20)
       
-        print '___________________'
+        print '_____fixes', n_fixes, 'jumps _____'
       
         for index, (event, rr, r, cc, c, co) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column, corr))):
             if index > 2390 and index < 2500:
