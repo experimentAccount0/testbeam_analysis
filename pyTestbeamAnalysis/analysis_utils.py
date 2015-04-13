@@ -209,60 +209,110 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
 
 
-def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=5):
-    correlated = np.ones(shape=event_numbers.shape, dtype=np.uint8)  # array to signal correlation to be ables to omit not correlated events in the analysis
-    analysis_functions.fix_event_alignment(np.ascontiguousarray(event_numbers), np.ascontiguousarray(ref_column), np.ascontiguousarray(column), np.ascontiguousarray(ref_row), np.ascontiguousarray(row), np.ascontiguousarray(correlated), error, n_bad_events)
+def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=5, n_good_events=3, search_range=10):
+    correlated = np.ascontiguousarray(np.ones(shape=event_numbers.shape, dtype=np.uint8))  # array to signal correlation to be ables to omit not correlated events in the analysis
+    event_numbers = np.ascontiguousarray(event_numbers)
+    ref_column = np.ascontiguousarray(ref_column)
+    column = np.ascontiguousarray(column)
+    ref_row = np.ascontiguousarray(ref_row)
+    row = np.ascontiguousarray(row)
+    analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, correlated, error, n_bad_events, n_good_events, search_range)
     return correlated
 
 if __name__ == '__main__':
     print 'MAIN'
     with tb.open_file(r'C:\Users\DavidLP\git\pyTestbeamAnalysis\pyTestbeamAnalysis\converter\Tracklets.h5', 'r') as in_file_h5:
-        event_numbers = in_file_h5.root.Tracklets[:]['event_number']
-        ref_column, ref_row = in_file_h5.root.Tracklets[:]['column_dut_0'], in_file_h5.root.Tracklets[:]['row_dut_0']
-        column, row = in_file_h5.root.Tracklets[:]['column_dut_1'], in_file_h5.root.Tracklets[:]['row_dut_1']
+        event_numbers = in_file_h5.root.Tracklets[8500:19500]['event_number'].copy()
+        ref_column, ref_row = in_file_h5.root.Tracklets[8500:19500]['column_dut_0'].copy(), in_file_h5.root.Tracklets[8500:19500]['row_dut_0'].copy()
+        column, row = in_file_h5.root.Tracklets[8500:19500]['column_dut_1'].copy(), in_file_h5.root.Tracklets[8500:19500]['row_dut_1'].copy()
         print in_file_h5.root.Tracklets.dtype.names
-    fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=10)
+      
+        for index, (event, rr, r, cc, c) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column))):
+            if event > 7140 and event < 7180:
+                print index, int(event), rr, r
+      
+        print '___________________'
+#      
+        corr = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=20, n_good_events=5, search_range=20)
+      
+        print '___________________'
+      
+        for index, (event, rr, r, cc, c, co) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column, corr))):
+            if index > 2390 and index < 2500:
+                print index, int(event), rr, r, co
+#      
+#         print '___________________'
+#         
+# #         print event_numbers[-1] - 518
+# #         
+# #         for i in range(287, 500, 1):
+# #             print  
+# #          
+#         for index, (event, rr, r, cc, c, co) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column, corr))):
+#             if event > 7485 and event < 7550:
+#                 print index, int(event), rr, r, co
+#    
+#         print '___________________'
+#           
+#         corr = np.logical_and(fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=10), corr)
+#                                      
+#         for index, (event, rr, r, cc, c, co) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column, corr))):
+#             if event > 7485 and event < 7550:
+#                 print index, int(event), rr, r, co
+#    
+#         print '___________________'
+#         
+#         corr = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=10)
+#                                    
+#         for index, (event, rr, r, cc, c, co) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column, corr))):
+#             if event > 7230 and event < 7280:
+#                 print index, int(event), rr, r, co
+#  
+#         print '___________________'
 
 #     size = 50
 #     np.random.seed(0)
-#     event_numbers = np.arange(size, dtype=np.int64).repeat(2)[:50]
+#     event_numbers = np.arange(size, dtype=np.int64).repeat(2)[:size]
 #     ref_column, ref_row = np.random.uniform(high=80, size=size), np.random.uniform(high=336, size=size)
 #     column, row = ref_column.copy(), ref_row.copy()
-#    
+#      
 #     column, row = np.zeros_like(column), np.zeros_like(row)
-#     column[10:] = ref_column[:-10]
-#     row[10:] = ref_row[:-10]
-       
-#     event_numbers[13:-1] = event_numbers[14:]
-#     ref_column[13:-1] = ref_column[14:]
-#     ref_row[13:-1] = ref_row[14:]
-#     column[13:-1] = column[14:]
-#     row[13:-1] = row[14:]
+#     column[10:] = ref_column[0:-10]
+#     row[10:] = ref_row[0:-10]
+#     column[20:] = ref_column[20:]
+#     row[20:] = ref_row[20:]
+#         
 #       
-#     column[13], column[14] = column[14], column[13]
-#     row[13], row[14] = row[14], row[13]
 #       
-#     column[15], column[16] = column[16], column[15]
-#     row[15], row[16] = row[16], row[15]
-#       
-#     column[17], column[18] = column[18], column[17]
-#     row[17], row[18] = row[18], row[17]
-      
-#     column[19], column[20] = column[20], column[19]
-#     row[19], row[20] = row[20], row[19]
-       
-#     row[10] = 43.9051
+# #     event_numbers[13:-1] = event_numbers[14:]
+# #     ref_column[13:-1] = ref_column[14:]
+# #     ref_row[13:-1] = ref_row[14:]
+# #     column[13:-1] = column[14:]
+# #     row[13:-1] = row[14:]
+# #
+# #     column[13], column[14] = column[14], column[13]
+# #     row[13], row[14] = row[14], row[13]
+# #
+# #     column[15], column[16] = column[16], column[15]
+# #     row[15], row[16] = row[16], row[15]
+# #
+# #     column[17], column[18] = column[18], column[17]
+# #     row[17], row[18] = row[18], row[17]
+#      
+# #     column[19], column[20] = column[20], column[19]
+# #     row[19], row[20] = row[20], row[19]
+#      
+# #     row[10] = 43.9051
 # #     row[18] = 43.9051
-#        
-#    
+#      
 #     for index, (event, hit_1, hit_2) in enumerate(np.column_stack((event_numbers, ref_row, row))):
 #         print index, int(event), hit_1, hit_2
 #     print '___________________'
-#        
-#     corr = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3)
- 
+#       
+#     corr = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, search_range=10)
+#       
 #     print '___________________'
 #     for index, (event, hit_1, hit_2, c) in enumerate(np.column_stack((event_numbers, ref_row, row, corr))):
 #         print index, int(event), hit_1, hit_2, c
 #     print '___________________'
-#     print 'DONE'
+    print 'DONE'
