@@ -18,7 +18,7 @@ init:
   - ps: ls C:\Miniconda/Scripts
   - C:\Miniconda\Scripts\conda create --yes -n test-environment numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml pip
   - C:\Miniconda\Scripts\activate.bat test-environment
-  - pip install progressbar-latest pyvisa pyvisa-py
+  - pip install progressbar-latest
   - C:\Miniconda\Scripts\conda info -a
   - C:\Miniconda\Scripts\conda list
 
@@ -26,7 +26,7 @@ install:
   - python.exe setup.py develop
 
 test_script:
-  - nosetests
+  - nosetests tests
 #  - cd tests\test-recipes\metadata
 # This will be effectively a no-op for recipes without bld.bat
 #  - for /D %%f in (*) do (C:\Miniconda\Scripts\conda-build --no-binstar-upload %%~nf)
