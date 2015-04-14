@@ -566,7 +566,7 @@ void Clusterizer::deleteHitMap()
 {
 	info("deleteHitMap()");
 	if (_hitMap != 0)
-		delete _hitMap;
+		delete[] _hitMap;
 	_hitMap = 0;
 }
 
@@ -586,7 +586,7 @@ void Clusterizer::deleteHitIndexMap()
 {
 	info(std::string("deleteHitIndexMap()"));
 	if (_hitIndexMap != 0)
-		delete _hitIndexMap;
+		delete[] _hitIndexMap;
 	_hitIndexMap = 0;
 }
 
@@ -636,11 +636,11 @@ void Clusterizer::deleteResultHistograms()
 {
 	info(std::string("deleteResultHistograms()"));
 	if (_clusterCharges != 0)
-		delete _clusterCharges;
+		delete[] _clusterCharges;
 	if (_clusterHits != 0)
-		delete _clusterHits;
+		delete[] _clusterHits;
 	if (_clusterPosition != 0)
-		delete _clusterPosition;
+		delete[] _clusterPosition;
 	_clusterCharges = 0;
 	_clusterCharges = 0;
 	_clusterHits = 0;
@@ -651,7 +651,7 @@ void Clusterizer::deleteChargeMap()
 {
 	info(std::string("deleteChargeMap()"));
 	if (_chargeMap != 0)
-		delete _chargeMap;
+		delete[] _chargeMap;
 	_chargeMap = 0;
 }
 
