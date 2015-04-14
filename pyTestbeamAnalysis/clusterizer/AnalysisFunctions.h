@@ -245,7 +245,7 @@ void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, Clus
 
 // loop over the refHit, Hit arrays and compare the hits of same event number. If they are similar (within an error) correlation is assumed. If more than nBadEvents are not correlated, broken correlation is assumed.
 // True/False is returned for correlated/not correlated data. The iRefHit index is the index of the first not correlated hit.
-bool _checkForCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int nGoodEvents = 0, bool print = false)
+bool _checkForCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int nGoodEvents = 0, bool print = false)
 {
 	int64_t tRefEventNumber = rEventArray[iRefHit] - 1;  // last read reference hit event number
 	unsigned int tNgoodEvents = 0; // consecutive correlated events
@@ -253,7 +253,7 @@ bool _checkForCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64
 	unsigned int tBadEvents = 0;  // consecutive not correlated events
 	unsigned int tHitIndex = iRefHit;  // actual first not correlated hit index
 	bool tIsCorrelated = false;  // flag for the actual event
-	bool tIsVirtual = false;  // pure virtual events only have virtual hits, correlation cannot be judged here
+	bool tIsVirtual = false;  // pure virtual events only have virtual hits or already no correlation flag set, correlation cannot be judged here
 
 	for (iRefHit; iRefHit < nHits; ++iRefHit) {
 		if (tRefEventNumber != rEventArray[iRefHit]) {  // check if event is finished
@@ -293,7 +293,7 @@ bool _checkForCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64
 		}
 		if (rRefCol[iRefHit] != 0 && rCol[iHit] != 0 && rRefRow[iRefHit] != 0 && rRow[iHit] != 0 && std::fabs(rRefCol[iRefHit] - rCol[iHit]) < rError && std::fabs(rRefRow[iRefHit] - rRow[iHit]) < rError)  // check for correlation of real hits
 			tIsCorrelated = true;
-		if (rRefCol[iRefHit] == 0 && rCol[iHit] == 0 && rRefRow[iRefHit] == 0 && rRow[iHit] == 0)  // if virtual hits occur in both devices correlation is also likely
+		if ((rRefCol[iRefHit] == 0 && rCol[iHit] == 0 && rRefRow[iRefHit] == 0 && rRow[iHit] == 0) || rCorrelated[iHit] == 0)  // if virtual hits occur in both devices correlation is likely
 			tIsVirtual = true;
 		if (_debug && print)
 			std::cout << "\n" << iRefHit << "\t" << iHit << "\t" << rEventArray[iRefHit] << "\t" << rEventArray[iHit] << "\t" << rRefCol[iRefHit] << " / " << rCol[iHit] << "\t" << rRefRow[iRefHit] << " / " << rRow[iHit] << "\t" << tIsCorrelated << "\t" << tBadEvents << "\t" << tNgoodEvents << "\n";
@@ -312,14 +312,16 @@ bool _checkForCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64
 	return true;
 }
 
-bool _findCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
+bool _findCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& correltationSearchRange, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
 {
-	unsigned int tSearchDistance = 2000; // search range (index) for correlation
+	unsigned int tSearchDistance = correltationSearchRange; // search range (index) for correlation
+
+	unsigned int tLastNotZeroHit = 0; // hit index of last non virtual hit, for loop speed up
 
 	// Determine the search distance in the reference hit array
 	unsigned int tStopRefHitIndex = nHits;
-	if (iRefHit + tSearchDistance < nHits)
-		tStopRefHitIndex = iRefHit + tSearchDistance;
+	if (iRefHit + correltationSearchRange < nHits)
+		tStopRefHitIndex = iRefHit + correltationSearchRange;
 
 	for (iRefHit; iRefHit < tStopRefHitIndex; ++iRefHit) {
 		if (rRefCol[iRefHit] == 0 && rRefRow[iRefHit] == 0)  // hit has to be non virtual (column/row != 0)
@@ -336,16 +338,20 @@ bool _findCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*&
 			tStopHitIndex = iRefHit + tSearchDistance;
 		if (_debug) std::cout << "Search between " << tStartHitIndex << " and " << tStopHitIndex << "\n";
 
+//		std::cout<<"tLastNotZeroHit "<<tLastNotZeroHit<<" "<<tStartHitIndex<<"\n";
+
 		// Loop over the hits within the search distance and try to find a fitting hit. All fitting hits are checked to have subsequent correlated hits. Otherwise it is only correlation by chance.
 		for (iHit = tStartHitIndex; iHit < tStopHitIndex; ++iHit) {
-			if (rCol[iHit] == 0)  //skip virtual hits
+			if (rCol[iHit] == 0 && rCol[iRefHit] == 0)  //skip virtual hits
 				continue;
+			else
+				tLastNotZeroHit = iHit;
 			// Search for correlated hit candidate
 			if (std::fabs(rRefCol[iRefHit] - rCol[iHit]) < rError && std::fabs(rRefRow[iRefHit] - rRow[iHit]) < rError) {  // check for correlation
 				if (_debug) std::cout << "Try correlated hit canditate " << iHit << ": " << rEventArray[iHit] << " " << rCol[iHit] << " " << rRow[iHit] << "... ";
 				unsigned int tiHit = iHit;  // temporaly store actual candidate index to be able to return to it after correlation check
 				unsigned int ttRefHit = iRefHit;  // temporaly store actual candidate index to be able to return to it after correlation check
-				if (_checkForCorrelation(ttRefHit, tiHit, rEventArray, rRefCol, rCol, rRefRow, rRow, tStopRefHitIndex, rError, goodEventsSearchRange, nGoodEvents, true)) {  // correlated hit candidate is correct if 5 / 10 events are also correlated (including the candidate)
+				if (_checkForCorrelation(ttRefHit, tiHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, tStopRefHitIndex, rError, goodEventsSearchRange, nGoodEvents, true)) {  // correlated hit candidate is correct if 5 / 10 events are also correlated (including the candidate)
 					if (_debug) std::cout << " SUCCESS! Is correlated hit!\n";
 					return true;
 				}
@@ -396,6 +402,7 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 						break;
 				}
 			}
+
 			tNrefhits = 1;
 			tNhits = 0;
 			tRefEventNumber = rEventArray[iRefHit];
@@ -441,7 +448,7 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 }
 
 // Fix the event alignment with hit position information, crazy...
-unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
+unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int& correltationSearchRange, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
 {
 	// traverse both hit arrays starting from 0
 	unsigned int iRefHit = 0;
@@ -451,17 +458,21 @@ unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefC
 
 	for (iRefHit; iRefHit < nHits ; ++iRefHit){
 		iHit = iRefHit;
-		if (_checkForCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, nHits, rError, nBadEvents)) // if true all hits are correlated, nothing to do
+		if (_checkForCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits, rError, nBadEvents)) // if true all hits are correlated, nothing to do
 			return tNfixes;
 		if (_info) std::cout << "No correlation starting at index (event) " << iRefHit << " (" << rEventArray[iRefHit] << ")\n";
 
-		if (!_findCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits, rError, nGoodEvents, goodEventsSearchRange)) {
+		if (!_findCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits, rError, correltationSearchRange, nGoodEvents, goodEventsSearchRange)) {
 			if (_info) std::cout << "Found no correlation up to reference hit " << iRefHit - 1 << "\n";
 			return tNfixes;
 		}
 		else {
-			if (_info) std::cout << "Start fixing correlation for " <<iRefHit<< ": "<< rRefCol[iRefHit] << "/" << rRefRow[iRefHit] << " = " << iHit<< ": "<< rCol[iHit] << "/" << rRow[iHit] << "\n";
-			_fixAlignment(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits);
+			if (iRefHit != iHit){
+				if (_info) std::cout << "Start fixing correlation for " <<iRefHit<< ": "<< rRefCol[iRefHit] << "/" << rRefRow[iRefHit] << " = " << iHit<< ": "<< rCol[iHit] << "/" << rRow[iHit] << "\n";
+				_fixAlignment(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits);
+			}
+			else
+				std::cout << "Correlation is back at " <<iRefHit<< ": "<< rRefCol[iRefHit] << "/" << rRefRow[iRefHit] << " = " << iHit<< ": "<< rCol[iHit] << "/" << rRow[iHit] << "\n";
 			tNfixes++;
 		}
 	}

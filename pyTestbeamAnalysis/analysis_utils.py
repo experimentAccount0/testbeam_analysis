@@ -209,22 +209,23 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
 
 
-def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=5, n_good_events=3, search_range=10):
+def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=5, n_good_events=3, correlation_search_range=2000, good_events_search_range=10):
     correlated = np.ascontiguousarray(np.ones(shape=event_numbers.shape, dtype=np.uint8))  # array to signal correlation to be ables to omit not correlated events in the analysis
     event_numbers = np.ascontiguousarray(event_numbers)
     ref_column = np.ascontiguousarray(ref_column)
     column = np.ascontiguousarray(column)
     ref_row = np.ascontiguousarray(ref_row)
     row = np.ascontiguousarray(row)
-    n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, correlated, error, n_bad_events, n_good_events, search_range)
+    n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
     return correlated, n_fixes
 
 if __name__ == '__main__':
     print 'MAIN'
-    with tb.open_file(r'C:\Users\DavidLP\git\pyTestbeamAnalysis\pyTestbeamAnalysis\converter\Tracklets.h5', 'r') as in_file_h5:
-        event_numbers = in_file_h5.root.Tracklets[8500:19500]['event_number'].copy()
-        ref_column, ref_row = in_file_h5.root.Tracklets[8500:19500]['column_dut_0'].copy(), in_file_h5.root.Tracklets[8500:19500]['row_dut_0'].copy()
-        column, row = in_file_h5.root.Tracklets[8500:19500]['column_dut_1'].copy(), in_file_h5.root.Tracklets[8500:19500]['row_dut_1'].copy()
+    with tb.open_file(r'C:\Users\DavidLP\git\pyTestbeamAnalysis\pyTestbeamAnalysis\converter\Tracklets_big.h5', 'r') as in_file_h5:
+        limit = 40000
+        event_numbers = in_file_h5.root.Tracklets[:limit]['event_number'].copy()
+        ref_column, ref_row = in_file_h5.root.Tracklets[:limit]['column_dut_0'].copy(), in_file_h5.root.Tracklets[:limit]['row_dut_0'].copy()
+        column, row = in_file_h5.root.Tracklets[:limit]['column_dut_1'].copy(), in_file_h5.root.Tracklets[:limit]['row_dut_1'].copy()
         print in_file_h5.root.Tracklets.dtype.names
       
         for index, (event, rr, r, cc, c) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column))):
@@ -233,12 +234,12 @@ if __name__ == '__main__':
       
         print '___________________'
 #      
-        corr, n_fixes = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=20, n_good_events=5, search_range=20)
+        corr, n_fixes = fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=2., n_bad_events=30, n_good_events=10, correlation_search_range=100000, good_events_search_range=100)
       
         print '_____fixes', n_fixes, 'jumps _____'
       
         for index, (event, rr, r, cc, c, co) in enumerate(np.column_stack((event_numbers, ref_row, row, ref_column, column, corr))):
-            if index > 2390 and index < 2500:
+            if index > 40000 - 100 and index < 40000:
                 print index, int(event), rr, r, co
 #      
 #         print '___________________'
