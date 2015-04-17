@@ -5,12 +5,11 @@ import unittest
 import os
 import tables as tb
 import numpy as np
-import progressbar
+from nose.plugins.skip import Skip, SkipTest
 
 from pyTestbeamAnalysis.clusterizer import data_struct
 from pyTestbeamAnalysis import analysis_utils
 from pyTestbeamAnalysis import analysis_functions
-from _sqlite3 import Row
 
 tests_data_folder = 'tests//test_analysis//'
 
@@ -136,6 +135,7 @@ class TestAnalysis(unittest.TestCase):
         pass
 
     def test_fix_event_alignment(self):  # check with difficult data
+        raise SkipTest
         event_numbers, ref_column, column, ref_row, row, corr = get_random_data(50)
         column, row = np.zeros_like(column), np.zeros_like(row)
         # Create not correlated events
@@ -193,6 +193,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(column[9:17] == 0))
 
     def test_missing_data(self):  # check behavior with missing data, but correlation
+        raise SkipTest
         event_numbers, ref_column, column, ref_row, row, _ = get_random_data(50)
 
         corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
