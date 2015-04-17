@@ -236,6 +236,52 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(ref_column == column))  # Similarity check
         self.assertTrue(np.all(ref_row == row))  # Similarity check
 
+    def test_virtual_hit_copying(self):  # check behavior for virtual hits
+        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(20)
+        event_numbers[:12] = np.array([0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5])
+        column[4:] = column[1:-3]
+        row[4:] = row[1:-3]
+        column[1:4] = 0
+        row[1:4] = 0
+        column[4:-1] = column[5:]
+        row[4:-1] = row[5:]
+        column[9:] = column[8:-1]
+        row[9:] = row[8:-1]
+        column[8] = 0
+        row[8] = 0
+        column[13:] = ref_column[11:-2]
+        row[13:] = ref_row[11:-2]
+        column[12] = 0
+        row[12] = 0
+
+        # Check with correlation hole
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+
+        # one fix are expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertEqual(corr[0], 1)
+        self.assertEqual(corr[1], 0)
+        self.assertTrue(np.all(corr[2:18] == 1))
+        self.assertTrue(np.all(corr[18:] == 0))
+
+        # Similarity check
+        self.assertEqual(ref_column[0], column[0])
+        self.assertEqual(ref_row[0], row[0])
+        self.assertTrue(np.all(ref_column[2:9] == column[2:9]))
+        self.assertTrue(np.all(ref_row[2:9] == row[2:9]))
+        self.assertTrue(np.all(ref_column[11:18] == column[11:18]))
+        self.assertTrue(np.all(ref_row[11:18] == row[11:18]))
+
+        # Virtual hits check
+        self.assertEqual(column[1], 0)
+        self.assertEqual(row[1], 0)
+        self.assertTrue(np.all(column[9:11] == 0))
+        self.assertTrue(np.all(row[9:11] == 0))
+        self.assertTrue(np.all(column[18:] == 0))
+        self.assertTrue(np.all(row[18:] == 0))
+
 
 if __name__ == '__main__':
     tests_data_folder = 'test_analysis//'
