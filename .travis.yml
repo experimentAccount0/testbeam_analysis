@@ -32,4 +32,4 @@ install:
   - python setup.py develop
 # Run test
 script:
-- nosetests tests
+- nosetests tests/test_analysis.py tests/test_alignment_fixing
