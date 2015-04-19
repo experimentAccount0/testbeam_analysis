@@ -10,13 +10,14 @@ import progressbar
 from pyTestbeamAnalysis.clusterizer import data_struct
 from pyTestbeamAnalysis import analysis_utils
 from pyTestbeamAnalysis import analysis_functions
+from nose import SkipTest
 
 tests_data_folder = 'tests//test_analysis//'
 
 
-def get_random_data(n_hits, seed=0):
+def get_random_data(n_hits, hits_per_event=2, seed=0):
     np.random.seed(seed)
-    event_numbers = np.arange(n_hits, dtype=np.int64).repeat(2)[:n_hits]
+    event_numbers = np.arange(n_hits, dtype=np.int64).repeat(hits_per_event)[:n_hits]
     ref_column, ref_row = np.random.uniform(high=80, size=n_hits), np.random.uniform(high=336, size=n_hits)
     column, row = ref_column.copy(), ref_row.copy()
     corr = np.ascontiguousarray(np.ones(shape=event_numbers.shape, dtype=np.uint8))  # array to signal correlation to be ables to omit not correlated events in the analysis
@@ -135,7 +136,7 @@ class TestAnalysis(unittest.TestCase):
         pass
 
     def test_fix_event_alignment(self):  # check with multiple jumps data
-        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(50)
+        event_numbers, ref_column, column, ref_row, row, _ = get_random_data(50)
         column, row = np.zeros_like(column), np.zeros_like(row)
         # Create not correlated events
         column[10:] = ref_column[0:-10]
@@ -281,6 +282,67 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(row[9:11] == 0))
         self.assertTrue(np.all(column[18:] == 0))
         self.assertTrue(np.all(row[18:] == 0))
+
+    def test_missing_events(self):  # test behaviour if events are missing
+        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(20, hits_per_event=1)
+        # Event offset = 3 and two consecutive events missing
+        column[:3] = 0
+        row[:3] = 0
+        column[3:] = ref_column[:-3]
+        row[3:] = ref_row[:-3]
+        event_numbers = np.delete(event_numbers, [9, 10], axis=0)
+        ref_column = np.delete(ref_column, [9, 10], axis=0)
+        column = np.delete(column, [9, 10], axis=0)
+        ref_row = np.delete(ref_row, [9, 10], axis=0)
+        row = np.delete(row, [9, 10], axis=0)
+        corr = np.delete(corr, [9, 10], axis=0)
+
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+
+        # one fix are expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertTrue(np.all(corr[:-3] == 1))
+        self.assertTrue(np.all(corr[-3:] == 0))
+
+        # Similarity check
+        self.assertTrue(np.all(ref_column[column != 0] == column[column != 0]))
+        self.assertTrue(np.all(ref_row[column != 0] == row[column != 0]))
+        self.assertTrue(np.all(column[6:8] == 0))
+        self.assertTrue(np.all(row[6:8] == 0))
+
+        # Event offset = 1, no events missing, two hits of one event missing
+        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(20, hits_per_event=3)
+        column[:3] = 0
+        row[:3] = 0
+        column[3:] = ref_column[:-3]
+        row[3:] = ref_row[:-3]
+        event_numbers = np.delete(event_numbers, [9, 10], axis=0)
+        ref_column = np.delete(ref_column, [9, 10], axis=0)
+        column = np.delete(column, [9, 10], axis=0)
+        ref_row = np.delete(ref_row, [9, 10], axis=0)
+        row = np.delete(row, [9, 10], axis=0)
+        corr = np.delete(corr, [9, 10], axis=0)
+
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+
+        # one fix are expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertTrue(np.all(corr[:9] == 1))
+        self.assertEqual(corr[9], 0)
+        self.assertTrue(np.all(corr[10:14] == 1))
+        self.assertTrue(np.all(corr[15:] == 0))
+
+        # Similarity check
+        self.assertTrue(np.all(ref_column[0:6] == column[0:6]))
+        self.assertTrue(np.all(ref_row[0:6] == row[0:6]))
+        self.assertTrue(np.all(ref_column[10:15] == column[10:15]))
+        self.assertTrue(np.all(ref_row[10:15] == row[10:15]))
+        self.assertTrue(np.all(column[15:] == 0))
+        self.assertTrue(np.all(row[15:] == 0))
 
 
 if __name__ == '__main__':
