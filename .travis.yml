@@ -5,7 +5,6 @@ sudo: false
 branches:
   only:
     - master
-    - development
 notifications:
   email:
     - pohl@physik.uni-bonn.de
@@ -21,15 +20,18 @@ before_install:
   - conda create --yes -n test-environment numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml
   - source activate test-environment
   - pip install progressbar-latest pyvisa pyvisa-py
+
 # Install pybar with needed packages
 install:
-  # Install prequisits
-  - pip install https://github.com/walac/pyusb/archive/master.zip
-  - pip install https://silab-redmine.physik.uni-bonn.de/attachments/download/735/pySiLibUSB-2.0.3.tar.gz
-  - git clone -b master https://github.com/SiLab-Bonn/basil; cd basil/host; python setup.py develop; cd ../..
-  - git clone -b development https://github.com/SiLab-Bonn/pyBAR; cd pyBAR; python setup.py develop; cd ..
+  # Install prequisits (for FE-I4 analyis: pyBAR (needs basil and pySiLibUSB (needs pyusb)))
+  # - pip install https://github.com/walac/pyusb/archive/master.zip
+  # - pip install https://silab-redmine.physik.uni-bonn.de/attachments/download/735/pySiLibUSB-2.0.3.tar.gz
+  # - pip install -e "git+https://github.com/SiLab-Bonn/basil.git@master#egg=basil&subdirectory=host"
+  # - pip install -e "git+https://github.com/SiLab-Bonn/pyBAR.git@development"
+
   # Install pyTestbeamAnalysis
   - python setup.py develop
+
 # Run test
 script:
 - nosetests tests/test_analysis.py tests/test_alignment_fixing
