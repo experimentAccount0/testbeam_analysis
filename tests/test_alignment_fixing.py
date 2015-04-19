@@ -371,35 +371,27 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(column == np.array([2, 0, 3, 4, 0, 0, 0, 9, 10, 0, 13, 14, 15, 0, 17, 0, 0, 0])))
         self.assertTrue(np.all(column == row))
 
-# Small but important change of test case
-#         event_numbers = np.array([0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 6, 6, 7, 7, 8, 8, 9, 10], dtype=np.int64)
-#         ref_column = np.array([1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20], dtype=np.double)
-#         ref_row = ref_column
-#         column = np.array([11, 11, 0, 2, 5, 5, 5, 3, 3, 4, 9, 10, 12, 12, 13, 14, 15, 17], dtype=np.double)
-#         row = column
-#
-#         print '___________________'
-#         for index, (event, hit_1, hit_2) in enumerate(np.column_stack((event_numbers, ref_row, row))):
-#             print index, int(event), hit_1, hit_2
-#         print '___________________'
-#
-#         corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
-#
-#         print '___________________'
-#         for index, (event, hit_1, hit_2, c) in enumerate(np.column_stack((event_numbers, ref_row, row, corr))):
-#             print index, int(event), hit_1, hit_2, c
-#         print '___________________'
-#
-# one fix are expected
-#         self.assertEqual(n_fixes, 1)
-#
-# Correlation flag check
-#         self.assertTrue(np.all(corr[:16] == 1))
-#         self.assertTrue(np.all(corr[17:] == 0))
-#
-# Similarity check
-#         self.assertTrue(np.all(column == np.array([2, 0, 3, 4, 0, 0, 0, 9, 10, 0, 13, 14, 15, 0, 17, 0, 0, 0])))
-#         self.assertTrue(np.all(column == row))
+        # Small but important change of test case, event 4 is copied to 2 and their are too many hits in 4 -> correlation has to be 0
+        event_numbers = np.array([0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 6, 6, 7, 7, 8, 8, 9, 10], dtype=np.int64)
+        ref_column = np.array([1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20], dtype=np.double)
+        ref_row = ref_column
+        column = np.array([11, 11, 0, 2, 5, 5, 5, 3, 3, 4, 9, 10, 12, 12, 13, 14, 15, 17], dtype=np.double)
+        row = column
+
+        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+
+        # one fix are expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertTrue(np.all(corr[0:2] == 1))
+        self.assertTrue(np.all(corr[2:4] == 0))
+        self.assertTrue(np.all(corr[4:16] == 1))
+        self.assertTrue(np.all(corr[17:] == 0))
+
+        # Similarity check
+        self.assertTrue(np.all(column == np.array([2, 0, 3, 3, 0, 0, 0, 9, 10, 0, 13, 14, 15, 0, 17, 0, 0, 0])))
+        self.assertTrue(np.all(column == row))
 
 if __name__ == '__main__':
     tests_data_folder = 'test_analysis//'
