@@ -143,7 +143,8 @@ class TestAnalysis(unittest.TestCase):
         row[10:] = ref_row[0:-10]
         column[20:] = ref_column[20:]
         row[20:] = ref_row[20:]
-        row[10] = 43.9051
+        row[10] = 3.14159
+        column[10] = 3.14159
 
         corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
 
@@ -151,8 +152,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertEqual(n_fixes, 2)
 
         # Correlation flag check
-        self.assertEqual(corr[0], 0)
-        self.assertTrue(np.all(corr[1:10] == 1))
+        self.assertTrue(np.all(corr[0:10] == 1))
         self.assertTrue(np.all(corr[11:20] == 0))
         self.assertTrue(np.all(corr[20:] == 1))
 
@@ -163,8 +163,8 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(ref_row[20:] == row[20:]))
 
         # Shifted data has to leave zeroes
-        self.assertEqual(column[0], 0)
-        self.assertEqual(row[0], 0)
+        self.assertEqual(column[0], 3.14159)
+        self.assertEqual(row[0], 3.14159)
         self.assertTrue(np.all(row[10:20] == 0))
         self.assertTrue(np.all(column[10:20] == 0))
 
@@ -193,9 +193,9 @@ class TestAnalysis(unittest.TestCase):
         event_numbers, ref_column, column, ref_row, row, corr = get_random_data(500)
         column[5:16] = 0
         row[5:16] = 0
-        column[16:19] = ref_column[6:9]
-        row[16:19] = ref_row[6:9]
-        corr[17] = 0  # create not correlated event
+        column[16:20] = ref_column[6:10]
+        row[16:20] = ref_row[6:10]
+        corr[16:18] = 0  # create not correlated event
 
         # Check with correlation hole
         n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
@@ -204,28 +204,36 @@ class TestAnalysis(unittest.TestCase):
         # Correlation flag check
         self.assertTrue(np.all(corr[0:6] == 1))
         self.assertTrue(np.all(corr[6:19] == 0))
-        self.assertTrue(np.all(corr[19:] == 1))
+        self.assertTrue(np.all(corr[20:] == 1))
 
-        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(50)
+        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(500)
         column[5:16] = 0
         row[5:16] = 0
-        column[16:19] = ref_column[6:9]
-        row[16:19] = ref_row[6:9]
-        corr[17] = 0  # create not correlated event
+        column[16:20] = ref_column[6:10]
+        row[16:20] = ref_row[6:10]
+        corr[16:18] = 0  # create not correlated event
 
         # check with event copying
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=1, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
 
         self.assertEqual(n_fixes, 2)  # 2 fixes are expected
 
         # Correlation flag check
-        self.assertTrue(np.all(corr[:7] == 1))
-        self.assertEqual(corr[7], 0)
-        self.assertTrue(np.all(corr[8:10]))
-        self.assertTrue(np.all(corr[10:19] == 0))
-        self.assertTrue(np.all(corr[19:27] == 1))
-        self.assertEqual(corr[27], 0)  # zero due to temporary copying to corr = 0 event
+        self.assertTrue(np.all(corr[0:6] == 1))
+        self.assertTrue(np.all(corr[6:8] == 0))
+        self.assertTrue(np.all(corr[8:10] == 1))
+        self.assertTrue(np.all(corr[10:20] == 0))
+        self.assertTrue(np.all(corr[20:26] == 1))
+        self.assertTrue(np.all(corr[26:28] == 0))
         self.assertTrue(np.all(corr[28:] == 1))
+
+        # Data check
+        self.assertTrue(np.all(ref_row[:5] == row[:5]))
+        self.assertTrue(np.all(ref_column[:5] == column[:5]))
+        self.assertTrue(np.all(ref_row[6:10] == row[6:10]))
+        self.assertTrue(np.all(ref_column[6:10] == column[6:10]))
+        self.assertTrue(np.all(ref_row[20:] == row[20:]))
+        self.assertTrue(np.all(ref_column[20:] == column[20:]))
 
     def test_no_correction(self):  # check behavior if no correction is needed
         event_numbers, ref_column, column, ref_row, row, corr = get_random_data(5000)
@@ -262,22 +270,20 @@ class TestAnalysis(unittest.TestCase):
         self.assertEqual(n_fixes, 1)
 
         # Correlation flag check
-        self.assertEqual(corr[0], 1)
-        self.assertEqual(corr[1], 0)
-        self.assertTrue(np.all(corr[2:18] == 1))
+        self.assertTrue(np.all(corr[:18] == 1))
         self.assertTrue(np.all(corr[18:] == 0))
 
         # Similarity check
         self.assertEqual(ref_column[0], column[0])
         self.assertEqual(ref_row[0], row[0])
-        self.assertTrue(np.all(ref_column[2:9] == column[2:9]))
-        self.assertTrue(np.all(ref_row[2:9] == row[2:9]))
+        self.assertTrue(np.all(ref_column[4:9] == column[4:9]))
+        self.assertTrue(np.all(ref_row[4:9] == row[4:9]))
         self.assertTrue(np.all(ref_column[11:18] == column[11:18]))
         self.assertTrue(np.all(ref_row[11:18] == row[11:18]))
 
         # Virtual hits check
-        self.assertEqual(column[1], 0)
-        self.assertEqual(row[1], 0)
+        self.assertEqual(column[3], 0)
+        self.assertEqual(row[3], 0)
         self.assertTrue(np.all(column[9:11] == 0))
         self.assertTrue(np.all(row[9:11] == 0))
         self.assertTrue(np.all(column[18:] == 0))
@@ -334,7 +340,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(corr[:9] == 1))
         self.assertEqual(corr[9], 0)
         self.assertTrue(np.all(corr[10:14] == 1))
-        self.assertTrue(np.all(corr[15:] == 0))
+        self.assertTrue(np.all(corr[16:] == 0))
 
         # Similarity check
         self.assertTrue(np.all(ref_column[0:6] == column[0:6]))
@@ -344,6 +350,56 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(column[15:] == 0))
         self.assertTrue(np.all(row[15:] == 0))
 
+    def test_tough_test_case(self):  # test crazy uncorrelated data
+        #         raise SkipTest
+        event_numbers = np.array([0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 6, 6, 7, 7, 8, 8, 9, 10], dtype=np.int64)
+        ref_column = np.array([1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20], dtype=np.double)
+        ref_row = ref_column
+        column = np.array([11, 11, 0, 2, 5, 5, 5, 3, 0, 4, 9, 10, 12, 12, 13, 14, 15, 17], dtype=np.double)
+        row = column
+
+        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+
+        # one fix are expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertTrue(np.all(corr[:16] == 1))
+        self.assertTrue(np.all(corr[17:] == 0))
+
+        # Similarity check
+        self.assertTrue(np.all(column == np.array([2, 0, 3, 4, 0, 0, 0, 9, 10, 0, 13, 14, 15, 0, 17, 0, 0, 0])))
+        self.assertTrue(np.all(column == row))
+
+# Small but important change of test case
+#         event_numbers = np.array([0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 6, 6, 7, 7, 8, 8, 9, 10], dtype=np.int64)
+#         ref_column = np.array([1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20], dtype=np.double)
+#         ref_row = ref_column
+#         column = np.array([11, 11, 0, 2, 5, 5, 5, 3, 3, 4, 9, 10, 12, 12, 13, 14, 15, 17], dtype=np.double)
+#         row = column
+#
+#         print '___________________'
+#         for index, (event, hit_1, hit_2) in enumerate(np.column_stack((event_numbers, ref_row, row))):
+#             print index, int(event), hit_1, hit_2
+#         print '___________________'
+#
+#         corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+#
+#         print '___________________'
+#         for index, (event, hit_1, hit_2, c) in enumerate(np.column_stack((event_numbers, ref_row, row, corr))):
+#             print index, int(event), hit_1, hit_2, c
+#         print '___________________'
+#
+# one fix are expected
+#         self.assertEqual(n_fixes, 1)
+#
+# Correlation flag check
+#         self.assertTrue(np.all(corr[:16] == 1))
+#         self.assertTrue(np.all(corr[17:] == 0))
+#
+# Similarity check
+#         self.assertTrue(np.all(column == np.array([2, 0, 3, 4, 0, 0, 0, 9, 10, 0, 13, 14, 15, 0, 17, 0, 0, 0])))
+#         self.assertTrue(np.all(column == row))
 
 if __name__ == '__main__':
     tests_data_folder = 'test_analysis//'
