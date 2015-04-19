@@ -258,13 +258,13 @@ bool _checkForNoCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int
 
 	for (; iRefHit < nHits && iHit < nHits; ++iRefHit, ++iHit) {
 		if ((rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
-			while (iHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])){  // reference hit array is at next event, catch up with hit array
-				iHit++;
-				tNHits++;
-			}
 			while (iRefHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])){  // hit array is at next event, catch up with reference hit array
 				iRefHit++;
 				tNrefHits++;
+			}
+			while (iHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])){  // reference hit array is at next event, catch up with hit array
+				iHit++;
+				tNHits++;
 			}
 		}
 
@@ -273,12 +273,12 @@ bool _checkForNoCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int
 				if (tBadEvents == 0) {
 					tHitIndex = iHit;
 					for (tHitIndex; tHitIndex > 0; --tHitIndex) {  // the actual first not correlated hit is the first hit of the last event
-						if (rEventArray[tHitIndex] < rEventArray[iRefHit] - 1) {
+						if (rEventArray[tHitIndex] < tRefEventNumber) {
 							tHitIndex++;
 							break;
 						}
 					}
-					if (rEventArray[tHitIndex] < rEventArray[iRefHit] - 1)
+					if (rEventArray[tHitIndex] < tRefEventNumber)
 						tHitIndex++;
 				}
 				if (tNVirtual == tNHits && tNVirtual == tNrefHits)  // if there are only virtual hits one cannot judge the correlation, do not increase bad event counter
@@ -326,13 +326,13 @@ bool _checkForCorrelation(unsigned int iRefHit, unsigned int iHit, const int64_t
 
 	for (; iRefHit < nHits && iHit < nHits; ++iRefHit, ++iHit) {
 		if ((rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
-			while (iHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])){  // reference hit array is at next event, catch up with hit array
-				iHit++;
-				tNHits++;
-			}
 			while (iRefHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])){  // hit array is at next event, catch up with reference hit array
 				iRefHit++;
 				tNrefHits++;
+			}
+			while (iHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])){  // reference hit array is at next event, catch up with hit array
+				iHit++;
+				tNHits++;
 			}
 		}
 
@@ -400,6 +400,21 @@ bool _findCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*&
 				if (_checkForCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, tStopRefHitIndex, rError, nGoodEvents, true)) {  // correlated hit candidate is correct if 5 / 10 events are also correlated (including the candidate)
 					if (_debug)
 						std::cout << " SUCCESS! Is correlated hit!\n";
+					// goto first ref hit / hit of the actual correlated event
+					unsigned int tiRefHit = iRefHit;
+					unsigned int tiHit = iHit;
+					for (; tiRefHit > 0 && rEventArray[tiRefHit] == rEventArray[iRefHit]; --tiRefHit) {  // mark all hits of last, incomplete event as not correlated
+					}
+					if (rEventArray[tiRefHit] != rEventArray[iRefHit])
+						tiRefHit++;
+					for (; tiHit > 0 && rEventArray[tiHit] == rEventArray[iHit]; --tiHit) {  // mark all hits of last, incomplete event as not correlated
+					}
+					if (rEventArray[tiHit] != rEventArray[iHit])
+						tiHit++;
+					std::cout<<"First ref hit of first correlated event "<<tiRefHit<<"\n";
+					std::cout<<"First hit of first correlated event "<<tiHit<<"\n";
+					iRefHit = tiRefHit;
+					iHit = tiHit;
 					return true;
 				}
 				else if (_debug)
@@ -439,7 +454,14 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 
 	for (; iRefHit < nHits && iHit < nHits; ++iRefHit, ++iHit) {
 		if ((rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
+			while (iRefHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])) {  // hit array is at a next event, catch up with reference hit array
+//				std::cout<<"Catch up reference array\n";
+				rCol[iRefHit] = 0;
+				rRow[iRefHit] = 0;
+				iRefHit++;
+			}
 			while (iHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])) {  // reference hit array is at a next event, catch up with hit array
+//				std::cout<<"Catch up hit array\n";
 				if (tLastCopiedEvent + tEventNumberOffset == rEventArray[iHit]){  // true if not all hits were copied -> mark all hits of this event as unsure correlated
 					for (int tiRefHit = (int) iRefHit - 1; tiRefHit > 0; --tiRefHit) {  // mark all hits of last, incomplete event as not correlated
 						if (tLastCopiedEvent == rEventArray[tiRefHit])
@@ -449,11 +471,6 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 					}
 				}
 				iHit++;
-			}
-			while (iRefHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])) {  // hit array is at a next event, catch up with reference hit array
-				rCol[iRefHit] = 0;
-				rRow[iRefHit] = 0;
-				iRefHit++;
 			}
 		}
 
@@ -482,7 +499,9 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 		}
 	}
 
-	for (unsigned int i = iRefHit; i >= 0 && i < nHits; ++i)  // last events do not exist in the hit array, thus set unsure correlation
+	// Last events maybe do not exist in the hit array, thus set unsure correlation
+	for(; iRefHit > 0 && iRefHit < nHits && rEventArray[iRefHit - 1] == rEventArray[iRefHit]; iRefHit++);  // increase reference hit until first not copied event
+	for (unsigned int i = iRefHit; i < nHits; ++i)
 		rCorrelated[i] = 3;
 
 	if (tEventNumberOffset < 0) {
@@ -497,6 +516,18 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 	}
 
 	return true;
+}
+
+void _mapCorrelationArray(uint8_t*& rCorrelated, const unsigned int& nHits)
+// correlation array is used to signal: 0 = unsure about correlation due to event merge where hits got lost, this cannot be fixed
+//								     1 = event is correlated, start assumption
+//									 2 = event hit has no corresponding hit, this flag is reset if hits are copied to this event
+// correlation array is mapped to simple correlated (flag = 1) / uncorrelated (flag = 0, 2) array for the final result
+{
+	for (unsigned int i = 0; i < nHits; ++i) {
+		if ((rCorrelated[i] & 2) == 2)
+			rCorrelated[i] = 0;
+	}
 }
 
 // Fix the event alignment with hit position information, crazy...
@@ -520,10 +551,7 @@ unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefC
 
 	unsigned int tNfixes = 0;  // number of fixes done
 
-	// correlation array is used to signal: 0 = unsure about correlation due to event merge where hits got lost, this cannot be fixed
-	//								     1 = event is correlated, start assumption
-	//									 2 = event hit has no corresponding hit, this flag is reset if hits are copied to this event
-	// correlation array is mapped to simple correlated (flag = 1) / uncorrelated (flag = 0, 2) array for the final result
+
 
 //	_checkForNoCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits, rError, nBadEvents);
 
@@ -539,10 +567,7 @@ unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefC
 			if (!_findCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, nHits, rError, correltationSearchRange, nGoodEvents, goodEventsSearchRange)) {
 				if (_info)
 					std::cout << "Found no correlation up to reference hit " << iRefHit - 1 << "\n";
-				for (unsigned int i = 0; i < nHits; ++i) {
-					if ((rCorrelated[i] & 2) == 2)
-						rCorrelated[i] = 0;
-				}
+				_mapCorrelationArray(rCorrelated, nHits);
 				return tNfixes;
 			}
 			else {
@@ -562,20 +587,13 @@ unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefC
 			}
 		}
 		else {  // everything is correlated, nothing to do
-			for (unsigned int i = 0; i < nHits; ++i) {
-				if ((rCorrelated[i] & 2) == 2)
-					rCorrelated[i] = 0;
-			}
+			_mapCorrelationArray(rCorrelated, nHits);
 			return tNfixes;
 		}
 
 	}
 
-	for (unsigned int i = 0; i < nHits; ++i) {
-		if ((rCorrelated[i] & 2) == 2)
-			rCorrelated[i] = 0;
-	}
-
+	_mapCorrelationArray(rCorrelated, nHits);
 	return tNfixes;
 }
 
