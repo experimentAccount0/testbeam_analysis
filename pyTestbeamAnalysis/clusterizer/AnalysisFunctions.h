@@ -257,7 +257,7 @@ bool _checkForNoCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int
 	unsigned int tNHits = 0; // number of hits (including virtual) of actual event
 
 	for (; iRefHit < nHits && iHit < nHits; ++iRefHit, ++iHit) {
-		if ((rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
+		while (iRefHit < nHits && iHit < nHits && (rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
 			while (iRefHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])){  // hit array is at next event, catch up with reference hit array
 				iRefHit++;
 				tNrefHits++;
@@ -325,7 +325,7 @@ bool _checkForCorrelation(unsigned int iRefHit, unsigned int iHit, const int64_t
 //	std::cout << "_checkForCorrelation "<<iRefHit<<" "<<iHit<<"\n";
 
 	for (; iRefHit < nHits && iHit < nHits; ++iRefHit, ++iHit) {
-		if ((rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
+		while (iRefHit < nHits && iHit < nHits && (rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
 			while (iRefHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])){  // hit array is at next event, catch up with reference hit array
 				iRefHit++;
 				tNrefHits++;
@@ -453,7 +453,8 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 	}
 
 	for (; iRefHit < nHits && iHit < nHits; ++iRefHit, ++iHit) {
-		if ((rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
+		while (iRefHit < nHits && iHit < nHits && (rEventArray[iRefHit] + tEventNumberOffset) != rEventArray[iHit]) {  // reference hit and hit array are not in sync --> correct
+			//std::cout<<"Reference at "<<rEventArray[iRefHit]<<" hit at "<<rEventArray[iHit]<<"\n";
 			while (iRefHit < nHits - 1 && ((rEventArray[iRefHit] + tEventNumberOffset) < rEventArray[iHit])) {  // hit array is at a next event, catch up with reference hit array
 //				std::cout<<"Catch up reference array\n";
 				rCol[iRefHit] = 0;
