@@ -146,14 +146,13 @@ class TestAnalysis(unittest.TestCase):
         row[10] = 3.14159
         column[10] = 3.14159
 
-        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
+        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=100)
 
         # Check fixes counter
-        self.assertEqual(n_fixes, 2)
+        self.assertEqual(n_fixes, 1)
 
         # Correlation flag check
         self.assertTrue(np.all(corr[0:10] == 1))
-        self.assertTrue(np.all(corr[11:20] == 0))
         self.assertTrue(np.all(corr[20:] == 1))
 
         # The data is correlated here
@@ -175,15 +174,15 @@ class TestAnalysis(unittest.TestCase):
         column[5:15] = 0
         row[5:15] = 0
 
-        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
+        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=100)
 
         # Check that no fixes where done
         self.assertEqual(n_fixes, 0)
 
         # Correlation flag check
-        self.assertTrue(np.all(corr[0:6] == 1))
-        self.assertTrue(np.all(corr[6:15] == 0))
-        self.assertTrue(np.all(corr[15:] == 1))
+        self.assertTrue(np.all(corr[:6] == 1))
+        self.assertTrue(np.all(corr[6:14] == 0))
+        self.assertTrue(np.all(corr[14:] == 1))
 
         # Data is the same where there are hits and correlation flag is set
         self.assertTrue(np.all(ref_column[np.logical_and(corr == 1, column != 0)] == column[np.logical_and(corr == 1, column != 0)]))
@@ -198,7 +197,7 @@ class TestAnalysis(unittest.TestCase):
         corr[16:18] = 0  # create not correlated event
 
         # Check with correlation hole
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=100)
 
         self.assertEqual(n_fixes, 0)  # no fixes are expected
         # Correlation flag check
@@ -206,7 +205,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(corr[6:19] == 0))
         self.assertTrue(np.all(corr[20:] == 1))
 
-        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(500)
+        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(50)
         column[5:16] = 0
         row[5:16] = 0
         column[16:20] = ref_column[6:10]
@@ -214,18 +213,16 @@ class TestAnalysis(unittest.TestCase):
         corr[16:18] = 0  # create not correlated event
 
         # check with event copying
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=1, correlation_search_range=100, good_events_search_range=4)
 
-        self.assertEqual(n_fixes, 2)  # 2 fixes are expected
+        self.assertEqual(n_fixes, 1)  # 1 fixe are expected
 
         # Correlation flag check
         self.assertTrue(np.all(corr[0:6] == 1))
         self.assertTrue(np.all(corr[6:8] == 0))
         self.assertTrue(np.all(corr[8:10] == 1))
         self.assertTrue(np.all(corr[10:20] == 0))
-        self.assertTrue(np.all(corr[20:26] == 1))
-        self.assertTrue(np.all(corr[26:28] == 0))
-        self.assertTrue(np.all(corr[28:] == 1))
+        self.assertTrue(np.all(corr[20:] == 1))
 
         # Data check
         self.assertTrue(np.all(ref_row[:5] == row[:5]))
@@ -238,7 +235,7 @@ class TestAnalysis(unittest.TestCase):
     def test_no_correction(self):  # check behavior if no correction is needed
         event_numbers, ref_column, column, ref_row, row, corr = get_random_data(5000)
         # Check with correlation hole
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=3, correlation_search_range=100, good_events_search_range=100)
 
         self.assertEqual(n_fixes, 0)  # no fixes are expected
         self.assertTrue(np.all(corr == 1))  # Correlation flag check
@@ -264,7 +261,7 @@ class TestAnalysis(unittest.TestCase):
         row[12] = 0
 
         # Check with correlation hole
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # one fix are expected
         self.assertEqual(n_fixes, 1)
@@ -303,7 +300,7 @@ class TestAnalysis(unittest.TestCase):
         row = np.delete(row, [9, 10], axis=0)
         corr = np.delete(corr, [9, 10], axis=0)
 
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # one fix are expected
         self.assertEqual(n_fixes, 1)
@@ -331,7 +328,7 @@ class TestAnalysis(unittest.TestCase):
         row = np.delete(row, [9, 10], axis=0)
         corr = np.delete(corr, [9, 10], axis=0)
 
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # one fix are expected
         self.assertEqual(n_fixes, 1)
@@ -365,7 +362,7 @@ class TestAnalysis(unittest.TestCase):
         row[3:] = ref_row[:-3]
         corr = np.ones_like(event_numbers, dtype=np.uint8)
 
-        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # one fix are expected
         self.assertEqual(n_fixes, 1)
@@ -386,7 +383,7 @@ class TestAnalysis(unittest.TestCase):
         column = np.array([11, 11, 0, 2, 5, 5, 5, 3, 0, 4, 9, 10, 12, 12, 13, 14, 15, 17], dtype=np.double)
         row = column
 
-        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # one fix are expected
         self.assertEqual(n_fixes, 1)
@@ -406,7 +403,7 @@ class TestAnalysis(unittest.TestCase):
         column = np.array([11, 11, 0, 2, 5, 5, 5, 3, 3, 4, 9, 10, 12, 12, 13, 14, 15, 17], dtype=np.double)
         row = column
 
-        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+        corr, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # one fix are expected
         self.assertEqual(n_fixes, 1)
