@@ -487,7 +487,7 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 
 		tLastCopiedEvent = rEventArray[iRefHit];
 
-		while (rCol[iHit] == 0 && rRow[iHit] == 0 && iHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) == rEventArray[iHit]))  // do not copy virtual hits
+		while (rCol[iHit] == 0 && rRow[iHit] == 0 && iHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) == rEventArray[iHit + 1]))  // do not copy virtual hits
 			iHit++;
 
 		if (_debug)
