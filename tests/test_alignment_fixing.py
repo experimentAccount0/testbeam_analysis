@@ -318,7 +318,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(column[6:8] == 0))
         self.assertTrue(np.all(row[6:8] == 0))
 
-        # Event offset = 1, no events missing, two hits of one event missing
+        # Event offset = 1, no events missing, but hits of one event missing
         event_numbers, ref_column, column, ref_row, row, corr = get_random_data(20, hits_per_event=3)
         column[:3] = 0
         row[:3] = 0
@@ -349,6 +349,34 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(ref_row[10:15] == row[10:15]))
         self.assertTrue(np.all(column[15:] == 0))
         self.assertTrue(np.all(row[15:] == 0))
+
+        # Event offset = 1, 1 hit events, missing hits
+        event_numbers, ref_column, column, ref_row, row, corr = get_random_data(20, hits_per_event=1)
+
+        ref_column[5] = 0
+        ref_row[5] = 0
+
+        ref_column[11:13] = 0
+        ref_row[11:13] = 0
+
+        column[:3] = 0
+        row[:3] = 0
+        column[3:] = ref_column[:-3]
+        row[3:] = ref_row[:-3]
+        corr = np.ones_like(event_numbers, dtype=np.uint8)
+
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, corr, error=0.1, n_bad_events=3, n_good_events=2, correlation_search_range=100, good_events_search_range=10)
+
+        # one fix are expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertTrue(np.all(corr[:17] == 1))
+        self.assertTrue(np.all(corr[17:] == 0))
+
+        # Similarity check
+        self.assertTrue(np.all(ref_column[corr == 1] == column[corr == 1]))
+        self.assertTrue(np.all(ref_row[corr == 1] == row[corr == 1]))
 
     def test_tough_test_case(self):  # test crazy uncorrelated data
         #         raise SkipTest
