@@ -209,14 +209,16 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
 
 
-def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, error=3., n_bad_events=5, n_good_events=3, correlation_search_range=2000, good_events_search_range=10):
+def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, error=3., n_bad_events=5, n_good_events=3, correlation_search_range=2000, good_events_search_range=10):
     correlated = np.ascontiguousarray(np.ones(shape=event_numbers.shape, dtype=np.uint8))  # array to signal correlation to be ables to omit not correlated events in the analysis
     event_numbers = np.ascontiguousarray(event_numbers)
     ref_column = np.ascontiguousarray(ref_column)
     column = np.ascontiguousarray(column)
     ref_row = np.ascontiguousarray(ref_row)
     row = np.ascontiguousarray(row)
-    n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
+    ref_charge = np.ascontiguousarray(ref_charge)
+    charge = np.ascontiguousarray(charge)
+    n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
     return correlated, n_fixes
 
 if __name__ == '__main__':

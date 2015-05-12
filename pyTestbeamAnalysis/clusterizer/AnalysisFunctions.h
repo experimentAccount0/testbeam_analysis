@@ -451,7 +451,7 @@ bool _findCorrelation(unsigned int& iRefHit, unsigned int& iHit, const int64_t*&
 	return false;
 }
 
-bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits)
+bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, const uint16_t*& rRefCharge, uint16_t*& rCharge, uint8_t*& rCorrelated, const unsigned int& nHits)
 {
 	if (_debug)
 		std::cout << "Fix alignment " << iRefHit << ": " << rEventArray[iRefHit] << "/" << rRefCol[iRefHit] << "/" << rRefRow[iRefHit] << " = " << iHit << ": " << rEventArray[iHit] << "/" << rCol[iHit] << "/" << rRow[iHit] << "\n";
@@ -462,14 +462,17 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 	unsigned int tHitIndex = iHit; // store start reference hit index for copying later
 	double* tColCopy = 0;
 	double* tRowCopy = 0;
+	uint16_t* tChargeCopy = 0;
 	uint8_t* tCorrelated = 0;
 	if (tEventNumberOffset < 0) {
 		tColCopy = new double[nHits];
 		tRowCopy = new double[nHits];
+		tChargeCopy = new uint16_t[nHits];
 		tCorrelated = new uint8_t[nHits];
 		for (unsigned int i = 0; i < nHits; ++i) {
 			tColCopy[i] = 0;  // initialize as virtual hits only
 			tRowCopy[i] = 0;  // initialize as virtual hits only
+			tChargeCopy[i] = 0;  // initialize as virtual hits only
 			tCorrelated[i] = rCorrelated[i];  // copy original
 		}
 	}
@@ -481,6 +484,7 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 //				std::cout<<"Catch up reference array\n";
 				rCol[iRefHit] = 0;
 				rRow[iRefHit] = 0;
+				rCharge[iRefHit] = 0;
 				iRefHit++;
 			}
 			while (iHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])) {  // reference hit array is at a next event, catch up with hit array
@@ -513,13 +517,16 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 			if (tEventNumberOffset > 0) {
 				rCol[iRefHit] = rCol[iHit];
 				rRow[iRefHit] = rRow[iHit];
+				rCharge[iRefHit] = rCharge[iHit];
 				rCorrelated[iRefHit] = ((rCorrelated[iRefHit] & rCorrelated[iHit]) & 1);  // leave unsure correlation flag intact, no correlation flag (2nd bit set) is expected and reset
 				rCol[iHit] = 0;
 				rRow[iHit] = 0;
+				rCharge[iHit] = 0;
 			}
 			else if (tEventNumberOffset < 0) {
 				tColCopy[iRefHit] = rCol[iHit];
 				tRowCopy[iRefHit] = rRow[iHit];
+				tChargeCopy[iRefHit] = rCharge[iHit];
 				tCorrelated[iRefHit] = ((rCorrelated[iRefHit] & rCorrelated[iHit]) & 1);  // leave unsure correlation flag intact, no correlation flag (2nd bit set) is expected and reset
 			}
 		}
@@ -535,10 +542,12 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 		for (unsigned int i = tHitIndex; i < nHits; ++i) {  // copy results
 			rCol[i] = tColCopy[i];
 			rRow[i] = tRowCopy[i];
+			rCharge[i] = tChargeCopy[i];
 			rCorrelated[i] = tCorrelated[i];
 		}
 		delete[] tColCopy;
 		delete[] tRowCopy;
+		delete[] tChargeCopy;
 		delete[] tCorrelated;
 	}
 	// Correct out of boundary indices
@@ -577,7 +586,7 @@ void _mapCorrelationArray(const int64_t*& rEventArray, uint8_t*& rCorrelated, co
 }
 
 // Fix the event alignment with hit position information, crazy...
-unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int& correltationSearchRange, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
+unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefCol, double*& rCol, const double*& rRefRow, double*& rRow, const uint16_t*& rRefCharge, uint16_t*& rCharge, uint8_t*& rCorrelated, const unsigned int& nHits, const double& rError, const unsigned int& nBadEvents, const unsigned int& correltationSearchRange, const unsigned int& nGoodEvents, const unsigned int& goodEventsSearchRange)
 {
 	// Event number has to always increase, check here
 	int64_t tEventNumber = rEventArray[0];
@@ -635,7 +644,7 @@ unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefC
 //						for (unsigned int i = 0; i < 10; ++i)
 //							std::cout << "      fixing correlation for " << rEventArray[iRefHit + i] << ": " << rRefRow[iRefHit + i] << " = " << rEventArray[iHit + i]  << ": " << rRow[iHit + i] << "\n";
 					}
-					_fixAlignment(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, tCorrBackRefHitIndex);
+					_fixAlignment(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rRefCharge, rCharge, rCorrelated, tCorrBackRefHitIndex);
 					tNfixes++;
 //					return 0;
 //					std::cout<<"FIXED IT\n";
