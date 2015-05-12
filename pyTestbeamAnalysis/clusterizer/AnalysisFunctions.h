@@ -572,7 +572,7 @@ void _mapCorrelationArray(const int64_t*& rEventArray, uint8_t*& rCorrelated, co
 		if (rEventArray[i] != tEvent){  // new event trigger
 			if (tEventCorrelation != 1)
 				tEventCorrelation = 0;
-			for (unsigned int j = i - 1; j > 0 && rEventArray[j] == tEvent; --j){
+			for (int j = i - 1; j >= 0 && rEventArray[j] == tEvent; --j){
 				rCorrelated[j] = tEventCorrelation;
 			}
 			tEvent = rEventArray[i];
@@ -629,7 +629,7 @@ unsigned int fixEventAlignment(const int64_t*& rEventArray, const double*& rRefC
 				}
 			}
 			else if (_info)
-				std::cout << "Correlation for hit index > " << tCorrBackRefHitIndex << " comes never back...\n";
+				std::cout << "Correlation for hit index > " << iRefHit << " comes never back...\n";
 
 			if (!_findCorrelation(iRefHit, iHit, rEventArray, rRefCol, rCol, rRefRow, rRow, rCorrelated, tCorrBackRefHitIndex, rError, correltationSearchRange, correltationSearchRange, nGoodEvents, goodEventsSearchRange)) {
 				if (_info)
