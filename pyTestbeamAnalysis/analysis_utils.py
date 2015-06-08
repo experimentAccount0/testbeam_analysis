@@ -149,7 +149,7 @@ def create_2d_pixel_hist(fig, ax, hist2d, title=None, x_axis_title=None, y_axis_
         if hist2d.all() is np.ma.masked:  # check if masked array is fully masked
             z_max = 1
         else:
-            z_max = 2 * ceil(hist2d.max())
+            z_max = ceil(hist2d.max())
     bounds = np.linspace(start=z_min, stop=z_max, num=255, endpoint=True)
     cmap = cm.get_cmap('jet')
     cmap.set_bad('w')
@@ -216,8 +216,8 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_cha
     column = np.ascontiguousarray(column)
     ref_row = np.ascontiguousarray(ref_row)
     row = np.ascontiguousarray(row)
-    ref_charge = np.ascontiguousarray(ref_charge)
-    charge = np.ascontiguousarray(charge)
+    ref_charge = np.ascontiguousarray(ref_charge, dtype=np.uint16)
+    charge = np.ascontiguousarray(charge, dtype=np.uint16)
     n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
     return correlated, n_fixes
 
