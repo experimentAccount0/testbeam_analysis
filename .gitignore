@@ -64,9 +64,12 @@ TestBeamData_Mimosa26_DUT0_hot_pixel.pdf
 TestBeamData_Mimosa26_DUT1_hot_pixel.pdf
 TestBeamData_Mimosa26_DUT2_hot_pixel.pdf
 hit_clusterizer.cpp
-*.pdf
 Alignment.h5
+Correlation.h5
 TrackCandidates.h5
 Tracklets.h5
 Tracks.h5
 tmp
+*.h5
+!data/
+*.pdf
