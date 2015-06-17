@@ -7,6 +7,7 @@ import numpy as np
 
 from pyTestbeamAnalysis import analysis_utils
 from pyTestbeamAnalysis import analysis_functions
+from nose import SkipTest
 
 
 def get_random_data(n_hits, hits_per_event=2, seed=0):
@@ -280,9 +281,6 @@ class TestAnalysis(unittest.TestCase):
         row[12] = 0
         charge[12] = 0
 
-        for ievent_numbers, iref_column, icolumn, iref_row, irow, iref_charge, icharge, icorr in np.column_stack((event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr)):
-            print int(ievent_numbers), iref_column, '/', iref_row, '=', icolumn, '/', irow, int(icorr)
-
         # Check with correlation hole
         n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr, error=0.1, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
@@ -315,77 +313,77 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(row[18:] == 0))
         self.assertTrue(np.all(charge[18:] == 0))
 
-        print '\n'
-        print 'Test with virtual hits in reference dut:'
-        print '\n'
+        # Test with virtual hits in reference, positive event number offset (ref to dut)
+        event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr = get_random_data(20)
+        event_numbers[:12] = np.array([0, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5])
+        column[4:] = column[1:-3]
+        row[4:] = row[1:-3]
+        charge[4:] = charge[1:-3]
+        column[1:4] = 0
+        row[1:4] = 0
+        charge[1:4] = 0
+        ref_column[4] = 0
+        ref_row[4] = 0
+        ref_charge[4] = 0
+        column[4:-1] = column[5:]
+        row[4:-1] = row[5:]
+        charge[4:-1] = charge[5:]
+        column[9:] = column[8:-1]
+        row[9:] = row[8:-1]
+        charge[9:] = charge[8:-1]
+        column[8] = 0
+        row[8] = 0
+        charge[8] = 0
+        column[13:] = ref_column[11:-2]
+        row[13:] = ref_row[11:-2]
+        charge[13:] = ref_charge[11:-2]
+        column[12] = 0
+        row[12] = 0
+        charge[12] = 0
+        ref_column[14:16] = 0
+        ref_row[14:16] = 0
+        ref_charge[14:16] = 0
 
-        # Test with virtual hits in reference
-        event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr = get_random_data(11)
-        event_numbers[:11] = np.array([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9])
-#         ref_column[0] = 53.5
-#         ref_row[0] = 281.5
-#         column[4:] = column[1:-3]
-#         row[4:] = row[1:-3]
-#         charge[4:] = charge[1:-3]
-#         column[1:4] = 0
-#         row[1:4] = 0
-#         charge[1:4] = 0
-#         ref_column[4] = 0
-#         ref_row[4] = 0
-#         ref_charge[4] = 0
-#         column[4:-1] = column[5:]
-#         row[4:-1] = row[5:]
-#         charge[4:-1] = charge[5:]
-#         column[9:] = column[8:-1]
-#         row[9:] = row[8:-1]
-#         charge[9:] = charge[8:-1]
-#         column[8] = 0
-#         row[8] = 0
-#         charge[8] = 0
-#         column[13:] = ref_column[11:-2]
-#         row[13:] = ref_row[11:-2]
-#         charge[13:] = ref_charge[11:-2]
-#         column[12] = 0
-#         row[12] = 0
-#         charge[12] = 0
-#         ref_column[14:16] = 0
-#         ref_row[14:16] = 0
-#         ref_charge[14:16] = 0
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr, error=5, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
 
         # Correlation flag check
-#         self.assertTrue(np.all(corr[:18] == 1))
-#         self.assertTrue(np.all(corr[18:] == 0))
-#
-#         # Similarity check
-#         self.assertEqual(ref_column[0], column[0])
-#         self.assertEqual(ref_row[0], row[0])
-#         self.assertEqual(ref_charge[0], charge[0])
-#         self.assertTrue(np.all(ref_column[5:9] == column[5:9]))
-#         self.assertTrue(np.all(ref_row[5:9] == row[5:9]))
-#         self.assertTrue(np.all(ref_charge[5:9] == charge[5:9]))
-#         self.assertTrue(np.all(ref_column[11:14] == column[11:14]))
-#         self.assertTrue(np.all(ref_row[11:14] == row[11:14]))
-#         self.assertTrue(np.all(ref_charge[11:14] == charge[11:14]))
-#         self.assertTrue(np.all(ref_column[16:18] == column[16:18]))
-#         self.assertTrue(np.all(ref_row[16:18] == row[16:18]))
-#         self.assertTrue(np.all(ref_charge[16:18] == charge[16:18]))
-#
-#         # Virtual hits check
-#         self.assertEqual(column[3], 0)
-#         self.assertEqual(row[3], 0)
-#         self.assertEqual(charge[3], 0)
-#         self.assertEqual(ref_column[4], 0)
-#         self.assertEqual(ref_row[4], 0)
-#         self.assertEqual(ref_charge[4], 0)
-#         self.assertTrue(np.all(column[9:11] == 0))
-#         self.assertTrue(np.all(row[9:11] == 0))
-#         self.assertTrue(np.all(charge[9:11] == 0))
-#         self.assertTrue(np.all(ref_column[14:16] == 0))
-#         self.assertTrue(np.all(ref_row[14:16] == 0))
-#         self.assertTrue(np.all(ref_charge[14:16] == 0))
-#         self.assertTrue(np.all(column[18:] == 0))
-#         self.assertTrue(np.all(row[18:] == 0))
-#         self.assertTrue(np.all(charge[18:] == 0))
+        self.assertTrue(np.all(corr[:18] == 1))
+        self.assertTrue(np.all(corr[18:] == 0))
+
+        # Similarity check
+        self.assertEqual(ref_column[0], column[0])
+        self.assertEqual(ref_row[0], row[0])
+        self.assertEqual(ref_charge[0], charge[0])
+        self.assertTrue(np.all(ref_column[5:9] == column[5:9]))
+        self.assertTrue(np.all(ref_row[5:9] == row[5:9]))
+        self.assertTrue(np.all(ref_charge[5:9] == charge[5:9]))
+        self.assertTrue(np.all(ref_column[11:14] == column[11:14]))
+        self.assertTrue(np.all(ref_row[11:14] == row[11:14]))
+        self.assertTrue(np.all(ref_charge[11:14] == charge[11:14]))
+        self.assertTrue(np.all(ref_column[16:18] == column[16:18]))
+        self.assertTrue(np.all(ref_row[16:18] == row[16:18]))
+        self.assertTrue(np.all(ref_charge[16:18] == charge[16:18]))
+
+        # Virtual hits check
+        self.assertEqual(column[3], 0)
+        self.assertEqual(row[3], 0)
+        self.assertEqual(charge[3], 0)
+        self.assertEqual(ref_column[4], 0)
+        self.assertEqual(ref_row[4], 0)
+        self.assertEqual(ref_charge[4], 0)
+        self.assertTrue(np.all(column[9:11] == 0))
+        self.assertTrue(np.all(row[9:11] == 0))
+        self.assertTrue(np.all(charge[9:11] == 0))
+        self.assertTrue(np.all(ref_column[14:16] == 0))
+        self.assertTrue(np.all(ref_row[14:16] == 0))
+        self.assertTrue(np.all(ref_charge[14:16] == 0))
+        self.assertTrue(np.all(column[18:] == 0))
+        self.assertTrue(np.all(row[18:] == 0))
+        self.assertTrue(np.all(charge[18:] == 0))
+
+        # Test with virtual hits, forward fixing, real data, negative event number offset (ref to dut)
+        event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr = get_random_data(11)
+        event_numbers[:11] = np.array([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9])
 
         ref_column[0], column[0], ref_row[0], row[0] = 53.5, 40.55479431152344, 281.5, 105.0828857421875
         ref_column[1], column[1], ref_row[1], row[1] = 40.5, 30.663848876953125, 102.5, 266.4919738769531
@@ -399,15 +397,7 @@ class TestAnalysis(unittest.TestCase):
         ref_column[9], column[9], ref_row[9], row[9] = 0.0, 8.888647079467773, 0.0, 332.7086486816406
         ref_column[10], column[10], ref_row[10], row[10] = 8.5, 4.0904927253723145, 336.5, 307.4698181152344
 
-        print 'before'
-        for ievent_numbers, iref_column, icolumn, iref_row, irow, icorr in np.column_stack((event_numbers, ref_column, column, ref_row, row, corr)):
-            print int(ievent_numbers), iref_column, '/', iref_row, '=', icolumn, '/', irow, int(icorr)
-
         n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr, error=5, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
-
-        print 'after'
-        for ievent_numbers, iref_column, icolumn, iref_row, irow, icorr in np.column_stack((event_numbers, ref_column, column, ref_row, row, corr)):
-            print int(ievent_numbers), iref_column, '/', iref_row, '=', icolumn, '/', irow, int(icorr)
 
         # one fix is expected
         self.assertEqual(n_fixes, 1)
