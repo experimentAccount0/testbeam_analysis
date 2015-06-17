@@ -463,17 +463,17 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 	double* tColCopy = 0;
 	double* tRowCopy = 0;
 	uint16_t* tChargeCopy = 0;
-	uint8_t* tCorrelated = 0;
+	uint8_t* tCorrelatedCopy = 0;
 	if (tEventNumberOffset < 0) {
 		tColCopy = new double[nHits];
 		tRowCopy = new double[nHits];
 		tChargeCopy = new uint16_t[nHits];
-		tCorrelated = new uint8_t[nHits];
+		tCorrelatedCopy = new uint8_t[nHits];
 		for (unsigned int i = 0; i < nHits; ++i) {
 			tColCopy[i] = 0;  // initialize as virtual hits only
 			tRowCopy[i] = 0;  // initialize as virtual hits only
 			tChargeCopy[i] = 0;  // initialize as virtual hits only
-			tCorrelated[i] = rCorrelated[i];  // copy original
+			tCorrelatedCopy[i] = rCorrelated[i];  // copy original
 		}
 	}
 
@@ -488,11 +488,15 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 				iRefHit++;
 			}
 			while (iHit < nHits && ((rEventArray[iRefHit] + tEventNumberOffset) > rEventArray[iHit])) {  // reference hit array is at a next event, catch up with hit array
-//				std::cout<<"Catch up hit array\n";
-				if (tLastCopiedEvent + tEventNumberOffset == rEventArray[iHit]) {  // true if not all hits were copied -> mark all hits of this event as unsure correlated
-					for (int tiRefHit = (int) iRefHit - 1; tiRefHit > 0; --tiRefHit) {  // mark all hits of last, incomplete event as not correlated
-						if (tLastCopiedEvent == rEventArray[tiRefHit])
-							rCorrelated[tiRefHit] = 0;
+				//				std::cout<<"Catch up hit array\n";
+				if (rRow[iHit] != 0 && tLastCopiedEvent + tEventNumberOffset == rEventArray[iHit]) {  // true if not all real hits were copied -> mark all hits of this event as unsure correlated
+					for (int tiRefHit = (int) iRefHit - 1; tiRefHit > 0; --tiRefHit) {  // mark all hits of last, incomplete event as unsure correlated (correlated = 0)
+						if (tLastCopiedEvent == rEventArray[tiRefHit]){
+							if (tEventNumberOffset > 0)
+								rCorrelated[tiRefHit] = 0;
+							else
+								tCorrelatedCopy[tiRefHit] = 0;
+						}
 						else
 							break;
 					}
@@ -527,7 +531,10 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 				tColCopy[iRefHit] = rCol[iHit];
 				tRowCopy[iRefHit] = rRow[iHit];
 				tChargeCopy[iRefHit] = rCharge[iHit];
-				tCorrelated[iRefHit] = ((rCorrelated[iRefHit] & rCorrelated[iHit]) & 1);  // leave unsure correlation flag intact, no correlation flag (2nd bit set) is expected and reset
+				tCorrelatedCopy[iRefHit] = ((rCorrelated[iRefHit] & rCorrelated[iHit]) & 1);  // leave unsure correlation flag intact, no correlation flag (2nd bit set) is expected and reset
+//				std::cout << "rCorrelated[iHit] "<<(int) rCorrelated[iHit]<<"\n";
+//				std::cout << "rCorrelated[iRefHit] "<<(int) rCorrelated[iRefHit]<<"\n";
+//				std::cout << "tCorrelatedCopy[iRefHit] "<<(int) tCorrelatedCopy[iRefHit]<<"\n";
 			}
 		}
 	}
@@ -543,12 +550,12 @@ bool _fixAlignment(unsigned int iRefHit, unsigned int iHit, const int64_t*& rEve
 			rCol[i] = tColCopy[i];
 			rRow[i] = tRowCopy[i];
 			rCharge[i] = tChargeCopy[i];
-			rCorrelated[i] = tCorrelated[i];
+			rCorrelated[i] = tCorrelatedCopy[i];
 		}
 		delete[] tColCopy;
 		delete[] tRowCopy;
 		delete[] tChargeCopy;
-		delete[] tCorrelated;
+		delete[] tCorrelatedCopy;
 	}
 	// Correct out of boundary indices
 	if (iRefHit == nHits)
