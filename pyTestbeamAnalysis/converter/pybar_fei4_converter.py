@@ -10,12 +10,11 @@ import logging
 import numpy as np
 import tables as tb
 from multiprocessing import Pool
-from matplotlib.backends.backend_pdf import PdfPages
-import matplotlib.pyplot as plt
 
 from pybar.analysis import analysis_utils
 from pybar.analysis.analyze_raw_data import AnalyzeRawData
 from pybar.analysis.RawDataConverter import data_struct
+from bokeh.colors import black
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
@@ -29,30 +28,31 @@ def analyze_raw_data(input_file):  # FE-I4 raw data analysis
     output_file_hits : pytables file
     '''
     with AnalyzeRawData(raw_data_file=input_file, create_pdf=True) as analyze_raw_data:
-        analyze_raw_data.use_trigger_number = False  # if trigger number is at the beginning of each event activate this for event alignment
-        analyze_raw_data.interpreter.use_tdc_word(False)
+        analyze_raw_data.align_at_trigger_number = True  # if trigger number is at the beginning of each event activate this for event alignment
+        analyze_raw_data.use_trigger_time_stamp = False  # the trigger number is a time stamp
+        analyze_raw_data.use_tdc_word = False
         analyze_raw_data.create_hit_table = True
         analyze_raw_data.create_meta_event_index = True
         analyze_raw_data.create_trigger_error_hist = True
         analyze_raw_data.create_rel_bcid_hist = True
         analyze_raw_data.create_error_hist = True
         analyze_raw_data.create_service_record_hist = True
-        analyze_raw_data.create_occupancy_hist = False
+        analyze_raw_data.create_occupancy_hist = True
         analyze_raw_data.create_tot_hist = False
-        analyze_raw_data.n_bcid = 16
-        analyze_raw_data.max_tot_value = 13
+#         analyze_raw_data.n_bcid = 16
+#         analyze_raw_data.max_tot_value = 13
         analyze_raw_data.interpreter.create_empty_event_hits(True)
-        analyze_raw_data.interpreter.set_debug_output(False)
-        analyze_raw_data.interpreter.set_info_output(False)
-        analyze_raw_data.interpreter.set_warning_output(False)
-        analyze_raw_data.clusterizer.set_warning_output(False)
-        analyze_raw_data.interpreter.debug_events(106060, 106065, True)
+#         analyze_raw_data.interpreter.set_debug_output(False)
+#         analyze_raw_data.interpreter.set_info_output(False)
+#         analyze_raw_data.interpreter.set_warning_output(False)
+#         analyze_raw_data.clusterizer.set_warning_output(False)
+        analyze_raw_data.interpreter.debug_events(0, 1, True)
         analyze_raw_data.interpret_word_table()
         analyze_raw_data.interpreter.print_summary()
         analyze_raw_data.plot_histograms()
 
 
-def process_dut(raw_data_file, fix_trigger_number=True):
+def process_dut(raw_data_file, do_corrections=False):
     ''' Process and format raw data.
     Parameters
     ----------
@@ -66,10 +66,16 @@ def process_dut(raw_data_file, fix_trigger_number=True):
     Tuple: (event_number, trigger_number, hits['trigger_number'])
     or None if not fix_trigger_number
     '''
+
+    if do_corrections is True:
+        fix_trigger_number, fix_event_number = False, True
+    else:
+        fix_trigger_number, fix_event_number = False, False
+
     analyze_raw_data(raw_data_file)
-    ret_value = align_events(raw_data_file[:-3] + '_interpreted.h5', raw_data_file[:-3] + '_event_aligned.h5', fix_trigger_number=fix_trigger_number)
+    ret_value = align_events(raw_data_file[:-3] + '_interpreted.h5', raw_data_file[:-3] + '_event_aligned.h5', fix_trigger_number=fix_trigger_number, fix_event_number=fix_event_number)
     format_hit_table(raw_data_file[:-3] + '_event_aligned.h5', raw_data_file[:-3] + '_aligned.h5')
-#     return ret_value
+    return ret_value
 
 
 def align_events(input_file, output_file, fix_event_number=True, fix_trigger_number=True, chunk_size=20000000):
@@ -95,18 +101,22 @@ def align_events(input_file, output_file, fix_event_number=True, fix_trigger_num
         with tb.open_file(output_file, 'w') as out_file_h5:
             hit_table_description = data_struct.HitInfoTable().columns.copy()
             hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hit_table_description, title='Selected hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False), chunkshape=(chunk_size,))
+
             # Correct hit event number
             for hits, _ in analysis_utils.data_aligned_at_events(hit_table, chunk_size=chunk_size):
+
                 if fix_trigger_number is True:
                     selection = np.logical_or((hits['trigger_status'] & 0b00000001) == 0b00000001,
                                               (hits['event_status'] & 0b0000000000000010) == 0b0000000000000010)
                     selected_te_hits = np.where(selection)[0]  # select both events with and without hit that have trigger error flag set
 
-                    assert selected_te_hits[0] > 0
+#                     assert selected_te_hits[0] > 0
                     tmp_trigger_number = hits['trigger_number'].astype(np.int32)
 
                     # save trigger and event number for plotting correlation between trigger number and event number
                     event_number, trigger_number = hits['event_number'].copy(), hits['trigger_number'].copy()
+
+                    hits['trigger_number'][0] = 0
 
                     offset = (hits['trigger_number'][selected_te_hits] - hits['trigger_number'][selected_te_hits - 1] - hits['event_number'][selected_te_hits] + hits['event_number'][selected_te_hits - 1]).astype(np.int32)  # save jumps in trigger number
                     offset_tot = np.cumsum(offset)
@@ -124,12 +134,21 @@ def align_events(input_file, output_file, fix_event_number=True, fix_trigger_num
 
                     hits['trigger_number'] = tmp_trigger_number
 
-                selected_hits = hits[(hits['event_status'] & 0b0000111111111111) == 0b0000000000000000]  # no error at all
+                selected_hits = hits[(hits['event_status'] & 0b0000100000000000) == 0b0000000000000000]  # select not empty events
 
                 if fix_event_number is True:
                     selector = (selected_hits['event_number'] != (np.divide(selected_hits['event_number'] + 1, 32768) * 32768 + selected_hits['trigger_number'] - 1))
                     n_fixed_hits += np.count_nonzero(selector)
+                    print np.divide(selected_hits['event_number'] + 1, 32768)[70135:70140]
+                    print selected_hits[70135:70140]
+                    selector = selected_hits['event_number'] > selected_hits['trigger_number']
+#                     exception = ~np.logical_and(selected_hits['event_number'] - np.divide(selected_hits['event_number'], 32768) * 32768 < 32767, selected_hits['event_number'] > selected_hits['trigger_number'])
+#                     selected_hits['event_number'][exception] = np.divide(selected_hits['event_number'][exception] + 32769, 32768) * 32768 + selected_hits['trigger_number'][exception] - 1
                     selected_hits['event_number'] = np.divide(selected_hits['event_number'] + 1, 32768) * 32768 + selected_hits['trigger_number'] - 1
+                    selected_hits['event_number'][selector] = np.divide(selected_hits['event_number'][selector] + 1, 32768) * 32768 + 32768 + selected_hits['trigger_number'][selector] - 1
+
+#                 FIX FOR DIAMOND:
+#                 selected_hits['event_number'] -= 1  # FIX FOR DIAMOND EVENT OFFSET
 
                 hit_table_out.append(selected_hits)
 
@@ -161,16 +180,25 @@ def format_hit_table(input_file, output_file):
             hits_formatted['charge'] = hits['tot']
             hit_table_out.append(hits_formatted)
 
+
+def _function_wrapper_process_dut(args):  # needed for multiprocessing call with arguments
+    return process_dut(*args)
+
+
 if __name__ == "__main__":
+
     # Input raw data file names
-    raw_data_files = ['C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_132_SCC_29_3.4_GeV_0.h5',  # the first DUT is the master reference DUT
-                      'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_213_SCC_99_3.4_GeV_0.h5',
-                      'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_214_SCC_146_3.4_GeV_0.h5',
-                      'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_201_SCC_166_3.4_GeV_0.h5',
-                      'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_207_SCC_112_3.4_GeV_0.h5',
-                      'C:\\Users\\DavidLP\\Desktop\\tb\\BOARD_ID_216_SCC_45_3.4_GeV_0.h5']  # the last DUT is the second reference DUT
-    # Do seperate DUT data processing in parallel. The output is a formatted hit table.
+    raw_data_files = [r'/home/silab/git/pyTestbeamAnalysis/pyTestbeamAnalysis/converter/BOARD_ID_132_SCC_29_DUT_0_3.4_GeV_LOW_THR_BIAS_SCAN_DIAMOND_400V_3D_20V_0.h5',  # the first DUT is the master reference DUT
+                      r'/home/silab/git/pyTestbeamAnalysis/pyTestbeamAnalysis/converter/BOARD_ID_213_SCC_99_DUT_1_3.4_GeV_LOW_THR_BIAS_SCAN_DIAMOND_400V_3D_20V_0.h5',
+                      r'/home/silab/git/pyTestbeamAnalysis/pyTestbeamAnalysis/converter/BOARD_ID_214_SCC_146_DUT_2_3.4_GeV_LOW_THR_BIAS_SCAN_DIAMOND_400V_3D_20V_0.h5',
+                      r'/home/silab/git/pyTestbeamAnalysis/pyTestbeamAnalysis/converter/BOARD_ID_201_SCC_166_DUT_3_3.4_GeV_LOW_THR_BIAS_SCAN_DIAMOND_400V_3D_20V_0.h5',
+                      r'/home/silab/git/pyTestbeamAnalysis/pyTestbeamAnalysis/converter/BOARD_ID_207_SCC_112_DUT_4_3.4_GeV_LOW_THR_BIAS_SCAN_DIAMOND_400V_3D_20V_0.h5',
+                      r'/home/silab/git/pyTestbeamAnalysis/pyTestbeamAnalysis/converter/BOARD_ID_216_SCC_45_DUT_5_3.4_GeV_LOW_THR_BIAS_SCAN_DIAMOND_400V_3D_20V_0.h5'   # the last DUT is the second reference DUT
+                      ]
+    # Do separate DUT data processing in parallel. The output is a formatted hit table.
     pool = Pool()
     results = pool.map(process_dut, raw_data_files)
     pool.close()
     pool.join()
+
+    process_dut(raw_data_files[0])
