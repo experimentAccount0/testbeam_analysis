@@ -12,15 +12,12 @@ init:
   - "ECHO %PYTHON%"
   - ps: Start-FileDownload 'http://download.microsoft.com/download/7/9/6/796EF2E4-801B-4FC4-AB28-B59FBF6D907B/VCForPython27.msi' C:\VCForPython27.msi; echo "Done"
   - cmd: msiexec /i C:\VCForPython27.msi /quiet /qn
-  - ps: if($env:PYTHON -eq "2.7" -and $env:Platform -eq "x64"){Start-FileDownload 'http://repo.continuum.io/miniconda/Miniconda-3.5.5-Windows-x86_64.exe' C:\Miniconda.exe; echo "Done"}
-  - ps: if($env:PYTHON -eq "2.7" -and $env:Platform -eq "x86"){Start-FileDownload 'http://repo.continuum.io/miniconda/Miniconda-3.5.5-Windows-x86.exe' C:\Miniconda.exe; echo "Done"}
-  - cmd: C:\Miniconda.exe /S /D=C:\Miniconda
-  - ps: ls C:\Miniconda/Scripts
-  - C:\Miniconda\Scripts\conda create --yes -n test-environment numpy cython pytables scipy matplotlib pandas nose pip pyserial bitarray pyzmq pyyaml 
-  - C:\Miniconda\Scripts\activate.bat test-environment
+  - set PATH=C:\Miniconda;C:\Miniconda\Scripts;%PATH%  # miniconda is already installed on appveyor: https://github.com/appveyor/ci/issues/359
+  - conda create --yes -n test-environment numpy cython pytables scipy matplotlib pandas nose pip pyserial bitarray pyzmq pyyaml 
+  - activate.bat test-environment
   - pip install progressbar-latest
-  - C:\Miniconda\Scripts\conda info -a
-  - C:\Miniconda\Scripts\conda list
+  - conda info -a
+  - conda list
 
 install:
   - python.exe setup.py develop
