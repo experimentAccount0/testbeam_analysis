@@ -68,4 +68,4 @@ if __name__ == '__main__':
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set column and row range for each DUT as list of tuples
-    atb.calculate_efficiency(tracks_file=output_folder + r'/Tracks.h5', alignment_file=output_folder + r'/Alignment.h5', output_pdf=output_folder + r'/Efficiency.pdf', z_positions=z_positions, dim_x=80, dim_y=336, minimum_track_density=2, pixel_size=pixel_size, use_duts=None, cut_distance=500, max_distance=500, col_range=(5, 75), row_range=(10, 320))
+    atb.calculate_efficiency(tracks_file=output_folder + r'/Tracks.h5', output_pdf=output_folder + r'/Efficiency.pdf', z_positions=z_positions, dim_x=80, dim_y=336, minimum_track_density=2, pixel_size=pixel_size, use_duts=None, cut_distance=500, max_distance=500, col_range=(5, 70), row_range=(20, 320))
