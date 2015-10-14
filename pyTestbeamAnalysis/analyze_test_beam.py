@@ -54,7 +54,7 @@ def remove_hot_pixels(data_file, threshold=2.):
     threshold : number
         The threshold when the pixel is removed given in sigma distance from the mean occupancy.
     '''
-    logging.info('Remove hot pixels in %s' % data_file)
+    logging.info('Remove hot pixels in %s', data_file)
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'w') as out_file_h5:
             hits = input_file_h5.root.Hits[:]
@@ -68,7 +68,7 @@ def remove_hot_pixels(data_file, threshold=2.):
             analysis_utils.create_2d_pixel_hist(fig, ax, occupancy.T, title='Pixel map (%d hot pixel)' % noisy_pixels[0].shape[0], z_min=0, z_max=np.std(occupancy) * threshold)
             fig.tight_layout()
             fig.savefig(data_file[:-3] + '_hot_pixel.pdf')
-            logging.info('Remove %d hot pixels. Takes about %d seconds.' % (noisy_pixels[0].shape[0], noisy_pixels[0].shape[0] / 10))
+            logging.info('Remove %d hot pixels. Takes about %d seconds.', noisy_pixels[0].shape[0], noisy_pixels[0].shape[0] / 10)
 
             # Ugly solution to delete noisy pixels from the table with numexpression
             noisy_pixel_strings = ['((col==%d)&(row==%d))' % (noisy_pixel[0] + 1, noisy_pixel[1] + 1) for noisy_pixel in np.column_stack((noisy_pixels))]
@@ -89,7 +89,7 @@ def cluster_hits(data_file):
     output_file : pytables file
     '''
 
-    logging.info('Cluster hits in %s' % data_file)
+    logging.info('Cluster hits in %s', data_file)
 
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
@@ -145,7 +145,7 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
         if int: select first int events
         if list of int (length 2): select events from first list item to second list item
     '''
-    logging.info('Correlate the position of %d DUTs' % len(hit_files))
+    logging.info('Correlate the position of %d DUTs', len(hit_files))
     with tb.open_file(alignment_file, mode="w") as out_file_h5:
         for index, hit_file in enumerate(hit_files):
             with tb.open_file(hit_file, 'r') as in_file_h5:
@@ -165,19 +165,19 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
                     first_reference = pd.DataFrame({'event_number': hit_table[:]['event_number'], 'column_ref': hit_table[:]['column'], 'row_ref': hit_table[:]['row'], 'tot_ref': hit_table[:]['charge']})
                     n_col_reference, n_row_reference = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
                 else:
-                    logging.info('Correlate detector %d with detector %d' % (index, 0))
+                    logging.info('Correlate detector %d with detector %d', index, 0)
                     dut = pd.DataFrame({'event_number': hit_table[:]['event_number'], 'column_dut': hit_table[:]['column'], 'row_dut': hit_table[:]['row'], 'tot_dut': hit_table[:]['charge']})
                     df = first_reference.merge(dut, how='left', on='event_number')
                     df.dropna(inplace=True)
                     n_col_dut, n_row_dut = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
                     col_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['column_ref'] - 1, shape=(n_col_dut, n_col_reference))
                     row_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['row_ref'] - 1, shape=(n_row_dut, n_row_reference))
-                    out = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % index, title='Column Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    out_2 = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % index, title='Row Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    out.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
-                    out_2.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
-                    out[:] = col_corr
-                    out_2[:] = row_corr
+                    out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % index, title='Column Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out_row = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % index, title='Row Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out_col.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
+                    out_row.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
+                    out_col[:] = col_corr
+                    out_row[:] = row_corr
 
 
 def align_hits(correlation_file, alignment_file, output_pdf, fit_offset_cut=[(10. / 10, 10. / 10)], fit_error_cut=[(100. / 1000, 100. / 1000)], show_plots=False):
@@ -220,7 +220,7 @@ def align_hits(correlation_file, alignment_file, output_pdf, fit_offset_cut=[(10
                     result[node_index]['dut_x'], result[node_index]['dut_y'] = int(re.search(r'\d+', node.name).group()), node.name[-1:]
                 except AttributeError:
                     continue
-                logging.info('Align %s' % node.name)
+                logging.info('Align %s', node.name)
 
                 data = node[:]
 
@@ -483,7 +483,7 @@ def fix_event_alignment(tracklets_files, tracklets_corr_file, alignment_file, er
 
                 logging.info('Fix alignment for % s', table_column)
                 correlated, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, error=error, n_bad_events=n_bad_events, n_good_events=n_good_events, correlation_search_range=correlation_search_range, good_events_search_range=good_events_search_range)
-                logging.info('Corrected %d places in the data' % n_fixes)
+                logging.info('Corrected %d places in the data', n_fixes)
                 particles_corrected['event_number'] = event_numbers  # create new particles array with corrected values
                 particles_corrected['column_dut_0'] = ref_column
                 particles_corrected['row_dut_0'] = ref_row
@@ -872,7 +872,7 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
             results = np.zeros((n_duts - 2,), dtype=[('DUT', np.uint8), ('z_position_column', np.float32), ('z_position_row', np.float32)])
 
             for dut_index in range(1, n_duts - 1):
-                logging.info('Find best z-position for DUT %d' % dut_index)
+                logging.info('Find best z-position for DUT %d', dut_index)
                 dut_selection = (1 << (n_duts - 1)) | 1 | ((1 << (n_duts - 1)) >> dut_index)
                 good_track_selection = np.logical_and((track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8)), track_candidates['n_tracks'] <= max_tracks)
                 good_track_candidates = track_candidates[good_track_selection]
@@ -918,11 +918,11 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
         z_positions_rec_abs = [i * z_positions[-1] for i in z_positions_rec]
         z_differences = [abs(i - j) for i, j in zip(z_positions, z_positions_rec_abs)]
         failing_duts = [j for (i, j) in zip(z_differences, range(5)) if i >= warn_at]
-        logging.info('Absolute reconstructed z-positions %s' % str(z_positions_rec_abs))
+        logging.info('Absolute reconstructed z-positions %s', str(z_positions_rec_abs))
         if failing_duts:
-            logging.warning('The reconstructed z positions are more than %1.1f cm off for DUTS %s' % (warn_at, str(failing_duts)))
+            logging.warning('The reconstructed z positions are more than %1.1f cm off for DUTS %s', warn_at, str(failing_duts))
         else:
-            logging.info('Difference between measured and reconstructed z-positions %s' % str(z_differences))
+            logging.info('Difference between measured and reconstructed z-positions %s', str(z_differences))
 
     return z_positions_rec_abs if z_positions is not None else z_positions_rec
 
@@ -1075,7 +1075,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
                 fit_duts = fit_duts if fit_duts else range(n_duts)
                 for fit_dut in fit_duts:  # loop over the duts to fit the tracks for
-                    logging.info('Fit tracks for DUT %d' % fit_dut)
+                    logging.info('Fit tracks for DUT %d', fit_dut)
 
                     # Select track candidates
                     dut_selection = 0  # duts to be used in the fit
@@ -1091,7 +1091,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         quality_mask = dut_selection | (1 << fit_dut)
 
                     if bin(dut_selection).count("1") < 2:
-                        logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d' % fit_dut)
+                        logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
                         continue
 
                     good_track_selection = np.logical_and((track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8)), track_candidates['n_tracks'] <= max_tracks)
@@ -1175,7 +1175,7 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(250, 50), use_duts
             actual_dut = int(node.name[-1:])
             if use_duts and actual_dut not in use_duts:
                 continue
-            logging.info('Calculate residuals for DUT %d' % actual_dut)
+            logging.info('Calculate residuals for DUT %d', actual_dut)
 
             track_array = node[:]
             if max_chi2:
@@ -1249,7 +1249,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_
                 actual_dut = int(node.name[-1:])
                 if use_duts and actual_dut not in use_duts:
                     continue
-                logging.info('Plot track density for DUT %d' % actual_dut)
+                logging.info('Plot track density for DUT %d', actual_dut)
 
                 track_array = node[:]
                 track_array = track_array[track_array['track_chi2'] != 1000000000]  # use tracks with converged fit only
@@ -1328,7 +1328,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 actual_dut = int(node.name[-1:])
                 if use_duts and actual_dut not in use_duts:
                     continue
-                logging.info('Calculate efficiency for DUT %d' % actual_dut)
+                logging.info('Calculate efficiency for DUT %d', actual_dut)
                 track_array = node[:]
 
                 # Cut in Chi 2 of the track fit
@@ -1444,7 +1444,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 plt.title('Efficiency for DUT %d' % actual_dut)
                 plt.xlim([-0.5, 101.5])
                 output_fig.savefig()
-                logging.info('Efficiency =  %1.4f' % np.ma.mean(efficiency))
+                logging.info('Efficiency =  %1.4f', np.ma.mean(efficiency))
 
 
 # Helper functions that are not ment to be called during analysis
