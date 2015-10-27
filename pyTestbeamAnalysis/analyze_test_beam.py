@@ -45,22 +45,23 @@ from pyTestbeamAnalysis import analysis_utils
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
-def remove_hot_pixels(data_file, threshold=2.):
+def remove_hot_pixels(data_file, threshold=6.):
     '''Std. analysis of a hit table. Clusters are created.
 
     Parameters
     ----------
     data_file : pytables file
     threshold : number
-        The threshold when the pixel is removed given in sigma distance from the mean occupancy.
+        The threshold when the pixel is removed given in sigma distance from the median occupancy.
     '''
     logging.info('Remove hot pixels in %s', data_file)
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'w') as out_file_h5:
             hits = input_file_h5.root.Hits[:]
             col, row = hits['column'], hits['row']
-            occupancy = analysis_utils.hist_2d_index(col - 1, row - 1, shape=(np.amax(col), np.amax(row)))
-            noisy_pixels = np.where(occupancy > np.mean(occupancy) + np.std(occupancy) * threshold)
+            max_row = np.amax(row)
+            occupancy = analysis_utils.hist_2d_index(col - 1, row - 1, shape=(np.amax(col), max_row))
+            noisy_pixels = np.where(occupancy > np.median(occupancy) + np.std(occupancy) * threshold)
             # Plot noisy pixel
             fig = Figure()
             fig.patch.set_facecolor('white')
@@ -68,19 +69,18 @@ def remove_hot_pixels(data_file, threshold=2.):
             analysis_utils.create_2d_pixel_hist(fig, ax, occupancy.T, title='Pixel map (%d hot pixel)' % noisy_pixels[0].shape[0], z_min=0, z_max=np.std(occupancy) * threshold)
             fig.tight_layout()
             fig.savefig(data_file[:-3] + '_hot_pixel.pdf')
-            logging.info('Remove %d hot pixels. Takes about %d seconds.', noisy_pixels[0].shape[0], noisy_pixels[0].shape[0] / 10)
+            logging.info('Remove %d hot pixels in %s', noisy_pixels[0].shape[0], data_file)
 
-            # Ugly solution to delete noisy pixels from the table with numexpression
-            noisy_pixel_strings = ['((col==%d)&(row==%d))' % (noisy_pixel[0] + 1, noisy_pixel[1] + 1) for noisy_pixel in np.column_stack((noisy_pixels))]
-            for one_slice in zip(*(iter(noisy_pixel_strings),) * (120 if len(noisy_pixel_strings) > 120 else len(noisy_pixel_strings))):
-                col, row = hits['column'], hits['row']
-                hits = hits[~ne.evaluate('|'.join(one_slice))]
+            # Select not noisy pixels
+            noisy_pix_1d = (noisy_pixels[0] + 1) * max_row + (noisy_pixels[1] + 1)  # map 2d array (col, row) to 1d array to increase selection speed
+            hits_1d = hits['column'].astype(np.uint32) * max_row + hits['row']  # astype needed, otherwise silently assuming np.uint16 (VERY BAD NUMPY!)
+            hits = hits[np.in1d(hits_1d, noisy_pix_1d, invert=True)]
 
             hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             hit_table_out.append(hits)
 
 
-def cluster_hits(data_file):
+def cluster_hits(data_file, max_x_distance=3, max_y_distance=3):
     '''Std. analysis of a hit table. Clusters are created.
 
     Parameters
@@ -95,8 +95,8 @@ def cluster_hits(data_file):
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
             hits = input_file_h5.root.Hits[:]
             clusterizer = HitClusterizer(np.amax(hits['column']), np.amax(hits['row']))
-            clusterizer.set_x_cluster_distance(1)  # cluster distance in columns
-            clusterizer.set_y_cluster_distance(2)  # cluster distance in rows
+            clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
+            clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
             clusterizer.set_frame_cluster_distance(4)   # cluster distance in time frames
             cluster = np.zeros_like(hits, dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
             clusterizer.set_cluster_info_array(cluster)  # tell the array to be filled
@@ -686,8 +686,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file):
     be able to cut on good tracks.
     This function is slow since the main loop happens in Python (< 1e5 tracks / second)
     but does the track finding loop on all cores in parallel (_find_tracks_loop()).
-    Does the same as find_tracks function but works on a corrected TrackCandidates file.
-    If optimize_track_aligment is used track quality can change and must be calculated again from corrected data.
+    Does the same as find_tracks function but works on a corrected TrackCandidates file (optimize_track_aligment)
 
     Parameters
     ----------
@@ -737,6 +736,8 @@ def optimize_track_alignment(trackcandidates_file, alignment_file, use_fraction=
     '''This step should not be needed but alignment checks showed an offset between the hit positions after alignment
     especially for DUTs that have a flipped orientation. This function corrects for the offset (c0 in the alignment).
     Does the same as optimize_hit_alignment but works on TrackCandidates file.
+    If optimize_track_aligment is used track quality can change and must be calculated again from corrected data (use find_tracks_corr).
+
 
     Parameters
     ----------
