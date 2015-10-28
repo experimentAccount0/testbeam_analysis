@@ -382,6 +382,55 @@ class TestAnalysis(unittest.TestCase):
         self.assertTrue(np.all(charge[18:] == 0))
 
         # Test with virtual hits, forward fixing, real data, negative event number offset (ref to dut)
+        event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr = get_random_data(20)
+        event_numbers[:20] = np.array([0, 1, 2, 3, 4, 5, 7, 8, 8, 9, 10, 11, 11, 11, 12, 12, 12, 12, 13, 14])
+
+        ref_column[0], column[0], ref_row[0], row[0] = 51.5, 0.000, 325.5, 0.0
+        ref_column[1], column[1], ref_row[1], row[1] = 71.5, 51.57, 144.5, 324.72
+        ref_column[2], column[2], ref_row[2], row[2] = 13.5, 71.26, 136.8, 143.54
+        ref_column[3], column[3], ref_row[3], row[3] = 40.5, 14.03, 244.5, 136.59
+        ref_column[4], column[4], ref_row[4], row[4] = 0.00, 41.55, 0.000, 241.10
+        ref_column[5], column[5], ref_row[5], row[5] = 0.00, 1.995, 0.000, 144.11
+        ref_column[6], column[6], ref_row[6], row[6] = 30.5, 0.000, 280.5, 0.0
+        ref_column[7], column[7], ref_row[7], row[7] = 25.5, 30.18, 112.5, 278.87
+        ref_column[8], column[8], ref_row[8], row[8] = 76.5, 0.000, 205.25, 0.0
+        ref_column[9], column[9], ref_row[9], row[9] = 47.5, 0.000, 327.5, 0.0
+        ref_column[10], column[10], ref_row[10], row[10] = 0.0, 47.47, 0.0, 330.97
+        ref_column[11], column[11], ref_row[11], row[11] = 23.5, 0.0, 310.5, 0.0
+        ref_column[12], column[12], ref_row[12], row[12] = 37.5, 0.0, 200.5, 0.0
+        ref_column[13], column[13], ref_row[13], row[13] = 57.5, 0.0, 192.5, 0.0
+        ref_column[14], column[14], ref_row[14], row[14] = 53.5, 25.89, 128.5, 333.5
+        ref_column[15], column[15], ref_row[15], row[15] = 0.00, 13.38, 0.0, 188.23
+        ref_column[16], column[16], ref_row[16], row[16] = 0.0, 38.59, 0.0, 203.75
+        ref_column[17], column[17], ref_row[17], row[17] = 0.0, 58.31, 0.0, 193.67
+        ref_column[18], column[18], ref_row[18], row[18] = 20.5, 53.54, 247.5, 124.68
+        ref_column[19], column[19], ref_row[19], row[19] = 72.5, 20.95, 219.5, 246.44
+
+        n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr, error=8, n_bad_events=2, n_good_events=2, correlation_search_range=100, good_events_search_range=100)
+
+        # one fix is expected
+        self.assertEqual(n_fixes, 1)
+
+        # Correlation flag check
+        self.assertTrue(np.all(corr[1:4] == 1))
+
+        # Similarity check
+        self.assertTrue(np.all(np.abs(ref_column[0:4] - column[0:4]) < 8))
+        self.assertTrue(np.all(np.abs(ref_row[0:4] - row[0:4]) < 8))
+        self.assertTrue(np.all(np.abs(ref_column[6] - column[6]) < 8))
+        self.assertTrue(np.all(np.abs(ref_row[6] - row[6]) < 8))
+        self.assertTrue(np.all(np.abs(ref_column[9] - column[9]) < 8))
+        self.assertTrue(np.all(np.abs(ref_row[9] - row[9]) < 8))
+        self.assertTrue(np.all(np.abs(ref_column[18] - column[18]) < 8))
+        self.assertTrue(np.all(np.abs(ref_row[18] - row[18]) < 8))
+#         self.assertTrue(np.all(np.abs(ref_column[7:11] - column[7:11]) < 8))
+#         self.assertTrue(np.all(np.abs(ref_row[7:11] - row[7:11]) < 8))
+
+        # Virtual hits check
+        self.assertEqual(ref_column[4], 0)
+        self.assertEqual(ref_row[4], 0)
+
+        # 2. Test with virtual hits, forward fixing, real data, negative event number offset (ref to dut)
         event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr = get_random_data(11)
         event_numbers[:11] = np.array([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9])
 
@@ -420,7 +469,7 @@ class TestAnalysis(unittest.TestCase):
         self.assertEqual(ref_column[6], 0)
         self.assertEqual(ref_row[6], 0)
 
-    def test_missing_events(self):  # test behaviour if events are missing
+    def test_missing_events(self):  # test behavior if events are missing
         event_numbers, ref_column, column, ref_row, row, ref_charge, charge, corr = get_random_data(20, hits_per_event=1)
         # Event offset = 3 and two consecutive events missing
         column[:3] = 0
