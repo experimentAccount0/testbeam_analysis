@@ -628,7 +628,7 @@ def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, corr
                     progress_bar.finish()
 
 
-def find_tracks(tracklets_file, alignment_file, track_candidates_file):
+def find_tracks(tracklets_file, alignment_file, track_candidates_file, pixel_size):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is given to
     be able to cut on good tracks.
@@ -645,6 +645,9 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
         Output file name for track candidate array
     '''
     logging.info('Build tracks from tracklets')
+
+    # calculate pixel dimension ratio (col/row) for hit distance
+    pixel_ratio = float(pixel_size[0]) / pixel_size[1]
 
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
@@ -664,7 +667,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
         slices = [tracklets[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
 
         pool = Pool(n_slices)  # let all cores work the array
-        arg = [(one_slice, correlations, n_duts, column_sigma, row_sigma) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
+        arg = [(one_slice, n_duts, column_sigma, row_sigma, pixel_ratio) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
         results = pool.map(_function_wrapper_find_tracks_loop, arg)
         result = np.concatenate(results)
         pool.close()
@@ -717,7 +720,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file):
         slices = [tracklets[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
 
         pool = Pool(n_slices)  # let all cores work the array
-        arg = [(one_slice, correlations, n_duts, column_sigma, row_sigma) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
+        arg = [(one_slice, n_duts, column_sigma, row_sigma) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
         results = pool.map(_function_wrapper_find_tracks_loop, arg)
         result = np.concatenate(results)
         pool.close()
@@ -1450,7 +1453,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
 
 # Helper functions that are not ment to be called during analysis
 
-def _find_tracks_loop(tracklets, correlations, n_duts, column_sigma, row_sigma):
+def _find_tracks_loop(tracklets, n_duts, column_sigma, row_sigma, pixel_ratio):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Not ment to be called stand alone.
     Optimizations included to make it easily compile with numba in the future. Can be called from
@@ -1460,16 +1463,32 @@ def _find_tracks_loop(tracklets, correlations, n_duts, column_sigma, row_sigma):
     n_tracks = tracklets.shape[0]
     # Numba does not understand python scopes, define all used variables here
     n_actual_tracks = 0
-    track_index = 0
+    track_index, actual_hit_track_index = 0, 0  # track index of table and first track index of actual event
     column, row = 0., 0.
     actual_track_column, actual_track_row = 0., 0.
     column_distance, row_distance = 0., 0.
     hit_distance = 0.
-    tmp_column, tmp_row = 0., 0.
     best_hit_distance = 0.
 
     progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=n_tracks, term_width=80)
     progress_bar.start()
+
+    def set_track_quality(tracklets, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
+        # Set track quality of actual DUT from closest DUT hit; if hit is within 2 or 5 sigma range; quality 0 already set
+        column, row = tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index]
+        if row != 0:  # row = 0: not hit
+            column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
+            if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # high quality track hits
+                actual_track['track_quality'] |= (65793 << dut_index)
+            elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # low quality track hits
+                actual_track['track_quality'] |= (257 << dut_index)
+        else:
+            actual_track['track_quality'] &= (~ (65793 << dut_index))
+
+    def swap_hits(tracklets, track_index, dut_index, column, row, charge):
+        tmp_column, tmp_row, tmp_charge = tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index]
+        tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index] = column, row, charge
+        tracklets[hit_index]['column_dut_%d' % dut_index], tracklets[hit_index]['row_dut_%d' % dut_index], tracklets[hit_index]['charge_dut_%d' % dut_index] = tmp_column, tmp_row, tmp_charge
 
     for track_index, actual_track in enumerate(tracklets):  # loop over all possible tracks
         progress_bar.update(track_index)
@@ -1477,77 +1496,57 @@ def _find_tracks_loop(tracklets, correlations, n_duts, column_sigma, row_sigma):
         # Set variables for new event
         if actual_track['event_number'] != actual_event_number:
             actual_event_number = actual_track['event_number']
-            for i in range(n_actual_tracks):  # set number of tracks of previous event
+            for i in range(n_actual_tracks):  # Set number of tracks of previous event
                 tracklets[track_index - 1 - i]['n_tracks'] = n_actual_tracks
             n_actual_tracks = 0
+            actual_hit_track_index = track_index
 
         n_actual_tracks += 1
         first_hit_set = False
 
         for dut_index in xrange(n_duts):  # loop over all DUTs in the actual track
-            actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
-            mask = (65793 << dut_index)  # mask for bitwise swapping of track quality
 
-            if not first_hit_set and actual_track['row_dut_%d' % dut_index] != 0:  # search for first DUT that registered a hit
+            actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
+
+            if not first_hit_set and actual_track['row_dut_%d' % dut_index] != 0:  # search for first DUT that registered a hit (row != 0)
                 actual_track_column, actual_track_row = actual_track['column_dut_%d' % dut_index], actual_track['row_dut_%d' % dut_index]
                 first_hit_set = True
                 actual_track['track_quality'] |= (65793 << dut_index)  # first track hit has best quality by definition
             else:  # Find best (closest) DUT hit
                 close_hit_found = False
-                for hit_index in xrange(track_index, tracklets.shape[0]):  # loop over all not sorted hits of actual DUT
+                for hit_index in xrange(actual_hit_track_index, tracklets.shape[0]):  # loop over all not sorted hits of actual DUT
                     if tracklets[hit_index]['event_number'] != actual_event_number:
                         break
                     column, row, charge, quality = tracklets[hit_index]['column_dut_%d' % dut_index], tracklets[hit_index]['row_dut_%d' % dut_index], tracklets[hit_index]['charge_dut_%d' % dut_index], tracklets[hit_index]['track_quality']
                     column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-                    hit_distance = sqrt((column_distance * 5) * (column_distance * 5) + row_distance * row_distance)
+                    hit_distance = sqrt((column_distance * pixel_ratio) * (column_distance * pixel_ratio) + row_distance * row_distance)
 
                     if row != 0:  # Track hit found
-                        actual_track['track_quality'] |= (1 << dut_index)
+                        actual_track['track_quality'] |= (1 << dut_index)  # track quality 0 for DUT dut_index (in first byte one bit set)
                         quality |= (1 << dut_index)
 
-                    if row != 0 and not close_hit_found and column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # good track hit (5 sigma search region)
-                        tmp_column, tmp_row, tmp_charge = tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index]
-                        selection = ~(tracklets[track_index]['track_quality'] & quality) & mask
-                        tracklets[track_index]['track_quality'], tracklets[hit_index]['track_quality'] = tracklets[track_index]['track_quality'] ^ selection, tracklets[hit_index]['track_quality'] ^ selection
-
-                        tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index] = column, row, charge
-
-                        tracklets[hit_index]['column_dut_%d' % dut_index], tracklets[hit_index]['row_dut_%d' % dut_index], tracklets[hit_index]['charge_dut_%d' % dut_index] = tmp_column, tmp_row, tmp_charge
-
+                    if row != 0 and not close_hit_found and column_distance < 5. * actual_column_sigma and row_distance < 5. * actual_row_sigma:  # good track hit (5 sigma search region)
+                        if tracklets[hit_index]['track_quality'] & (65793 << dut_index) == (65793 << dut_index):  # Check if hit is already a close hit, then do not move
+                            set_track_quality(tracklets, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
+                            continue
+                        if tracklets[hit_index]['track_quality'] & (257 << dut_index) == (257 << dut_index):  # Check if old hit is closer, then do not move
+                            column_distance_old, row_distance_old = abs(column - tracklets[hit_index]['column_dut_0']), abs(row - tracklets[hit_index]['row_dut_0'])
+                            hit_distance_old = sqrt((column_distance_old * pixel_ratio) * (column_distance_old * pixel_ratio) + row_distance_old * row_distance_old)
+                            if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track
+                                set_track_quality(tracklets, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
+                                continue
+                        swap_hits(tracklets, track_index, dut_index, column, row, charge)
                         best_hit_distance = hit_distance
                         close_hit_found = True
                     elif row != 0 and close_hit_found and hit_distance < best_hit_distance:  # found better track hit
-                        tmp_column, tmp_row, tmp_charge = tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index]
-                        selection = ~(tracklets[track_index]['track_quality'] & quality) & mask
-                        tracklets[track_index]['track_quality'], tracklets[hit_index]['track_quality'] = tracklets[track_index]['track_quality'] ^ selection, tracklets[hit_index]['track_quality'] ^ selection
-
-                        tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index] = column, row, charge
-
-                        tracklets[hit_index]['column_dut_%d' % dut_index], tracklets[hit_index]['row_dut_%d' % dut_index], tracklets[hit_index]['charge_dut_%d' % dut_index] = tmp_column, tmp_row, tmp_charge
-
+                        swap_hits(tracklets, track_index, dut_index, column, row, charge)
                         best_hit_distance = hit_distance
-                    elif row == 0 and not close_hit_found:  # take no hit if no good hit is found
-                        tmp_column, tmp_row, tmp_charge = tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index]
-                        selection = ~(tracklets[track_index]['track_quality'] & quality) & mask
-                        tracklets[track_index]['track_quality'], tracklets[hit_index]['track_quality'] = tracklets[track_index]['track_quality'] ^ selection, tracklets[hit_index]['track_quality'] ^ selection
 
-                        tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index] = column, row, charge
+                    set_track_quality(tracklets, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
 
-                        tracklets[hit_index]['column_dut_%d' % dut_index], tracklets[hit_index]['row_dut_%d' % dut_index], tracklets[hit_index]['charge_dut_%d' % dut_index] = tmp_column, tmp_row, tmp_charge
-
-                    # Set track quality of actual DUT from closest DUT hit
-                    column, row, charge = tracklets[track_index]['column_dut_%d' % dut_index], tracklets[track_index]['row_dut_%d' % dut_index], tracklets[track_index]['charge_dut_%d' % dut_index]
-                    if row != 0:
-                        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-                        if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # high quality track hits
-                            actual_track['track_quality'] |= (65793 << dut_index)
-                        elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # low quality track hits
-                            actual_track['track_quality'] |= (257 << dut_index)
-                    else:
-                        actual_track['track_quality'] &= (~ (65793 << dut_index))
-        else:
-            for i in range(n_actual_tracks):
-                tracklets[track_index - i]['n_tracks'] = n_actual_tracks
+        # Set number of tracks of last event
+        for i in range(n_actual_tracks):
+            tracklets[track_index - i]['n_tracks'] = n_actual_tracks
 
     progress_bar.finish()
     return tracklets
