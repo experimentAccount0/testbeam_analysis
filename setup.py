@@ -3,6 +3,23 @@ from setuptools import setup, find_packages, Extension  # This setup relies on s
 import numpy as np
 from Cython.Build import cythonize
 
+version = 0.01
+
+class build_ext_opt(build_ext):
+    def initialize_options(self):
+        build_ext.initialize_options(self)
+        self.compiler = 'msvc' if os.name == 'nt' else None  # in Anaconda the libpython package includes the MinGW import libraries and a file (Lib/distutils/distutils.cfg) which sets the default compiler to mingw32. Alternatively try conda remove libpython.
+
+    def build_extensions(self):
+        c = self.compiler.compiler_type
+        if c in copt:
+            for e in self.extensions:
+                e.extra_compile_args = copt[c]
+        if c in lopt:
+            for e in self.extensions:
+                e.extra_link_args = lopt[c]
+        build_ext.build_extensions(self)
+
 cpp_extension = cythonize([
     Extension('testbeam_analysis.hit_clusterizer', ['testbeam_analysis/clusterizer/hit_clusterizer.pyx', 'testbeam_analysis/clusterizer/Clusterizer.cpp', 'testbeam_analysis/clusterizer/Basis.cpp']),
     Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/clusterizer/analysis_functions.pyx'])
@@ -14,10 +31,6 @@ author_email = 'christian.bespin@uni-bonn.de, pohl@physik.uni-bonn.de'
 # requirements for core functionality from requirements.txt
 with open('requirements.txt') as f:
     install_requires = f.read().splitlines()
-
-f = open('VERSION', 'r')
-version = f.readline().strip()
-f.close()
 
 setup(
     name='testbeam_analysis',
@@ -36,6 +49,7 @@ setup(
     package_data={'': ['*.txt', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
     ext_modules=cpp_extension,
     include_dirs=[np.get_include()],
+    cmdclass={'build_ext': build_ext_opt},
     keywords=['testbeam', 'particle', 'reconstruction', 'pixel', 'detector'],
     platforms='any'
 )
