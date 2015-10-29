@@ -1,8 +1,5 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
-import matplotlib
-# Force matplotlib to not use any Xwindows backend; does not really work?, http://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
-matplotlib.use('Agg')
 import unittest
 import tables as tb
 import numpy as np
