@@ -8,7 +8,7 @@ import numpy as np
 from testbeam_analysis.clusterizer import data_struct
 from testbeam_analysis import analysis_utils
 
-tests_data_folder = r'tests/test_analysis/'
+tests_data_folder = r'tests/test_analysis_utils/'
 
 
 def get_array_differences(first_array, second_array):
@@ -105,7 +105,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
     return checks_passed, error_msg
 
 
-class TestAnalysis(unittest.TestCase):
+class TestAnalysisUtils(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -192,6 +192,6 @@ class TestAnalysis(unittest.TestCase):
             self.assertTrue(exception_ok & np.all(array == array_fast))
 
 if __name__ == '__main__':
-    tests_data_folder = r'test_analysis/'
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestAnalysis)
+    tests_data_folder = r'test_analysis_utils/'
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestAnalysisUtils)
     unittest.TextTestRunner(verbosity=2).run(suite)
