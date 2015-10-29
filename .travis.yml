@@ -12,6 +12,10 @@ branches:
 notifications:
   email:
     - pohl@physik.uni-bonn.de
+    
+cache:
+  directories:
+  - $HOME/.pip-cache/
  
 # Setup miniconda python with needed packages
 before_install:
@@ -41,4 +45,4 @@ script:
   - nosetests --with-coverage --cover-package=testbeam_analysis
   
 after_success:
-  - coveralls
+- coveralls
