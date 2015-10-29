@@ -15,7 +15,7 @@ import numpy as np
 from testbeam_analysis import analysis_utils
 
 
-def plot_noisy_pixel(occupancy, noisy_pixels, filename):
+def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
     # Plot noisy pixel
     fig = Figure()
     fig.patch.set_facecolor('white')
