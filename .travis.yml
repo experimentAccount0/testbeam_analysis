@@ -30,7 +30,7 @@ before_install:
   - conda update --yes conda
   - conda info -a
   - conda install --yes numpy cython pytables scipy matplotlib pandas nose
-  - pip install progressbar-latest xvfbwrapper coverage
+  - pip install progressbar-latest xvfbwrapper coverage coveralls
   - python setup.py develop
 
 # Run test
