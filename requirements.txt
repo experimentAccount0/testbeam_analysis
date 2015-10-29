@@ -1,0 +1,6 @@
+cython  # for C++ extensions
+pandas  # for merging on event number for correlations
+tables  # the data format
+scipy   # analysis functions
+numpy   # for C array object and fast algorithms
+matplotlib  # for plotting
