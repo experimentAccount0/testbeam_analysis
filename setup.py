@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages, Extension  # This setup relies on setuptools since distutils is insufficient and badly hacked code
 import numpy as np
+from distutils.command.build_ext import build_ext
 from Cython.Build import cythonize
+import os
 
 version = 0.01
+
+copt = {'msvc': ['-IpyTestbeamAnalysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
+lopt = {}
+
 
 class build_ext_opt(build_ext):
     def initialize_options(self):
