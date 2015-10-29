@@ -2,16 +2,14 @@
 '''
 
 import unittest
-import os
 import tables as tb
 import numpy as np
-import progressbar
 
-from pyTestbeamAnalysis.clusterizer import data_struct
-from pyTestbeamAnalysis import analysis_utils
-from pyTestbeamAnalysis import analysis_functions
+from testbeam_analysis.clusterizer import data_struct
+from testbeam_analysis import analysis_utils
+from testbeam_analysis import analysis_functions
 
-tests_data_folder = 'tests//test_analysis//'
+tests_data_folder = r'tests/test_analysis/'
 
 
 def get_array_differences(first_array, second_array):
@@ -195,6 +193,6 @@ class TestAnalysis(unittest.TestCase):
             self.assertTrue(exception_ok & np.all(array == array_fast))
 
 if __name__ == '__main__':
-    tests_data_folder = 'test_analysis//'
+    tests_data_folder = r'test_analysis/'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)

@@ -5,9 +5,8 @@ import unittest
 import tables as tb
 import numpy as np
 
-from pyTestbeamAnalysis import analysis_utils
-from pyTestbeamAnalysis import analysis_functions
-from nose import SkipTest
+from testbeam_analysis import analysis_utils
+from testbeam_analysis import analysis_functions
 
 
 def get_random_data(n_hits, hits_per_event=2, seed=0):

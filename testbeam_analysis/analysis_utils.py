@@ -8,8 +8,8 @@ from math import ceil
 from matplotlib import colors, cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from pyTestbeamAnalysis import analysis_functions
-from pyTestbeamAnalysis.clusterizer import data_struct
+from testbeam_analysis import analysis_functions
+from testbeam_analysis.clusterizer import data_struct
 
 
 def in1d_events(ar1, ar2):
