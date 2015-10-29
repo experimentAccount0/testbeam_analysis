@@ -1,7 +1,9 @@
-# pyTestbeamAnalysis [![Code Status](https://landscape.io/github/SiLab-Bonn/pyTestbeamAnalysis/master/landscape.svg?style=flat)](https://landscape.io/github/SiLab-Bonn/pyTestbeamAnalysis/master) [![Build Status](https://travis-ci.org/SiLab-Bonn/pyTestbeamAnalysis.svg?branch=master)](https://travis-ci.org/SiLab-Bonn/pyTestbeamAnalysis) [![Build Status](https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/pyTestbeamAnalysis)](https://ci.appveyor.com/project/DavidLP/pytestbeamanalysis)
-A _very_ simple analysis of pixel-sensor data from testbeams. All steps of a full analysis are included in one file in only 1000 lines of Python code. If you you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. 
+# pyTestbeamAnalysis [![Code Status](https://landscape.io/github/SiLab-Bonn/pyTestbeamAnalysis/master/landscape.svg?style=flat)](https://landscape.io/github/SiLab-Bonn/pyTestbeamAnalysis/master) [![Build Status](https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=master)](https://travis-ci.org/SiLab-Bonn/testbeam_analysis) [![Build Status](https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/pyTestbeamAnalysis)](https://ci.appveyor.com/project/DavidLP/pytestbeamanalysis)
+A _very_ simple analysis of pixel-sensor data from test beams. All steps of a full analysis are included in very few lines of Python code. If you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. 
 If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. _EUTelescope_. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code.
- For a quick first impression check the example plots in the wiki.
+For a quick first impression check the example plots in the wiki.
+
+In future releases it is forseen to make the code more readable and to implement a Kalman Filter to have the best possible track fit results.
 
 # Installation
 You have to have Python 2.7 and the following modules installed:

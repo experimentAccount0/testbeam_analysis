@@ -4,3 +4,4 @@ tables  # the data format
 scipy   # analysis functions
 numpy   # for C array object and fast algorithms
 matplotlib  # for plotting
+future  # Python 2/3 compatibility
