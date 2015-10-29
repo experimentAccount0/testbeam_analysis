@@ -2,8 +2,8 @@
 from tables import dtype_from_descr
 import numpy as np
 
-from pyTestbeamAnalysis.hit_clusterizer import HitClusterizer
-from pyTestbeamAnalysis.clusterizer import data_struct
+from testbeam_analysis.hit_clusterizer import HitClusterizer
+from testbeam_analysis.clusterizer import data_struct
 
 
 def pprint_array(array):
