@@ -52,7 +52,7 @@ def remove_hot_pixels(data_file, threshold=6.):
             max_row = np.amax(row)
             occupancy = analysis_utils.hist_2d_index(col - 1, row - 1, shape=(np.amax(col), max_row))
             noisy_pixels = np.where(occupancy > np.median(occupancy) + np.std(occupancy) * threshold)
-            plot_utils.plot_noisy_pixel(occupancy, noisy_pixels, filename=data_file[:-3] + '_hot_pixel.pdf')
+            plot_utils.plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename=data_file[:-3] + '_hot_pixel.pdf')
             logging.info('Remove %d hot pixels in %s', noisy_pixels[0].shape[0], data_file)
 
             # Select not noisy pixels
@@ -113,7 +113,7 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
     with tb.open_file(alignment_file, mode="w") as out_file_h5:
         for index, hit_file in enumerate(hit_files):
             with tb.open_file(hit_file, 'r') as in_file_h5:
-                # set event selection
+                # Set event selection
                 event_range = [event_range, ] if not isinstance(event_range, list) else event_range
                 if len(event_range) == 2:
                     event_start, event_end = event_range[0], event_range[1]
