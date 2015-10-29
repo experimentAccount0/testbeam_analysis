@@ -25,6 +25,8 @@ import tables as tb
 from multiprocessing import Pool, cpu_count
 from scipy.optimize import curve_fit, minimize_scalar
 
+from builtins import range
+
 from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis.hit_clusterizer import HitClusterizer
@@ -178,7 +180,7 @@ def align_hits(correlation_file, alignment_file, output_pdf, fit_offset_cut=[(10
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(correlation_file, mode="r+") as in_file_h5:
             n_nodes = sum(1 for _ in enumerate(in_file_h5.root))  # Determine number of nodes, is there a better way?
-            result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('c2', np.float), ('c2_error', np.float), ('sigma', np.float), ('sigma_error', np.float), ('description', np.str_, 40)])
+            result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('c2', np.float), ('c2_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
             for node_index, node in enumerate(in_file_h5.root):
                 try:
                     result[node_index]['dut_x'], result[node_index]['dut_y'] = int(re.search(r'\d+', node.name).group()), node.name[-1:]
@@ -247,7 +249,6 @@ def align_hits(correlation_file, alignment_file, output_pdf, fit_offset_cut=[(10
                 result[node_index]['c1'], result[node_index]['c1_error'] = fit[1], np.absolute(pcov[1][1]) ** 0.5
                 result[node_index]['c2'], result[node_index]['c2_error'] = fit[2], np.absolute(pcov[2][2]) ** 0.5
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
-                result[node_index]['description'] = node.title
 
                 # Plot selected data with fit
                 plot_utils.plot_alignment_fit(data, selected_data, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, offset, result, node_index, i, node.title, output_fig)
@@ -527,7 +528,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, pixel_siz
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
         row_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
         column_sigma[0], row_sigma[0] = 0, 0  # DUT0 has no correlation error
-        for index in range(1, correlations.shape[0] / 2 + 1):
+        for index in range(1, correlations.shape[0] // 2 + 1):
             column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
@@ -536,7 +537,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, pixel_siz
         n_duts = sum(['column' in col for col in tracklets.dtype.names])
         n_slices = cpu_count() - 1
         n_tracks = tracklets.nrows
-        slice_length = n_tracks / n_slices
+        slice_length = n_tracks // n_slices
         slices = [tracklets[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
 
         pool = Pool(n_slices)  # let all cores work the array
@@ -865,11 +866,11 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
 
                     good_track_selection = np.logical_and((track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8)), track_candidates['n_tracks'] <= max_tracks)
 
-                    print 'Lost due to normal cuts', good_track_selection.shape[0] - np.sum(good_track_selection)
+                    logging.info('Lost due to track quality cuts %d', good_track_selection.shape[0] - np.sum(good_track_selection))
 
                     if use_correlated:  # reduce track selection to only correlated duts
                         good_track_selection &= (track_candidates['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
-                        print 'Lost due to correlated cuts', good_track_selection.shape[0] - np.sum(track_candidates['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
+                        logging.info('Lost due to correlated cuts %d', good_track_selection.shape[0] - np.sum(track_candidates['track_quality'] & (quality_mask << 24) == (quality_mask << 24)))
 
                     good_track_candidates = track_candidates[good_track_selection]
 
@@ -1112,7 +1113,7 @@ def _find_tracks_loop(tracklets, n_duts, column_sigma, row_sigma, pixel_ratio):
         n_actual_tracks += 1
         first_hit_set = False
 
-        for dut_index in xrange(n_duts):  # loop over all DUTs in the actual track
+        for dut_index in range(n_duts):  # loop over all DUTs in the actual track
 
             actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
 
@@ -1122,7 +1123,7 @@ def _find_tracks_loop(tracklets, n_duts, column_sigma, row_sigma, pixel_ratio):
                 actual_track['track_quality'] |= (65793 << dut_index)  # first track hit has best quality by definition
             else:  # Find best (closest) DUT hit
                 close_hit_found = False
-                for hit_index in xrange(actual_hit_track_index, tracklets.shape[0]):  # loop over all not sorted hits of actual DUT
+                for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # loop over all not sorted hits of actual DUT
                     if tracklets[hit_index]['event_number'] != actual_event_number:
                         break
                     column, row, charge, quality = tracklets[hit_index]['column_dut_%d' % dut_index], tracklets[hit_index]['row_dut_%d' % dut_index], tracklets[hit_index]['charge_dut_%d' % dut_index], tracklets[hit_index]['track_quality']
@@ -1193,4 +1194,4 @@ def _function_wrapper_fit_tracks_loop(args):  # needed for multiprocessing call 
 
 
 if __name__ == "__main__":
-    print 'Please check examples how to use the code'
+    print('Please check examples how to use the code')
