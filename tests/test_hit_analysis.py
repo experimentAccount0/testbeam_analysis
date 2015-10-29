@@ -1,6 +1,8 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
-
+import matplotlib
+# Force matplotlib to not use any Xwindows backend, http://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
+matplotlib.use('Agg')
 import unittest
 import tables as tb
 import numpy as np
@@ -111,7 +113,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
     return checks_passed, error_msg
 
 
-class TestAnalysisUtils(unittest.TestCase):
+class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -165,5 +167,5 @@ class TestAnalysisUtils(unittest.TestCase):
 
 if __name__ == '__main__':
     tests_data_folder = r'test_hit_analysis/'
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestAnalysisUtils)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)
