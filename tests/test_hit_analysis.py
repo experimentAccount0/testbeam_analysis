@@ -1,7 +1,7 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
 import matplotlib
-# Force matplotlib to not use any Xwindows backend, http://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
+# Force matplotlib to not use any Xwindows backend; does not really work?, http://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
 matplotlib.use('Agg')
 import unittest
 import tables as tb
@@ -117,6 +117,10 @@ class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if os.name != 'nt':
+            from xvfbwrapper import Xvfb
+            cls.vdisplay = Xvfb()
+            cls.vdisplay.start()
         cls.noisy_data_file = tests_data_folder + 'TestBeamData_Mimosa26_DUT0_small.h5'
         cls.data_files = [tests_data_folder + 'TestBeamData_FEI4_DUT0_small.h5',
                           tests_data_folder + 'TestBeamData_FEI4_DUT1_small.h5',
