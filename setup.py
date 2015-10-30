@@ -7,14 +7,14 @@ import os
 
 version = 0.01
 
-copt = {'msvc': ['-IpyTestbeamAnalysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
+copt = {'msvc': ['-Itestbeam_analysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
 lopt = {}
 
 
 class build_ext_opt(build_ext):
     def initialize_options(self):
         build_ext.initialize_options(self)
-        self.compiler = 'msvc' if os.name == 'nt' else None  # in Anaconda the libpython package includes the MinGW import libraries and a file (Lib/distutils/distutils.cfg) which sets the default compiler to mingw32. Alternatively try conda remove libpython.
+        self.compiler = 'msvc' if os.name == 'nt' else None  # in Miniconda the libpython package includes the MinGW import libraries and a file (Lib/distutils/distutils.cfg) which sets the default compiler to mingw32. Alternatively try conda remove libpython.
 
     def build_extensions(self):
         c = self.compiler.compiler_type
