@@ -930,6 +930,8 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(250, 50), use_duts
 
     output_fig = PdfPages(output_pdf) if output_pdf else None
 
+    residuals = []
+
     with tb.open_file(tracks_file, mode='r') as in_file_h5:
         for node in in_file_h5.root:
             actual_dut = int(node.name[-1:])
@@ -960,9 +962,12 @@ def calculate_residuals(tracks_file, z_positions, pixel_size=(250, 50), use_duts
                     fit_ok = False
 
                 plot_utils.plot_residuals(pixel_dim, i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig)
+                residuals.append(coeff[2])
 
     if output_fig:
         output_fig.close()
+
+    return residuals
 
 
 def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):
@@ -993,6 +998,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
     '''
     logging.info('Calculate efficiency')
     with PdfPages(output_pdf) as output_fig:
+        efficiencies = []
         with tb.open_file(tracks_file, mode='r') as in_file_h5:
             for index, node in enumerate(in_file_h5.root):
                 actual_dut = int(node.name[-1:])
@@ -1058,6 +1064,8 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
 
                 logging.info('Efficiency =  %1.4f', np.ma.mean(efficiency))
+                efficiencies.append(np.ma.mean(efficiency))
+    return efficiencies
 
 
 # Helper functions that are not ment to be called during analysis
