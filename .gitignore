@@ -74,6 +74,7 @@ tmp
 !data/
 !test_hit_analysis/
 !test_track_analysis/
+!test_result_analysis/
 *.pdf
 *tmp*.*
 .coverage*
