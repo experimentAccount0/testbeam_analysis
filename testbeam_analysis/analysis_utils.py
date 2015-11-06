@@ -143,8 +143,8 @@ def hist_3d_index(x, y, z, shape):
     return np.reshape(result, shape)  # rebuilt 3D hist from 1D hist
 
 
-def create_2d_pixel_hist(fig, ax, hist2d, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
-    extent = [0.5, 80.5, 336.5, 0.5]
+def create_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
+    extent = [0.5, plot_range[0] + .5, plot_range[1] + .5, 0.5]
     if z_max is None:
         if hist2d.all() is np.ma.masked:  # check if masked array is fully masked
             z_max = 1
