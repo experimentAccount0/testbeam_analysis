@@ -277,11 +277,12 @@ def plot_residuals(pixel_dim, i, actual_dut, edges, hist, fit_ok, coeff, gauss, 
         plt.title('Residuals for DUT %d' % actual_dut)
         plt.xlabel('Residual Column [um]' if i == 0 else 'Residual Row [um]')
         plt.ylabel('#')
+
         plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
         if fit_ok:
             plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
-            plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm%.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
-            gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm%.1f$\nmu=$%.1f\pm%.1f$\nsigma=$%.1f\pm%.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+            plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
+            gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
             plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r-', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         if output_fig is not None:
