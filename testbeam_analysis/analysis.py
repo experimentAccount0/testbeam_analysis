@@ -621,7 +621,6 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
         tr_column = np.transpose(tr_column)
         tr_row = np.transpose(tr_row)
         tr_charge = np.transpose(tr_charge)
-
         tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma, pixel_ratio)
 
         # merge data into one array
@@ -1026,10 +1025,18 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
     col_range, row_range : iterable
         column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation)
     '''
+
     logging.info('Calculate efficiency')
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
         with tb.open_file(tracks_file, mode='r') as in_file_h5:
+            # bins define (virtual) pixel size for histogramming
+            bin_x, bin_y = dim_x, dim_y
+
+            # sensor dimensions in um
+            dim_x *= pixel_size[0]
+            dim_y *= pixel_size[1]
+
             for index, node in enumerate(in_file_h5.root):
                 actual_dut = int(node.name[-1:])
                 if use_duts and actual_dut not in use_duts:
@@ -1055,21 +1062,17 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 if None not in col_range:
                     selection = np.logical_and(intersection[:, 0] >= col_range[index][0], intersection[:, 0] <= col_range[index][1])
                     hits, intersection = hits[selection], intersection[selection]
-                else:
-                    col_range = [(0, dim_x)]
                 if None not in row_range:
                     selection = np.logical_and(intersection[:, 1] >= row_range[index][0], intersection[:, 1] <= row_range[index][1])
                     hits, intersection = hits[selection], intersection[selection]
-                else:
-                    row_range = [(0, dim_y)]
 
                 # Calculate distance between track hit and DUT hit
-                scale = np.square(np.array((pixel_size[0], pixel_size[1], 0)))  # regard pixel size for calculating distances
+                scale = np.square(np.array((1, 1, 0)))  # regard pixel size for calculating distances
                 distance = np.sqrt(np.dot(np.square(intersection - hits), scale))  # array with distances between DUT hit and track hit for each event. Values in um
 
                 col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                distance_array = np.histogramdd(col_row_distance, bins=(dim_x, dim_y, max_distance), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5], [0, max_distance]])[0]
-                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(dim_x, dim_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                distance_array = np.histogramdd(col_row_distance, bins=(bin_x, bin_y, max_distance), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5], [0, max_distance]])[0]
+                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
 
                 # Calculate distances between hit and intersection
                 distance_mean_array = np.average(distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
@@ -1085,16 +1088,17 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 else:
                     intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
 
-                plot_utils.efficiency_plots(distance_min_array, distance_max_array, actual_dut, intersection, minimum_track_density, intersection_valid_hit, hit_hist, distance_mean_array, dim_x, dim_y, cut_distance, output_fig)
+                plot_utils.efficiency_plots(distance_min_array, distance_max_array, actual_dut, intersection, minimum_track_density, intersection_valid_hit, hit_hist, distance_mean_array, dim_x, dim_y, bin_x, bin_y, cut_distance, output_fig)
 
-                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(dim_x, dim_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
-                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(dim_x, dim_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
                 efficiency = np.zeros_like(track_density_with_DUT_hit)
                 efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
 
                 logging.info('Efficiency =  %1.4f', np.ma.mean(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
+
     return efficiencies
 
 # Helper functions that are not ment to be called during analysis
@@ -1113,12 +1117,12 @@ def _set_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, act
     else:
         actual_track.track_quality &= (~ (65793 << dut_index))
 
-    # get number of hits for this track. Hits are identified by sigma distance given by quality variable
-    quality = 5
-    if row != 0:  # row = 0: not hit
-        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < quality * actual_column_sigma and row_distance < quality * actual_row_sigma:
-            actual_track.n_hits |= (1 << dut_index)
+#     # get number of hits for this track. Hits are identified by sigma distance given by quality variable
+#     quality = 5
+#     if row != 0:  # row = 0: not hit
+#         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
+#         if column_distance < quality * actual_column_sigma and row_distance < quality * actual_row_sigma:
+#             actual_track.n_hits |= (1 << dut_index)
 
 
 @njit

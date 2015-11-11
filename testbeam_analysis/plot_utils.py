@@ -291,7 +291,7 @@ def plot_residuals(pixel_dim, i, actual_dut, edges, hist, fit_ok, coeff, gauss, 
             plt.show()
 
 
-def efficiency_plots(distance_min_array, distance_max_array, actual_dut, intersection, minimum_track_density, intersection_valid_hit, hit_hist, distance_mean_array, dim_x, dim_y, cut_distance, output_fig):
+def efficiency_plots(distance_min_array, distance_max_array, actual_dut, intersection, minimum_track_density, intersection_valid_hit, hit_hist, distance_mean_array, dim_x, dim_y, bin_x, bin_y, cut_distance, output_fig):
     plot_range = (dim_x, dim_y)
 
     fig = Figure()
@@ -308,8 +308,8 @@ def efficiency_plots(distance_min_array, distance_max_array, actual_dut, interse
     fig.tight_layout()
     output_fig.savefig(fig)
 
-    track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(dim_x, dim_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
-    track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(dim_x, dim_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+    track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+    track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
     efficiency = np.zeros_like(track_density_with_DUT_hit)
     efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
 
