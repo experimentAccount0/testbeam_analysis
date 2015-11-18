@@ -31,6 +31,7 @@ from numba import njit
 from builtins import range
 
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 
 from testbeam_analysis.hit_clusterizer import HitClusterizer
 from testbeam_analysis.clusterizer import data_struct
@@ -84,8 +85,8 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3):
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
             hits = input_file_h5.root.Hits[:]
             clusterizer = HitClusterizer(np.amax(hits['column']), np.amax(hits['row']))
-            clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
-            clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
+            clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in column
+            clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in row
             clusterizer.set_frame_cluster_distance(4)   # cluster distance in time frames
             cluster = np.zeros_like(hits, dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
             clusterizer.set_cluster_info_array(cluster)  # tell the array to be filled
@@ -192,6 +193,12 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     continue
                 logging.info('Align %s', node.name)
 
+                # TODO: allow pixel_size for each DUT or one size for all DUTs
+                if 'Col' in node.title:  # differ between column and row for sensors with rectangular pixels
+                    pixel_length, pixel_length_ref = pixel_size[node_index][0], pixel_size[node_index][0]
+                else:
+                    pixel_length, pixel_length_ref = pixel_size[node_index - n_duts + 2][1], pixel_size[node_index - n_duts + 2][1]
+
                 data = node[:]
 
                 # Start values for fitting
@@ -205,9 +212,11 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                 chi2 = np.array([-1. for _ in range(data.shape[0])])
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
-                channel_indices = np.arange(data.shape[0])
-                for index in channel_indices:
-                    p0 = [As[index], mus[index], 1., 1.]
+                # Get values with highest correlation for alignment fit
+                # Do this with channel indices, convert results to um
+                channel_indices = pixel_length * np.arange(data.shape[0])
+                for index in np.arange(data.shape[0]):
+                    p0 = [As[index], mus[index], 1., 0.]
                     try:
                         x = np.arange(data.shape[1])
                         coeff, var_matrix = curve_fit(gauss, x, data[index, :], p0=p0)
@@ -219,10 +228,13 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     except RuntimeError:
                         pass
 
-                mean_error_fitted = np.abs(mean_error_fitted)
+                # Convert fit results to um for alignment fit
+                mean_fitted *= pixel_length
+                mean_error_fitted = pixel_length * np.abs(mean_error_fitted)
 
                 # Fit data with a straight line 3 times to remove outliers
-                selected_data = range(data.shape[0])
+                selected_data = np.arange(data.shape[0])
+
                 for i in range(3):
                     f = lambda x, c0, c1: c0 + c1 * x
                     if not np.any(selected_data):
@@ -234,33 +246,32 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                         index = node_index % len(fit_offset_cut)
                         offset_limit, error_limit = fit_offset_cut[index][0] if 'Col' in node.title else fit_offset_cut[index][1], fit_error_cut[index][0] if 'Col' in node.title else fit_error_cut[index][1]
 
-                    fit, pcov = curve_fit(f, np.arange(data.shape[0])[selected_data], mean_fitted[selected_data])
+                    # TODO: give start values
+                    fit, pcov = curve_fit(f, pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data])
                     fit_fn = np.poly1d(fit[::-1])
-                    offset = fit_fn(np.arange(data.shape[0])) - mean_fitted
+                    offset = fit_fn(pixel_length_ref * np.arange(data.shape[0])) - mean_fitted
                     selected_data = np.where(np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) < offset_limit, mean_error_fitted < error_limit)))
                     if show_plots:
-                        plot_utils.plot_alignments(data, selected_data, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, node.title)
+                        # TODO: plot does not show prefit
+                        plot_utils.plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, node.title)
 
                 # Refit with higher polynomial
                 g = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-                fit, pcov = curve_fit(g, np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
+                fit, pcov = curve_fit(g, pixel_length_ref * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
                 fit_fn = np.poly1d(fit[::-1])
 
                 # Calculate mean sigma (is somewhat a residual) and store the actual data in result array
-                mean_sigma = np.mean(np.array(sigma_fitted)[selected_data])
-                mean_sigma_error = np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(channel_indices[selected_data].shape[0])
-                if node_index < (n_duts - 1):
-                    pixel_length = pixel_size[0]
-                else:
-                    pixel_length = pixel_size[1]
+                mean_sigma = pixel_length * np.mean(np.array(sigma_fitted)[selected_data])
+                mean_sigma_error = pixel_length * np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(channel_indices[selected_data].shape[0])
+                # TODO: allow sensors with different pixel sizes in telescope
 
-                result[node_index]['c0'], result[node_index]['c0_error'] = pixel_length * fit[0], pixel_length * np.absolute(pcov[0][0]) ** 0.5
-                result[node_index]['c1'], result[node_index]['c1_error'] = pixel_length * fit[1], pixel_length * np.absolute(pcov[1][1]) ** 0.5
-                result[node_index]['c2'], result[node_index]['c2_error'] = pixel_length * fit[2], pixel_length * np.absolute(pcov[2][2]) ** 0.5
-                result[node_index]['sigma'], result[node_index]['sigma_error'] = pixel_length * mean_sigma, pixel_length * mean_sigma_error
+                result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
+                result[node_index]['c1'], result[node_index]['c1_error'] = fit[1], np.absolute(pcov[1][1]) ** 0.5
+                result[node_index]['c2'], result[node_index]['c2_error'] = fit[2], np.absolute(pcov[2][2]) ** 0.5
+                result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Plot selected data with fit
-                plot_utils.plot_alignment_fit(data, selected_data, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, offset, result, node_index, i, node.title, output_fig)
+                plot_utils.plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, node.title, output_fig)
 
             with tb.open_file(alignment_file, mode="w") as out_file_h5:
                 try:
@@ -286,7 +297,6 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
         Merge only given number of cluster data
     '''
     logging.info('Merge cluster to tracklets')
-    column_size, row_size = pixel_size[0], pixel_size[1]
 
     with tb.open_file(alignment_file, mode="r") as in_file_h5:
         correlation = in_file_h5.root.Alignment[:]
@@ -316,18 +326,18 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
             with tb.open_file(cluster_file, mode='r') as in_file_h5:
                 actual_cluster = analysis_utils.map_cluster(common_event_number, in_file_h5.root.Cluster[:])
                 selection = actual_cluster['mean_column'] != 0
-                actual_mean_column = actual_cluster['mean_column'][selection]  # correct only hits, 0 is no hit
-                actual_mean_row = actual_cluster['mean_row'][selection]  # correct only hits, 0 is no hit
+                print pixel_size[index][0]
+                actual_mean_column = pixel_size[index][0] * actual_cluster['mean_column'][selection]  # correct only hits, 0 is no hit
+                actual_mean_row = pixel_size[index][1] * actual_cluster['mean_row'][selection]  # correct only hits, 0 is no hit
                 if index == 0:  # Position corrections are normalized to the first reference
                     c0 = np.array([0., 0.])
-                    c1 = np.array([pixel_size[0], pixel_size[1]])
+                    c1 = np.array([1., 1.])
                     c2 = np.array([0., 0.])
                 else:
                     c0 = correlation[correlation['dut_x'] == index]['c0']
                     c1 = correlation[correlation['dut_x'] == index]['c1']
                     c2 = correlation[correlation['dut_x'] == index]['c2']
 
-                print column_size, row_size
                 tracklets_array['column_dut_%d' % index][selection] = (c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0])
                 tracklets_array['row_dut_%d' % index][selection] = (c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1])
                 tracklets_array['charge_dut_%d' % index][selection] = actual_cluster['charge'][selection]
@@ -510,7 +520,7 @@ def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, corr
 
                         plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100)
                         progress_bar.update(index)
-                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig)
+                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, output_fig)
                     progress_bar.finish()
 
 
@@ -969,6 +979,13 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
             logging.info('Calculate residuals for DUT %d', actual_dut)
 
             track_array = node[:]
+
+            event_number = track_array['event_number']
+            n_tracks = track_array['n_tracks']
+            plt.plot(event_number[::250], n_tracks[::250], 'o-')
+            plt.ylim(ymin=0)
+            output_fig.savefig()
+
             if max_chi2:
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
             track_array = track_array[np.logical_and(track_array['column_dut_%d' % actual_dut] != 0., track_array['row_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
@@ -999,7 +1016,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
     return residuals
 
 
-def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):
+def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, bins=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -1009,11 +1026,13 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
     z_positions : iterable
         z_positions of all devices relative to DUT0
     dim_x, dim_y : integer
-        front end dimensions of device
+        front end dimensions of device in um
     pixel_size : iterable
         pixel dimensions
     minimum_track_density : int
         minimum track density required to consider bin for efficiency calculation
+    bins : iterable
+        define virtual pixel size
     use_duts : iterable
         the duts to calculate efficiency for. If None all duts are used
     max_chi2 : int
@@ -1031,11 +1050,10 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
         efficiencies = []
         with tb.open_file(tracks_file, mode='r') as in_file_h5:
             # bins define (virtual) pixel size for histogramming
-            bin_x, bin_y = dim_x, dim_y
-
-            # sensor dimensions in um
-            dim_x *= pixel_size[0]
-            dim_y *= pixel_size[1]
+            if bins is None:
+                bin_x, bin_y = dim_x / pixel_size[0], dim_y / pixel_size[1]  # if not set otherwise use true pixel size
+            else:
+                bin_x, bin_y = dim_x / bins[0], dim_y / bins[1]  # calculate number of bins from given (virtual) pixel size
 
             for index, node in enumerate(in_file_h5.root):
                 actual_dut = int(node.name[-1:])
@@ -1101,9 +1119,8 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
 
     return efficiencies
 
+
 # Helper functions that are not ment to be called during analysis
-
-
 @njit
 def _set_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
     # Set track quality of actual DUT from closest DUT hit; if hit is within 2 or 5 sigma range; quality 0 already set

@@ -65,35 +65,35 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     output_fig.savefig()
 
 
-def plot_alignments(data, selected_data, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title):
+def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title):
     plt.clf()
     plt.title(title + ', Fit %d' % i)
-    plt.plot(np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
-    plt.plot(np.arange(data.shape[0])[selected_data], fit_fn(np.arange(data.shape[0]))[selected_data], '-', label='Prefit')
-    plt.plot(np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.plot(np.arange(data.shape[0])[selected_data], offset[selected_data] * 10., 'o-', label='Offset x 10')
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], fit_fn(pixel_length * np.arange(data.shape[0]))[selected_data], '-', label='Prefit')
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], offset[selected_data] * 10., 'o-', label='Offset x 10')
 
     plt.ylim((np.min(offset[selected_data]), np.amax(mean_fitted[selected_data])))
-    plt.xlim((np.min(np.arange(data.shape[0])[selected_data]), data.shape[0]))
+    plt.xlim((np.min(np.arange(data.shape[0])[selected_data]), pixel_length * data.shape[0]))
     plt.xlabel('DUT%d' % result[node_index]['dut_x'])
     plt.ylabel('DUT0')
     plt.legend(loc=0)
     plt.show()
 
 
-def plot_alignment_fit(data, selected_data, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, offset, result, node_index, i, title, output_fig):
+def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, i, node_index, title, output_fig):
     plt.clf()
-    plt.errorbar(np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
-    plt.plot(np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.plot(np.arange(data.shape[0])[selected_data], (fit_fn(np.arange(data.shape[0])[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
+    plt.errorbar(pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], (fit_fn(pixel_length * np.arange(data.shape[0])[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
     fit_legend_entry = 'fit: c0+c1x+c2x^2\nc0=$%1.1e\pm%1.1e$\nc1=$%1.1e\pm%1.1e$\nc2=$%1.1e\pm%1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5)
-    plt.plot(np.arange(data.shape[0]), fit_fn(np.arange(data.shape[0])), '-', label=fit_legend_entry)
-    plt.plot(np.arange(data.shape[0])[selected_data], chi2[selected_data] / 1.e7)
+    plt.plot(pixel_length * np.arange(data.shape[0]), fit_fn(pixel_length * np.arange(data.shape[0])), '-', label=fit_legend_entry)
+    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], chi2[selected_data] / 1.e7)
     plt.legend(loc=0)
     plt.title(title)
     plt.xlabel('DUT %s' % result[node_index]['dut_y'])
     plt.ylabel('DUT %s' % result[node_index]['dut_x'])
-    plt.xlim((0, np.amax(np.arange(data.shape[0]))))
+    plt.xlim((0, np.amax(pixel_length * np.arange(data.shape[0]))))
     plt.grid()
     output_fig.savefig()
 
@@ -157,7 +157,6 @@ def plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, 
     plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), median, linewidth=2.0, label='Median')
     plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), mean, linewidth=2.0, label='Mean')
     plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), correlation, linewidth=2.0, label='Alignment')
-    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), alignment, linewidth=2.0, label='Alignment')
     plt.legend(loc=0)
     output_fig.savefig()
 
@@ -178,7 +177,7 @@ def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, 
     output_fig.savefig()
 
 
-def plot_events(track_file, z_positions, event_range, pixel_size=(250, 50), plot_lim=(2, 2), dut=None, max_chi2=None, output_pdf=None):
+def plot_events(track_file, z_positions, event_range, pixel_size, plot_lim=(2, 2), dut=None, max_chi2=None, output_pdf=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -374,7 +373,7 @@ def efficiency_plots(distance_min_array, distance_max_array, actual_dut, interse
     plt.yscale('log')
     plt.title('Efficiency for DUT %d' % actual_dut)
     plt.xlim([-0.5, 101.5])
-    plt.hist(efficiency.ravel(), bins=100, range=(1, 101))
+    plt.hist(efficiency.ravel(), bins=100, range=(1, 100))
     output_fig.savefig()
 
 
