@@ -5,7 +5,7 @@ from distutils.command.build_ext import build_ext
 from Cython.Build import cythonize
 import os
 
-version = 0.01
+version = 0.1
 
 copt = {'msvc': ['-Itestbeam_analysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
 lopt = {}
@@ -44,7 +44,7 @@ setup(
     description='A light weight test beam analysis in Python and C++.',
     url='https://github.com/SiLab-Bonn/testbeam_analysis',
     license='BSD 3-Clause ("BSD New" or "BSD Simplified") License',
-    long_description='A very simple analysis of pixel-sensor data from testbeams. All steps of a full analysis are included in one file in < 1500 lines of Python code. If you you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. EUTelescope. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code. For a quick first impression check the example plots in the wiki and run the examples.',
+    long_description='A light weight analysis of pixel-sensor data from testbeams. All steps of a full analysis are included. If you you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. EUTelescope. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code. The not yet achieved goal is to have understandable, simple and well tested code that can be easily used.',
     author=author,
     maintainer=author,
     author_email=author_email,
