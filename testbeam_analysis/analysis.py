@@ -33,8 +33,9 @@ from builtins import range
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
-from testbeam_analysis.hit_clusterizer import HitClusterizer
-from testbeam_analysis.clusterizer import data_struct
+from pixel_clusterizer.clusterizer import HitClusterizer
+from pixel_clusterizer import data_struct
+
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
 
@@ -70,7 +71,7 @@ def remove_hot_pixels(data_file, threshold=6.):
             hit_table_out.append(hits)
 
 
-def cluster_hits(data_file, max_x_distance=3, max_y_distance=3):
+def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distance=2):
     '''Std. analysis of a hit table. Clusters are created.
 
     Parameters
@@ -84,15 +85,22 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3):
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
             hits = input_file_h5.root.Hits[:]
-            clusterizer = HitClusterizer(np.amax(hits['column']), np.amax(hits['row']))
-            clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in column
-            clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in row
-            clusterizer.set_frame_cluster_distance(4)   # cluster distance in time frames
-            cluster = np.zeros_like(hits, dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
-            clusterizer.set_cluster_info_array(cluster)  # tell the array to be filled
-            clusterizer.add_hits(hits)
-            cluster = cluster[:clusterizer.get_n_clusters()]
-            cluster_table_description = data_struct.ClusterInfoTable().columns.copy()
+
+            # create clusterizer object
+            clusterizer = HitClusterizer()
+
+            # Set clusterzier settings
+            clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
+            clusterizer.create_cluster_info_array(True)  # create cluster
+            clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
+            clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
+            clusterizer.set_frame_cluster_distance(max_time_distance)   # cluster distance in time frames
+
+            # main functions
+            clusterizer.add_hits(hits)  # cluster hits
+            cluster = clusterizer.get_cluster()
+
+            cluster_table_description = data_struct.ClusterInfo
             cluster_table_out = output_file_h5.createTable(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             cluster_table_out.append(cluster)
 
