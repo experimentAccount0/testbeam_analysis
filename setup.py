@@ -5,7 +5,7 @@ from distutils.command.build_ext import build_ext
 from Cython.Build import cythonize
 import os
 
-version = 0.01
+version = 0.1
 
 copt = {'msvc': ['-Itestbeam_analysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
 lopt = {}
@@ -27,8 +27,7 @@ class build_ext_opt(build_ext):
         build_ext.build_extensions(self)
 
 cpp_extension = cythonize([
-    Extension('testbeam_analysis.hit_clusterizer', ['testbeam_analysis/clusterizer/hit_clusterizer.pyx', 'testbeam_analysis/clusterizer/Clusterizer.cpp', 'testbeam_analysis/clusterizer/Basis.cpp']),
-    Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/clusterizer/analysis_functions.pyx'])
+    Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/cpp/analysis_functions.pyx'])
 ])
 
 author = 'Christian Bespin, David-Leon Pohl'
