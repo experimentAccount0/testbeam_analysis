@@ -71,7 +71,7 @@ def remove_hot_pixels(data_file, threshold=6.):
             hit_table_out.append(hits)
 
 
-def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distance=2):
+def cluster_hits(data_file, n_cols=80, n_rows=336, max_x_distance=3, max_y_distance=3, max_time_distance=2):
     '''Std. analysis of a hit table. Clusters are created.
 
     Parameters
@@ -84,10 +84,8 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distanc
 
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
-            hits = input_file_h5.root.Hits[:]
-
             # create clusterizer object
-            clusterizer = HitClusterizer()
+            clusterizer = HitClusterizer(n_cols, n_rows)
 
             # Set clusterzier settings
             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
@@ -96,13 +94,14 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distanc
             clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
             clusterizer.set_frame_cluster_distance(max_time_distance)   # cluster distance in time frames
 
-            # main functions
-            clusterizer.add_hits(hits)  # cluster hits
-            cluster = clusterizer.get_cluster()
-
+            # Output data
             cluster_table_description = data_struct.ClusterInfo
             cluster_table_out = output_file_h5.createTable(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            cluster_table_out.append(cluster)
+
+            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=1000000):
+                clusterizer.add_hits(hits)  # cluster hits
+                cluster = clusterizer.get_cluster()
+                cluster_table_out.append(cluster)
 
 
 def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
@@ -529,11 +528,11 @@ def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, corr
 
                         plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100)
                         progress_bar.update(index)
-                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, output_fig)
+                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig)
                     progress_bar.finish()
 
 
-def find_tracks(tracklets_file, alignment_file, track_candidates_file, pixel_size):
+def find_tracks(tracklets_file, alignment_file, track_candidates_file):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is given to
     be able to cut on good tracks.
@@ -550,9 +549,6 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, pixel_siz
         Output file name for track candidate array
     '''
     logging.info('Build tracks from tracklets')
-
-    # calculate pixel dimension ratio (col/row) for hit distance
-    pixel_ratio = float(pixel_size[0]) / pixel_size[1]
 
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
@@ -581,7 +577,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, pixel_siz
         tr_row = np.transpose(tr_row)
         tr_charge = np.transpose(tr_charge)
 
-        tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma, pixel_ratio)
+        tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
 
         # merge data into one array
         combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks, tracklets.n_hits))
@@ -612,9 +608,6 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
     '''
     logging.info('Build tracks from tracklets')
 
-    # calculate pixel dimension ratio (col/row) for hit distance
-    pixel_ratio = float(pixel_size[0]) / pixel_size[1]
-
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
@@ -640,7 +633,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
         tr_column = np.transpose(tr_column)
         tr_row = np.transpose(tr_row)
         tr_charge = np.transpose(tr_charge)
-        tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma, pixel_ratio)
+        tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
 
         # merge data into one array
         combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
@@ -1169,7 +1162,7 @@ def _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, 
 
 # Helper functions that are not ment to be called during analysis
 @njit
-def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma, pixel_ratio):
+def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Not ment to be called stand alone.
     Optimizations included to make it easily compile with numba in the future. Can be called from
@@ -1220,7 +1213,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                         break
                     column, row, charge, quality = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index], tracklets[hit_index].track_quality
                     column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-                    hit_distance = sqrt((column_distance * pixel_ratio) * (column_distance * pixel_ratio) + row_distance * row_distance)
+                    hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
 
                     if row != 0:  # Track hit found
                         actual_track.track_quality |= (1 << dut_index)  # track quality 0 for DUT dut_index (in first byte one bit set)
@@ -1232,7 +1225,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                             continue
                         if tracklets[hit_index].track_quality & (257 << dut_index) == (257 << dut_index):  # Check if old hit is closer, then do not move
                             column_distance_old, row_distance_old = abs(column - tr_column[hit_index][0]), abs(row - tr_row[hit_index][0])
-                            hit_distance_old = sqrt((column_distance_old * pixel_ratio) * (column_distance_old * pixel_ratio) + row_distance_old * row_distance_old)
+                            hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
                             if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track
                                 _set_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
                                 continue
