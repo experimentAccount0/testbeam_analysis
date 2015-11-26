@@ -5,7 +5,7 @@ import unittest
 import tables as tb
 import numpy as np
 
-from testbeam_analysis.clusterizer import data_struct
+from testbeam_analysis.cpp import data_struct
 from testbeam_analysis import analysis_utils
 
 tests_data_folder = r'tests/test_analysis_utils/'

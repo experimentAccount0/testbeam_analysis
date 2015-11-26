@@ -89,7 +89,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
                     expected_data = first_h5_file.get_node(first_h5_file.root, node_name)[:]
                     data = second_h5_file.get_node(second_h5_file.root, node_name)[:]
                     if (exact or expected_data.dtype.names is not None):  # exact comparison if exact is set and on recarray data (np.allclose does not work on recarray)
-                        if not np.all(expected_data == data):  # compare the arrays for each element
+                        if not np.array_equal(expected_data, data):  # compare the arrays for each element
                             checks_passed = False
                             error_msg += node_name
                             if detailed_comparison:
@@ -114,7 +114,7 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if os.name != 'nt':
-            from xvfbwrapper import Xvfb
+            from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
         cls.noisy_data_file = tests_data_folder + 'TestBeamData_Mimosa26_DUT0_small.h5'
@@ -128,45 +128,50 @@ class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-#         os.remove(cls.output_folder + 'Correlation.h5')
-#         os.remove(cls.output_folder + 'Alignment.h5')
-#         os.remove(cls.output_folder + 'Alignment.pdf')
+        os.remove(cls.output_folder + 'Correlation.h5')
+        os.remove(cls.output_folder + 'Alignment.h5')
+        os.remove(cls.output_folder + 'Alignment.pdf')
         os.remove(cls.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5')
         os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
         os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.pdf')
-#         os.remove(cls.output_folder + 'Tracklets.h5')
+        os.remove(cls.output_folder + 'Tracklets.h5')
 
     def test_hot_pixel_remover(self):
         tba.remove_hot_pixels(self.noisy_data_file)
-        compare_h5_files(tests_data_folder + 'HotPixel_result.h5', self.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'HotPixel_result.h5', self.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
+        self.assertTrue(data_equal, msg=error_msg)
+  
+    def test_hit_correlation(self):  # check the hit correlation function
+        tba.correlate_hits(self.data_files,
+                           alignment_file=self.output_folder + 'Correlation.h5',
+                           fraction=1,
+                           event_range=0)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Correlation_result.h5', self.output_folder + 'Correlation.h5', exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
 
-#     def test_hit_correlation(self):  # check the hit correlation function
-#         tba.correlate_hits(self.data_files,
-#                            alignment_file=self.output_folder + 'Correlation.h5',
-#                            fraction=1,
-#                            event_range=0)
-#         compare_h5_files(tests_data_folder + 'Correlation_result.h5', self.output_folder + 'Correlation.h5', exact=False)
-# 
-#     def test_hit_alignment(self):  # check the hit alignment function
-#         tba.align_hits(correlation_file=tests_data_folder + 'Correlation_result.h5',
-#                        alignment_file=self.output_folder + 'Alignment.h5',
-#                        output_pdf=self.output_folder + 'Alignment.pdf',
-#                        fit_offset_cut=(10. / 10., 70.0 / 10.),
-#                        fit_error_cut=(50. / 1000., 250. / 1000.),
-#                        pixel_size=self.pixel_size)
-#         compare_h5_files(tests_data_folder + 'Alignment_result.h5', self.output_folder + 'Alignment.h5', exact=False)
+    def test_hit_alignment(self):  # check the hit alignment function
+        tba.align_hits(correlation_file=tests_data_folder + 'Correlation_result.h5',
+                       alignment_file=self.output_folder + 'Alignment.h5',
+                       output_pdf=self.output_folder + 'Alignment.pdf',
+                       fit_offset_cut=(2000. / 10., 2000. / 10.),
+                       fit_error_cut=(10000. / 1000., 10000. / 1000.),
+                       pixel_size=self.pixel_size)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Alignment_result.h5', self.output_folder + 'Alignment.h5', exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
 
     def test_hit_clustering(self):
         tba.cluster_hits(self.data_files[0], max_x_distance=1, max_y_distance=2)
-        compare_h5_files(tests_data_folder + 'Cluster_result.h5', self.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5', exact=False)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Cluster_result.h5', self.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5', exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
 
-#     def test_cluster_merging(self):
-#         cluster_files = [tests_data_folder + 'Cluster_DUT%d_cluster.h5' % i for i in range(4)]
-#         tba.merge_cluster_data(cluster_files,
-#                                alignment_file=tests_data_folder + 'Alignment_result.h5',
-#                                tracklets_file=self.output_folder + 'Tracklets.h5',
-#                                pixel_size=self.pixel_size)
-#         compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets.h5')
+    def test_cluster_merging(self):
+        cluster_files = [tests_data_folder + 'Cluster_DUT%d_cluster.h5' % i for i in range(4)]
+        tba.merge_cluster_data(cluster_files,
+                               alignment_file=tests_data_folder + 'Alignment_result.h5',
+                               tracklets_file=self.output_folder + 'Tracklets.h5',
+                               pixel_size=self.pixel_size)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets.h5')
+        self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
     tests_data_folder = r'test_hit_analysis/'
