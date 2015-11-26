@@ -171,10 +171,11 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
         The output file for correlation data.
     combine_bins : int
         Rebin the alignment histograms to get better statistics
-    combine_bins : float
-        Omit channels where the number of hits is < no_data_cut * mean channel hits
-        Happens e.g. if the device is not fully illuminated
-    fit_error_cut : float / iterable
+    fit_offset_cut : float / list, (column, row)
+        Omit channels where the distance to the fit is > fit_offset_cut
+        Happens e.g. if there is no clear correlation due to noise, insufficient statistics
+        If given a list of floats use one list item for each DUT
+    fit_error_cut : float / list, (column, row)
         Omit channels where the fit has an error > fit_error_cut
         Happens e.g. if there is no clear correlation due to noise, insufficient statistics
         If given a list of floats use one list item for each DUT
@@ -240,7 +241,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                 mean_fitted *= pixel_length
                 mean_error_fitted = pixel_length * np.abs(mean_error_fitted)
 
-                # Fit data with a straight line 3 times to remove outliers
+                # Fit selected data with a straight line 3 times to remove outliers
                 selected_data = np.arange(data.shape[0])
 
                 for i in range(3):
@@ -937,6 +938,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
 
                     slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
                     pool = Pool(n_slices)
+                    pixel_size = (1, 1)
                     arg = [(one_slice, pixel_size) for one_slice in slices]  # FIXME: slices are not aligned at event numbers, up to n_slices * 2 tracks are found wrong
                     results = pool.map(_function_wrapper_fit_tracks_loop, arg)
                     pool.close()
@@ -1004,6 +1006,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
             # Calculate in um
             difference[:, 0] *= 1
             difference[:, 1] *= 1
+            coeff = None
 
             for i in range(2):  # col / row
                 pixel_dim = 50  # TODO: define plot range by sigma values
@@ -1250,24 +1253,22 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
     return tracklets, tr_column, tr_row, tr_charge
 
 
-def _fit_tracks_loop(track_hits, pixel_dimension):
+def _fit_tracks_loop(track_hits, pixel_size):
     ''' Do 3d line fit and calculate chi2 for each fit. '''
-    def line_fit_3d(data, scale):
+    def line_fit_3d(data):
         datamean = data.mean(axis=0)
         offset, slope = datamean, np.linalg.svd(data - datamean)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
         intersections = offset + slope / slope[2] * (data.T[2][:, np.newaxis] - offset[2])  # fitted line and dut plane intersections (here: points)
-        chi2 = np.sum(np.dot(np.square(data - intersections), scale), dtype=np.uint32)  # chi2 of the fit in pixel dimension units
+        chi2 = np.sum(np.dot(np.square(data - intersections)), dtype=np.uint32)  # chi2 of the fit in pixel dimension units
         return datamean, slope, chi2
 
     slope = np.zeros((track_hits.shape[0], 3, ))
     offset = np.zeros((track_hits.shape[0], 3, ))
     chi2 = np.zeros((track_hits.shape[0], ))
 
-    scale = np.square(np.array((pixel_dimension[0], pixel_dimension[-1], 0)))
-
     for index, actual_hits in enumerate(track_hits):  # loop over selected track candidate hits and fit
         try:
-            offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits, scale)
+            offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits)
         except np.linalg.linalg.LinAlgError:
             chi2[index] = 1e9
 
