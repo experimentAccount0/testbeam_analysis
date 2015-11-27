@@ -177,7 +177,7 @@ def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, 
     output_fig.savefig()
 
 
-def plot_events(track_file, z_positions, event_range, pixel_size, plot_lim=(2, 2), dut=None, max_chi2=None, output_pdf=None):
+def plot_events(track_file, z_positions, event_range, dut=None, max_chi2=None, output_pdf=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -186,10 +186,6 @@ def plot_events(track_file, z_positions, event_range, pixel_size, plot_lim=(2, 2
     z_positions : iterable
     event_range : iterable:
         (start event number, stop event number(
-    pixel_size : iterable:
-        (column size, row size) in um
-    plot_lim : iterable:
-        (column lim, row lim) in cm
     dut : int
         Take data from this DUT
     max_chi2 : int
@@ -219,14 +215,13 @@ def plot_events(track_file, z_positions, event_range, pixel_size, plot_lim=(2, 2
             x, y, z = [], [], []
             for dut_index in range(0, n_duts):
                 if track['row_dut_%d' % dut_index] != 0:  # No hit has row = 0
-                    x.append(track['column_dut_%d' % dut_index] * pixel_size[0] * 1e-3)
-                    y.append(track['row_dut_%d' % dut_index] * pixel_size[1] * 1e-3)
-                    z.append(z_positions[dut_index])
+                    x.append(track['column_dut_%d' % dut_index] * 1.e-3)  # in mm
+                    y.append(track['row_dut_%d' % dut_index] * 1.e-3)  # in mm
+                    z.append(z_positions[dut_index] * 1.e-3)  # in mm
             if fitted_tracks:
-                scale = np.array((pixel_size[0] * 1e-3, pixel_size[1] * 1e-3, 1))
-                offset = np.array((track['offset_0'], track['offset_1'], track['offset_2'])) * scale
-                slope = np.array((track['slope_0'], track['slope_1'], track['slope_2'])) * scale
-                linepts = offset + slope * np.mgrid[-100:100:2j][:, np.newaxis]
+                offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
+                slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
+                linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-100000:100000:2000j][:, np.newaxis]
 
             n_hits = bin(track['track_quality'] & 0xFF).count('1')
             n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
@@ -238,12 +233,12 @@ def plot_events(track_file, z_positions, event_range, pixel_size, plot_lim=(2, 2
                 else:
                     ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
 
-        ax.set_xlim(0, 20)
-        ax.set_ylim(0, 20)
-        ax.set_zlim(z_positions[0], z_positions[-1])
+#         ax.set_xlim(0, 20)
+#         ax.set_ylim(0, 20)
+        ax.set_zlim(z_positions[0] * 1.e-3, z_positions[-1] * 1.e-3)
         ax.set_xlabel('x [mm]')
         ax.set_ylabel('y [mm]')
-        ax.set_zlabel('z [cm]')
+        ax.set_zlabel('z [mm]')
         plt.title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
         if output_pdf is not None:
             output_fig.savefig()
