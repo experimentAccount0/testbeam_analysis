@@ -23,7 +23,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
     use_duts : iterable
         the duts to calculate residuals for. If None all duts are used
     max_chi2 : int
-        USe only converged fits (cut on chi2)
+        Use only converged fits (cut on chi2)
     output_pdf : pdf file name
         if None plots are printed to screen
     '''
@@ -46,12 +46,6 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
 
             track_array = node[:]
 
-            event_number = track_array['event_number']
-            n_tracks = track_array['n_tracks']
-            plt.plot(event_number[::250], n_tracks[::250], 'o-')
-            plt.ylim(ymin=0)
-            output_fig.savefig()
-
             if max_chi2:
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
             track_array = track_array[np.logical_and(track_array['column_dut_%d' % actual_dut] != 0., track_array['row_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
@@ -59,22 +53,17 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
             intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
             difference = intersection - hits
 
-            # Calculate in um
-            difference[:, 0] *= 1
-            difference[:, 1] *= 1
-            coeff = None
-
             for i in range(2):  # col / row
-                pixel_dim = 50  # TODO: define plot range by sigma values
-                hist, edges = np.histogram(difference[:, i], range=(-4. * pixel_dim, 4. * pixel_dim), bins=200)
+                mean, rms = np.mean(difference[:, i]), np.std(difference[:, i])
+                hist, edges = np.histogram(difference[:, i], range=(mean - 5. * rms, mean + 5. * rms), bins=1000)
                 fit_ok = False
                 try:
-                    coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), 0., pixel_dim])
+                    coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
                     fit_ok = True
                 except:
                     fit_ok = False
 
-                plot_utils.plot_residuals(pixel_dim, i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig)
+                plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
                 residuals.append(coeff[2])
 
     if output_fig:
