@@ -225,7 +225,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], max_tracks=1, track_quality=1, output_pdf=None, use_correlated=False):
+def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -244,7 +244,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
     include_duts : iterable
         the relative dut positions of dut to use in the track fit. The position is relative to the actual dut the tracks are fitted for
         e.g. actual track fit dut = 2, include_duts = [-3, -2, -1, 1] means that duts 0, 1, 3 are used for the track fit
-    max_tracks : int
+    max_tracks : int, None
         only events with tracks <= max tracks are taken
     track_quality : int
         0: All tracks with hits in DUT and references are taken
@@ -315,9 +315,11 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
                         continue
 
-                    good_track_selection = np.logical_and((track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8)), track_candidates['n_tracks'] <= max_tracks)
+                    good_track_selection = (track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
+                    if max_tracks:
+                        good_track_selection = np.logical_and(good_track_selection, track_candidates['n_tracks'] <= max_tracks)
 
-                    logging.info('Lost %d tracks due to track quality cuts, %d percent ', good_track_selection.shape[0] - np.sum(good_track_selection), (1. - float(np.sum(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
+                    logging.info('Lost %d tracks due to track quality cuts, %d percent ', good_track_selection.shape[0] - np.count_nonzero(good_track_selection), (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
 
                     if use_correlated:  # reduce track selection to only correlated duts
                         good_track_selection &= (track_candidates['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
