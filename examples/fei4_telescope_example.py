@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from testbeam_analysis import hit_analysis
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
-#from testbeam_analysis import result_analysis
+from testbeam_analysis import result_analysis
 from testbeam_analysis import plot_utils
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
@@ -39,9 +39,7 @@ if __name__ == '__main__':
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(data_files,
-                                 alignment_file=output_folder + r'/Correlation.h5',
-                                 fraction=1,
-                                 event_range=0)
+                                 alignment_file=output_folder + r'/Correlation.h5')
     plot_utils.plot_correlations(alignment_file=output_folder + r'/Correlation.h5',
                                  output_pdf=output_folder + r'/Correlations.pdf')
 
@@ -52,8 +50,7 @@ if __name__ == '__main__':
                              output_pdf=output_folder + r'/Alignment.pdf',
                              fit_offset_cut=(200. / 10., 200. / 10.),
                              fit_error_cut=(4000. / 1000., 1500. / 1000.),
-                             pixel_size=pixel_size,
-                             show_plots=False)
+                             pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(cluster_files,
@@ -71,12 +68,9 @@ if __name__ == '__main__':
                               tracks_file=output_folder + r'/Tracks.h5',
                               output_pdf=output_folder + r'/Tracks.pdf',
                               z_positions=z_positions,
-                              fit_duts=None,
+                              fit_duts=[1, 2],
                               include_duts=[-3, -2, -1, 1, 2, 3],
-                              ignore_duts=None,
-                              max_tracks=1,
-                              track_quality=1,
-                              use_correlated=False)
+                              track_quality=1)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(track_file=output_folder + r'/Tracks.h5',
@@ -85,12 +79,11 @@ if __name__ == '__main__':
                            event_range=(0, 10),
                            dut=1)
 
-# # Calculate the residuals to check the alignment
-#     result_analysis.calculate_residuals(tracks_file=output_folder + r'/Tracks.h5',
-#                                         output_pdf=output_folder + r'/Residuals.pdf',
-#                                         z_positions=z_positions,
-#                                         use_duts=None,
-#                                         max_chi2=3e3)
+# Calculate the residuals to check the alignment
+    result_analysis.calculate_residuals(tracks_file=output_folder + r'/Tracks.h5',
+                                        output_pdf=output_folder + r'/Residuals.pdf',
+                                        z_positions=z_positions,
+                                        max_chi2=10000)
 
 # Plot the track density on selected DUT planes
 #     plot_utils.plot_track_density(tracks_file=output_folder + r'/Tracks.h5',
