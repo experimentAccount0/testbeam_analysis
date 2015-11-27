@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import tables as tb
-from math import sqrt
+from math import sqrt, ceil
 import logging
 import re
 import numpy as np
@@ -262,22 +262,32 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     output_fig.savefig()
 
 
-def plot_residuals(pixel_dim, i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig):
+def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig):
+    def get_rms_from_histogram(counts, bin_positions):
+        values = []
+        for index, one_bin in enumerate(counts):
+            for _ in range(one_bin):
+                values.append(bin_positions[index])
+        return np.std(values)
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
-        plot_range = (-i - 4.5 * pixel_dim, i + 4.5 * pixel_dim)
+        plot_range = (-5 * get_rms_from_histogram(hist, edges), 5. * get_rms_from_histogram(hist, edges))
         plt.xlim(plot_range)
         plt.grid()
         plt.title('Residuals for DUT %d' % actual_dut)
         plt.xlabel('Residual Column [um]' if i == 0 else 'Residual Row [um]')
         plt.ylabel('#')
 
+        if plot_log:
+            plt.ylim(1, int(ceil(np.amax(hist) / 10.0)) * 100)
+
         plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
         if fit_ok:
             plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
             plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
+            plt.plot([np.mean(difference[:, i]), np.mean(difference[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='red', linewidth=2)
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r-', label=gauss_fit_legend_entry, linewidth=2)
+            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         if output_fig is not None:
             output_fig.savefig()
@@ -372,7 +382,7 @@ def efficiency_plots(distance_min_array, distance_max_array, actual_dut, interse
     output_fig.savefig()
 
 
-def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
+def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_zero=True, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
     Parameters
     ----------
@@ -396,10 +406,6 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
             plot_ref_dut = False
             # bins define (virtual) pixel size for histogramming
             bin_x, bin_y = dim_x, dim_y
-
-            # sensor dimensions in um
-            dim_x *= pixel_size[0]
-            dim_y *= pixel_size[1]
 
             plot_range = (dim_x, dim_y)
 
