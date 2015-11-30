@@ -7,10 +7,10 @@
 #include <ctime>
 #include <cmath>
 #include <exception>
+#include <stdexcept>
 #include <algorithm>
 #include <sstream>
 
-#include "Basis.h"
 #include "defines.h"
 
 bool _debug = false;
