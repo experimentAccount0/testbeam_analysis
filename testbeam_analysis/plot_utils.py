@@ -81,7 +81,7 @@ def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean
     plt.show()
 
 
-def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, i, node_index, title, output_fig):
+def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, title, output_fig):
     plt.clf()
     plt.errorbar(pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
     plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
@@ -91,8 +91,8 @@ def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, f
     plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], chi2[selected_data] / 1.e7)
     plt.legend(loc=0)
     plt.title(title)
-    plt.xlabel('DUT %s' % result[node_index]['dut_y'])
-    plt.ylabel('DUT %s' % result[node_index]['dut_x'])
+    plt.xlabel('DUT %s' % result[node_index]['dut_x'])
+    plt.ylabel('DUT %s' % result[node_index]['dut_y'])
     plt.xlim((0, np.amax(pixel_length * np.arange(data.shape[0]))))
     plt.grid()
     output_fig.savefig()
