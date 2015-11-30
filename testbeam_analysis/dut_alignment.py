@@ -113,9 +113,9 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
 
                 # TODO: allow pixel_size for each DUT or one size for all DUTs
                 if 'Col' in node.title:  # differ between column and row for sensors with rectangular pixels
-                    pixel_length, pixel_length_ref = pixel_size[node_index][0], pixel_size[node_index][0]
+                    pixel_length, pixel_length_ref = pixel_size[node_index][0], pixel_size[0][0]
                 else:
-                    pixel_length, pixel_length_ref = pixel_size[node_index - n_duts + 2][1], pixel_size[node_index - n_duts + 2][1]
+                    pixel_length, pixel_length_ref = pixel_size[node_index - n_duts + 2][1], pixel_size[0][1]
 
                 data = node[:]
 
@@ -345,7 +345,7 @@ def fix_event_alignment(tracklets_files, tracklets_corr_file, alignment_file, er
             correction_out.append(particles_corrected)
 
 
-def optimize_hit_alignment(tracklets_files, alignment_file, use_fraction=0.1):
+def optimize_hit_alignment(tracklets_files, alignment_file, fraction=10):
     '''This step should not be needed but alignment checks showed an offset between the hit positions after alignment
     especially for DUTs that have a flipped orientation. This function corrects for the offset (c0 in the alignment).
 
@@ -356,7 +356,7 @@ def optimize_hit_alignment(tracklets_files, alignment_file, use_fraction=0.1):
     aligment_file : string
         Input file name with alignment data
     use_fraction : float
-        The fraction of hits to used for the alignment correction. For speed up. 1 means all hits are used
+        Use only every fraction-th hit for the alignment correction. For speed up. 1 means all hits are used
     '''
     logging.info('Optimize hit alignment')
     with tb.open_file(tracklets_files, mode="r+") as in_file_h5:
@@ -369,8 +369,7 @@ def optimize_hit_alignment(tracklets_files, alignment_file, use_fraction=0.1):
                     actual_dut = int(table_column[-1:])
                     ref_dut_column = table_column[:-1] + '0'
                     logging.info('Optimize alignment for % s', table_column)
-                    every_nth_hit = int(1. / use_fraction)
-                    particle_selection = particles[::every_nth_hit][np.logical_and(particles[::every_nth_hit][ref_dut_column] > 0, particles[::every_nth_hit][table_column] > 0)]  # only select events with hits in both DUTs
+                    particle_selection = particles[::fraction][np.logical_and(particles[::fraction][ref_dut_column] > 0, particles[::fraction][table_column] > 0)]  # only select events with hits in both DUTs
                     difference = particle_selection[ref_dut_column] - particle_selection[table_column]
                     selection = np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)  # select all hits from events with hits in both DUTs
                     particles[table_column][selection] += np.median(difference)
