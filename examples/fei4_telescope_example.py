@@ -86,24 +86,22 @@ if __name__ == '__main__':
                                         max_chi2=10000)
 
 # Plot the track density on selected DUT planes
-#     plot_utils.plot_track_density(tracks_file=output_folder + r'/Tracks.h5',
-#                                   output_pdf=output_folder + r'/TrackDensity.pdf',
-#                                   z_positions=z_positions,
-#                                   dim_x=80,
-#                                   dim_y=336,
-#                                   use_duts=None)
-#
+    plot_utils.plot_track_density(tracks_file=output_folder + r'/Tracks.h5',
+                                  output_pdf=output_folder + r'/TrackDensity.pdf',
+                                  z_positions=z_positions,
+                                  dim_x=80,
+                                  dim_y=336,
+                                  use_duts=None)
+
 # Calculate the efficiency and mean hit/track hit distance
 # When needed, set included column and row range for each DUT as list of tuples
-#     result_analysis.calculate_efficiency(tracks_file=output_folder + r'/Tracks.h5',
-#                              output_pdf=output_folder + r'/Efficiency.pdf',
-#                              z_positions=z_positions,
-#                              dim_x=80,
-#                              dim_y=336,
-#                              minimum_track_density=2,
-#                              pixel_size=pixel_size,
-#                              use_duts=None,
-#                              cut_distance=500,
-#                              max_distance=500,
-#                              col_range=(5, 70),
-#                              row_range=(20, 320))
+    result_analysis.calculate_efficiency(tracks_file=output_folder + r'/Tracks.h5',
+                             output_pdf=output_folder + r'/Efficiency.pdf',
+                             z_positions=z_positions,
+                             bin_size=(250, 50),
+                             minimum_track_density=2,
+                             use_duts=None,
+                             cut_distance=500,
+                             max_distance=500,
+                             col_range=(1250, 17500),
+                             row_range=(1000, 16000))
