@@ -4,13 +4,10 @@ import logging
 import tables as tb
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
 from testbeam_analysis import plot_utils
-
 
 def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
@@ -72,7 +69,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
     return residuals
 
 
-def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, minimum_track_density, bins=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):
+def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -81,14 +78,12 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
     output_pdf : pdf file name object
     z_positions : iterable
         z_positions of all devices relative to DUT0
-    dim_x, dim_y : integer
-        front end dimensions of device in um
-    pixel_size : iterable
-        pixel dimensions
+    bin_size : iterable
+        sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
     minimum_track_density : int
         minimum track density required to consider bin for efficiency calculation
-    bins : iterable
-        define virtual pixel size
+    sensor_size : iterable
+        size of the used sensor in um. Give one tuple (x, y) for every plane or list of tuples for different planes
     use_duts : iterable
         the duts to calculate efficiency for. If None all duts are used
     max_chi2 : int
@@ -105,18 +100,32 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
         with tb.open_file(tracks_file, mode='r') as in_file_h5:
-            # bins define (virtual) pixel size for histogramming
-            if bins is None:
-                bin_x, bin_y = dim_x / pixel_size[0], dim_y / pixel_size[1]  # if not set otherwise use true pixel size
-            else:
-                bin_x, bin_y = dim_x / bins[0], dim_y / bins[1]  # calculate number of bins from given (virtual) pixel size
-
             for index, node in enumerate(in_file_h5.root):
                 actual_dut = int(node.name[-1:])
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.info('Calculate efficiency for DUT %d', actual_dut)
                 track_array = node[:]
+                
+                # Get pixel and bin sizes for calculations and plotting
+                # Allow different sensor sizes for every plane
+                if not sensor_size:
+                    dimensions = (np.amax(track_array['column_dut_%d' % actual_dut]), np.amax(track_array['row_dut_%d' % actual_dut]))
+                else:
+                    dimensions = [sensor_size, ] if not isinstance(sensor_size, list) else sensor_size
+                    if len(dimensions) == 1:
+                        dimensions = dimensions[0]
+                    else:
+                        dimensions = dimensions[index]
+                        
+                # Allow different bin_sizes for every plane
+                bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
+                if len(bin_size) != 1:
+                    n_bin_x = dimensions[0] / bin_size[index][0]
+                    n_bin_y = dimensions[1] / bin_size[index][1]
+                else:
+                    n_bin_x = dimensions[0] / bin_size[0][0]
+                    n_bin_y = dimensions[1] / bin_size[0][1]
 
                 # Cut in Chi 2 of the track fit
                 if max_chi2:
@@ -145,8 +154,8 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 distance = np.sqrt(np.dot(np.square(intersection - hits), scale))  # array with distances between DUT hit and track hit for each event. Values in um
 
                 col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                distance_array = np.histogramdd(col_row_distance, bins=(bin_x, bin_y, max_distance), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5], [0, max_distance]])[0]
-                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                distance_array = np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5], [0, max_distance]])[0]
+                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5]])
 
                 # Calculate distances between hit and intersection
                 distance_mean_array = np.average(distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
@@ -162,13 +171,13 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, dim_x, dim_y, pix
                 else:
                     intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
 
-                plot_utils.efficiency_plots(distance_min_array, distance_max_array, actual_dut, intersection, minimum_track_density, intersection_valid_hit, hit_hist, distance_mean_array, dim_x, dim_y, bin_x, bin_y, cut_distance, output_fig)
-
-                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
-                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5]])
+                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5]])
                 efficiency = np.zeros_like(track_density_with_DUT_hit)
                 efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
+                
+                plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, dimensions, cut_distance, output_fig)
 
                 logging.info('Efficiency =  %1.4f', np.ma.mean(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
