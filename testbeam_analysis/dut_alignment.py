@@ -244,7 +244,6 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
             with tb.open_file(cluster_file, mode='r') as in_file_h5:
                 actual_cluster = analysis_utils.map_cluster(common_event_number, in_file_h5.root.Cluster[:])
                 selection = actual_cluster['mean_column'] != 0
-                print pixel_size[index][0]
                 actual_mean_column = pixel_size[index][0] * actual_cluster['mean_column'][selection]  # correct only hits, 0 is no hit
                 actual_mean_row = pixel_size[index][1] * actual_cluster['mean_row'][selection]  # correct only hits, 0 is no hit
                 if index == 0:  # Position corrections are normalized to the first reference
