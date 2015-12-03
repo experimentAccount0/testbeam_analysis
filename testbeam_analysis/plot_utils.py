@@ -14,7 +14,6 @@ import numpy as np
 
 from testbeam_analysis import analysis_utils
 
-
 def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
     # Plot noisy pixel
     plot_range = (occupancy.shape[0], occupancy.shape[1])
@@ -372,7 +371,8 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     output_fig.savefig()
 
 
-def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_zero=True, use_duts=None, max_chi2=None):
+# TODO: no hardcoded values
+def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
     Parameters
     ----------
@@ -382,7 +382,9 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_
     z_positions : iterable
         Iterable with z-positions of all DUTs
     dim_x, dim_y : integer
-        front end dimensions of device
+        front end dimensions of device (number of pixels)
+    pixel_size : iterable
+        pixel size (x, y) for every plane
     mask_zero : bool
         Mask heatmap entries = 0 for plotting
     use_duts : iterable
@@ -394,15 +396,17 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(tracks_file, mode='r') as in_file_h5:
             plot_ref_dut = False
-            # bins define (virtual) pixel size for histogramming
-            bin_x, bin_y = dim_x, dim_y
-            
-            dim_x *= 250
-            dim_y *= 50
+            dimensions = []
 
-            plot_range = (dim_x, dim_y)
+            for index, node in enumerate(in_file_h5.root):
+                # Bins define (virtual) pixel size for histogramming
+                bin_x, bin_y = dim_x, dim_y
+                
+                # Calculate dimensions in um for every plane
+                dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
 
-            for node in in_file_h5.root:
+                plot_range = (dimensions[index][0], dimensions[index][1])
+                
                 actual_dut = int(node.name[-1:])
                 if use_duts and actual_dut not in use_duts:
                     continue
@@ -410,16 +414,16 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_
 
                 track_array = node[:]
 
-                # if set, select only converged fits
+                # If set, select only converged fits
                 if max_chi2:
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
 
-                if plot_ref_dut:  # plot first and last device
-                    heatmap_ref_hits, _, _ = np.histogram2d(track_array['column_dut_0'], track_array['row_dut_0'], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                if plot_ref_dut:  # Plot first and last device
+                    heatmap_ref_hits, _, _ = np.histogram2d(track_array['column_dut_0'], track_array['row_dut_0'], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
                     if mask_zero:
                         heatmap_ref_hits = np.ma.array(heatmap_ref_hits, mask=(heatmap_ref_hits == 0))
 
-                    # get number of hits in DUT0
+                    # Get number of hits in DUT0
                     n_ref_hits = np.count_nonzero(heatmap_ref_hits)
 
                     fig = Figure()
@@ -434,15 +438,15 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, mask_
                 offset, slope = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
 
-                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
-                heatmap_hits, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(bin_x, bin_y), range=[[1.5, dim_x + 0.5], [1.5, dim_y + 0.5]])
+                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
+                heatmap_hits, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
 
-                # for better readability allow masking of entries that are zero
+                # For better readability allow masking of entries that are zero
                 if mask_zero:
                     heatmap = np.ma.array(heatmap, mask=(heatmap == 0))
                     heatmap_hits = np.ma.array(heatmap_hits, mask=(heatmap_hits == 0))
 
-                # get number of hits / tracks
+                # Get number of hits / tracks
                 n_hits_heatmap = np.count_nonzero(heatmap)
                 n_hits_heatmap_hits = np.count_nonzero(heatmap_hits)
 
