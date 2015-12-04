@@ -14,6 +14,7 @@ import numpy as np
 
 from testbeam_analysis import analysis_utils
 
+
 def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
     # Plot noisy pixel
     plot_range = (occupancy.shape[0], occupancy.shape[1])
@@ -294,6 +295,152 @@ def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference,
             plt.show()
 
 
+def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
+    '''Takes the tracks and calculates the track density projected on selected DUTs.
+    Parameters
+    ----------
+    tracks_file : string
+        file name with the tracks table
+    output_pdf : pdf file name object
+    z_positions : iterable
+        Iterable with z-positions of all DUTs
+    dim_x, dim_y : integer
+        front end dimensions of device (number of pixels)
+    pixel_size : iterable
+        pixel size (x, y) for every plane
+    mask_zero : bool
+        Mask heatmap entries = 0 for plotting
+    use_duts : iterable
+        the duts to plot track density for. If None all duts are used
+    max_chi2 : int
+        only use tracks with a chi2 <= max_chi2
+    '''
+    logging.info('Plot track density')
+    with PdfPages(output_pdf) as output_fig:
+        with tb.open_file(tracks_file, mode='r') as in_file_h5:
+            plot_ref_dut = False
+            dimensions = []
+
+            for index, node in enumerate(in_file_h5.root):
+                # Bins define (virtual) pixel size for histogramming
+                bin_x, bin_y = dim_x, dim_y
+
+                # Calculate dimensions in um for every plane
+                dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
+
+                plot_range = (dimensions[index][0], dimensions[index][1])
+
+                actual_dut = int(node.name[-1:])
+                if use_duts and actual_dut not in use_duts:
+                    continue
+                logging.info('Plot track density for DUT %d', actual_dut)
+
+                track_array = node[:]
+
+                # If set, select only converged fits
+                if max_chi2:
+                    track_array = track_array[track_array['track_chi2'] <= max_chi2]
+
+                if plot_ref_dut:  # Plot first and last device
+                    heatmap_ref_hits, _, _ = np.histogram2d(track_array['column_dut_0'], track_array['row_dut_0'], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
+                    if mask_zero:
+                        heatmap_ref_hits = np.ma.array(heatmap_ref_hits, mask=(heatmap_ref_hits == 0))
+
+                    # Get number of hits in DUT0
+                    n_ref_hits = np.count_nonzero(heatmap_ref_hits)
+
+                    fig = Figure()
+                    fig.patch.set_facecolor('white')
+                    ax = fig.add_subplot(111)
+                    analysis_utils.create_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
+                    fig.tight_layout()
+                    output_fig.savefig(fig)
+
+                    plot_ref_dut = False
+
+                offset, slope = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
+                intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+
+                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
+                heatmap_hits, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
+
+                # For better readability allow masking of entries that are zero
+                if mask_zero:
+                    heatmap = np.ma.array(heatmap, mask=(heatmap == 0))
+                    heatmap_hits = np.ma.array(heatmap_hits, mask=(heatmap_hits == 0))
+
+                # Get number of hits / tracks
+                n_hits_heatmap = np.count_nonzero(heatmap)
+                n_hits_heatmap_hits = np.count_nonzero(heatmap_hits)
+
+                fig = Figure()
+                fig.patch.set_facecolor('white')
+                ax = fig.add_subplot(111)
+                analysis_utils.create_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
+                fig.tight_layout()
+                output_fig.savefig(fig)
+
+                fig = Figure()
+                fig.patch.set_facecolor('white')
+                ax = fig.add_subplot(111)
+                analysis_utils.create_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
+                fig.tight_layout()
+                output_fig.savefig(fig)
+
+
+def plot_charge_distribution(tracks_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
+    '''Takes the data and plots the charge distribution for selected DUTs.
+    Parameters
+    ----------
+    tracks_file : string
+        file name with the tracks table
+    output_pdf : pdf file name object
+    dim_x, dim_y : integer
+        front end dimensions of device (number of pixels)
+    pixel_size : iterable
+        pixel size (x, y) for every plane
+    mask_zero : bool
+        Mask heatmap entries = 0 for plotting
+    use_duts : iterable
+        the duts to plot track density for. If None all duts are used
+    '''
+    logging.info('Plot charge distribution')
+    with PdfPages(output_pdf) as output_fig:
+        with tb.open_file(tracks_file, mode='r') as in_file_h5:
+            dimensions = []
+            for index, node in enumerate(in_file_h5.root):
+                # Bins define (virtual) pixel size for histogramming
+                # TODO: allow different sensor sizes
+                n_bin_x, n_bin_y = dim_x, dim_y
+
+                # Calculate dimensions in um for every plane
+                dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
+                plot_range = (dimensions[index][0], dimensions[index][1])
+
+                actual_dut = int(node.name[-1:])
+                if use_duts and actual_dut not in use_duts:
+                    continue
+                logging.info('Plot charge distribution for DUT %d', actual_dut)
+
+                track_array = node[:]
+
+                n_bins_charge = int(np.amax(track_array['charge_dut_%d' % actual_dut]))
+
+                x_y_charge = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], track_array['charge_dut_%d' % actual_dut]))
+                hit_hist, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
+                charge_distribution = np.histogramdd(x_y_charge, bins=(n_bin_x, n_bin_y, n_bins_charge), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5], [0, n_bins_charge]])[0]
+
+                charges = np.average(charge_distribution, axis=2, weights=range(0, n_bins_charge)) * sum(range(0, n_bins_charge)) / hit_hist.astype(float)
+                charges = np.ma.masked_invalid(charges)
+
+                fig = Figure()
+                fig.patch.set_facecolor('white')
+                ax = fig.add_subplot(111)
+                analysis_utils.create_2d_pixel_hist(fig, ax, charges.T, plot_range, title='Charge distribution for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charges) * 1.5))
+                fig.tight_layout()
+                output_fig.savefig(fig)
+
+
 def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
     # get number of entries for every histogram
     n_hits_distance_min_array = distance_min_array.count()
@@ -303,13 +450,13 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     n_tracks_track_density = np.count_nonzero(track_density)
     n_tracks_track_density_with_DUT_hit = np.count_nonzero(track_density_with_DUT_hit)
     n_hits_efficiency = np.count_nonzero(efficiency)
-    
+
     # for better readability allow masking of entries that are zero
     if mask_zero:
         hit_hist = np.ma.array(hit_hist, mask=(hit_hist == 0))
         track_density = np.ma.array(track_density, mask=(track_density == 0))
         track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
-    
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
@@ -369,97 +516,3 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     plt.xlim([-0.5, 101.5])
     plt.hist(efficiency.ravel(), bins=100, range=(1, 100))
     output_fig.savefig()
-
-
-# TODO: no hardcoded values
-def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
-    '''Takes the tracks and calculates the track density projected on selected DUTs.
-    Parameters
-    ----------
-    tracks_file : string
-        file name with the tracks table
-    output_pdf : pdf file name object
-    z_positions : iterable
-        Iterable with z-positions of all DUTs
-    dim_x, dim_y : integer
-        front end dimensions of device (number of pixels)
-    pixel_size : iterable
-        pixel size (x, y) for every plane
-    mask_zero : bool
-        Mask heatmap entries = 0 for plotting
-    use_duts : iterable
-        the duts to plot track density for. If None all duts are used
-    max_chi2 : int
-        only use tracks with a chi2 <= max_chi2
-    '''
-    logging.info('Plot track density')
-    with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(tracks_file, mode='r') as in_file_h5:
-            plot_ref_dut = False
-            dimensions = []
-
-            for index, node in enumerate(in_file_h5.root):
-                # Bins define (virtual) pixel size for histogramming
-                bin_x, bin_y = dim_x, dim_y
-                
-                # Calculate dimensions in um for every plane
-                dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
-
-                plot_range = (dimensions[index][0], dimensions[index][1])
-                
-                actual_dut = int(node.name[-1:])
-                if use_duts and actual_dut not in use_duts:
-                    continue
-                logging.info('Plot track density for DUT %d', actual_dut)
-
-                track_array = node[:]
-
-                # If set, select only converged fits
-                if max_chi2:
-                    track_array = track_array[track_array['track_chi2'] <= max_chi2]
-
-                if plot_ref_dut:  # Plot first and last device
-                    heatmap_ref_hits, _, _ = np.histogram2d(track_array['column_dut_0'], track_array['row_dut_0'], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-                    if mask_zero:
-                        heatmap_ref_hits = np.ma.array(heatmap_ref_hits, mask=(heatmap_ref_hits == 0))
-
-                    # Get number of hits in DUT0
-                    n_ref_hits = np.count_nonzero(heatmap_ref_hits)
-
-                    fig = Figure()
-                    fig.patch.set_facecolor('white')
-                    ax = fig.add_subplot(111)
-                    analysis_utils.create_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
-                    fig.tight_layout()
-                    output_fig.savefig(fig)
-
-                    plot_ref_dut = False
-
-                offset, slope = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-                intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
-
-                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-                heatmap_hits, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-
-                # For better readability allow masking of entries that are zero
-                if mask_zero:
-                    heatmap = np.ma.array(heatmap, mask=(heatmap == 0))
-                    heatmap_hits = np.ma.array(heatmap_hits, mask=(heatmap_hits == 0))
-
-                # Get number of hits / tracks
-                n_hits_heatmap = np.count_nonzero(heatmap)
-                n_hits_heatmap_hits = np.count_nonzero(heatmap_hits)
-
-                fig = Figure()
-                fig.patch.set_facecolor('white')
-                ax = fig.add_subplot(111)
-                analysis_utils.create_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
-                fig.tight_layout()
-                output_fig.savefig(fig)
-
-                fig = Figure()
-                fig.patch.set_facecolor('white')
-                ax = fig.add_subplot(111)
-                analysis_utils.create_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
-                fig.tight_layout()
-                output_fig.savefig(fig)
