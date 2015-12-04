@@ -9,6 +9,7 @@ from scipy.optimize import curve_fit
 
 from testbeam_analysis import plot_utils
 
+
 def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
@@ -106,7 +107,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                     continue
                 logging.info('Calculate efficiency for DUT %d', actual_dut)
                 track_array = node[:]
-                
+
                 # Get pixel and bin sizes for calculations and plotting
                 # Allow different sensor sizes for every plane
                 if not sensor_size:
@@ -117,7 +118,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                         dimensions = dimensions[0]
                     else:
                         dimensions = dimensions[index]
-                        
+
                 # Allow different bin_sizes for every plane
                 bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
                 if len(bin_size) != 1:
@@ -176,7 +177,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                 efficiency = np.zeros_like(track_density_with_DUT_hit)
                 efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
-                
+
                 plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, dimensions, cut_distance, output_fig)
 
                 logging.info('Efficiency =  %1.4f', np.ma.mean(efficiency))
