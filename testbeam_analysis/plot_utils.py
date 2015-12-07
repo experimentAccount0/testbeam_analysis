@@ -388,7 +388,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
                 output_fig.savefig(fig)
 
 
-def plot_charge_distribution(tracks_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
+def plot_charge_distribution(trackcandidates_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
     '''Takes the data and plots the charge distribution for selected DUTs.
     Parameters
     ----------
@@ -406,39 +406,42 @@ def plot_charge_distribution(tracks_file, output_pdf, dim_x, dim_y, pixel_size, 
     '''
     logging.info('Plot charge distribution')
     with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(tracks_file, mode='r') as in_file_h5:
+        with tb.open_file(trackcandidates_file, mode='r') as in_file_h5:
             dimensions = []
-            for index, node in enumerate(in_file_h5.root):
-                # Bins define (virtual) pixel size for histogramming
-                # TODO: allow different sensor sizes
-                n_bin_x, n_bin_y = dim_x, dim_y
+            for table_column in in_file_h5.root.TrackCandidates.dtype.names:
+                if 'charge' in table_column:
+                    actual_dut = int(table_column[-1:])
 
-                # Calculate dimensions in um for every plane
-                dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
-                plot_range = (dimensions[index][0], dimensions[index][1])
+                    # Bins define (virtual) pixel size for histogramming
+                    # TODO: allow different sensor sizes
+                    n_bin_x, n_bin_y = dim_x, dim_y
 
-                actual_dut = int(node.name[-1:])
-                if use_duts and actual_dut not in use_duts:
-                    continue
-                logging.info('Plot charge distribution for DUT %d', actual_dut)
+                    # Calculate dimensions in um for every plane
+                    index = actual_dut
+                    dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
+                    plot_range = (dimensions[index][0], dimensions[index][1])
 
-                track_array = node[:]
+                    if use_duts and actual_dut not in use_duts:
+                        continue
+                    logging.info('Plot charge distribution for DUT %d', actual_dut)
 
-                n_bins_charge = int(np.amax(track_array['charge_dut_%d' % actual_dut]))
+                    track_array = in_file_h5.root.TrackCandidates[:]
 
-                x_y_charge = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], track_array['charge_dut_%d' % actual_dut]))
-                hit_hist, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-                charge_distribution = np.histogramdd(x_y_charge, bins=(n_bin_x, n_bin_y, n_bins_charge), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5], [0, n_bins_charge]])[0]
+                    n_bins_charge = int(np.amax(track_array['charge_dut_%d' % actual_dut]))
 
-                charges = np.average(charge_distribution, axis=2, weights=range(0, n_bins_charge)) * sum(range(0, n_bins_charge)) / hit_hist.astype(float)
-                charges = np.ma.masked_invalid(charges)
+                    x_y_charge = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], track_array['charge_dut_%d' % actual_dut]))
+                    hit_hist, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
+                    charge_distribution = np.histogramdd(x_y_charge, bins=(n_bin_x, n_bin_y, n_bins_charge), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5], [0, n_bins_charge]])[0]
 
-                fig = Figure()
-                fig.patch.set_facecolor('white')
-                ax = fig.add_subplot(111)
-                analysis_utils.create_2d_pixel_hist(fig, ax, charges.T, plot_range, title='Charge distribution for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charges) * 1.5))
-                fig.tight_layout()
-                output_fig.savefig(fig)
+                    charge_density = np.average(charge_distribution, axis=2, weights=range(0, n_bins_charge)) * sum(range(0, n_bins_charge)) / hit_hist.astype(float)
+                    charge_density = np.ma.masked_invalid(charge_density)
+
+                    fig = Figure()
+                    fig.patch.set_facecolor('white')
+                    ax = fig.add_subplot(111)
+                    analysis_utils.create_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
+                    fig.tight_layout()
+                    output_fig.savefig(fig)
 
 
 def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
