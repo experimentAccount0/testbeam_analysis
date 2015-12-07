@@ -47,7 +47,6 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
 
         # prepare data for track finding, create arrays for column, row and charge data
         tracklets = tracklets[:].view(np.recarray)
-        tracklets = recfunctions.append_fields(tracklets, 'n_hits', np.repeat(0, tracklets.shape[0]), asrecarray=True)
         tr_column = tracklets['column_dut_0']
         tr_row = tracklets['row_dut_0']
         tr_charge = tracklets['charge_dut_0']
@@ -62,7 +61,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
         tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
 
         # merge data into one array
-        combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks, tracklets.n_hits))
+        combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
 
         with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
@@ -436,7 +435,6 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
                 first_hit_set = True
                 tracklets[track_index].track_quality |= (65793 << dut_index)  # first track hit has best quality by definition
-                tracklets[track_index].n_hits |= (1 << dut_index)  # first hit found
             else:  # Find best (closest) DUT hit
                 close_hit_found = False
                 for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # loop over all not sorted hits of actual DUT
