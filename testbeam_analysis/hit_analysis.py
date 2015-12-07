@@ -39,7 +39,11 @@ def remove_noisy_pixels(data_file, threshold=6.):
             hit_table_out.append(hits)
 
 
-def cluster_hits(data_file, n_cols=80, n_rows=336, max_x_distance=3, max_y_distance=3, max_time_distance=2):
+def cluster_hits_wrapper(args):
+    return cluster_hits(*args)
+
+
+def cluster_hits(data_file, n_cols, n_rows, max_x_distance=3, max_y_distance=3, max_time_distance=2):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
