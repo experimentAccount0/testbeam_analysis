@@ -113,7 +113,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
 
                 # TODO: allow pixel_size for each DUT or one size for all DUTs
                 if 'Col' in node.title:  # differ between column and row for sensors with rectangular pixels
-                    pixel_length, pixel_length_ref = pixel_size[node_index][0], pixel_size[0][0]
+                    pixel_length, pixel_length_ref = pixel_size[node_index + 1][0], pixel_size[0][0]
                 else:
                     pixel_length, pixel_length_ref = pixel_size[node_index - n_duts + 2][1], pixel_size[0][1]
 
@@ -147,8 +147,8 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                         pass
 
                 # Convert fit results to um for alignment fit
-                mean_fitted *= pixel_length
-                mean_error_fitted = pixel_length * np.abs(mean_error_fitted)
+                mean_fitted *= pixel_length_ref
+                mean_error_fitted = pixel_length_ref * np.abs(mean_error_fitted)
 
                 # Fit selected data with a straight line 3 times to remove outliers
                 selected_data = np.arange(data.shape[0])
@@ -167,7 +167,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     # TODO: give start values
                     fit, pcov = curve_fit(f, pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data])
                     fit_fn = np.poly1d(fit[::-1])
-                    offset = fit_fn(pixel_length_ref * np.arange(data.shape[0])) - mean_fitted
+                    offset = fit_fn(pixel_length * np.arange(data.shape[0])) - mean_fitted
                     selected_data = np.where(np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) < offset_limit, mean_error_fitted < error_limit)))
                     if show_plots:
                         # TODO: plot does not show prefit
@@ -175,12 +175,12 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
 
                 # Refit with higher polynomial
                 g = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-                fit, pcov = curve_fit(g, pixel_length_ref * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
+                fit, pcov = curve_fit(g, pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
                 fit_fn = np.poly1d(fit[::-1])
 
                 # Calculate mean sigma (is somewhat a residual) and store the actual data in result array
-                mean_sigma = pixel_length * np.mean(np.array(sigma_fitted)[selected_data])
-                mean_sigma_error = pixel_length * np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(channel_indices[selected_data].shape[0])
+                mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted)[selected_data])
+                mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(channel_indices[selected_data].shape[0])
                 # TODO: allow sensors with different pixel sizes in telescope
 
                 result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
