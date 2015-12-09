@@ -5,13 +5,7 @@ import tables as tb
 import numpy as np
 import os
 
-
-from multiprocessing import Pool
-from testbeam_analysis.cpp import data_struct
-from testbeam_analysis import analysis_utils
-
-import testbeam_analysis.analysis as tba
-from testbeam_analysis import plot_utils
+from testbeam_analysis import track_analysis
 
 tests_data_folder = r'tests/test_track_analysis/'
 
@@ -97,6 +91,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
                             if detailed_comparison:
                                 error_msg += get_array_differences(expected_data, data)
                             error_msg += '\n'
+                            print node_name, np.where(expected_data['column_dut_1'] != data['column_dut_1'])
                     else:
                         if not np.allclose(expected_data, data):
                             np.allclose(expected_data, data)
@@ -125,30 +120,30 @@ class TestTrackAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        pass
-#         os.remove(cls.output_folder + 'TrackCandidates.h5')
+        os.remove(cls.output_folder + 'TrackCandidates.h5')
 #         os.remove(cls.output_folder + 'Tracks.h5')
+#         os.remove(cls.output_folder + 'Tracks.pdf')
 
-#     def test_track_finding(self):
-#         tba.find_tracks(tracklets_file=tests_data_folder + 'Tracklets_small.h5',
-#                         alignment_file=tests_data_folder + r'Alignment_result.h5',
-#                         track_candidates_file=self.output_folder + 'TrackCandidates.h5',
-#                         pixel_size=self.pixel_size)
-#         data_equal, error_msg = compare_h5_files(tests_data_folder + 'TrackCandidates_result.h5', self.output_folder + 'TrackCandidates.h5')
-#         self.assertTrue(data_equal, msg=error_msg)
+    def test_track_finding(self):
+        track_analysis.find_tracks(tracklets_file=tests_data_folder + 'Tracklets_small.h5',
+                                   alignment_file=tests_data_folder + r'Alignment_result.h5',
+                                   track_candidates_file=self.output_folder + 'TrackCandidates.h5')
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'TrackCandidates_result.h5', self.output_folder + 'TrackCandidates.h5')
+        self.assertTrue(data_equal, msg=error_msg)
 
+    @unittest.SkipTest
     def test_track_fitting(self):
         # Fit the track candidates and create new track table
-        tba.fit_tracks(track_candidates_file=tests_data_folder + 'TrackCandidates_result.h5',
-                       tracks_file=self.output_folder + 'Tracks.h5',
-                       output_pdf=self.output_folder + 'Tracks.pdf',
-                       z_positions=self.z_positions,
-                       fit_duts=None,
-                       include_duts=[-3, -2, -1, 1, 2, 3],
-                       ignore_duts=None,
-                       max_tracks=1,
-                       track_quality=1,
-                       use_correlated=False)
+        track_analysis.fit_tracks(track_candidates_file=tests_data_folder + 'TrackCandidates_result.h5',
+                                  tracks_file=self.output_folder + 'Tracks.h5',
+                                  output_pdf=self.output_folder + 'Tracks.pdf',
+                                  z_positions=self.z_positions,
+                                  fit_duts=None,
+                                  include_duts=[-3, -2, -1, 1, 2, 3],
+                                  ignore_duts=None,
+                                  max_tracks=1,
+                                  track_quality=1,
+                                  use_correlated=False)
         data_equal, error_msg = compare_h5_files(tests_data_folder + 'Tracks_result.h5', self.output_folder + 'Tracks.h5')
         self.assertTrue(data_equal, msg=error_msg)
 

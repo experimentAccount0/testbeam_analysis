@@ -5,9 +5,9 @@ import tables as tb
 import numpy as np
 import os
 
-from testbeam_analysis import hit_analysis
+from testbeam_analysis import dut_alignment
 
-tests_data_folder = r'tests/test_hit_analysis/'
+tests_data_folder = r'tests/test_dut_alignment/'
 
 
 def get_array_differences(first_array, second_array):
@@ -113,7 +113,6 @@ class TestHitAnalysis(unittest.TestCase):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
-        cls.noisy_data_file = tests_data_folder + 'TestBeamData_Mimosa26_DUT0_small.h5'
         cls.data_files = [tests_data_folder + 'TestBeamData_FEI4_DUT0_small.h5',
                           tests_data_folder + 'TestBeamData_FEI4_DUT1_small.h5',
                           tests_data_folder + 'TestBeamData_FEI4_DUT2_small.h5',
@@ -124,21 +123,39 @@ class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(cls.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5')
-        os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
-        os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.pdf')
+        os.remove(cls.output_folder + 'Correlation.h5')
+        os.remove(cls.output_folder + 'Alignment.h5')
+        os.remove(cls.output_folder + 'Alignment.pdf')
+        os.remove(cls.output_folder + 'Tracklets.h5')
 
-    def test_noisy_pixel_remover(self):
-        hit_analysis.remove_noisy_pixels(self.noisy_data_file)
-        data_equal, error_msg = compare_h5_files(tests_data_folder + 'HotPixel_result.h5', self.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
+    def test_hit_correlation(self):  # check the hit correlation function
+        dut_alignment.correlate_hits(self.data_files,
+                                     alignment_file=self.output_folder + 'Correlation.h5',
+                                     fraction=1,
+                                     event_range=0)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Correlation_result.h5', self.output_folder + 'Correlation.h5', exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
-    def test_hit_clustering(self):
-        hit_analysis.cluster_hits(self.data_files[0], n_cols=80, n_rows=336, max_x_distance=1, max_y_distance=2)
-        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Cluster_result.h5', self.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5', exact=False)
+    def test_hit_alignment(self):  # check the hit alignment function
+        dut_alignment.align_hits(correlation_file=tests_data_folder + 'Correlation_result.h5',
+                                 alignment_file=self.output_folder + 'Alignment.h5',
+                                 output_pdf=self.output_folder + 'Alignment.pdf',
+                                 fit_offset_cut=(2000. / 10., 2000. / 10.),
+                                 fit_error_cut=(10000. / 1000., 10000. / 1000.),
+                                 pixel_size=self.pixel_size)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Alignment_result.h5', self.output_folder + 'Alignment.h5', exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
+
+    def test_cluster_merging(self):
+        cluster_files = [tests_data_folder + 'Cluster_DUT%d_cluster.h5' % i for i in range(4)]
+        dut_alignment.merge_cluster_data(cluster_files,
+                                         alignment_file=tests_data_folder + 'Alignment_result.h5',
+                                         tracklets_file=self.output_folder + 'Tracklets.h5',
+                                         pixel_size=self.pixel_size)
+        data_equal, error_msg = compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets.h5')
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
-    tests_data_folder = r'test_hit_analysis/'
+    tests_data_folder = r'test_dut_alignment/'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)
