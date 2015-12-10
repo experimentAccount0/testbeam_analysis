@@ -21,7 +21,7 @@ def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    print 'occupancy', np.median(occupancy) + np.std(occupancy), np.std(occupancy[occupancy < 10]), np.mean(occupancy), occupancy
+#     print 'occupancy', np.median(occupancy) + np.std(occupancy), np.std(occupancy[occupancy < 10]), np.mean(occupancy), occupancy
     analysis_utils.create_2d_pixel_hist(fig, ax, occupancy.T, plot_range, title='Pixel map (%d hot pixel)' % noisy_pixels[0].shape[0], z_min=0, z_max=np.std(occupancy[occupancy < 10]) * threshold)
     fig.tight_layout()
     fig.savefig(filename)
@@ -93,7 +93,7 @@ def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, f
     plt.title(title)
     plt.xlabel('DUT %s' % result[node_index]['dut_x'])
     plt.ylabel('DUT %s' % result[node_index]['dut_y'])
-    plt.xlim((0, np.amax(pixel_length * np.arange(data.shape[0]))))
+    plt.xlim((0, pixel_length * data.shape[0]))
     plt.grid()
     output_fig.savefig()
 
@@ -411,14 +411,19 @@ def plot_charge_distribution(trackcandidates_file, output_pdf, dim_x, dim_y, pix
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
                 if 'charge' in table_column:
                     actual_dut = int(table_column[-1:])
-
-                    # Bins define (virtual) pixel size for histogramming
-                    # TODO: allow different sensor sizes
-                    n_bin_x, n_bin_y = dim_x, dim_y
-
-                    # Calculate dimensions in um for every plane
                     index = actual_dut
-                    dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
+
+                    # allow one channel value for all planes or one value for each plane
+                    channels_x = [dim_x, ] if not isinstance(dim_x, tuple) else dim_x
+                    channels_y = [dim_y, ] if not isinstance(dim_y, tuple) else dim_y
+                    if len(channels_x) == 1:  # if one value for all planes
+                        n_bin_x, n_bin_y = channels_x, channels_y  # Bins define (virtual) pixel size for histogramming
+                        dimensions.append((channels_x * pixel_size[index][0], channels_y * pixel_size[index][1]))  # Calculate dimensions in um for every plane
+
+                    else:  # if one value for each plane
+                        n_bin_x, n_bin_y = channels_x[index], channels_y[index]  # Bins define (virtual) pixel size for histogramming
+                        dimensions.append((channels_x[index] * pixel_size[index][0], channels_y[index] * pixel_size[index][1]))  # Calculate dimensions in um for every plane
+
                     plot_range = (dimensions[index][0], dimensions[index][1])
 
                     if use_duts and actual_dut not in use_duts:
