@@ -4,5 +4,6 @@ tables  # the data format
 scipy   # analysis functions
 numpy   # for C array object and fast algorithms
 matplotlib  # for plotting
+numba   # for speedup of python loops
 future  # Python 2/3 compatibility
 pixel_clusterizer  # to cluster pixel hits
