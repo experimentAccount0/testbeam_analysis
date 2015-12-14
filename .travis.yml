@@ -30,7 +30,7 @@ before_install:
   - conda update --yes conda
   - conda info -a
   - conda install --yes numpy cython pytables scipy matplotlib pandas nose numba
-  - pip install progressbar-latest xvfbwrapper coverage coveralls
+  - pip install progressbar-latest xvfbwrapper coverage coveralls pixel_clusterizer
   - python setup.py develop
 
 # Run test
