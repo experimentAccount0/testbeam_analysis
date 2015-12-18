@@ -43,7 +43,7 @@ def cluster_hits_wrapper(args):
     return cluster_hits(*args)
 
 
-def cluster_hits(data_file, n_cols, n_rows, max_x_distance=3, max_y_distance=3, max_time_distance=2):
+def cluster_hits(data_file, n_cols, n_rows, n_frames, n_charges, max_x_distance=3, max_y_distance=3, max_time_distance=2):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
@@ -57,7 +57,7 @@ def cluster_hits(data_file, n_cols, n_rows, max_x_distance=3, max_y_distance=3, 
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
             # create clusterizer object
-            clusterizer = HitClusterizer(n_cols, n_rows)
+            clusterizer = HitClusterizer(n_cols, n_rows, n_frames=n_frames, n_charges=n_charges)
 
             # Set clusterzier settings
             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
