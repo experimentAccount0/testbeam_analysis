@@ -87,7 +87,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
     track_candidates_file : string
         Output file name for track candidate array
     '''
-    logging.info('Build tracks from tracklets')
+    logging.info('Build tracks from TrackCandidates')
 
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
@@ -121,7 +121,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
 
         with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
-            track_candidates2 = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.Tracklets.description, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            track_candidates2 = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.TrackCandidates.description, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             track_candidates2.append(combined)
 
 
@@ -172,7 +172,7 @@ def optimize_track_alignment(trackcandidates_file, alignment_file, fraction=1, c
         corrected_trackcandidates_table.append(particles)
 
 
-def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=10000000, correlated_only=False):
+def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=10000000, correlated_only=False, track_quality=None):
     '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
     for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
     (with the event number).
@@ -187,12 +187,19 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
         The number of events to combine for the hit position check
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
+    track_quality : int
+        0: All tracks with hits in DUT and references are taken
+        1: The track hits in DUT and reference are within 5-sigma of the correlation
+        2: The track hits in DUT and reference are within 2-sigma of the correlation
+        Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each 'quality stage', one digit per DUT.
+        E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     '''
     logging.info('Check TrackCandidates Alignment')
     with tb.open_file(trackcandidates_files, mode="r") as in_file_h5:
         with PdfPages(output_pdf) as output_fig:
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
+                    dut_index = int(table_column[-1])  # DUT index of actual DUT data
                     median, mean, std, alignment, correlation = [], [], [], [], []
                     ref_dut_column = table_column[:-1] + '0'
                     logging.info('Check alignment for % s', table_column)
@@ -202,7 +209,9 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                         particles = in_file_h5.root.TrackCandidates[index:index + combine_n_hits:5]  # take every 10th hit
                         particles = particles[np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)]  # only select events with hits in both DUTs
                         if correlated_only is True:
-                            particles = particles[particles['track_quality'] & (1 << (24 + int(table_column[-1]))) == (1 << (24 + int(table_column[-1])))]
+                            particles = particles[particles['track_quality'] & (1 << (24 + dut_index)) == (1 << (24 + dut_index))]
+                        if track_quality:
+                            particles = particles[particles['track_quality'] & (1 << (track_quality * 8 + dut_index)) == (1 << (track_quality * 8 + dut_index))]
                         if particles.shape[0] == 0:
                             logging.warning('No correlation for dut %s and events %d - %d', table_column, index, index + combine_n_hits)
                             median.append(-1)
