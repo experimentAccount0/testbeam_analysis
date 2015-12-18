@@ -134,7 +134,7 @@ class TestHitAnalysis(unittest.TestCase):
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_hit_clustering(self):
-        hit_analysis.cluster_hits(self.data_files[0], n_cols=80, n_rows=336, max_x_distance=1, max_y_distance=2)
+        hit_analysis.cluster_hits(self.data_files[0], n_cols=80, n_rows=336, n_frames=16, n_charges=16, max_x_distance=1, max_y_distance=2)
         data_equal, error_msg = compare_h5_files(tests_data_folder + 'Cluster_result.h5', self.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5', exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 

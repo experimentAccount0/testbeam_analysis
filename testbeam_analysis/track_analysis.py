@@ -45,7 +45,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
         tracklets = in_file_h5.root.Tracklets
         n_duts = sum(['column' in col for col in tracklets.dtype.names])
 
-        # prepare data for track finding, create arrays for column, row and charge data
+        # Prepare data for track finding, create arrays for column, row and charge data
         tracklets = tracklets[:].view(np.recarray)
         tr_column = tracklets['column_dut_0']
         tr_row = tracklets['row_dut_0']
@@ -60,7 +60,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
 
         tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
 
-        # merge data into one array
+        # Merge data into one array
         combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
 
@@ -407,7 +407,7 @@ def _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, 
 def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Not ment to be called stand alone.
-    Optimizations included to make it easily compile with numba in the future. Can be called from
+    Optimizations included to make it compile with numba. Can be called from
     several real threads if they work on different areas of the array'''
 
     n_duts = tr_column.shape[1]
