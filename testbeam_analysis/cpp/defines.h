@@ -38,7 +38,7 @@ typedef struct ClusterInfo{
   uint64_t eventNumber;  	  //event number value (unsigned long long: 0 to 18,446,744,073,709,551,615)
   unsigned short ID;	  	  //the cluster id of the cluster
   unsigned short size; 		  //sum tot of all cluster hits
-  unsigned short int charge; 	  //sum charge of all cluster hits
+  float charge; 	  //sum charge of all cluster hits
   unsigned short int seed_column;  //seed pixel column value (unsigned char: 0 to 255)
   unsigned short int seed_row;//seed pixel row value (unsigned short int: 0 to 65.535)
   float mean_column;		  //column value (unsigned short int: 0 to 65.535)
