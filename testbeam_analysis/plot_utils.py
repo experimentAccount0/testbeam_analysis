@@ -53,7 +53,7 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
         return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2)) + offset
     plt.clf()
     gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm% .1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-    plt.bar(x, y, label='data')
+    plt.bar(x - 0.5, y, label='data', width=1)  # substract .5 to get edges of bins correct, since x parameter is center of bins
     x_fit = np.arange(np.amin(x), np.amax(x), 0.1)
     y_fit = gauss(x_fit, *coeff)
     plt.plot(x_fit, y_fit, '-', label=gauss_fit_legend_entry)
@@ -63,18 +63,20 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     plt.ylabel('#')
     plt.grid()
     output_fig.savefig()
+    plt.show()
 
 
 def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title):
+    x = np.arange(1.5, data.shape[0] + 1.5)
     plt.clf()
     plt.title(title + ', Fit %d' % i)
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], fit_fn(pixel_length * np.arange(data.shape[0]))[selected_data], '-', label='Prefit')
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], offset[selected_data] * 10., 'o-', label='Offset x 10')
+    plt.plot(pixel_length * x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
+    plt.plot(pixel_length * x[selected_data], fit_fn(pixel_length * x)[selected_data], '-', label='Prefit')
+    plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
+    plt.plot(pixel_length * x[selected_data], offset[selected_data] * 10., 'o-', label='Offset x 10')
 
     plt.ylim((np.min(offset[selected_data]), np.amax(mean_fitted[selected_data])))
-    plt.xlim((np.min(np.arange(data.shape[0])[selected_data]), pixel_length * data.shape[0]))
+    plt.xlim((np.min(x[selected_data]), pixel_length * data.shape[0]))
     plt.xlabel('DUT%d' % result[node_index]['dut_x'])
     plt.ylabel('DUT0')
     plt.legend(loc=0)
@@ -82,13 +84,14 @@ def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean
 
 
 def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, title, output_fig):
+    x = np.arange(1.5, data.shape[0] + 1.5)
     plt.clf()
-    plt.errorbar(pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], (fit_fn(pixel_length * np.arange(data.shape[0])[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
-    fit_legend_entry = 'fit: c0+c1x+c2x^2\nc0=$%1.1e\pm%1.1e$\nc1=$%1.1e\pm%1.1e$\nc2=$%1.1e\pm%1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5)
-    plt.plot(pixel_length * np.arange(data.shape[0]), fit_fn(pixel_length * np.arange(data.shape[0])), '-', label=fit_legend_entry)
-    plt.plot(pixel_length * np.arange(data.shape[0])[selected_data], chi2[selected_data] / 1.e7)
+    plt.errorbar(pixel_length * x[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
+    plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
+    plt.plot(pixel_length * x[selected_data], (fit_fn(pixel_length * x[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
+    fit_legend_entry = 'fit: c0+c1x+c2x^2\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$\nc2=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5)
+    plt.plot(pixel_length * x, fit_fn(pixel_length * x), '-', label=fit_legend_entry)
+    plt.plot(pixel_length * x[selected_data], chi2[selected_data] / 1.e7)
     plt.legend(loc=0)
     plt.title(title)
     plt.xlabel('DUT %s' % result[node_index]['dut_x'])
@@ -134,7 +137,7 @@ def plot_correlations(alignment_file, output_pdf):
 
 def plot_hit_alignment(title, difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100):
     plt.clf()
-    plt.hist(difference, bins=bins, range=(-np.amax(particles[:][ref_dut_column]) / 1., np.amax(particles[:][ref_dut_column]) / 1.))
+    plt.hist(difference, bins=bins, range=(-1. / 100. * np.amax(particles[:][ref_dut_column]) / 1., 1. / 100. * np.amax(particles[:][ref_dut_column]) / 1.))
     try:
         plt.yscale('log')
     except ValueError:
