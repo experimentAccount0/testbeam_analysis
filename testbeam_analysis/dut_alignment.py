@@ -131,12 +131,12 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
                 # Get values with highest correlation for alignment fit
-                # Do this with channel indices, convert results to um
-                channel_indices = pixel_length * np.arange(data.shape[0])
+                # Do this with channel indices, later convert to um
+                x = np.arange(1.5, data.shape[1] + 1.5)  # Set bin centers as data points
+
                 for index in np.arange(data.shape[0]):
                     p0 = [As[index], mus[index], 1., 0.]
                     try:
-                        x = np.arange(data.shape[1])
                         coeff, var_matrix = curve_fit(gauss, x, data[index, :], p0=p0)
                         mean_fitted[index] = coeff[1]
                         mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
@@ -146,9 +146,13 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     except RuntimeError:
                         pass
 
+                # Unset invalid data
+                mean_fitted[~np.isfinite(mean_fitted)] = -1
+                mean_error_fitted[~np.isfinite(mean_error_fitted)] = -1
+
                 # Convert fit results to um for alignment fit
                 mean_fitted *= pixel_length_ref
-                mean_error_fitted = pixel_length_ref * np.abs(mean_error_fitted)
+                mean_error_fitted = pixel_length_ref * mean_error_fitted
 
                 # Fit selected data with a straight line 3 times to remove outliers
                 selected_data = np.arange(data.shape[0])
@@ -158,38 +162,38 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     if not np.any(selected_data):
                         raise RuntimeError('The cuts are too tight, there is no point to fit. Release cuts and rerun alignment.')
                     index = 0
-                    if len(fit_offset_cut) == 1 and len(fit_error_cut) == 1:  # use same fit_offset_cut and fit_error_cut values for all fits
+                    if len(fit_offset_cut) == 1 and len(fit_error_cut) == 1:  # Use same fit_offset_cut and fit_error_cut values for all fits
                         offset_limit, error_limit = fit_offset_cut[0][0] if 'Col' in node.title else fit_offset_cut[0][1], fit_error_cut[0][0] if 'Col' in node.title else fit_error_cut[0][1]
-                    else:  # use different fit_offset_cut and fit_error_cut values for every fit
+                    else:  # Use different fit_offset_cut and fit_error_cut values for every fit
                         index = node_index % len(fit_offset_cut)
                         offset_limit, error_limit = fit_offset_cut[index][0] if 'Col' in node.title else fit_offset_cut[index][1], fit_error_cut[index][0] if 'Col' in node.title else fit_error_cut[index][1]
 
-                    # TODO: give start values
-                    fit, pcov = curve_fit(f, pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data])
+                    fit, pcov = curve_fit(f, pixel_length * x[selected_data], mean_fitted[selected_data])
                     fit_fn = np.poly1d(fit[::-1])
-                    offset = fit_fn(pixel_length * np.arange(data.shape[0])) - mean_fitted
+                    offset = fit_fn(pixel_length * x) - mean_fitted
                     selected_data = np.where(np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) < offset_limit, mean_error_fitted < error_limit)))
-                    if show_plots:
-                        # TODO: plot does not show prefit
+                    if show_plots and np.any(selected_data):
                         plot_utils.plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, node.title)
 
                 # Refit with higher polynomial
-                g = lambda x, c0, c1, c2, c3: c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-                fit, pcov = curve_fit(g, pixel_length * np.arange(data.shape[0])[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True)
+                # Use results from straight line fit as start values for last fit
+                g = lambda x, c0, c1, c2: c0 + c1 * x + c2 * x ** 2
+                fit, pcov = curve_fit(g, pixel_length * x[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True, p0=[fit[0], fit[1], 0.])
                 fit_fn = np.poly1d(fit[::-1])
 
-                # Calculate mean sigma (is somewhat a residual) and store the actual data in result array
+                # Calculate mean sigma (is somewhat a residual) and its error and store the actual data in result array
                 mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted)[selected_data])
-                mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(channel_indices[selected_data].shape[0])
-                # TODO: allow sensors with different pixel sizes in telescope
+                mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(np.array(sigma_fitted)[selected_data].shape[0])
 
+                # Write fit results to array
                 result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
                 result[node_index]['c1'], result[node_index]['c1_error'] = fit[1], np.absolute(pcov[1][1]) ** 0.5
                 result[node_index]['c2'], result[node_index]['c2_error'] = fit[2], np.absolute(pcov[2][2]) ** 0.5
+
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Plot selected data with fit
-                plot_utils.plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, node.title, output_fig)
+                plot_utils.plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, node.title, show_plots, output_fig)
 
             with tb.open_file(alignment_file, mode="w") as out_file_h5:
                 try:
@@ -243,9 +247,9 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
             logging.info('Add cluster file ' + str(cluster_file))
             with tb.open_file(cluster_file, mode='r') as in_file_h5:
                 actual_cluster = analysis_utils.map_cluster(common_event_number, in_file_h5.root.Cluster[:])
-                selection = actual_cluster['mean_column'] != 0
-                actual_mean_column = pixel_size[index][0] * actual_cluster['mean_column'][selection]  # correct only hits, 0 is no hit
-                actual_mean_row = pixel_size[index][1] * actual_cluster['mean_row'][selection]  # correct only hits, 0 is no hit
+                selection = actual_cluster['mean_column'] != 0  # correct only hits, 0 is no hit
+                actual_mean_column = pixel_size[index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
+                actual_mean_row = pixel_size[index][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
                 if index == 0:  # Position corrections are normalized to the first reference
                     c0 = np.array([0., 0.])
                     c1 = np.array([1., 1.])
@@ -255,11 +259,12 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
                     c1 = correlation[correlation['dut_x'] == index]['c1']
                     c2 = correlation[correlation['dut_x'] == index]['c2']
 
+                # Apply alignment information
                 tracklets_array['column_dut_%d' % index][selection] = (c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0])
                 tracklets_array['row_dut_%d' % index][selection] = (c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1])
                 tracklets_array['charge_dut_%d' % index][selection] = actual_cluster['charge'][selection]
 
-#         np.nan_to_num(tracklets_array)
+        np.nan_to_num(tracklets_array)
         tracklets_array['event_number'] = common_event_number
         if max_index:
             tracklets_array = tracklets_array[:max_index]
@@ -288,7 +293,7 @@ def fix_event_alignment(tracklets_files, tracklets_corr_file, alignment_file, er
         Number of events that get checked for correlation when no correlation is found
     '''
 
-    # get alignment errors
+    # Get alignment errors
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
@@ -321,18 +326,20 @@ def fix_event_alignment(tracklets_files, tracklets_corr_file, alignment_file, er
                 correlated, n_fixes = analysis_utils.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, error=error, n_bad_events=n_bad_events, n_good_events=n_good_events, correlation_search_range=correlation_search_range, good_events_search_range=good_events_search_range)
                 logging.info('Corrected %d places in the data', n_fixes)
                 particles_corrected['event_number'] = event_numbers  # create new particles array with corrected values
-                particles_corrected['column_dut_0'] = ref_column
+                particles_corrected['column_dut_0'] = ref_column  # copy values that have not been changed
                 particles_corrected['row_dut_0'] = ref_row
-                particles_corrected['charge_dut_0'] = ref_charge  # copy values that have not been changed
+                particles_corrected['charge_dut_0'] = ref_charge
                 particles_corrected['n_tracks'] = particles['n_tracks']
-                particles_corrected[table_column] = column
+                particles_corrected[table_column] = column  # fill array with corrected values
                 particles_corrected['row_dut_' + table_column[-1]] = row
                 particles_corrected['charge_dut_' + table_column[-1]] = charge
 
                 correlation_index = np.where(correlated == 1)[0]
 
+                # Set correlation flag in track_quality field
                 particles_corrected['track_quality'][correlation_index] |= (1 << (24 + int(table_column[-1])))
 
+        # Create output file
         with tb.open_file(tracklets_corr_file, mode="w") as out_file_h5:
             try:
                 out_file_h5.root.Tracklets._f_remove(recursive=True, force=False)
@@ -372,7 +379,7 @@ def optimize_hit_alignment(tracklets_files, alignment_file, fraction=10):
                     difference = particle_selection[ref_dut_column] - particle_selection[table_column]
                     selection = np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)  # select all hits from events with hits in both DUTs
                     particles[table_column][selection] += np.median(difference)
-                    # Change linear offset of alignment
+                    # Shift values by deviation from median
                     if 'col' in table_column:
                         alignment_data['c0'][actual_dut - 1] -= np.median(difference)
                     else:
@@ -426,6 +433,7 @@ def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, corr
                             continue
                         difference = particles[:][ref_dut_column] - particles[:][table_column]
 
+                        # Calculate median, mean and RMS
                         actual_median, actual_mean, actual_rms = np.median(difference), np.mean(difference), np.std(difference)
                         alignment.append(np.median(np.abs(difference)))
                         correlation.append(difference.shape[0] * 100. / combine_n_hits)
