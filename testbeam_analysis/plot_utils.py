@@ -83,7 +83,7 @@ def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean
     plt.show()
 
 
-def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, title, output_fig):
+def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, title, show_plots, output_fig):
     x = np.arange(1.5, data.shape[0] + 1.5)
     plt.clf()
     plt.errorbar(pixel_length * x[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
@@ -99,7 +99,8 @@ def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, f
     plt.xlim((0, pixel_length * data.shape[0]))
     plt.grid()
     output_fig.savefig()
-
+    if show_plots:
+        plt.show()
 
 def plot_correlations(alignment_file, output_pdf):
     '''Takes the correlation histograms and plots them
