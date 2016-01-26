@@ -53,7 +53,7 @@ setup(
     include_package_data=True,  # accept all data files and directories matched by MANIFEST.in or found in source control
     package_data={'': ['*.txt', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
     ext_modules=cpp_extension,
-    include_dirs=[np.get_include()],
+    include_dirs=[np.get_include(), 'testbeam_analysis/cpp/external'],
     cmdclass={'build_ext': build_ext_opt},
     keywords=['testbeam', 'particle', 'reconstruction', 'pixel', 'detector'],
     platforms='any'
