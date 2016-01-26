@@ -24,7 +24,7 @@ class TestResultAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         os.remove(cls.output_folder + 'Efficiency.pdf')
-#         os.remove(cls.output_folder + 'Residuals.pdf')
+        os.remove(cls.output_folder + 'Residuals.pdf')
 
     def test_residuals_calculation(self):
         residuals = result_analysis.calculate_residuals(tracks_file=tests_data_folder + 'Tracks_result.h5',
