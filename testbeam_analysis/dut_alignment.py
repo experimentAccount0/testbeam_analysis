@@ -394,7 +394,7 @@ def optimize_hit_alignment(tracklets_files, alignment_file, fraction=10):
         corrected_tracklets_table.append(particles)
 
 
-def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, correlated_only=False):
+def check_hit_alignment(tracklets_file, output_pdf, combine_n_hits=100000, correlated_only=False):
     '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
     for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
     (with the event number).
@@ -410,7 +410,7 @@ def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, corr
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
     '''
     logging.info('Check hit alignment')
-    with tb.open_file(tracklets_files, mode="r") as in_file_h5:
+    with tb.open_file(tracklets_file, mode="r") as in_file_h5:
         with PdfPages(output_pdf) as output_fig:
             for table_column in in_file_h5.root.Tracklets.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
@@ -443,7 +443,7 @@ def check_hit_alignment(tracklets_files, output_pdf, combine_n_hits=100000, corr
                         mean.append(actual_mean)
                         std.append(actual_rms)
 
-                        plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100)
+                        plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=64)
                         progress_bar.update(index)
                     plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig)
                     progress_bar.finish()
