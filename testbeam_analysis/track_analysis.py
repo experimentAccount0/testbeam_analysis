@@ -379,7 +379,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
 @njit
 def _set_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
     # Set track quality of actual DUT from closest DUT hit, if hit is within 2 or 5 sigma range
-    # quality 0 (there is one hit, no matter of sigma distance) is already set
+    # Quality 0 (there is one hit, no matter of sigma distance) is already set
     column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
     if row != 0:  # row = 0 is no hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
@@ -404,24 +404,21 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
     is given a quality identifier. Not ment to be called stand alone.
     Optimizations included to make it compile with numba. Can be called from
     several real threads if they work on different areas of the array'''
-
     n_duts = tr_column.shape[1]
     actual_event_number = tracklets[0].event_number
 
-    # Numba does not understand python scopes, define all used variables here
+    # Numba uses c scopes, thus define all used variables here
     n_actual_tracks = 0
-    track_index, actual_hit_track_index = 0, 0  # track index of table and first track index of actual event
+    track_index, actual_hit_track_index = 0, 0  # Track index of table and first track index of actual event
     column, row = 0., 0.
     actual_track_column, actual_track_row = 0., 0.
     column_distance, row_distance = 0., 0.
     hit_distance = 0.
     best_hit_distance = 0.
 
-    for track_index, actual_track in enumerate(tracklets):  # loop over all possible tracks
-        # progress_bar.update(track_index))
-
+    for track_index, actual_track in enumerate(tracklets):  # Loop over all possible tracks
         # Set variables for new event
-        if actual_track.event_number != actual_event_number:
+        if actual_track.event_number != actual_event_number:  # Detect new event
             actual_event_number = actual_track.event_number
             for i in range(n_actual_tracks):  # Set number of tracks of previous event
                 tracklets[track_index - 1 - i].n_tracks = n_actual_tracks
@@ -438,10 +435,10 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
             if not first_hit_set and tr_row[track_index][dut_index] != 0:  # search for first DUT that registered a hit (row != 0)
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
                 first_hit_set = True
-                tracklets[track_index].track_quality |= (65793 << dut_index)  # first track hit has best quality by definition
+                tracklets[track_index].track_quality |= (65793 << dut_index)  # First track hit has best quality by definition
             else:  # Find best (closest) DUT hit
                 close_hit_found = False
-                for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # loop over all not sorted hits of actual DUT
+                for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # Loop over all not sorted hits of actual DUT
                     if tracklets[hit_index].event_number != actual_event_number:
                         break
                     column, row, charge, quality = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index], tracklets[hit_index].track_quality
