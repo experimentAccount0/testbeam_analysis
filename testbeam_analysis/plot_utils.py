@@ -65,20 +65,24 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     output_fig.savefig()
 
 
-def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title):
+def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title, offset_limit, error_limit):
     x = np.arange(1.5, data.shape[0] + 1.5)
     plt.clf()
     plt.title(title + ', Fit %d' % i)
     plt.plot(pixel_length * x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
     plt.plot(pixel_length * x[selected_data], fit_fn(pixel_length * x)[selected_data], '-', label='Prefit')
-    plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.plot(pixel_length * x[selected_data], offset[selected_data] * 10., 'o-', label='Offset x 10')
+    plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'ro-', label='Error x 1000')
+    plt.plot(pixel_length * x[selected_data], offset[selected_data] * 10., 'go-', label='Offset x 10')
 
     plt.ylim((np.min(offset[selected_data]), np.amax(mean_fitted[selected_data])))
     plt.xlim((np.min(x[selected_data]), pixel_length * data.shape[0]))
     plt.xlabel('DUT%d' % result[node_index]['dut_x'])
     plt.ylabel('DUT0')
     plt.legend(loc=0)
+    plt.grid()
+
+    plt.plot([np.min(x[selected_data]), pixel_length * data.shape[0]], [offset_limit * 10., offset_limit * 10.], 'g--')
+    plt.plot([np.min(x[selected_data]), pixel_length * data.shape[0]], [error_limit * 1000., error_limit * 1000.], 'r--')
     plt.show()
 
 

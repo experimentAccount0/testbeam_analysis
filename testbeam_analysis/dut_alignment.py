@@ -174,7 +174,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     offset = fit_fn(pixel_length * x_align_fit) - mean_fitted
                     selected_data = np.where(np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) < offset_limit, mean_error_fitted < error_limit)))[0]
                     if show_plots and np.any(selected_data):
-                        plot_utils.plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, node.title)
+                        plot_utils.plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, node.title, offset_limit, error_limit)
 
                 # Refit with higher polynomial
                 # Use results from straight line fit as start values for last fit
