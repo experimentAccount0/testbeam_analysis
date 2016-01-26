@@ -32,6 +32,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
     '''
     logging.info('Build tracks from tracklets')
 
+    # Get alignment errors from file
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
@@ -58,9 +59,10 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
         tr_row = np.transpose(tr_row)
         tr_charge = np.transpose(tr_charge)
 
+        # Perform the track finding with jitted loop
         tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
 
-        # Merge data into one array
+        # Merge result data from arrays into one recarray
         combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
 
@@ -89,6 +91,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
     '''
     logging.info('Build tracks from TrackCandidates')
 
+    # Get alignment errors from file
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
@@ -114,9 +117,11 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
         tr_column = np.transpose(tr_column)
         tr_row = np.transpose(tr_row)
         tr_charge = np.transpose(tr_charge)
+
+        # Perform the track finding with jitted loop
         tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
 
-        # merge data into one array
+        # Merge result data from arrays into one recarray
         combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
 
@@ -268,6 +273,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
     '''
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
+        # Define description
         description = [('event_number', np.int64)]
         for index in range(n_duts):
             description.append(('column_dut_%d' % index, np.float))
@@ -281,6 +287,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
             description.append(('slope_%d' % dimension, np.float))
         description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.uint8)])
 
+        # Define structure of track_array
         tracks_array = np.zeros((n_tracks,), dtype=description)
         tracks_array['event_number'] = good_track_candidates['event_number']
         tracks_array['track_quality'] = good_track_candidates['track_quality']
@@ -302,13 +309,13 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                 track_candidates = in_file_h5.root.TrackCandidates[:]
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
                 fit_duts = fit_duts if fit_duts else range(n_duts)
-                for fit_dut in fit_duts:  # loop over the duts to fit the tracks for
+                for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT %d', fit_dut)
 
                     # Select track candidates
-                    dut_selection = 0  # duts to be used in the fit
-                    quality_mask = 0  # masks duts to check track quality for
-                    for include_dut in include_duts:  # calculate mask to select DUT hits for fitting
+                    dut_selection = 0  # DUTs to be used in the fit
+                    quality_mask = 0  # Masks DUTs to check track quality for
+                    for include_dut in include_duts:  # Calculate mask to select DUT hits for fitting
                         if fit_dut + include_dut < 0 or ((ignore_duts and fit_dut + include_dut in ignore_duts) or fit_dut + include_dut >= n_duts):
                             continue
                         if include_dut >= 0:
@@ -316,19 +323,20 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         else:
                             dut_selection |= ((1 << fit_dut) >> abs(include_dut))
 
-                        quality_mask = dut_selection | (1 << fit_dut)
+                        quality_mask = dut_selection | (1 << fit_dut)  # Include the DUT where the track is fitted for in quality check
 
                     if bin(dut_selection).count("1") < 2:
                         logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
                         continue
 
+                    # Select tracks based on given track_quality
                     good_track_selection = (track_candidates['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
-                    if max_tracks:
+                    if max_tracks:  # Option to neglect events with too many hits
                         good_track_selection = np.logical_and(good_track_selection, track_candidates['n_tracks'] <= max_tracks)
 
                     logging.info('Lost %d tracks due to track quality cuts, %d percent ', good_track_selection.shape[0] - np.count_nonzero(good_track_selection), (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
 
-                    if use_correlated:  # reduce track selection to only correlated duts
+                    if use_correlated:  # Reduce track selection to correlated DUTs only
                         good_track_selection &= (track_candidates['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
                         logging.info('Lost due to correlated cuts %d', good_track_selection.shape[0] - np.sum(track_candidates['track_quality'] & (quality_mask << 24) == (quality_mask << 24)))
 
@@ -336,10 +344,10 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
 
                     # Prepare track hits array to be fitted
                     n_fit_duts = bin(dut_selection).count("1")
-                    index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # index of tmp track hits array
+                    index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
                     track_hits = np.zeros((n_tracks, n_fit_duts, 3))
-                    for dut_index in range(0, n_duts):  # fill index loop of new array
-                        if (1 << dut_index) & dut_selection == (1 << dut_index):  # true if dut is used in fit
+                    for dut_index in range(0, n_duts):  # Fill index loop of new array
+                        if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
                             xyz = np.column_stack((good_track_candidates['column_dut_%s' % dut_index], good_track_candidates['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks)))
                             track_hits[:, index, :] = xyz
                             index += 1
@@ -363,36 +371,24 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                     tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     tracklets_table.append(tracks_array)
 
+                    # Plot chi2 distribution
                     plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
 
 
-# Helper functions that are not ment to be called during analysis
+# Helper functions that are not meant to be called during analysis
 @njit
 def _set_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
-    # Set track quality of actual DUT from closest DUT hit; if hit is within 2 or 5 sigma range; quality 0 already set
+    # Set track quality of actual DUT from closest DUT hit, if hit is within 2 or 5 sigma range
+    # quality 0 (there is one hit, no matter of sigma distance) is already set
     column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
-    if row != 0:  # row = 0: not hit
+    if row != 0:  # row = 0 is no hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # high quality track hits
+        if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # High quality track hits
             actual_track.track_quality |= (65793 << dut_index)
-        elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # low quality track hits
+        elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # Low quality track hits
             actual_track.track_quality |= (257 << dut_index)
     else:
-        actual_track.track_quality &= (~ (65793 << dut_index))
-
-#     # get number of hits for this track. Hits are identified by sigma distance given by quality variable
-#     quality = 5
-#     if row != 0:  # row = 0: not hit
-#         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-#         if column_distance < quality * actual_column_sigma and row_distance < quality * actual_row_sigma:
-#             actual_track.n_hits |= (1 << dut_index)
-
-
-@njit
-def _set_n_hits(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma, quality):
-    # get number of hits for this track. Hits are identified by sigma distance given by quality variable
-    n_hits = bin(actual_track.track_quality).count("1")
-    return n_hits
+        actual_track.track_quality &= (~ (65793 << dut_index))  # Unset track quality
 
 
 @njit
@@ -402,7 +398,6 @@ def _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, 
     tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index] = tmp_column, tmp_row, tmp_charge
 
 
-# Helper functions that are not ment to be called during analysis
 @njit
 def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
@@ -488,15 +483,15 @@ def _fit_tracks_loop(track_hits):
     def line_fit_3d(hits):
         datamean = hits.mean(axis=0)
         offset, slope = datamean, np.linalg.svd(hits - datamean)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
-        intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # fitted line and dut plane intersections (here: points)
-        chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # chi2 of the fit in um units
+        intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # Fitted line and DUT plane intersections (here: points)
+        chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
         return datamean, slope, chi2
 
     slope = np.zeros((track_hits.shape[0], 3, ))
     offset = np.zeros((track_hits.shape[0], 3, ))
     chi2 = np.zeros((track_hits.shape[0], ))
 
-    for index, actual_hits in enumerate(track_hits):  # loop over selected track candidate hits and fit
+    for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
         try:
             offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits)
         except np.linalg.linalg.LinAlgError:
@@ -505,5 +500,5 @@ def _fit_tracks_loop(track_hits):
     return offset, slope, chi2
 
 
-def _function_wrapper_find_tracks_loop(args):  # needed for multiprocessing call with arguments
+def _function_wrapper_find_tracks_loop(args):  # Needed for multiprocessing call with arguments
     return _find_tracks_loop(*args)
