@@ -29,7 +29,7 @@ before_install:
   - export PATH="$HOME/miniconda/bin:$PATH"
   - conda update --yes conda
   - conda info -a
-  - conda install --yes numpy cython pytables scipy matplotlib pandas nose numba
+  - conda install --yes numpy cython pytables scipy matplotlib pandas nose numba=0.22.1
   - pip install progressbar-latest xvfbwrapper coverage coveralls pixel_clusterizer
   - python setup.py develop
 
