@@ -62,7 +62,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
                     fit_ok = False
 
                 plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
-                residuals.append(coeff[2])
+                residuals.append(np.abs(coeff[2]))
 
     if output_fig:
         output_fig.close()
@@ -86,7 +86,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
     sensor_size : iterable
         size of the used sensor in um. Give one tuple (x, y) for every plane or list of tuples for different planes
     use_duts : iterable
-        the duts to calculate efficiency for. If None all duts are used
+        the DUTs to calculate efficiency for. If None all duts are used
     max_chi2 : int
         only use track with a chi2 <= max_chi2
     cut_distance : int
@@ -167,7 +167,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                 distance_min_array = np.ma.masked_invalid(distance_min_array)
 
                 # Calculate efficiency
-                if cut_distance:  # select intersections where hit is distance
+                if cut_distance:  # Select intersections where hit is in given distance around track intersection
                     intersection_valid_hit = intersection[np.logical_and(np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0), distance < cut_distance)]
                 else:
                     intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
