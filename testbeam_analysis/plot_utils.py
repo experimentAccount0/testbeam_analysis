@@ -33,9 +33,9 @@ def plot_cluster_size(cluster_files, output_pdf):
             with tb.open_file(cluster_file, 'r') as input_file_h5:
                 cluster = input_file_h5.root.Cluster[:]
                 # Save cluster size histogram
-                max_cluster_size = np.amax(cluster['size'])
+                max_cluster_size = np.amax(cluster['n_hits'])
                 plt.clf()
-                plt.bar(np.arange(max_cluster_size) + 0.6, analysis_utils.hist_1d_index(cluster['size'] - 1, shape=(max_cluster_size, )))
+                plt.bar(np.arange(max_cluster_size) + 0.6, analysis_utils.hist_1d_index(cluster['n_hits'] - 1, shape=(max_cluster_size, )))
                 plt.title('Cluster size of\n%s' % cluster_file)
                 plt.xlabel('Cluster size')
                 plt.ylabel('#')
@@ -63,7 +63,6 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     plt.ylabel('#')
     plt.grid()
     output_fig.savefig()
-    plt.show()
 
 
 def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title):
@@ -225,7 +224,7 @@ def plot_events(track_file, z_positions, event_range, dut=None, max_chi2=None, o
             if fitted_tracks:
                 offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
                 slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
-                linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-100000:100000:2000j][:, np.newaxis]
+                linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
 
             n_hits = bin(track['track_quality'] & 0xFF).count('1')
             n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
