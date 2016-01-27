@@ -30,7 +30,7 @@ class ClusterHitInfoTable(tb.IsDescription):
 class ClusterInfoTable(tb.IsDescription):
     event_number = tb.Int64Col(pos=0)
     id = tb.UInt16Col(pos=1)
-    size = tb.UInt16Col(pos=2)
+    n_hits = tb.UInt16Col(pos=2)
     charge = tb.Float32Col(pos=3)
     seed_column = tb.UInt16Col(pos=4)
     seed_row = tb.UInt16Col(pos=5)
