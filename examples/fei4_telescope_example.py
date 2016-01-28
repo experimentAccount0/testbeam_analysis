@@ -15,7 +15,8 @@ from testbeam_analysis import plot_utils
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
-if __name__ == '__main__':
+
+if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
     # The location of the data files, one file per DUT
     data_files = [r'data/TestBeamData_FEI4_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system, called internally DUT0
                   r'data/TestBeamData_FEI4_DUT1.h5',  # DUT1
@@ -74,7 +75,6 @@ if __name__ == '__main__':
                               tracks_file=output_folder + r'/Tracks.h5',
                               output_pdf=output_folder + r'/Tracks.pdf',
                               z_positions=z_positions,
-                              max_tracks=1,
                               fit_duts=[0, 1, 2, 3],
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
