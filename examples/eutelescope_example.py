@@ -15,13 +15,13 @@ from testbeam_analysis import plot_utils
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
-if __name__ == '__main__':
-    # The location of the datafiles, one file per DUT
-    data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
-                  r'data/TestBeamData_Mimosa26_DUT1.h5',
-                  r'data/TestBeamData_Mimosa26_DUT2.h5',
-                  ]
+# The location of the datafiles, one file per DUT
+data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
+              r'data/TestBeamData_Mimosa26_DUT1.h5',
+              r'data/TestBeamData_Mimosa26_DUT2.h5',
+              ]
 
+if __name__ == '__main__':
     # Dimesions
     pixel_size = [(18.4, 18.4), (18.4, 18.4), (18.4, 18.4), (18.4, 18.4)]  # um
     n_pixels = [(1152, 576), (1152, 576), (1152, 576), (1152, 576)]
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
     # Remove hot pixels, only needed for devices wih noisy pixels like Mimosa 26
-    Pool().map(hit_analysis.remove_noisy_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
+    # Pool().map(hit_analysis.remove_noisy_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
     data_files = [data_file[:-3] + '_hot_pixel.h5' for data_file in data_files]
     cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
 
@@ -69,10 +69,6 @@ if __name__ == '__main__':
                                alignment_file=output_folder + r'/Alignment.h5',
                                track_candidates_file=output_folder + r'/TrackCandidates.h5')
 
-    # Check alignment of hits in position and time
-    dut_alignment.check_hit_alignment(output_folder + r'/Tracklets.h5',
-                                      output_folder + r'/Alignment_Check.pdf')
-
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(track_candidates_file=output_folder + r'/TrackCandidates.h5',
                               tracks_file=output_folder + r'/Tracks.h5',
@@ -81,7 +77,6 @@ if __name__ == '__main__':
                               fit_duts=[0, 1, 2],
                               include_duts=[-2, -1, 1, 2],
                               ignore_duts=None,
-                              max_tracks=4,
                               track_quality=2)
 
     # Calculate the residuals to check the alignment
