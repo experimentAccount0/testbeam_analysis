@@ -91,19 +91,20 @@ def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, f
     plt.clf()
     plt.errorbar(pixel_length * x[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
     plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.plot(pixel_length * x[selected_data], (fit_fn(pixel_length * x[selected_data]) - mean_fitted[selected_data]) * 10., 'o-', label='Offset x 10')
+    plt.errorbar(pixel_length * x[selected_data], (fit_fn(pixel_length * x[selected_data]) - mean_fitted[selected_data]) * 10., mean_error_fitted[selected_data] * 10., fmt='o-', label='Offset x 10')
     fit_legend_entry = 'fit: c0+c1x+c2x^2\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$\nc2=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5)
     plt.plot(pixel_length * x, fit_fn(pixel_length * x), '-', label=fit_legend_entry)
     plt.plot(pixel_length * x[selected_data], chi2[selected_data] / 1.e7)
     plt.legend(loc=0)
     plt.title(title)
-    plt.xlabel('DUT %s' % result[node_index]['dut_x'])
-    plt.ylabel('DUT %s' % result[node_index]['dut_y'])
+    plt.xlabel('DUT %s [um]' % result[node_index]['dut_x'])
+    plt.ylabel('DUT %s [um]' % result[node_index]['dut_y'])
     plt.xlim((0, pixel_length * data.shape[0]))
     plt.grid()
     output_fig.savefig()
     if show_plots:
         plt.show()
+
 
 def plot_correlations(alignment_file, output_pdf):
     '''Takes the correlation histograms and plots them
