@@ -15,13 +15,14 @@ from testbeam_analysis import plot_utils
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
-# The location of the datafiles, one file per DUT
-data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
-              r'data/TestBeamData_Mimosa26_DUT1.h5',
-              r'data/TestBeamData_Mimosa26_DUT2.h5',
-              ]
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
+    # The location of the datafiles, one file per DUT
+    data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
+                  r'data/TestBeamData_Mimosa26_DUT1.h5',
+                  r'data/TestBeamData_Mimosa26_DUT2.h5',
+                  ]
+
     # Dimesions
     pixel_size = [(18.4, 18.4), (18.4, 18.4), (18.4, 18.4), (18.4, 18.4)]  # um
     n_pixels = [(1152, 576), (1152, 576), (1152, 576), (1152, 576)]
