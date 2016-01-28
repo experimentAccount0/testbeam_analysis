@@ -57,8 +57,13 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
                     df = first_reference.merge(dut, how='left', on='event_number')
                     df.dropna(inplace=True)
                     n_col_dut, n_row_dut = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
+                    # Correlation of x against x and y against y
                     col_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['column_ref'] - 1, shape=(n_col_dut, n_col_reference))
                     row_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['row_ref'] - 1, shape=(n_row_dut, n_row_reference))
+#                     TODO: implement rotated devices
+#                     # Correlation of x against y and y against x (should be constant exepct the sensor is rotated)
+#                     row_col_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['column_ref'] - 1, shape=(n_row_dut, n_col_reference))
+#                     col_row_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['row_ref'] - 1, shape=(n_col_dut, n_row_reference))
                     out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % index, title='Column Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     out_row = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % index, title='Row Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     out_col.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
