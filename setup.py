@@ -7,7 +7,7 @@ import os
 
 version = 0.1
 
-copt = {'msvc': ['-Itestbeam_analysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
+copt = {'msvc': ['-Itestbeam_analysis/cpp/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
 lopt = {}
 
 
@@ -30,8 +30,8 @@ cpp_extension = cythonize([
     Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/cpp/analysis_functions.pyx'])
 ])
 
-author = 'Christian Bespin, David-Leon Pohl'
-author_email = 'christian.bespin@uni-bonn.de, pohl@physik.uni-bonn.de'
+author = 'David-Leon Pohl, Christian Bespin, Jens Janssen, Luigi Vigani'
+author_email = 'pohl@physik.uni-bonn.de'
 
 # requirements for core functionality from requirements.txt
 with open('requirements.txt') as f:
@@ -53,7 +53,7 @@ setup(
     include_package_data=True,  # accept all data files and directories matched by MANIFEST.in or found in source control
     package_data={'': ['*.txt', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
     ext_modules=cpp_extension,
-    include_dirs=[np.get_include(), 'testbeam_analysis/cpp/external'],
+    include_dirs=[np.get_include()],
     cmdclass={'build_ext': build_ext_opt},
     keywords=['testbeam', 'particle', 'reconstruction', 'pixel', 'detector'],
     platforms='any'
