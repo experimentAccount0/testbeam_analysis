@@ -4,7 +4,6 @@ import logging
 import tables as tb
 import numpy as np
 from pixel_clusterizer.clusterizer import HitClusterizer
-from pixel_clusterizer import data_struct
 
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
@@ -43,7 +42,7 @@ def cluster_hits_wrapper(args):
     return cluster_hits(*args)
 
 
-def cluster_hits(data_file, n_cols, n_rows, n_frames, n_charges, max_x_distance=3, max_y_distance=3, max_time_distance=2):
+def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distance=2, chunk_size=1000000):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
@@ -57,53 +56,27 @@ def cluster_hits(data_file, n_cols, n_rows, n_frames, n_charges, max_x_distance=
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
             # create clusterizer object
-            clusterizer = HitClusterizer(n_cols, n_rows, n_frames=n_frames, n_charges=n_charges)
+            clusterizer = HitClusterizer()
+            clusterizer.set_max_hits(chunk_size)
 
             # Set clusterzier settings
             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
-            clusterizer.create_cluster_info_array(True)  # create cluster
             clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
             clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
             clusterizer.set_frame_cluster_distance(max_time_distance)   # cluster distance in time frames
 
             # Output data
-            cluster_table_description = data_struct.ClusterInfo
+            cluster_table_description = np.dtype([('event_number', '<i8'),
+                                                                ('ID', '<u2'),
+                                                                ('n_hits', '<u2'),
+                                                                ('charge', 'f4'),
+                                                                ('seed_column', '<u2'),
+                                                                ('seed_row', '<u2'),
+                                                                ('mean_column', 'f4'),
+                                                                ('mean_row', 'f4')])
             cluster_table_out = output_file_h5.createTable(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
-            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=1000000):
-                clusterizer.add_hits(hits)  # cluster hits
+            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
+                clusterizer.cluster_hits(hits)  # Cluster hits
                 cluster = clusterizer.get_cluster()
                 cluster_table_out.append(cluster)
-
-
-# def cluster_hits_new(data_file, max_x_distance=3, max_y_distance=3, max_time_distance=2):
-#     '''Clusters the hits in the data file containing the hit table.
-# 
-#     Parameters
-#     ----------
-#     data_file : pytables file
-#     output_file : pytables file
-#     '''
-# 
-#     logging.info('Cluster hits in %s', data_file)
-# 
-#     with tb.open_file(data_file, 'r') as input_file_h5:
-#         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:
-#             # create clusterizer object
-#             clusterizer = clusterizer2.HitClusterizer()
-# 
-#             # Set clusterzier settings
-#             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
-#             # clusterizer.create_cluster_info_array(True)  # create cluster
-#             clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
-#             clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
-#             clusterizer.set_frame_cluster_distance(max_time_distance)   # cluster distance in time frames
-# 
-#             # Output data
-#             cluster_table_description = data_struct.ClusterInfo
-#             cluster_table_out = output_file_h5.createTable(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-# 
-#             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=1000000):
-#                 clusterizer.add_hits(hits)  # cluster hits
-#                 cluster = clusterizer.get_cluster()
-#                 cluster_table_out.append(cluster)

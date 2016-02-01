@@ -6,4 +6,4 @@ numpy   # for C array object and fast algorithms
 matplotlib  # for plotting
 numba==0.22.1   # for speedup of python loops, 0.22.1 was working
 future  # Python 2/3 compatibility
-pixel_clusterizer>=2.2  # to cluster pixel hits
+pixel_clusterizer>=2.3  # to cluster pixel hits
