@@ -4,7 +4,6 @@ import logging
 import tables as tb
 import numpy as np
 from pixel_clusterizer.clusterizer import HitClusterizer
-#from pixel_clusterizer import clusterizer2
 from pixel_clusterizer import data_struct
 
 from testbeam_analysis import analysis_utils
