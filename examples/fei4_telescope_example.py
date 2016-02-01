@@ -35,7 +35,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # The following shows a complete test beam analysis by calling the separate function in correct order
 
     # Cluster hits off all DUTs
-    args = [(data_files[i], n_pixels[i][0], n_pixels[i][1], 16, 14) for i in range(0, len(data_files))]
+    args = [(data_files[i], 1, 2, 2, 1000000) for i in range(0, len(data_files))]
     Pool().map(hit_analysis.cluster_hits_wrapper, args)  # find cluster on all DUT data files in parallel on multiple cores
     plot_utils.plot_cluster_size(cluster_files,
                                  output_pdf=output_folder + r'/Cluster_Size.pdf')
