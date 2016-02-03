@@ -32,7 +32,7 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
         if int: select first int events
         if list of int (length 2): select events from first list item to second list item
     '''
-    logging.info('Correlate the position of %d DUTs', len(hit_files))
+    logging.info('=== Correlate the position of %d DUTs ===', len(hit_files))
     with tb.open_file(alignment_file, mode="w") as out_file_h5:
         for index, hit_file in enumerate(hit_files):
             with tb.open_file(hit_file, 'r') as in_file_h5:
@@ -95,7 +95,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
         If given a list of floats use one list item for each DUT
     output_pdf : pdf file name object
     '''
-    logging.info('Align hit coordinates')
+    logging.info('=== Align hit coordinates ===')
 
     def gauss(x, *p):
         A, mu, sigma, offset = p
@@ -167,12 +167,10 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     f = lambda x, c0, c1: c0 + c1 * x
                     if not np.any(selected_data):
                         raise RuntimeError('The cuts are too tight, there is no point to fit. Release cuts and rerun alignment.')
-                    index = 0
                     if len(fit_offset_cut) == 1 and len(fit_error_cut) == 1:  # Use same fit_offset_cut and fit_error_cut values for all fits
                         offset_limit, error_limit = fit_offset_cut[0][0] if 'Col' in node.title else fit_offset_cut[0][1], fit_error_cut[0][0] if 'Col' in node.title else fit_error_cut[0][1]
                     else:  # Use different fit_offset_cut and fit_error_cut values for every fit
-                        index = node_index % len(fit_offset_cut)
-                        offset_limit, error_limit = fit_offset_cut[index][0] if 'Col' in node.title else fit_offset_cut[index][1], fit_error_cut[index][0] if 'Col' in node.title else fit_error_cut[index][1]
+                        offset_limit, error_limit = fit_offset_cut[node_index][0] if 'Col' in node.title else fit_offset_cut[node_index - n_duts + 1][1], fit_error_cut[node_index][0] if 'Col' in node.title else fit_error_cut[node_index - n_duts + 1][1]
 
                     fit, pcov = curve_fit(f, pixel_length * x_align_fit[selected_data], mean_fitted[selected_data])
                     fit_fn = np.poly1d(fit[::-1])
@@ -224,7 +222,7 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
     max_index : int
         Merge only given number of cluster data
     '''
-    logging.info('Merge cluster to tracklets')
+    logging.info('=== Merge cluster to tracklets ===')
 
     with tb.open_file(alignment_file, mode="r") as in_file_h5:
         correlation = in_file_h5.root.Alignment[:]
@@ -309,7 +307,7 @@ def fix_event_alignment(tracklets_files, tracklets_corr_file, alignment_file, er
             column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
-    logging.info('Fix event alignment')
+    logging.info('=== Fix event alignment ===')
 
     with tb.open_file(tracklets_files, mode="r") as in_file_h5:
         particles = in_file_h5.root.Tracklets[:]
@@ -370,7 +368,7 @@ def optimize_hit_alignment(tracklets_files, alignment_file, fraction=10):
     use_fraction : float
         Use only every fraction-th hit for the alignment correction. For speed up. 1 means all hits are used
     '''
-    logging.info('Optimize hit alignment')
+    logging.info('=== Optimize hit alignment ===')
     with tb.open_file(tracklets_files, mode="r+") as in_file_h5:
         particles = in_file_h5.root.Tracklets[:]
         with tb.open_file(alignment_file, 'r+') as alignment_file_h5:
@@ -414,7 +412,7 @@ def check_hit_alignment(tracklets_file, output_pdf, combine_n_hits=100000, corre
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
     '''
-    logging.info('Check hit alignment')
+    logging.info('=== Check hit alignment ===')
     with tb.open_file(tracklets_file, mode="r") as in_file_h5:
         with PdfPages(output_pdf) as output_fig:
             for table_column in in_file_h5.root.Tracklets.dtype.names:
@@ -469,7 +467,7 @@ def align_z(track_candidates_file, alignment_file, output_pdf, z_positions=None,
         1: The track hits in DUT and reference are within 5-sigma of the correlation
         2: The track hits in DUT and reference are within 2-sigma of the correlation
     '''
-    logging.info('Find relative z-position')
+    logging.info('=== Find relative z-position ===')
 
     def pos_error(z, dut, first_reference, last_reference):
         return np.mean(np.square(z * (last_reference - first_reference) + first_reference - dut))
