@@ -25,7 +25,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
     output_pdf : pdf file name
         if None plots are printed to screen
     '''
-    logging.info('Calculate residuals')
+    logging.info('=== Calculate residuals ===')
 
     def gauss(x, *p):
         A, mu, sigma = p
@@ -97,7 +97,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
         column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation)
     '''
 
-    logging.info('Calculate efficiency')
+    logging.info('=== Calculate efficiency ===')
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
         with tb.open_file(tracks_file, mode='r') as in_file_h5:

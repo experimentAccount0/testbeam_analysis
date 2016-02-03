@@ -18,7 +18,7 @@ def remove_noisy_pixels(data_file, threshold=6.):
     threshold : number
         The threshold when the pixel is removed given in sigma distance from the median occupancy.
     '''
-    logging.info('Remove noisy pixels in %s', data_file)
+    logging.info('=== Remove noisy pixels in %s ===', data_file)
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'w') as out_file_h5:
             hits = input_file_h5.root.Hits[:]
@@ -51,7 +51,7 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distanc
     output_file : pytables file
     '''
 
-    logging.info('Cluster hits in %s', data_file)
+    logging.info('=== Cluster hits in %s ===', data_file)
 
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_cluster.h5', 'w') as output_file_h5:

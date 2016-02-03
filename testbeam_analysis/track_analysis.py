@@ -8,7 +8,6 @@ import numpy as np
 from math import sqrt
 from numba import njit
 from multiprocessing import Pool, cpu_count
-from numpy.lib import recfunctions
 from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis import plot_utils
@@ -30,7 +29,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
     track_candidates_file : string
         Output file name for track candidate array
     '''
-    logging.info('Build tracks from tracklets')
+    logging.info('=== Build tracks from tracklets ===')
 
     # Get alignment errors from file
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
@@ -89,7 +88,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
     track_candidates_file : string
         Output file name for track candidate array
     '''
-    logging.info('Build tracks from TrackCandidates')
+    logging.info('=== Build tracks from TrackCandidates ===')
 
     # Get alignment errors from file
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
@@ -148,7 +147,7 @@ def optimize_track_alignment(trackcandidates_file, alignment_file, fraction=1, c
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
     '''
-    logging.info('Optimize track alignment')
+    logging.info('=== Optimize track alignment ===')
     with tb.open_file(trackcandidates_file, mode="r+") as in_file_h5:
         particles = in_file_h5.root.TrackCandidates[:]
         with tb.open_file(alignment_file, 'r+') as alignment_file_h5:
@@ -199,7 +198,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
         Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each 'quality stage', one digit per DUT.
         E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     '''
-    logging.info('Check TrackCandidates Alignment')
+    logging.info('=== Check TrackCandidates Alignment ===')
     with tb.open_file(trackcandidates_files, mode="r") as in_file_h5:
         with PdfPages(output_pdf) as output_fig:
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
@@ -271,6 +270,8 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
     '''
+
+    logging.info('=== Fit tracks ===')
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
         # Define description
