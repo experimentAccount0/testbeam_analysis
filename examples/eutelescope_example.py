@@ -1,6 +1,8 @@
 ''' Example script to run a full analysis on telescope data. The original data can be found in the example folder of the EuTelescope framework. 
-The telescope consists of 6 planes with 15 cm distance between the planes. Onle the first three planes were taken here, thus the line fit chi2 
-is always 0. The residuals for the second plane (DUT 1) are about 8 um and comparable to the residuals from EuTelescope (6 um).
+The telescope consists of 6 planes with 15 cm distance between the planes. The residuals for the second plane (DUT 1) are about 8 um and comparable 
+to the residuals from EuTelescope (6 um).
+
+The other plane residuals are not that small depicting a worse performance in device algnment and track fitting. 
 '''
 
 import os
@@ -17,15 +19,29 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
-    # The location of the datafiles, one file per DUT
-    data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system
-                  r'data/TestBeamData_Mimosa26_DUT1.h5',
-                  r'data/TestBeamData_Mimosa26_DUT2.h5',
+    # The location of the data files, one file per DUT
+    data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # The first DUT (DUT 0) is the reference DUT defining the coordinate system
+                  r'data/TestBeamData_Mimosa26_DUT1.h5',  # Data file of DUT 1
+                  r'data/TestBeamData_Mimosa26_DUT2.h5',  # Data file of DUT 2
+                  r'data/TestBeamData_Mimosa26_DUT3.h5',  # Data file of DUT 3
+                  r'data/TestBeamData_Mimosa26_DUT4.h5',  # Data file of DUT 4
+                  r'data/TestBeamData_Mimosa26_DUT5.h5',  # Data file of DUT 5
                   ]
 
-    # Dimesions
-    pixel_size = [(18.4, 18.4), (18.4, 18.4), (18.4, 18.4), (18.4, 18.4)]  # um
-    n_pixels = [(1152, 576), (1152, 576), (1152, 576), (1152, 576)]
+    # Pixel dimesions and matrix size of the DUTs
+    pixel_size = [(18.4, 18.4),  # Column, row pixel pitch in um of DUT 0
+                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 1
+                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 2
+                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 3
+                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 4
+                  (18.4, 18.4)]  # Column, row pixel pitch in um of DUT 5
+    n_pixels = [(1152, 576),  # Number of pixels on column, row for DUT 0
+                (1152, 576),  # Number of pixels on column, row for DUT 1
+                (1152, 576),  # Number of pixels on column, row for DUT 2
+                (1152, 576),  # Number of pixels on column, row for DUT 3
+                (1152, 576),  # Number of pixels on column, row for DUT 4
+                (1152, 576)]  # Number of pixels on column, row for DUT 5
+
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
@@ -33,7 +49,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
     # Remove hot pixels, only needed for devices wih noisy pixels like Mimosa 26
-    # Pool().map(hit_analysis.remove_noisy_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
+    Pool().map(hit_analysis.remove_noisy_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
     data_files = [data_file[:-3] + '_hot_pixel.h5' for data_file in data_files]
     cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
 
@@ -54,8 +70,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     dut_alignment.align_hits(correlation_file=output_folder + r'/Correlation.h5',
                              alignment_file=output_folder + r'/Alignment.h5',
                              output_pdf=output_folder + r'/Alignment.pdf',
-                             fit_offset_cut=[(800. / 10., 200. / 10.), (800. / 10., 500. / 10.)],
-                             fit_error_cut=[(4000. / 1000., 2200. / 1000.), (10000. / 1000., 8000. / 1000.)],
+                             fit_offset_cut=[(800. / 10., 200. / 10.),  # Offset cut for DUT0 in columns, row
+                                             (1000. / 10., 1000. / 10.),  # Offset cut for DUT1 in columns, row
+                                             (1200. / 10., 1200. / 10.),
+                                             (1400. / 10., 1400. / 10.),
+                                             (1800. / 10., 1800. / 10.)],  # Offset cut for all DUT rows
+                             fit_error_cut=[(4000. / 1000., 2200. / 1000.),  # Fit error cut for DUT1 in columns, row
+                                            (9000. / 1000., 9000. / 1000.),  # Fit error cut for DUT2 in columns, row
+                                            (20000. / 1000., 20000. / 1000.),
+                                            (25000. / 1000., 25000. / 1000.),
+                                            (35000. / 1000., 35000. / 1000.)],
                              pixel_size=pixel_size,
                              show_plots=False)
 
@@ -75,8 +99,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                               tracks_file=output_folder + r'/Tracks.h5',
                               output_pdf=output_folder + r'/Tracks.pdf',
                               z_positions=z_positions,
-                              fit_duts=[0, 1, 2],
-                              include_duts=[-2, -1, 1, 2],
+                              fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
+                              include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
                               track_quality=2)
 
