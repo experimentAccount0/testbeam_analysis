@@ -107,7 +107,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(correlation_file, mode="r+") as in_file_h5:
             n_nodes = sum(1 for _ in enumerate(in_file_h5.root))  # Determine number of nodes, is there a better way?
-            n_duts = n_nodes / 2 + 1
+            n_duts = int(n_nodes / 2 + 1)
             result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('c2', np.float), ('c2_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
             for node_index, node in enumerate(in_file_h5.root):
                 try:
