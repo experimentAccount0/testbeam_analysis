@@ -5,7 +5,6 @@ environment:
     - PYTHON: 2.7
 
 platform:
-  - x86
   - x64
 
 init:
