@@ -34,7 +34,6 @@ class TestTrackAnalysis(unittest.TestCase):
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'TrackCandidates_result.h5', self.output_folder + 'TrackCandidates.h5')
         self.assertTrue(data_equal, msg=error_msg)
 
-    @unittest.SkipTest
     def test_track_fitting(self):
         # Fit the track candidates and create new track table
         track_analysis.fit_tracks(track_candidates_file=tests_data_folder + 'TrackCandidates_result.h5',
@@ -44,10 +43,9 @@ class TestTrackAnalysis(unittest.TestCase):
                                   fit_duts=None,
                                   include_duts=[-3, -2, -1, 1, 2, 3],
                                   ignore_duts=None,
-                                  max_tracks=1,
                                   track_quality=1,
                                   use_correlated=False)
-        data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracks_result.h5', self.output_folder + 'Tracks.h5')
+        data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracks_result.h5', self.output_folder + 'Tracks.h5', exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':

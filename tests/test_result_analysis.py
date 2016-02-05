@@ -40,7 +40,7 @@ class TestResultAnalysis(unittest.TestCase):
 
     def test_efficiency_calculation(self):
         efficiencies = result_analysis.calculate_efficiency(tracks_file=self.output_folder + 'Tracks_result.h5',
-                                                            output_pdf=self.output_folder + r'/Efficiency.pdf',
+                                                            output_pdf=self.output_folder + r'Efficiency.pdf',
                                                             z_positions=self.z_positions,
                                                             bin_size=(250, 50),
                                                             minimum_track_density=2,
@@ -49,10 +49,11 @@ class TestResultAnalysis(unittest.TestCase):
                                                             max_distance=500,
                                                             col_range=(1250, 17500),
                                                             row_range=(1000, 16000))
-        self.assertAlmostEqual(efficiencies[0], 100.0, msg='DUT 0 efficiencies do not match', places=3)
-        self.assertAlmostEqual(efficiencies[1], 98.701298701298697, msg='DUT 1 efficiencies do not match', places=3)
-        self.assertAlmostEqual(efficiencies[2], 97.468354430379748, msg='DUT 2 efficiencies do not match', places=3)
-        self.assertAlmostEqual(efficiencies[3], 100.0, msg='DUT 3 efficiencies do not match', places=3)
+ 
+        self.assertAlmostEqual(efficiencies[0], 100.000, msg='DUT 0 efficiencies do not match', places=3)
+        self.assertAlmostEqual(efficiencies[1], 98.7013, msg='DUT 1 efficiencies do not match', places=3)
+        self.assertAlmostEqual(efficiencies[2], 97.4684, msg='DUT 2 efficiencies do not match', places=3)
+        self.assertAlmostEqual(efficiencies[3], 100.000, msg='DUT 3 efficiencies do not match', places=3)
 
 if __name__ == '__main__':
     tests_data_folder = r'test_result_analysis/'
