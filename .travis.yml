@@ -5,6 +5,11 @@ python:
  
 sudo: false
 
+addons:
+  apt:
+    packages:
+    - gfortran
+
 notifications:
   email:
     - pohl@physik.uni-bonn.de
