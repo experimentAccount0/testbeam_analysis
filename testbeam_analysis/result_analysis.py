@@ -15,15 +15,19 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
     Parameters
     ----------
     tracks_file : string
-        file name with the tracks table
+        File name with the tracks table
     z_position : iterable
-        the positions of the devices in z in cm
+        The positions of the devices in z in cm
     use_duts : iterable
-        the duts to calculate residuals for. If None all duts are used
+        The duts to calculate residuals for. If None all duts in the tracks_file are used
     max_chi2 : int
         Use only converged fits (cut on chi2)
     output_pdf : pdf file name
-        if None plots are printed to screen
+        If None plots are printed to screen.
+        If False no plots are created.
+    Returns
+    -------
+    A list of residuals in column row. e.g.: [Col residual DUT 0, Row residual DUT 0, Col residual DUT 1, Row residual DUT 1, ...]
     '''
     logging.info('=== Calculate residuals ===')
 
@@ -61,7 +65,8 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
                 except:
                     fit_ok = False
 
-                plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
+                if output_pdf is not False:
+                    plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
                 residuals.append(np.abs(coeff[2]))
 
     if output_fig:
