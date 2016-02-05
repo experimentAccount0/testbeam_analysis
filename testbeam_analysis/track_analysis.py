@@ -354,7 +354,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                             index += 1
 
                     # Split data and fit on all available cores
-                    n_slices = cpu_count() - 1
+                    n_slices = cpu_count()
                     slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
 
                     slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
