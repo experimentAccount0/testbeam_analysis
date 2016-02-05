@@ -227,11 +227,26 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
     with tb.open_file(alignment_file, mode="r") as in_file_h5:
         correlation = in_file_h5.root.Alignment[:]
 
-    # Calculate a event number index to map the cluster of all files to
-    common_event_number = None
+    # Calculate a new event number index to map the cluster files of all planes into it
+    rows = 0
     for cluster_file in cluster_files:
         with tb.open_file(cluster_file, mode='r') as in_file_h5:
-            common_event_number = in_file_h5.root.Cluster[:]['event_number'] if common_event_number is None else analysis_utils.get_max_events_in_both_arrays(common_event_number, in_file_h5.root.Cluster[:]['event_number'])
+            rows = max(rows, in_file_h5.root.Cluster.cols.event_number[-1])
+    common_bin_count = None
+    for cluster_file in cluster_files:
+            with tb.open_file(cluster_file, mode='r') as in_file_h5:
+                bin_count = np.bincount(in_file_h5.root.Cluster.cols.event_number[:], minlength=rows + 1)
+                if common_bin_count is None:
+                    common_bin_count = bin_count
+                else:
+                    common_bin_count = np.maximum(common_bin_count, bin_count)
+    # http://stackoverflow.com/questions/22671192/inverse-of-numpys-bincount-function
+    p = np.cumsum(common_bin_count)
+    i = np.zeros(p[-1], np.int)
+    np.add.at(i, p[:-1], 1)
+    common_event_number = np.cumsum(i)
+    # this does the same:
+    # common_event_number = np.repeat(np.arange(common_bin_count.size), common_bin_count)
 
     # Create result array description, depends on the number of DUTs
     description = [('event_number', np.int64)]
