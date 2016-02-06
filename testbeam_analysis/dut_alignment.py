@@ -241,12 +241,12 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
                 else:
                     common_bin_count = np.maximum(common_bin_count, bin_count)
     # http://stackoverflow.com/questions/22671192/inverse-of-numpys-bincount-function
-    p = np.cumsum(common_bin_count)
-    i = np.zeros(p[-1], np.int)
+    p = np.cumsum(common_bin_count, dtype=np.int64)
+    i = np.zeros(p[-1], dtype=np.int64)
     np.add.at(i, p[:-1], 1)
-    common_event_number = np.cumsum(i).astype(np.int64)
+    common_event_number = np.cumsum(i, dtype=np.int64)
     # this does the same:
-    # common_event_number = np.repeat(np.arange(common_bin_count.size), common_bin_count)
+    # common_event_number = np.repeat(np.arange(common_bin_count.size, dtype=np.int64), common_bin_count)
 
 #     # Calculate a event number index to map the cluster of all files to
 #     common_event_number_2 = None
