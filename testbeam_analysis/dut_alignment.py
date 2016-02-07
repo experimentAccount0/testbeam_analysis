@@ -341,7 +341,7 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
                     tracklets_array['column_dut_%d' % plane_index][selection] = (c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0])
                     tracklets_array['row_dut_%d' % plane_index][selection] = (c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1])
                     tracklets_array['charge_dut_%d' % plane_index][selection] = actual_cluster['charge'][selection]
-                    cluster_file_index[plane_index] = cluster_data_chunk.shape[0]
+                    cluster_file_index[plane_index] = cluster_file_index[plane_index] + cluster_data_chunk.shape[0]
 
             np.nan_to_num(tracklets_array)
             tracklets_array['event_number'] = common_event_numbers_chunk
