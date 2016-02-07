@@ -268,21 +268,22 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
 #     common_event_numbers = np.cumsum(i, dtype=np.int64)
     # this does the same and is faster when using dtype np.int64:
     common_event_numbers = np.repeat(np.arange(common_bin_count.size, dtype=np.int64), common_bin_count)
-    print common_event_numbers, common_event_numbers.shape
-
+#     print common_event_numbers, common_event_numbers.shape
+#
+#     common_bin_count = None
 #     for cluster_file in cluster_files:
 #         with tb.open_file(cluster_file, mode='r') as in_file_h5:
-#             print in_file_h5.filename
 #             event_numbers = in_file_h5.root.Cluster.cols.event_number[:]
-#             bin_count = np.bincount(event_numbers, minlength=rows + 1)
+#             bin_count = np.bincount(event_numbers, minlength=max_event_number + 1)
 #             if common_bin_count is None:
 #                 common_bin_count = bin_count
 #             else:
 #                 common_bin_count = np.maximum(common_bin_count, bin_count)
 #     common_event_numbers_3 = np.repeat(np.arange(common_bin_count.size, dtype=np.int64), common_bin_count)
+#     print common_event_numbers_3, common_event_numbers_3.shape
 #     print (common_event_numbers == common_event_numbers_3).all()
 
-#     # Calculate a event number index to map the cluster of all files to
+    # Calculate a event number index to map the cluster of all files to
 #     common_event_numbers_2 = None
 #     for cluster_file in cluster_files:
 #         with tb.open_file(cluster_file, mode='r') as in_file_h5:
@@ -311,7 +312,7 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
                 last_incomplete_event_number = common_event_numbers[event_number_index + 1000000 - 1]
                 last_event_number_index = np.searchsorted(common_event_numbers, last_incomplete_event_number)
                 if last_event_number_index == event_number_index:
-                    print "warning"
+                    logging.warning('Increase chunk size')
                     last_event_number_index = event_number_index + 1000000
             event_number_chunk_length = last_event_number_index - event_number_index
             common_event_numbers_chunk = common_event_numbers[event_number_index:last_event_number_index]
@@ -322,7 +323,6 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
             for plane_index, cluster_file in enumerate(cluster_files):
                 logging.info('Add cluster file ' + str(cluster_file))
                 with tb.open_file(cluster_file, mode='r') as in_file_h5:
-                    print in_file_h5.filename
                     cluster_data_chunk = in_file_h5.root.Cluster.read_where('(event_number <= %s)' % last_event_number, start=cluster_file_index[plane_index], stop=cluster_file_index[plane_index] + 1000000)
                     actual_cluster = analysis_utils.map_cluster(common_event_numbers_chunk, cluster_data_chunk)
                     selection = actual_cluster['mean_column'] != 0  # correct only hits, 0 is no hit
