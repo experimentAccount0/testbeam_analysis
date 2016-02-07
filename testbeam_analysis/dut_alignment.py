@@ -6,6 +6,7 @@ import progressbar
 import tables as tb
 import numpy as np
 import pandas as pd
+import itertools
 
 from scipy.optimize import curve_fit, minimize_scalar
 from matplotlib.backends.backend_pdf import PdfPages
@@ -207,20 +208,23 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                     logging.warning('Correlation table exists already. Do not create new.')
 
 
-def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size, max_index=None):
+def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size, limit_events=None):
     '''Takes the cluster from all cluster files and merges them into one big table onto the event number.
     Empty entries are signaled with charge = 0. The position is referenced from the correlation data to the first plane.
     Function uses easily several GB of RAM. If memory errors occur buy a better PC or chunk this function.
 
+    TODO: less memory footprint
+
     Parameters
     ----------
     cluster_files : list of pytables files
-        Files with cluster data
-    alignment_file : pytables files
-        The file with the correlation data
-    track_candidates_file : pytables files
-    max_index : int
-        Merge only given number of cluster data
+        File name of the input cluster files with correlation data.
+    alignment_file : pytables file
+        File name of the input aligment data.
+    tracklets_file : pytables file
+        File name of the output tracklet file.
+    limit_events : int
+        Limit events to givien number. Only events with hits are counted. If None or 0, all events will be taken.
     '''
     logging.info('=== Merge cluster to tracklets ===')
 
@@ -228,32 +232,55 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
         correlation = in_file_h5.root.Alignment[:]
 
     # Calculate a new event number index to map the cluster files of all planes into it
-    rows = 0
+    max_event_number = 0
     for cluster_file in cluster_files:
         with tb.open_file(cluster_file, mode='r') as in_file_h5:
-            rows = max(rows, in_file_h5.root.Cluster.cols.event_number[-1])
+            max_event_number = max(max_event_number, in_file_h5.root.Cluster.cols.event_number[-1])
     common_bin_count = None
     for cluster_file in cluster_files:
-            with tb.open_file(cluster_file, mode='r') as in_file_h5:
-                bin_count = np.bincount(in_file_h5.root.Cluster.cols.event_number[:], minlength=rows + 1)
+        with tb.open_file(cluster_file, mode='r') as in_file_h5:
+            print in_file_h5.filename
+            rows = in_file_h5.root.Cluster.nrows
+            for index in itertools.count(0, 1000000):
+                print index
+                event_numbers = in_file_h5.root.Cluster.cols.event_number[index:index + 1000000]
+                bin_count = np.bincount(event_numbers, minlength=max_event_number + 1)
                 if common_bin_count is None:
                     common_bin_count = bin_count
                 else:
                     common_bin_count = np.maximum(common_bin_count, bin_count)
-    # http://stackoverflow.com/questions/22671192/inverse-of-numpys-bincount-function
-    p = np.cumsum(common_bin_count, dtype=np.int64)
-    i = np.zeros(p[-1], dtype=np.int64)
-    np.add.at(i, p[:-1], 1)
-    common_event_number = np.cumsum(i, dtype=np.int64)
-    # this does the same:
-    # common_event_number = np.repeat(np.arange(common_bin_count.size, dtype=np.int64), common_bin_count)
+                if index + 1000000 >= rows:
+                    break
+    if limit_events:
+        common_bin_count = common_bin_count[:np.nonzero(common_bin_count)[0][:limit_events][-1] + 1]
+    # inverse of bin count: http://stackoverflow.com/questions/22671192/inverse-of-numpys-bincount-function
+#     p = np.cumsum(common_bin_count, dtype=np.int64)
+#     i = np.zeros(p[-1], dtype=np.int64)
+#     np.add.at(i, p[:-1], 1)
+#     common_event_numbers = np.cumsum(i, dtype=np.int64)
+    # this does the same and is faster when using dtype np.int64:
+    common_event_numbers = np.repeat(np.arange(common_bin_count.size, dtype=np.int64), common_bin_count)
+    print common_event_numbers, common_event_numbers.shape
 
-#     # Calculate a event number index to map the cluster of all files to
-#     common_event_number_2 = None
 #     for cluster_file in cluster_files:
 #         with tb.open_file(cluster_file, mode='r') as in_file_h5:
-#             common_event_number_2 = in_file_h5.root.Cluster[:]['event_number'] if common_event_number_2 is None else analysis_utils.get_max_events_in_both_arrays(common_event_number_2, in_file_h5.root.Cluster[:]['event_number'])
+#             print in_file_h5.filename
+#             event_numbers = in_file_h5.root.Cluster.cols.event_number[:]
+#             bin_count = np.bincount(event_numbers, minlength=rows + 1)
+#             if common_bin_count is None:
+#                 common_bin_count = bin_count
+#             else:
+#                 common_bin_count = np.maximum(common_bin_count, bin_count)
+#     common_event_numbers_3 = np.repeat(np.arange(common_bin_count.size, dtype=np.int64), common_bin_count)
+#     print (common_event_numbers == common_event_numbers_3).all()
 
+#     # Calculate a event number index to map the cluster of all files to
+#     common_event_numbers_2 = None
+#     for cluster_file in cluster_files:
+#         with tb.open_file(cluster_file, mode='r') as in_file_h5:
+#             common_event_numbers_2 = in_file_h5.root.Cluster[:]['event_number'] if common_event_numbers_2 is None else analysis_utils.get_max_events_in_both_arrays(common_event_numbers_2, in_file_h5.root.Cluster[:]['event_number'])
+#     print (common_event_numbers_2 == common_event_numbers_3).all()
+#     return
     # Create result array description, depends on the number of DUTs
     description = [('event_number', np.int64)]
     for index, _ in enumerate(cluster_files):
@@ -267,33 +294,52 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
     # Merge the cluster data from different DUTs into one table
     with tb.open_file(tracklets_file, mode='w') as out_file_h5:
         tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracklets', description=np.zeros((1,), dtype=description).dtype, title='Tracklets', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-        tracklets_array = np.zeros((common_event_number.shape[0],), dtype=description)
-        for index, cluster_file in enumerate(cluster_files):
-            logging.info('Add cluster file ' + str(cluster_file))
-            with tb.open_file(cluster_file, mode='r') as in_file_h5:
-                actual_cluster = analysis_utils.map_cluster(common_event_number, in_file_h5.root.Cluster[:])
-                selection = actual_cluster['mean_column'] != 0  # correct only hits, 0 is no hit
-                actual_mean_column = pixel_size[index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
-                actual_mean_row = pixel_size[index][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
-                if index == 0:  # Position corrections are normalized to the first reference
-                    c0 = np.array([0., 0.])
-                    c1 = np.array([1., 1.])
-                    c2 = np.array([0., 0.])
-                else:
-                    c0 = correlation[correlation['dut_x'] == index]['c0']
-                    c1 = correlation[correlation['dut_x'] == index]['c1']
-                    c2 = correlation[correlation['dut_x'] == index]['c2']
+        event_number_index = 0
+        cluster_file_index = [0] * len(cluster_files)
+        while event_number_index < common_event_numbers.shape[0]:
+            if event_number_index + 1000000 >= common_event_numbers.shape[0]:
+                last_event_number_index = common_event_numbers.shape[0]
+            else:
+                last_incomplete_event_number = common_event_numbers[event_number_index + 1000000 - 1]
+                last_event_number_index = np.searchsorted(common_event_numbers, last_incomplete_event_number)
+                if last_event_number_index == event_number_index:
+                    print "warning"
+                    last_event_number_index = event_number_index + 1000000
+            event_number_chunk_length = last_event_number_index - event_number_index
+            common_event_numbers_chunk = common_event_numbers[event_number_index:last_event_number_index]
+            print common_event_numbers_chunk, common_event_numbers_chunk.shape
+            last_event_number = common_event_numbers_chunk[-1]
 
-                # Apply alignment information
-                tracklets_array['column_dut_%d' % index][selection] = (c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0])
-                tracklets_array['row_dut_%d' % index][selection] = (c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1])
-                tracklets_array['charge_dut_%d' % index][selection] = actual_cluster['charge'][selection]
+            tracklets_array = np.zeros((event_number_chunk_length,), dtype=description)
+            for plane_index, cluster_file in enumerate(cluster_files):
+                logging.info('Add cluster file ' + str(cluster_file))
+                with tb.open_file(cluster_file, mode='r') as in_file_h5:
+                    print in_file_h5.filename
+                    cluster_data_chunk = in_file_h5.root.Cluster.read_where('(event_number <= %s)' % last_event_number, start=cluster_file_index[plane_index], stop=cluster_file_index[plane_index] + 1000000)
+                    actual_cluster = analysis_utils.map_cluster(common_event_numbers_chunk, cluster_data_chunk)
+                    selection = actual_cluster['mean_column'] != 0  # correct only hits, 0 is no hit
+                    actual_mean_column = pixel_size[plane_index][0] * actual_cluster['mean_column'][selection]  # Convert column indices to metric units (um)
+                    actual_mean_row = pixel_size[plane_index][1] * actual_cluster['mean_row'][selection]  # Convert row indices to metric units (um)
+                    if plane_index == 0:  # Position corrections are normalized to the first reference
+                        c0 = np.array([0., 0.])
+                        c1 = np.array([1., 1.])
+                        c2 = np.array([0., 0.])
+                    else:
+                        c0 = correlation[correlation['dut_x'] == plane_index]['c0']
+                        c1 = correlation[correlation['dut_x'] == plane_index]['c1']
+                        c2 = correlation[correlation['dut_x'] == plane_index]['c2']
 
-        np.nan_to_num(tracklets_array)
-        tracklets_array['event_number'] = common_event_number
-        if max_index:
-            tracklets_array = tracklets_array[:max_index]
-        tracklets_table.append(tracklets_array)
+                    # Apply alignment information
+                    tracklets_array['column_dut_%d' % plane_index][selection] = (c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0])
+                    tracklets_array['row_dut_%d' % plane_index][selection] = (c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1])
+                    tracklets_array['charge_dut_%d' % plane_index][selection] = actual_cluster['charge'][selection]
+                    cluster_file_index[plane_index] = cluster_data_chunk.shape[0]
+
+            np.nan_to_num(tracklets_array)
+            tracklets_array['event_number'] = common_event_numbers_chunk
+            tracklets_table.append(tracklets_array)
+            # set read index to the end of the last processed event
+            event_number_index = last_event_number_index
 
 
 def fix_event_alignment(tracklets_files, tracklets_corr_file, alignment_file, error=3., n_bad_events=100, n_good_events=10, correlation_search_range=20000, good_events_search_range=100):
