@@ -239,18 +239,26 @@ def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size
     common_bin_count = None
     for cluster_file in cluster_files:
         with tb.open_file(cluster_file, mode='r') as in_file_h5:
-            print in_file_h5.filename
-            rows = in_file_h5.root.Cluster.nrows
-            for index in itertools.count(0, 1000000):
-                print index
-                event_numbers = in_file_h5.root.Cluster.cols.event_number[index:index + 1000000]
+            start_index = 0
+            max_rows = in_file_h5.root.Cluster.nrows
+            while start_index < max_rows:
+                event_numbers = in_file_h5.root.Cluster.cols.event_number[start_index:start_index + 1000000]
+                if start_index + 1000000 >= max_rows:
+                    stop_index = 1000000
+                else:
+                    last_incomplete_event_number = event_numbers[-1]
+                    stop_index = np.searchsorted(event_numbers, last_incomplete_event_number)
+                    if stop_index + start_index == start_index:
+                        logging.warning('Increase chunk size')
+                        stop_index = 1000000
+                event_numbers = event_numbers[:stop_index]
                 bin_count = np.bincount(event_numbers, minlength=max_event_number + 1)
                 if common_bin_count is None:
                     common_bin_count = bin_count
                 else:
                     common_bin_count = np.maximum(common_bin_count, bin_count)
-                if index + 1000000 >= rows:
-                    break
+                start_index = start_index + stop_index
+
     if limit_events:
         common_bin_count = common_bin_count[:np.nonzero(common_bin_count)[0][:limit_events][-1] + 1]
     # inverse of bin count: http://stackoverflow.com/questions/22671192/inverse-of-numpys-bincount-function
