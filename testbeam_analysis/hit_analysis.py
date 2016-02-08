@@ -39,10 +39,10 @@ def remove_noisy_pixels(data_file, threshold=6.):
 
 
 def cluster_hits_wrapper(args):
-    return cluster_hits(*args)
+    return cluster_hits(**args)
 
 
-def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distance=2, chunk_size=1000000):
+def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distance=2, max_cluster_hits=1000, chunk_size=1000000):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
@@ -58,6 +58,7 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distanc
             # create clusterizer object
             clusterizer = HitClusterizer()
             clusterizer.set_max_hits(chunk_size)
+            clusterizer.set_max_cluster_hits(max_cluster_hits)
 
             # Set clusterzier settings
             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
