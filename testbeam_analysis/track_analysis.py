@@ -4,7 +4,6 @@ import logging
 import progressbar
 import tables as tb
 import numpy as np
-import itertools
 
 from math import sqrt
 from numba import njit
@@ -12,9 +11,10 @@ from multiprocessing import Pool, cpu_count
 from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis import plot_utils
+from testbeam_analysis import analysis_utils
 
 
-def find_tracks(tracklets_file, alignment_file, track_candidates_file, limit_events=None):
+def find_tracks(tracklets_file, alignment_file, track_candidates_file, limit_events=None, chunk_size=100000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is given to
     be able to cut on good tracks.
@@ -46,25 +46,11 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, limit_eve
         with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
             track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.Tracklets.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             n_duts = sum(['column' in col for col in in_file_h5.root.Tracklets.dtype.names])
-            print "n_duts", n_duts
 
-            print "read max event number"
-            max_event_number = in_file_h5.root.Tracklets.cols.event_number[-1]
-            print max_event_number
-            tracklets_file_index = 0
-            tracklets_data_chunk = None
-            for event_number in itertools.count(0, 100000):
-                if event_number > max_event_number:
-                    break
-                # TODO: fix
-                if limit_events and total_events >= limit_events:
-                    break
-                last_event_number = event_number + 100000 - 1
-                print event_number, last_event_number
-                print tracklets_file_index
-
+            for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Tracklets, chunk_size=chunk_size):
+                tracklets_data_chunk = tracklets_data_chunk.view(np.recarray)
+                
                 # Prepare data for track finding, create arrays for column, row and charge data
-                tracklets_data_chunk = in_file_h5.root.Tracklets.read_where('(event_number <= %s)' % last_event_number, start=tracklets_file_index, stop=in_file_h5.root.Tracklets.nrows).view(np.recarray)
                 tr_column = tracklets_data_chunk['column_dut_0']
                 tr_row = tracklets_data_chunk['row_dut_0']
                 tr_charge = tracklets_data_chunk['charge_dut_0']
