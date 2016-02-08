@@ -9,8 +9,12 @@ from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
 
 
-def remove_noisy_pixels(data_file, threshold=6.):
+def remove_noisy_pixels(data_file, threshold=6., chunk_size=10000000):
     '''Removes noisy pixels from the data file containing the hit table.
+    The hit table is read in chunks and for each chunk the noisy pixels are determined and removed.
+
+    To call this function on 8 cores in parallel with chunk_size=10000000 the following RAM is needed:
+    11 byte * 8 * 10000000 = 880 Mb
 
     Parameters
     ----------
@@ -21,21 +25,21 @@ def remove_noisy_pixels(data_file, threshold=6.):
     logging.info('=== Remove noisy pixels in %s ===', data_file)
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'w') as out_file_h5:
-            hits = input_file_h5.root.Hits[:]
-            col, row = hits['column'], hits['row']
-            max_row = np.amax(row)
-            occupancy = analysis_utils.hist_2d_index(col - 1, row - 1, shape=(np.amax(col), max_row))
-            noisy_pixels = np.where(occupancy > np.median(occupancy) + np.std(occupancy) * threshold)
-            plot_utils.plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename=data_file[:-3] + '_hot_pixel.pdf')
-            logging.info('Remove %d hot pixels in %s', noisy_pixels[0].shape[0], data_file)
+            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
+                col, row = hits['column'], hits['row']
+                max_row = np.amax(row)
+                occupancy = analysis_utils.hist_2d_index(col - 1, row - 1, shape=(np.amax(col), max_row))
+                noisy_pixels = np.where(occupancy > np.median(occupancy) + np.std(occupancy) * threshold)
+                plot_utils.plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename=data_file[:-3] + '_hot_pixel.pdf')
+                logging.info('Remove %d hot pixels in %s', noisy_pixels[0].shape[0], data_file)
 
-            # Select not noisy pixels
-            noisy_pix_1d = (noisy_pixels[0] + 1) * max_row + (noisy_pixels[1] + 1)  # map 2d array (col, row) to 1d array to increase selection speed
-            hits_1d = hits['column'].astype(np.uint32) * max_row + hits['row']  # astype needed, otherwise silently assuming np.uint16 (VERY BAD NUMPY!)
-            hits = hits[np.in1d(hits_1d, noisy_pix_1d, invert=True)]
+                # Select not noisy pixels
+                noisy_pix_1d = (noisy_pixels[0] + 1) * max_row + (noisy_pixels[1] + 1)  # map 2d array (col, row) to 1d array to increase selection speed
+                hits_1d = hits['column'].astype(np.uint32) * max_row + hits['row']  # astype needed, otherwise silently assuming np.uint16 (VERY BAD NUMPY!)
+                hits = hits[np.in1d(hits_1d, noisy_pix_1d, invert=True)]
 
-            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            hit_table_out.append(hits)
+                hit_table_out.append(hits)
 
 
 def cluster_hits_wrapper(args):
