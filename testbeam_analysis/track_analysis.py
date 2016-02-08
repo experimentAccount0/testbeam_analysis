@@ -4,6 +4,7 @@ import logging
 import progressbar
 import tables as tb
 import numpy as np
+import itertools
 
 from math import sqrt
 from numba import njit
@@ -13,7 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from testbeam_analysis import plot_utils
 
 
-def find_tracks(tracklets_file, alignment_file, track_candidates_file):
+def find_tracks(tracklets_file, alignment_file, track_candidates_file, limit_events=None):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is given to
     be able to cut on good tracks.
@@ -42,32 +43,47 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file):
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
     with tb.open_file(tracklets_file, mode='r') as in_file_h5:
-        tracklets = in_file_h5.root.Tracklets
-        n_duts = sum(['column' in col for col in tracklets.dtype.names])
-
-        # Prepare data for track finding, create arrays for column, row and charge data
-        tracklets = tracklets[:].view(np.recarray)
-        tr_column = tracklets['column_dut_0']
-        tr_row = tracklets['row_dut_0']
-        tr_charge = tracklets['charge_dut_0']
-        for dut_index in range(n_duts - 1):
-            tr_column = np.vstack((tr_column, tracklets['column_dut_%d' % (dut_index + 1)]))
-            tr_row = np.vstack((tr_row, tracklets['row_dut_%d' % (dut_index + 1)]))
-            tr_charge = np.vstack((tr_charge, tracklets['charge_dut_%d' % (dut_index + 1)]))
-        tr_column = np.transpose(tr_column)
-        tr_row = np.transpose(tr_row)
-        tr_charge = np.transpose(tr_charge)
-
-        # Perform the track finding with jitted loop
-        tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
-
-        # Merge result data from arrays into one recarray
-        combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
-        combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
-
         with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
-            track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=tracklets.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            track_candidates.append(combined)
+            track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.Tracklets.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            n_duts = sum(['column' in col for col in in_file_h5.root.Tracklets.dtype.names])
+            print "n_duts", n_duts
+
+            print "read max event number"
+            max_event_number = in_file_h5.root.Tracklets.cols.event_number[-1]
+            print max_event_number
+            tracklets_file_index = 0
+            tracklets_data_chunk = None
+            for event_number in itertools.count(0, 100000):
+                if event_number > max_event_number:
+                    break
+                # TODO: fix
+                if limit_events and total_events >= limit_events:
+                    break
+                last_event_number = event_number + 100000 - 1
+                print event_number, last_event_number
+                print tracklets_file_index
+
+                # Prepare data for track finding, create arrays for column, row and charge data
+                tracklets_data_chunk = in_file_h5.root.Tracklets.read_where('(event_number <= %s)' % last_event_number, start=tracklets_file_index, stop=in_file_h5.root.Tracklets.nrows).view(np.recarray)
+                tr_column = tracklets_data_chunk['column_dut_0']
+                tr_row = tracklets_data_chunk['row_dut_0']
+                tr_charge = tracklets_data_chunk['charge_dut_0']
+                for dut_index in range(n_duts - 1):
+                    tr_column = np.vstack((tr_column, tracklets_data_chunk['column_dut_%d' % (dut_index + 1)]))
+                    tr_row = np.vstack((tr_row, tracklets_data_chunk['row_dut_%d' % (dut_index + 1)]))
+                    tr_charge = np.vstack((tr_charge, tracklets_data_chunk['charge_dut_%d' % (dut_index + 1)]))
+                tr_column = np.transpose(tr_column)
+                tr_row = np.transpose(tr_row)
+                tr_charge = np.transpose(tr_charge)
+
+                # Perform the track finding with jitted loop
+                tracklets_data_chunk, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
+
+                # Merge result data from arrays into one recarray
+                combined = np.column_stack((tracklets_data_chunk.event_number, tr_column, tr_row, tr_charge, tracklets_data_chunk.track_quality, tracklets_data_chunk.n_tracks))
+                combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
+
+                track_candidates.append(combined)
 
 
 def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixel_size):
