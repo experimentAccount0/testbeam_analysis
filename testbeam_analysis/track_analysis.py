@@ -49,7 +49,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, limit_eve
 
             for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Tracklets, chunk_size=chunk_size):
                 tracklets_data_chunk = tracklets_data_chunk.view(np.recarray)
-                
+
                 # Prepare data for track finding, create arrays for column, row and charge data
                 tr_column = tracklets_data_chunk['column_dut_0']
                 tr_row = tracklets_data_chunk['row_dut_0']
