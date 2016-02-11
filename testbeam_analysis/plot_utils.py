@@ -106,7 +106,7 @@ def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, f
         plt.show()
 
 
-def plot_correlations(alignment_file, output_pdf):
+def plot_correlations(alignment_file, output_pdf, pixel_size=None):
     '''Takes the correlation histograms and plots them
 
     Parameters
@@ -120,23 +120,35 @@ def plot_correlations(alignment_file, output_pdf):
         with tb.open_file(alignment_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
                 try:
-                    first, second = int(re.search(r'\d+', node.name).group()), node.name[-1:]
+                    indices = re.findall(r'\d+', node.name)
+                    dut_idx = int(indices[0])
+                    ref_idx = int(indices[1])
+                    if "Column" in node.name:
+                        column = True
+                    else:
+                        column = False
                 except AttributeError:
                     continue
                 data = node[:]
                 plt.clf()
-                cmap = cm.get_cmap('jet', 200)
+                cmap = cm.get_cmap('viridis')
                 cmap.set_bad('w')
                 norm = colors.LogNorm()
-                z_max = np.amax(data)
-                im = plt.imshow(data.T, cmap=cmap, norm=norm, aspect='equal', interpolation='nearest')
-                divider = make_axes_locatable(plt.gca())
+                if pixel_size:
+                    aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
+                else:
+                    aspect = "auto"
+                im = plt.imshow(data.T, cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
                 plt.gca().invert_yaxis()
                 plt.title(node.title)
-                plt.xlabel('DUT %s' % first)
-                plt.ylabel('DUT %s' % second)
-                cax = divider.append_axes("right", size="5%", pad=0.1)
-                plt.colorbar(im, cax=cax, ticks=np.linspace(start=0, stop=z_max, num=9, endpoint=True))
+                plt.xlabel('DUT %s' % dut_idx)
+                plt.ylabel('DUT %s' % ref_idx)
+                # do not append to axis to preserve aspect ratio
+                plt.colorbar(im, fraction=0.04, pad=0.05)
+#                 divider = make_axes_locatable(plt.gca())
+#                 cax = divider.append_axes("right", size="5%", pad=0.1)
+#                 z_max = np.amax(data)
+#                 plt.colorbar(im, cax=cax, ticks=np.linspace(start=0, stop=z_max, num=9, endpoint=True))
                 output_fig.savefig()
 
 
