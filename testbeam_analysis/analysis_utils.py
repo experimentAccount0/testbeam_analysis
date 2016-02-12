@@ -4,10 +4,6 @@ import logging
 import numpy as np
 import numexpr as ne
 import tables as tb
-from math import ceil
-
-from matplotlib import colors, cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from testbeam_analysis import analysis_functions
 from testbeam_analysis.cpp import data_struct
@@ -142,29 +138,6 @@ def hist_3d_index(x, y, z, shape):
     result = np.zeros(shape=shape, dtype=np.uint16).ravel()  # ravel hist in c-style, 3D --> 1D
     analysis_functions.hist_3d(x, y, z, shape[0], shape[1], shape[2], result)
     return np.reshape(result, shape)  # rebuilt 3D hist from 1D hist
-
-
-def create_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
-    extent = [0.5, plot_range[0] + .5, plot_range[1] + .5, 0.5]
-    if z_max is None:
-        if hist2d.all() is np.ma.masked:  # check if masked array is fully masked
-            z_max = 1
-        else:
-            z_max = ceil(hist2d.max())
-    bounds = np.linspace(start=z_min, stop=z_max, num=255, endpoint=True)
-    cmap = cm.get_cmap('jet')
-    cmap.set_bad('w')
-    norm = colors.BoundaryNorm(bounds, cmap.N)
-    im = ax.imshow(hist2d, interpolation='nearest', aspect="auto", cmap=cmap, norm=norm, extent=extent)
-    if title is not None:
-        ax.set_title(title)
-    if x_axis_title is not None:
-        ax.set_xlabel(x_axis_title)
-    if y_axis_title is not None:
-        ax.set_ylabel(y_axis_title)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
 
 
 def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sorted=True):

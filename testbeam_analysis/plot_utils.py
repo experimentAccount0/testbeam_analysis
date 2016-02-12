@@ -15,6 +15,29 @@ import numpy as np
 from testbeam_analysis import analysis_utils
 
 
+def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
+    extent = [0.5, plot_range[0] + .5, plot_range[1] + .5, 0.5]
+    if z_max is None:
+        if hist2d.all() is np.ma.masked:  # check if masked array is fully masked
+            z_max = 1
+        else:
+            z_max = ceil(hist2d.max())
+    bounds = np.linspace(start=z_min, stop=z_max, num=255, endpoint=True)
+    cmap = cm.get_cmap('viridis')
+    cmap.set_bad('w')
+    norm = colors.BoundaryNorm(bounds, cmap.N)
+    im = ax.imshow(hist2d, interpolation='none', aspect="auto", cmap=cmap, norm=norm, extent=extent)
+    if title is not None:
+        ax.set_title(title)
+    if x_axis_title is not None:
+        ax.set_xlabel(x_axis_title)
+    if y_axis_title is not None:
+        ax.set_ylabel(y_axis_title)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
+
+
 def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
     # Plot noisy pixel
     plot_range = (occupancy.shape[0], occupancy.shape[1])
@@ -22,9 +45,38 @@ def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
 #     print 'occupancy', np.median(occupancy) + np.std(occupancy), np.std(occupancy[occupancy < 10]), np.mean(occupancy), occupancy
-    analysis_utils.create_2d_pixel_hist(fig, ax, occupancy.T, plot_range, title='Pixel map (%d hot pixel)' % noisy_pixels[0].shape[0], z_min=0, z_max=np.std(occupancy[occupancy < 10]) * threshold)
+    plot_2d_pixel_hist(fig, ax, occupancy.T, plot_range, title='Pixel map (%d hot pixel)' % noisy_pixels[0].shape[0], z_min=0, z_max=np.std(occupancy[occupancy < 10]) * threshold)
     fig.tight_layout()
     fig.savefig(filename)
+
+
+def plot_noisy_pixels(occupancy, filename):
+    with PdfPages(filename) as output_pdf:
+        plt.figure()
+        ax1 = plt.subplot(121)
+        ax2 = plt.subplot(122)
+
+        cmap = cm.get_cmap('viridis')
+    #     cmap.set_bad('w')
+    #     norm = colors.LogNorm()
+        norm = None
+
+        hot_pixels = np.nonzero(np.ma.getmask(occupancy))
+#         for y, x in zip(hot_pixels[0], hot_pixels[1]):
+        ax1.plot(hot_pixels[1], hot_pixels[0], 'ro', mfc='none', mec='r', ms=10)
+        ax1.set_title('Data with %d hot pixels' % np.ma.count_masked(occupancy))
+        ax1.imshow(np.ma.getdata(occupancy), cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))
+        ax1.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax1.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+
+        ax2.set_title('Data with %d hot pixels removed' % np.ma.count_masked(occupancy))
+        ax2.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))  # , extent=(0, n_pixels[1], 0, n_pixels[0]))
+    #     np.ma.filled(occupancy, fill_value=0)
+        ax2.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax2.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+
+#         plt.show()
+        output_pdf.savefig()
 
 
 def plot_cluster_size(cluster_files, output_pdf):
@@ -372,7 +424,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
                     fig = Figure()
                     fig.patch.set_facecolor('white')
                     ax = fig.add_subplot(111)
-                    analysis_utils.create_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
+                    plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
@@ -396,14 +448,14 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
-                analysis_utils.create_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_fig.savefig(fig)
 
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
-                analysis_utils.create_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_fig.savefig(fig)
 
@@ -464,7 +516,7 @@ def plot_charge_distribution(trackcandidates_file, output_pdf, dim_x, dim_y, pix
                     fig = Figure()
                     fig.patch.set_facecolor('white')
                     ax = fig.add_subplot(111)
-                    analysis_utils.create_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
+                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
@@ -488,49 +540,49 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
+    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    analysis_utils.create_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0., z_max=100.)
+    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0., z_max=100.)
     fig.tight_layout()
     output_fig.savefig(fig)
 
