@@ -1,16 +1,24 @@
 ''' All functions acting on the hits of one DUT are listed here'''
+from __future__ import division
 
 import logging
 import tables as tb
 import numpy as np
+import collections
+from scipy.ndimage import median_filter
+
 from pixel_clusterizer.clusterizer import HitClusterizer
 
 from testbeam_analysis import analysis_utils
-from testbeam_analysis import plot_utils
+from plot_utils import plot_noisy_pixels
 
 
-def remove_noisy_pixels(data_file, threshold=6.):
+def remove_noisy_pixels(data_file, n_pixels, threshold=(20, 5, 2), chunk_size=1000000):
     '''Removes noisy pixels from the data file containing the hit table.
+    The hit table is read in chunks and for each chunk the noisy pixels are determined and removed.
+
+    To call this function on 8 cores in parallel with chunk_size=1000000 the following RAM is needed:
+    11 byte * 8 * 1000000 = 88 Mb
 
     Parameters
     ----------
@@ -18,24 +26,62 @@ def remove_noisy_pixels(data_file, threshold=6.):
     threshold : number
         The threshold when the pixel is removed given in sigma distance from the median occupancy.
     '''
-    logging.info('=== Remove noisy pixels in %s ===', data_file)
+    logging.info('=== Removing noisy pixel in %s ===', data_file)
+    occupancy = None
+    with tb.open_file(data_file, 'r') as input_file_h5:
+        for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
+            col, row = hits['column'], hits['row']
+            chunk_occ = analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixels)
+            if occupancy is None:
+                occupancy = chunk_occ
+            else:
+                occupancy = occupancy + chunk_occ
+
+    if not isinstance(threshold, collections.Iterable):
+        threshold = [threshold]
+    blurred = median_filter(occupancy.astype(np.int32), size=2, mode='constant')
+    difference = occupancy - blurred
+
+    difference = np.ma.masked_array(difference)
+    for thr in threshold:
+        std = np.ma.std(difference)
+        threshold = thr * std
+        occupancy = np.ma.masked_where(difference > threshold, occupancy)
+        logging.info('Removed a total of %d hot pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), thr, data_file)
+        difference = np.ma.masked_array(difference, mask=np.ma.getmask(occupancy))
+
+    hot_pixels = np.nonzero(np.ma.getmask(occupancy))
+    noisy_pix_1d = (hot_pixels[0] + 1) * n_pixels[1] + (hot_pixels[1] + 1)  # map 2d array (col, row) to 1d array to increase selection speed
+
     with tb.open_file(data_file, 'r') as input_file_h5:
         with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'w') as out_file_h5:
-            hits = input_file_h5.root.Hits[:]
-            col, row = hits['column'], hits['row']
-            max_row = np.amax(row)
-            occupancy = analysis_utils.hist_2d_index(col - 1, row - 1, shape=(np.amax(col), max_row))
-            noisy_pixels = np.where(occupancy > np.median(occupancy) + np.std(occupancy) * threshold)
-            plot_utils.plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename=data_file[:-3] + '_hot_pixel.pdf')
-            logging.info('Remove %d hot pixels in %s', noisy_pixels[0].shape[0], data_file)
+            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
+                # Select not noisy pixels
+                hits_1d = hits['column'].astype(np.uint32) * n_pixels[1] + hits['row']  # change dtype to fit new number
+                hits = hits[np.in1d(hits_1d, noisy_pix_1d, invert=True)]
 
-            # Select not noisy pixels
-            noisy_pix_1d = (noisy_pixels[0] + 1) * max_row + (noisy_pixels[1] + 1)  # map 2d array (col, row) to 1d array to increase selection speed
-            hits_1d = hits['column'].astype(np.uint32) * max_row + hits['row']  # astype needed, otherwise silently assuming np.uint16 (VERY BAD NUMPY!)
-            hits = hits[np.in1d(hits_1d, noisy_pix_1d, invert=True)]
+                hit_table_out.append(hits)
 
-            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            hit_table_out.append(hits)
+            logging.info('Reducing data by a factor of %.2f in %s', hit_table_out.nrows / input_file_h5.root.Hits.nrows, out_file_h5.filename)
+
+    plot_noisy_pixels(occupancy, data_file[:-3] + '_hot_pixel.pdf')
+
+# testing output file
+#     occupancy = None
+#     with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'r') as input_file_h5:
+#         for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
+#             col, row = hits['column'], hits['row']
+#             chunk_occ = analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixels)
+#             if occupancy is None:
+#                 occupancy = chunk_occ
+#             else:
+#                 occupancy = occupancy + chunk_occ
+#
+#     occupancy = np.ma.masked_where(occupancy == 0, occupancy)
+#     plt.figure()
+#     plt.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))
+#     plt.show()
 
 
 def cluster_hits_wrapper(args):
@@ -63,17 +109,17 @@ def cluster_hits(data_file, max_x_distance=3, max_y_distance=3, max_time_distanc
             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
             clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
             clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
-            clusterizer.set_frame_cluster_distance(max_time_distance)   # cluster distance in time frames
+            clusterizer.set_frame_cluster_distance(max_time_distance)  # cluster distance in time frames
 
             # Output data
             cluster_table_description = np.dtype([('event_number', '<i8'),
-                                                                ('ID', '<u2'),
-                                                                ('n_hits', '<u2'),
-                                                                ('charge', 'f4'),
-                                                                ('seed_column', '<u2'),
-                                                                ('seed_row', '<u2'),
-                                                                ('mean_column', 'f4'),
-                                                                ('mean_row', 'f4')])
+                                                    ('ID', '<u2'),
+                                                    ('n_hits', '<u2'),
+                                                    ('charge', 'f4'),
+                                                    ('seed_column', '<u2'),
+                                                    ('seed_row', '<u2'),
+                                                    ('mean_column', 'f4'),
+                                                    ('mean_row', 'f4')])
             cluster_table_out = output_file_h5.createTable(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
