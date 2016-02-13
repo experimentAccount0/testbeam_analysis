@@ -31,6 +31,7 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(cls.output_folder + 'Alignment.h5')
         os.remove(cls.output_folder + 'Alignment.pdf')
         os.remove(cls.output_folder + 'Tracklets.h5')
+        os.remove(cls.output_folder + 'Tracklets_2.h5')
 
     def test_hit_correlation(self):  # check the hit correlation function
         dut_alignment.correlate_hits(self.data_files,
@@ -59,8 +60,17 @@ class TestHitAnalysis(unittest.TestCase):
                                          pixel_size=self.pixel_size)
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets.h5')
         self.assertTrue(data_equal, msg=error_msg)
+        # Retest with tiny chunk size to force chunked merging
+        dut_alignment.merge_cluster_data(cluster_files,
+                                         alignment_file=tests_data_folder + 'Alignment_result.h5',
+                                         tracklets_file=self.output_folder + 'Tracklets_2.h5',
+                                         pixel_size=self.pixel_size,
+                                         chunk_size=293)
+
+        data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets_2.h5')
+        self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
-    tests_data_folder = r'test_dut_alignment/'
+    tests_data_folder = r'C:\\Users\DavidLP\\git\\testbeam_analysis\\tests\\test_dut_alignment\\'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)
