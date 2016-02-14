@@ -33,6 +33,12 @@ class TestTrackAnalysis(unittest.TestCase):
                                    track_candidates_file=self.output_folder + 'TrackCandidates.h5')
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'TrackCandidates_result.h5', self.output_folder + 'TrackCandidates.h5')
         self.assertTrue(data_equal, msg=error_msg)
+        track_analysis.find_tracks(tracklets_file=tests_data_folder + 'Tracklets_small.h5',
+                                   alignment_file=tests_data_folder + r'Alignment_result.h5',
+                                   track_candidates_file=self.output_folder + 'TrackCandidates_2.h5',
+                                   chunk_size=293)
+        data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'TrackCandidates_result.h5', self.output_folder + 'TrackCandidates_2.h5')
+        self.assertTrue(data_equal, msg=error_msg)
 
     def test_track_fitting(self):
         # Fit the track candidates and create new track table
