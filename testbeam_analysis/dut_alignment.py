@@ -6,7 +6,7 @@ import progressbar
 import tables as tb
 import numpy as np
 import pandas as pd
-import itertools
+
 
 from scipy.optimize import curve_fit, minimize_scalar
 from matplotlib.backends.backend_pdf import PdfPages
@@ -62,7 +62,7 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
                     col_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['column_ref'] - 1, shape=(n_col_dut, n_col_reference))
                     row_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['row_ref'] - 1, shape=(n_row_dut, n_row_reference))
 #                     TODO: implement rotated devices
-#                     # Correlation of x against y and y against x (should be constant exepct the sensor is rotated)
+# Correlation of x against y and y against x (should be constant exepct the sensor is rotated)
 #                     row_col_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['column_ref'] - 1, shape=(n_row_dut, n_col_reference))
 #                     col_row_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['row_ref'] - 1, shape=(n_col_dut, n_row_reference))
                     out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % index, title='Column Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -73,10 +73,9 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
                     out_row[:] = row_corr
 
 
-def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_offset_cut=[(10. / 10, 10. / 10)], fit_error_cut=[(100. / 1000, 100. / 1000)], show_plots=False):
-    '''Takes the correlation histograms, determines useful ranges with valid data, fits the correlations and stores the correlation parameters. With the
-    correlation parameters one can calculate the hit position of each DUT in the master reference coordinate system. The fits are
-    also plotted.
+def align_hits(correlation_file, alignment_file, output_pdf, pixel_size):
+    '''Takes the correlation histograms, fits the correlations and stores the correlation parameters. The user can define cuts on the fit error and straight line offset
+    in an interactive way.
 
     Parameters
     ----------
@@ -84,26 +83,16 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
         The input file with the correlation histograms
     alignment_file : pytables file
         The output file for correlation data.
-    combine_bins : int
-        Rebin the alignment histograms to get better statistics
-    fit_offset_cut : float / list, (column, row)
-        Omit channels where the distance to the fit is > fit_offset_cut
-        Happens e.g. if there is no clear correlation due to noise, insufficient statistics
-        If given a list of floats use one list item for each DUT
-    fit_error_cut : float / list, (column, row)
-        Omit channels where the fit has an error > fit_error_cut
-        Happens e.g. if there is no clear correlation due to noise, insufficient statistics
-        If given a list of floats use one list item for each DUT
-    output_pdf : pdf file name object
+    output_pdf : pdf file
+        File name for the alignment plots
+    pixel_size: iterable of column, row pairs if devices have different pixel sizes or one column, row iterable if the pixel size is the same
+        e.g. [(10, 20), (30, 40)] for two devices with pixel size 10x20 um and 30x40 um
     '''
     logging.info('=== Align hit coordinates ===')
 
     def gauss(x, *p):
         A, mu, sigma, offset = p
         return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2)) + offset
-
-    fit_offset_cut = [fit_offset_cut, ] if not isinstance(fit_offset_cut, list) else fit_offset_cut
-    fit_error_cut = [fit_error_cut, ] if not isinstance(fit_error_cut, list) else fit_error_cut
 
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(correlation_file, mode="r+") as in_file_h5:
@@ -134,6 +123,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                 mean_error_fitted = np.array([-1. for _ in range(data.shape[0])])
                 sigma_fitted = np.array([-1. for _ in range(data.shape[0])])
                 chi2 = np.array([-1. for _ in range(data.shape[0])])
+                n_hits = np.array([-1. for _ in range(data.shape[0])])
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
                 # Get values with highest correlation for alignment fit
@@ -147,6 +137,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                         mean_fitted[index] = coeff[1]
                         mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
                         sigma_fitted[index] = coeff[2]
+                        n_hits[index] = data[index, :].sum()
                         if index == data.shape[0] / 2:
                             plot_utils.plot_correlation_fit(x_hist_fit, data[index, :], coeff, var_matrix, 'DUT 0 at DUT %s = %d' % (result[node_index]['dut_x'], index), node.title, output_fig)
                     except RuntimeError:
@@ -160,35 +151,29 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                 mean_fitted *= pixel_length_ref
                 mean_error_fitted = pixel_length_ref * mean_error_fitted
 
-                # Fit selected data with a straight line 3 times to remove outliers
-                selected_data = np.arange(data.shape[0])
-                x_align_fit = np.arange(1.5, data.shape[0] + 1.5)
+                # Show the correlation fit/fit errors and offsets from straigt line
+                # Let the user change the cuts (error limit, offset limit) and refit until result looks good
+                refit = True
+                selected_data = np.ones_like(mean_fitted, dtype=np.bool)
+                x = np.arange(1.5, mean_fitted.shape[0] + 1.5) * pixel_length
+                while(refit):
+                    selected_data, fit, refit = plot_utils.plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, 'DUT%d' % result[node_index]['dut_x'], node.title)
+                    x = x[selected_data]
+                    mean_fitted = mean_fitted[selected_data]
+                    mean_error_fitted = mean_error_fitted[selected_data]
+                    sigma_fitted = sigma_fitted[selected_data]
+                    chi2 = chi2[selected_data]
+                    n_hits = n_hits[selected_data]
 
-                for i in range(3):
-                    f = lambda x, c0, c1: c0 + c1 * x
-                    if not np.any(selected_data):
-                        raise RuntimeError('The cuts are too tight, there is no point to fit. Release cuts and rerun alignment.')
-                    if len(fit_offset_cut) == 1 and len(fit_error_cut) == 1:  # Use same fit_offset_cut and fit_error_cut values for all fits
-                        offset_limit, error_limit = fit_offset_cut[0][0] if 'Col' in node.title else fit_offset_cut[0][1], fit_error_cut[0][0] if 'Col' in node.title else fit_error_cut[0][1]
-                    else:  # Use different fit_offset_cut and fit_error_cut values for every fit
-                        offset_limit, error_limit = fit_offset_cut[node_index][0] if 'Col' in node.title else fit_offset_cut[node_index - n_duts + 1][1], fit_error_cut[node_index][0] if 'Col' in node.title else fit_error_cut[node_index - n_duts + 1][1]
-
-                    fit, pcov = curve_fit(f, pixel_length * x_align_fit[selected_data], mean_fitted[selected_data])
-                    fit_fn = np.poly1d(fit[::-1])
-                    offset = fit_fn(pixel_length * x_align_fit) - mean_fitted
-                    selected_data = np.where(np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) < offset_limit, mean_error_fitted < error_limit)))[0]
-                    if show_plots and np.any(selected_data):
-                        plot_utils.plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, node.title, offset_limit, error_limit)
-
-                # Refit with higher polynomial
+                # Refit with higher polynomial, describes sometimes the correlation better (TODO: Why?)
                 # Use results from straight line fit as start values for last fit
                 g = lambda x, c0, c1, c2: c0 + c1 * x + c2 * x ** 2
-                fit, pcov = curve_fit(g, pixel_length * x_align_fit[selected_data], mean_fitted[selected_data], sigma=mean_error_fitted[selected_data], absolute_sigma=True, p0=[fit[0], fit[1], 0.])
+                fit, pcov = curve_fit(g, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1], 0.])
                 fit_fn = np.poly1d(fit[::-1])
 
                 # Calculate mean sigma (is somewhat a residual) and its error and store the actual data in result array
-                mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted)[selected_data])
-                mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)[selected_data]) / np.sqrt(np.array(sigma_fitted)[selected_data].shape[0])
+                mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted))
+                mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)) / np.sqrt(np.array(sigma_fitted).shape[0])
 
                 # Write fit results to array
                 result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
@@ -198,7 +183,7 @@ def align_hits(correlation_file, pixel_size, alignment_file, output_pdf, fit_off
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Plot selected data with fit
-                plot_utils.plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, node.title, show_plots, output_fig)
+                plot_utils.plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, node.title, output_fig)
 
             with tb.open_file(alignment_file, mode="w") as out_file_h5:
                 try:

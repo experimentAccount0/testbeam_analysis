@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+from scipy.optimize import curve_fit
+from matplotlib.widgets import Slider, Button, RadioButtons
+
+
 import tables as tb
 from math import sqrt, ceil
 import logging
@@ -38,19 +42,19 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
 
 
-def plot_noisy_pixel(occupancy, noisy_pixels, threshold, filename):
+def plot_noisy_pixel(occupancy, noisy_pixel, threshold, filename):
     # Plot noisy pixel
     plot_range = (occupancy.shape[0], occupancy.shape[1])
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
 #     print 'occupancy', np.median(occupancy) + np.std(occupancy), np.std(occupancy[occupancy < 10]), np.mean(occupancy), occupancy
-    plot_2d_pixel_hist(fig, ax, occupancy.T, plot_range, title='Pixel map (%d hot pixel)' % noisy_pixels[0].shape[0], z_min=0, z_max=np.std(occupancy[occupancy < 10]) * threshold)
+    plot_2d_pixel_hist(fig, ax, occupancy.T, plot_range, title='Pixel map (%d hot pixel)' % noisy_pixel[0].shape[0], z_min=0, z_max=np.std(occupancy[occupancy < 10]) * threshold)
     fig.tight_layout()
     fig.savefig(filename)
 
 
-def plot_noisy_pixels(occupancy, filename):
+def plot_noisy_pixel(occupancy, filename):
     with PdfPages(filename) as output_pdf:
         plt.figure()
         ax1 = plt.subplot(121)
@@ -61,16 +65,16 @@ def plot_noisy_pixels(occupancy, filename):
     #     norm = colors.LogNorm()
         norm = None
 
-        hot_pixels = np.nonzero(np.ma.getmask(occupancy))
-#         for y, x in zip(hot_pixels[0], hot_pixels[1]):
-        ax1.plot(hot_pixels[1], hot_pixels[0], 'ro', mfc='none', mec='r', ms=10)
-        ax1.set_title('Data with %d hot pixels' % np.ma.count_masked(occupancy))
+        hot_pixel = np.nonzero(np.ma.getmask(occupancy))
+#         for y, x in zip(hot_pixel[0], hot_pixel[1]):
+        ax1.plot(hot_pixel[1], hot_pixel[0], 'ro', mfc='none', mec='r', ms=10)
+        ax1.set_title('Data with %d hot pixel' % np.ma.count_masked(occupancy))
         ax1.imshow(np.ma.getdata(occupancy), cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))
         ax1.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax1.set_ylim(-0.5, occupancy.shape[0] - 0.5)
 
-        ax2.set_title('Data with %d hot pixels removed' % np.ma.count_masked(occupancy))
-        ax2.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))  # , extent=(0, n_pixels[1], 0, n_pixels[0]))
+        ax2.set_title('Data with %d hot pixel removed' % np.ma.count_masked(occupancy))
+        ax2.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))  # , extent=(0, n_pixel[1], 0, n_pixel[0]))
     #     np.ma.filled(occupancy, fill_value=0)
         ax2.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax2.set_ylim(-0.5, occupancy.shape[0] - 0.5)
@@ -117,45 +121,114 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     output_fig.savefig()
 
 
-def plot_alignments(data, selected_data, pixel_length, mean_fitted, fit_fn, mean_error_fitted, offset, result, node_index, i, title, offset_limit, error_limit):
-    x = np.arange(1.5, data.shape[0] + 1.5)
+def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
+    global selected_data
+    global fixed_selected_data
+    global fit
+    global do_refit
+    global error_limit
+    global offset_limit
+
+    do_refit = True
+
+    # Fit selected data with a straight line 3 times to remove outliers
+    def update_offset(offset_limit_new):
+        global selected_data
+        global error_limit
+        global offset_limit
+        offset_limit = offset_limit_new
+        offset_limit_plot.set_ydata([offset_limit * 10., offset_limit * 10.])
+        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        update_plot(selected_data)
+
+    def update_error(error_limit_new):
+        global selected_data
+        global error_limit
+        global offset_limit
+        error_limit = error_limit_new
+        error_limit_plot.set_ydata([error_limit * 1000., error_limit * 1000.])
+        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        update_plot(selected_data)
+
+    def update_plot(selected_data):
+        if np.count_nonzero(selected_data) > 1:
+            mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
+        else:
+            logging.info('Cuts are too tight. Not enough point to fit')
+
+    f = lambda x, c0, c1: c0 + c1 * x
+
+    selected_data = (mean_error_fitted > 1e-3)
+    fixed_selected_data = np.ones_like(mean_fitted, dtype=np.bool)
     plt.clf()
-    plt.title(title + ', Fit %d' % i)
-    plt.plot(pixel_length * x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')
-    plt.plot(pixel_length * x[selected_data], fit_fn(pixel_length * x)[selected_data], '-', label='Prefit')
-    plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'ro-', label='Error x 1000')
-    plt.plot(pixel_length * x[selected_data], offset[selected_data] * 10., 'go-', label='Offset x 10')
+    fig = plt.gcf()
+    ax = fig.add_subplot(1, 1, 1)
+    fit, _ = curve_fit(f, x, mean_fitted)
+    fit_fn = np.poly1d(fit[::-1])
+    offset = np.abs(fit_fn(x) - mean_fitted)
+    offset_limit = np.amax(offset)
+    error_limit = np.amax(mean_error_fitted)
 
-    plt.ylim((np.min(offset[selected_data]), np.amax(mean_fitted[selected_data])))
-    plt.xlim((np.min(x[selected_data]), pixel_length * data.shape[0]))
-    plt.xlabel('DUT%d' % result[node_index]['dut_x'])
-    plt.ylabel('DUT0')
-    plt.legend(loc=0)
-    plt.grid()
+    mean_plot, = ax.plot(x, mean_fitted, 'o-', label='Data prefit')
+    ax.plot(x, fit_fn(x), '-', label='Prefit')
+    ax.plot(x, mean_error_fitted * 1000., 'ro-', label='Error x 1000')
+    ax.plot(x, offset * 10., 'go-', label='Offset x 10')
+    offset_limit_plot, = ax.plot([np.min(x), np.max(x)], [offset_limit * 10., offset_limit * 10.], 'g--')
+    error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit * 1000., error_limit * 1000.], 'r--')
+    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * np.amax(mean_fitted), align='center', alpha=0.1, label='Number of hits [a.u.]')
 
-    plt.plot([np.min(x[selected_data]), pixel_length * data.shape[0]], [offset_limit * 10., offset_limit * 10.], 'g--')
-    plt.plot([np.min(x[selected_data]), pixel_length * data.shape[0]], [error_limit * 1000., error_limit * 1000.], 'r--')
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel('DUT0')
+    ax.legend(loc=0)
+    ax.grid()
+
+    def finish(event):
+        global do_refit
+        do_refit = False
+        plt.close()
+
+    def refit(event):
+        plt.close()
+
+    # Setup interactivd sliders/buttons
+    ax_offset = plt.axes([0.125, 0.04, 0.5, 0.02], axisbg='white')
+    ax_error = plt.axes([0.125, 0.01, 0.5, 0.02], axisbg='white')
+    ax_button_refit = plt.axes([0.67, 0.01, 0.1, 0.05], axisbg='black')
+    ax_button_ok = plt.axes([0.80, 0.01, 0.1, 0.05], axisbg='black')
+
+    offset_slider = Slider(ax_offset, 'Offset Cut', 0.0, offset_limit, valinit=offset_limit)
+    error_slider = Slider(ax_error, 'Error cut', 0.0, error_limit, valinit=error_limit)
+    refit_button = Button(ax_button_refit, 'Refit')
+    ok_button = Button(ax_button_ok, 'OK')
+
+    offset_slider.on_changed(update_offset)
+    error_slider.on_changed(update_error)
+    refit_button.on_clicked(refit)
+
+    ok_button.on_clicked(finish)
+
+    plt.get_current_fig_manager().window.showMaximized()
     plt.show()
 
+    return selected_data, fit, do_refit
 
-def plot_alignment_fit(data, selected_data, pixel_length, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, i, title, show_plots, output_fig):
-    x = np.arange(1.5, data.shape[0] + 1.5)
+
+def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, title, output_fig):
     plt.clf()
-    plt.errorbar(pixel_length * x[selected_data], mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
-    plt.plot(pixel_length * x[selected_data], mean_error_fitted[selected_data] * 1000., 'o-', label='Error x 1000')
-    plt.errorbar(pixel_length * x[selected_data], (fit_fn(pixel_length * x[selected_data]) - mean_fitted[selected_data]) * 10., mean_error_fitted[selected_data] * 10., fmt='o-', label='Offset x 10')
+    plt.errorbar(x, mean_fitted[selected_data], yerr=mean_error_fitted[selected_data], fmt='.')
+    plt.plot(x, mean_error_fitted[selected_data] * 1000., 'ro-', label='Error x 1000')
+    plt.errorbar(x, (fit_fn(x) - mean_fitted[selected_data]) * 10., mean_error_fitted[selected_data] * 10., fmt='go-', label='Offset x 10')
     fit_legend_entry = 'fit: c0+c1x+c2x^2\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$\nc2=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5)
-    plt.plot(pixel_length * x, fit_fn(pixel_length * x), '-', label=fit_legend_entry)
-    plt.plot(pixel_length * x[selected_data], chi2[selected_data] / 1.e7)
+    plt.plot(x, fit_fn(x), '-', label=fit_legend_entry)
+    plt.plot(x, chi2 / 1.e7)
     plt.legend(loc=0)
     plt.title(title)
     plt.xlabel('DUT %s [um]' % result[node_index]['dut_x'])
     plt.ylabel('DUT %s [um]' % result[node_index]['dut_y'])
-    plt.xlim((0, pixel_length * data.shape[0]))
+    #plt.xlim((0, x.shape[0]))
     plt.grid()
     output_fig.savefig()
-    if show_plots:
-        plt.show()
 
 
 def plot_correlations(alignment_file, output_pdf, pixel_size=None):
@@ -377,7 +450,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
     z_positions : iterable
         Iterable with z-positions of all DUTs
     dim_x, dim_y : integer
-        front end dimensions of device (number of pixels)
+        front end dimensions of device (number of pixel)
     pixel_size : iterable
         pixel size (x, y) for every plane
     mask_zero : bool
@@ -468,7 +541,7 @@ def plot_charge_distribution(trackcandidates_file, output_pdf, dim_x, dim_y, pix
         file name with the tracks table
     output_pdf : pdf file name object
     dim_x, dim_y : integer
-        front end dimensions of device (number of pixels)
+        front end dimensions of device (number of pixel)
     pixel_size : iterable
         pixel size (x, y) for every plane
     mask_zero : bool
