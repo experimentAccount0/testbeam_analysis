@@ -175,7 +175,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
     ax.plot(x, offset * 10., 'go-', label='Offset x 10')
     offset_limit_plot, = ax.plot([np.min(x), np.max(x)], [offset_limit * 10., offset_limit * 10.], 'g--')
     error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit * 1000., error_limit * 1000.], 'r--')
-    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * np.amax(mean_fitted), align='center', alpha=0.1, label='Number of hits [a.u.]')
+    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * np.amax(mean_fitted), align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.diff(x)[0])
 
     ax.set_title(title)
     ax.set_xlabel(xlabel)
@@ -655,7 +655,7 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0., z_max=100.)
+    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=np.amin(efficiency), z_max=100.)
     fig.tight_layout()
     output_fig.savefig(fig)
 
