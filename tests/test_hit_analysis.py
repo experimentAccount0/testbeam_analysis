@@ -33,7 +33,7 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.pdf')
 
     def test_noisy_pixel_remover(self):
-        hit_analysis.remove_noisy_pixels(self.noisy_data_file)
+        hit_analysis.remove_noisy_pixel(self.noisy_data_file, n_pixel=(1152, 576))
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'HotPixel_result.h5', self.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
         self.assertTrue(data_equal, msg=error_msg)
 
