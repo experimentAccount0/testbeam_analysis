@@ -35,12 +35,12 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                   (18.4, 18.4),  # Column, row pixel pitch in um of DUT 3
                   (18.4, 18.4),  # Column, row pixel pitch in um of DUT 4
                   (18.4, 18.4)]  # Column, row pixel pitch in um of DUT 5
-    n_pixels = [(1152, 576),  # Number of pixels on column, row for DUT 0
-                (1152, 576),  # Number of pixels on column, row for DUT 1
-                (1152, 576),  # Number of pixels on column, row for DUT 2
-                (1152, 576),  # Number of pixels on column, row for DUT 3
-                (1152, 576),  # Number of pixels on column, row for DUT 4
-                (1152, 576)]  # Number of pixels on column, row for DUT 5
+    n_pixel = [(1152, 576),  # Number of pixel on column, row for DUT 0
+               (1152, 576),  # Number of pixel on column, row for DUT 1
+               (1152, 576),  # Number of pixel on column, row for DUT 2
+               (1152, 576),  # Number of pixel on column, row for DUT 3
+               (1152, 576),  # Number of pixel on column, row for DUT 4
+               (1152, 576)]  # Number of pixel on column, row for DUT 5
 
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
 
@@ -48,8 +48,13 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-    # Remove hot pixels, only needed for devices wih noisy pixels like Mimosa 26
-    Pool().map(hit_analysis.remove_noisy_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
+    # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
+    args = [{'data_file': data_files[i],
+             'n_pixel': n_pixel[i]} for i in range(0, len(data_files))]
+    pool = Pool()
+    pool.map(hit_analysis.remove_noisy_pixel_wrapper, args)  # delete noisy hits in DUT data files in parallel on multiple cores
+    pool.close()
+    pool.join()
     data_files = [data_file[:-3] + '_hot_pixel.h5' for data_file in data_files]
     cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
 
@@ -59,7 +64,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
              'max_y_distance': 3,
              'max_time_distance': 2,
              'max_cluster_hits':1000000} for i in range(0, len(data_files))]
+    pool = Pool()
     Pool().map(hit_analysis.cluster_hits_wrapper, args)  # find cluster on all DUT data files in parallel on multiple cores
+    pool.close()
+    pool.join()
     plot_utils.plot_cluster_size(cluster_files,
                                  output_pdf=output_folder + r'/Cluster_Size.pdf')
 
@@ -74,18 +82,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     dut_alignment.align_hits(correlation_file=output_folder + r'/Correlation.h5',
                              alignment_file=output_folder + r'/Alignment.h5',
                              output_pdf=output_folder + r'/Alignment.pdf',
-                             fit_offset_cut=[(800. / 10., 200. / 10.),  # Offset cut for DUT0 in columns, row
-                                             (1000. / 10., 1000. / 10.),  # Offset cut for DUT1 in columns, row
-                                             (1200. / 10., 1200. / 10.),
-                                             (1400. / 10., 1400. / 10.),
-                                             (1800. / 10., 1800. / 10.)],  # Offset cut for all DUT rows
-                             fit_error_cut=[(4000. / 1000., 2200. / 1000.),  # Fit error cut for DUT1 in columns, row
-                                            (9000. / 1000., 9000. / 1000.),  # Fit error cut for DUT2 in columns, row
-                                            (20000. / 1000., 20000. / 1000.),
-                                            (25000. / 1000., 25000. / 1000.),
-                                            (35000. / 1000., 35000. / 1000.)],
-                             pixel_size=pixel_size,
-                             show_plots=False)
+                             pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(cluster_files,

@@ -26,7 +26,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Dimensions
     pixel_size = [(250, 50), (250, 50), (250, 50), (250, 50)]  # in um
-    n_pixels = [(80, 336), (80, 336), (80, 336), (80, 336)]
+    n_pixel = [(80, 336), (80, 336), (80, 336), (80, 336)]
     z_positions = [0., 19500, 108800, 128300]  # in um; optional, can be also deduced from data, but usually not with high precision (~ mm)
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
@@ -40,7 +40,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
              'max_y_distance': 1,
              'max_time_distance': 2,
              'max_cluster_hits':1000} for i in range(0, len(data_files))]
-    Pool().map(hit_analysis.cluster_hits_wrapper, args)  # find cluster on all DUT data files in parallel on multiple cores
+    pool = Pool()
+    pool.map(hit_analysis.cluster_hits_wrapper, args)  # find cluster on all DUT data files in parallel on multiple cores
+    pool.close()
+    pool.join()
     plot_utils.plot_cluster_size(cluster_files,
                                  output_pdf=output_folder + r'/Cluster_Size.pdf')
 
@@ -55,8 +58,6 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     dut_alignment.align_hits(correlation_file=output_folder + r'/Correlation.h5',
                              alignment_file=output_folder + r'/Alignment.h5',
                              output_pdf=output_folder + r'/Alignment.pdf',
-                             fit_offset_cut=(200. / 10., 200. / 10.),
-                             fit_error_cut=(4000. / 1000., 1500. / 1000.),
                              pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
