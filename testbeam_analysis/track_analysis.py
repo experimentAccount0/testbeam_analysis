@@ -14,12 +14,11 @@ from testbeam_analysis import plot_utils
 from testbeam_analysis import analysis_utils
 
 
-def find_tracks(tracklets_file, alignment_file, track_candidates_file, limit_events=None, chunk_size=100000):
+def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_range=None, chunk_size=1000000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is given to
     be able to cut on good tracks.
-    This function is slow since the main loop happens in Python (< 1e5 tracks / second) but does the track finding
-    loop on all cores in parallel (_find_tracks_loop()).
+    This function is uses numba to increase the speed on the inner loop (_find_tracks_loop()).
 
     Parameters
     ----------
