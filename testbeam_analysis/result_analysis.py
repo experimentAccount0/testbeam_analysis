@@ -185,7 +185,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
 
                 plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, dimensions, cut_distance, output_fig)
 
-                logging.info('Efficiency =  %1.4f', np.ma.mean(efficiency))
+                logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
 
     return efficiencies
