@@ -22,9 +22,16 @@ def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold
 
     Parameters
     ----------
-    data_file : pytables file
-    threshold : number
-        The threshold when the pixel is removed given in sigma distance from the median occupancy.
+    input_raw_data_file : string
+        Input PyTables raw data file.
+    n_pixel : tuple
+        Total number of pixels per column and row.
+    pixel_size : tuple
+        Pixel dimension for column and row. If None, assuming square pixels.
+    threshold : float
+        The threshold for pixel masking. The threshold is given in units of sigma of the pixel noise (background subtracted).
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
     logging.info('=== Removing noisy pixel in %s ===', input_raw_data_file)
     occupancy = None
@@ -46,7 +53,6 @@ def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold
     abs_occ_threshold = threshold * std
     occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
     logging.info('Removed a total of %d hot pixel at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_raw_data_file)
-    difference = np.ma.masked_array(difference, mask=np.ma.getmask(occupancy))
 
     # generate tuple col / row array of hot pixels
     noisy_pixels = np.nonzero(np.ma.getmask(occupancy))
