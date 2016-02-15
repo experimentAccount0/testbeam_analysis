@@ -1,13 +1,9 @@
-''' Script to check the correlation fixing based on 
-'''
-
 import unittest
-import tables as tb
+
 import numpy as np
 
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import analysis_functions
-from testbeam_analysis.tools import test_tools
 
 
 def get_random_data(n_hits, hits_per_event=2, seed=0):

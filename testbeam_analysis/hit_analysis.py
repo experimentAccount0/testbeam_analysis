@@ -2,13 +2,13 @@
 from __future__ import division
 
 import logging
+import collections
+
 import tables as tb
 import numpy as np
-import collections
 from scipy.ndimage import median_filter
 
 from pixel_clusterizer.clusterizer import HitClusterizer
-
 from testbeam_analysis import analysis_utils
 from plot_utils import plot_noisy_pixel
 

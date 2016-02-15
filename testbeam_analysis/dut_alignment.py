@@ -1,4 +1,5 @@
 ''' All DUT alignment functions in space and time are listed here plus additional alignment check functions'''
+from __future__ import division
 
 import logging
 import re

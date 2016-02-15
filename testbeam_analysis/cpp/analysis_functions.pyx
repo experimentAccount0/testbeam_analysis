@@ -1,16 +1,15 @@
 # distutils: language = c++
 # cython: boundscheck=False
 # cython: wraparound=False
+from numpy cimport ndarray
+from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t, int64_t
+from data_struct cimport numpy_hit_info, numpy_cluster_info
 
 import numpy as np
 cimport numpy as cnp
-from numpy cimport ndarray
-
-from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t, int64_t
-
-from data_struct cimport numpy_hit_info, numpy_cluster_info
 
 cnp.import_array()  # if array is used it has to be imported, otherwise possible runtime error
+
 
 cdef extern from "AnalysisFunctions.h":
     cdef cppclass ClusterInfo:

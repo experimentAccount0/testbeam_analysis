@@ -1,7 +1,8 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
-import unittest
 import os
+
+import unittest
 
 from testbeam_analysis import hit_analysis
 from testbeam_analysis.tools import test_tools
@@ -20,29 +21,29 @@ class TestHitAnalysis(unittest.TestCase):
                 cls.vdisplay.start()
             except (ImportError, EnvironmentError):
                 pass
-        cls.noisy_data_file = tests_data_folder + 'TestBeamData_Mimosa26_DUT0_small.h5'
-        cls.data_files = [tests_data_folder + 'TestBeamData_FEI4_DUT0_small.h5',
-                          tests_data_folder + 'TestBeamData_FEI4_DUT1_small.h5',
-                          tests_data_folder + 'TestBeamData_FEI4_DUT2_small.h5',
-                          tests_data_folder + 'TestBeamData_FEI4_DUT3_small.h5'
+        cls.noisy_data_file = os.path.join(tests_data_folder + 'TestBeamData_Mimosa26_DUT0_small.h5')
+        cls.data_files = [os.path.join(tests_data_folder + 'TestBeamData_FEI4_DUT0_small.h5'),
+                          os.path.join(tests_data_folder + 'TestBeamData_FEI4_DUT1_small.h5'),
+                          os.path.join(tests_data_folder + 'TestBeamData_FEI4_DUT2_small.h5'),
+                          os.path.join(tests_data_folder + 'TestBeamData_FEI4_DUT3_small.h5')
                           ]
         cls.output_folder = tests_data_folder
         cls.pixel_size = ((250, 50), (250, 50), (250, 50), (250, 50))  # in um
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(cls.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5')
-        os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
-        os.remove(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.pdf')
+        os.remove(os.path.join(cls.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5'))
+        os.remove(os.path.join(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5'))
+        os.remove(os.path.join(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.pdf'))
 
     def test_noisy_pixel_remover(self):
         hit_analysis.remove_noisy_pixel(self.noisy_data_file, n_pixel=(1152, 576))
-        data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'HotPixel_result.h5', self.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5')
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'HotPixel_result.h5'), os.path.join(self.output_folder + 'TestBeamData_Mimosa26_DUT0_small_hot_pixel.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_hit_clustering(self):
         hit_analysis.cluster_hits(self.data_files[0], max_x_distance=1, max_y_distance=2)
-        data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Cluster_result.h5', self.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5', exact=False)
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Cluster_result.h5'), os.path.join(self.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':

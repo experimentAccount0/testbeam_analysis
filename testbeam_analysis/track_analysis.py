@@ -1,26 +1,28 @@
 ''' Track finding and fitting functions are listed here.'''
+from __future__ import division
 
 import logging
 import progressbar
+from multiprocessing import Pool, cpu_count
+from math import sqrt
+from cmath import log
+
+from pykalman.standard import KalmanFilter
 import tables as tb
 import numpy as np
-
-from math import sqrt
+from scipy.optimize import curve_fit
 from numba import njit
-from multiprocessing import Pool, cpu_count
 from matplotlib.backends.backend_pdf import PdfPages
-
-from cmath import log
 
 from testbeam_analysis import plot_utils
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import geometry_utils
-from pykalman.standard import KalmanFilter
-from scipy.optimize import curve_fit
+
 
 def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+
 
 def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_range=None, chunk_size=1000000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
@@ -615,15 +617,17 @@ def _fit_tracks_loop(track_hits):
 def _function_wrapper_find_tracks_loop(args):  # Needed for multiprocessing call with arguments
     return _find_tracks_loop(*args)
 
+
 def _function_wrapper_fit_tracks_kalman_loop(args):  # Needed for multiprocessing call with arguments
     return _fit_tracks_kalman_loop(*args)
+
 
 def _kalman_fit_3d(hits, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance, sigma):
 
     kf = KalmanFilter(
         transition_matrix, observation_matrix, transition_covariance, observation_covariance, transition_offset, observation_offset,
         initial_state_mean, initial_state_covariance
-            )
+    )
 
     nplanes = hits.shape[0]
     meas = np.c_[hits, np.zeros((nplanes))]
@@ -635,10 +639,12 @@ def _kalman_fit_3d(hits, transition_matrix, transition_covariance, transition_of
 
     return smoothed_state_estimates[:, 0], chi2
 
+
 def _fit_tracks_kalman_loop(track_hits, pitches, plane_pos):
     nplanes = track_hits.shape[1]
-    thickness_si = [50. for i in range(nplanes)]
-    thickness_al = [600. for j in range(nplanes)]
+    # TODO: from parameter
+    thickness_si = [50. for _ in range(nplanes)]
+    thickness_al = [600. for _ in range(nplanes)]
     thicknesses = thickness_si + thickness_al
     sigma = np.dot([pitches[i] for i in range(nplanes)], 1 / sqrt(12.))  # Resolution of each telescope plane
     # TOFIX

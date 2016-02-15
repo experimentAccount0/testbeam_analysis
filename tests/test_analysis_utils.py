@@ -1,7 +1,9 @@
 ''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
 '''
+import os
 
 import unittest
+
 import tables as tb
 import numpy as np
 
@@ -87,7 +89,7 @@ class TestAnalysisUtils(unittest.TestCase):
         self.assertTrue(exception_ok & np.all(array == array_fast))
 
     def test_3d_index_histograming(self):  # check compiled hist_3D_index function
-        with tb.open_file(tests_data_folder + 'hist_data.h5', mode="r") as in_file_h5:
+        with tb.open_file(os.path.join(tests_data_folder + 'hist_data.h5'), mode="r") as in_file_h5:
             xyz = in_file_h5.root.HistDataXYZ[:]
             x, y, z = xyz[0], xyz[1], xyz[2]
             shape = (100, 100, 100)
