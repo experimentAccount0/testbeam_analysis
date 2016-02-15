@@ -8,9 +8,14 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
 from testbeam_analysis import plot_utils
+from testbeam_analysis import analysis_utils
+from testbeam_analysis import geometry_utils
 
+def gauss(x, *p):
+    A, mu, sigma = p
+    return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
-def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
+def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method = "Interpolation", geometryFile = 'data/Geometry.h5'):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
@@ -40,6 +45,7 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
     residuals = []
 
     with tb.open_file(tracks_file, mode='r') as in_file_h5:
+        translations, rotations = geometry_utils.recontruct_geometry_from_file(geometryFile)
         for node in in_file_h5.root:
             actual_dut = int(node.name[-1:])
             if use_duts and actual_dut not in use_duts:
@@ -51,9 +57,18 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
             if max_chi2:
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
             track_array = track_array[np.logical_and(track_array['column_dut_%d' % actual_dut] != 0., track_array['row_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
-            hits, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-            intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
-            difference = intersection - hits
+            if method == "Interpolation2":
+                hits, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
+                intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+            elif method == "Kalman" or method == "Interpolation":
+                hits, intersection = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), np.column_stack((track_array['predicted_x%d' % actual_dut], track_array['predicted_y%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0])))
+            
+            tmpc = hits[:,0]*rotations[actual_dut,0,0] + hits[:,1]*rotations[actual_dut,0,1] + translations[actual_dut,0]
+            tmpr = hits[:,0]*rotations[actual_dut,1,0] + hits[:,1]*rotations[actual_dut,1,1] + translations[actual_dut,1]
+            hits[:,0] = tmpc
+            hits[:,1] = tmpr
+            
+            difference = hits - intersection
 
             for i in range(2):  # col / row
                 mean, rms = np.mean(difference[:, i]), np.std(difference[:, i])
@@ -68,11 +83,69 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
                 if output_pdf is not False:
                     plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
                 residuals.append(np.abs(coeff[2]))
+                
+                for j in range(2):
+                    n, xedges, yedges = np.histogram2d(hits[:,i], difference[:,j],bins=[100,100], range = [[np.amin(hits[:,i]),np.amax(hits[:,i])], [-100,100]])
+                    plot_utils.plot_residuals_correlations(i, j, actual_dut, xedges, yedges, hits[:,i], difference[:,j], output_fig)
+#                    s = analysis_utils.hist_2d_index(hits[:,i], difference[:,j], shape=(50,50))
+                    #if j != i:
+                    mean_fitted, selected_data, fit, pcov = calculate_correlation_fromplot(hits[:,i], difference[:,j], xedges, yedges, dofit=True)
+                    plot_utils.plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitted, selected_data, fit, pcov, output_fig)
 
     if output_fig:
         output_fig.close()
 
     return residuals
+
+def calculate_correlation_fromplot (data1, data2, edges1, edges2, dofit = True):
+    step = edges1[1]-edges1[0]
+    nbins = len(edges1)
+    resx = []
+    mean_fitted = np.zeros(nbins)
+    mean_error_fitted = np.zeros(nbins)
+
+    for j in range(len(edges1)):
+        r = []
+        resx.append(r)
+
+    for i, x in enumerate(data1):
+        n = np.int((x-edges1[0])/step)
+        resx[n].append(data2[i])
+    
+    for n in range(nbins):
+        if len(resx[n]) == 0:
+            mean_fitted[n] = -1
+            continue
+        p0 = [np.amax(resx[n]), 0, 10]
+        hist, edges = np.histogram(resx[n], range=(edges2[0], edges2[-1]), bins=len(edges2))
+        ed = (edges[:-1] + edges[1:]) / 2.
+        try:
+            coeff, var_matrix = curve_fit(gauss, ed, hist, p0=p0)
+            if var_matrix[1,1] > 0.1:
+                ''' > 0.01 for kalman'''
+                ''' TOFIX: cut must be parameter!'''
+                mean_fitted[n] = -1
+                continue
+            mean_fitted[n] = coeff[1]
+            mean_error_fitted[n] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
+            #sigma_fitted[index] = coeff[2]
+        except RuntimeError:
+            pass
+
+    mean_fitted[~np.isfinite(mean_fitted)] = -1
+    selected_data = np.where(np.logical_and(mean_fitted != -1, 1>0))[0]
+    
+    f = lambda x, c0, c1: c0 + c1 * x
+    if dofit:
+        fit, pcov = curve_fit(f, edges1[selected_data], mean_fitted[selected_data])
+    else:
+        fit, pcov = None, None
+    
+    print "Linear fit:"
+    print fit
+    print pcov
+    
+    return mean_fitted, selected_data, fit, pcov
 
 
 def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):

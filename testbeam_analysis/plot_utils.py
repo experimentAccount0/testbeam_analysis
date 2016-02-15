@@ -445,6 +445,50 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
     output_fig.savefig()
 
+def plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matrix, output_fig, fitDut, parName = 'Slope'):
+    for plot_log in [False, True]:
+        plt.clf()
+        plot_range = (-5 * get_rms_from_histogram(hist, edges), 5. * get_rms_from_histogram(hist, edges))
+        plt.xlim(plot_range)
+        plt.grid()
+        
+        fitdut = str(fitDut)
+            
+        if i == 0:
+            plt.title(parName + ' x, DUT ' + fitdut)
+        elif i == 1:
+            plt.title(parName + ' y, DUT ' + fitdut)
+        elif i == 2:
+            plt.title(parName + ' z, DUT ' + fitdut)
+        if parName == 'Slope':
+            plt.xlabel('Slope (rad)')
+        elif parName == 'Offset':
+            plt.xlabel('Offset (um)')
+        plt.ylabel('#')
+
+        if plot_log:
+            plt.ylim(1, int(ceil(np.amax(hist) / 10.0)) * 100)
+            
+        plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
+        if fit_ok:
+            plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
+            if parName == 'Slope':
+                plt.plot([np.median(slopes[:, i]), np.median(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.6f\pm %.6f$' % (np.median(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='green', linewidth=2)
+                plt.plot([np.mean(slopes[:, i]), np.mean(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.6f\pm %.6f$' % (np.mean(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='red', linewidth=2)
+            elif parName == 'Offset':
+                plt.plot([np.median(slopes[:, i]), np.median(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='green', linewidth=2)
+                plt.plot([np.mean(slopes[:, i]), np.mean(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='red', linewidth=2)
+            if parName == 'Slope':
+                gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.6f\pm %.6f$\nsigma=$%.6f\pm %.6f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+            elif parName == 'Offset':
+                gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            #plt.plot(np.arange((edges[0]), (edges[-1]), 0.1), gauss(np.arange((edges[0]), (edges[-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            plt.legend(loc=0)
+        if output_fig is not None:
+            output_fig.savefig()
+        else:
+            plt.show()
 
 def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig):
     def get_rms_from_histogram(counts, bin_positions):
@@ -478,6 +522,48 @@ def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference,
         else:
             plt.show()
 
+
+def plot_residuals_correlations(i, j, actual_dut, xedges, yedges, x, y, output_fig):
+    
+    plt.clf()
+    plot_range_x = (xedges[0], xedges[-1])
+    plt.xlim(plot_range_x)
+    plot_range_y = (yedges[0], yedges[-1])
+    plt.ylim(plot_range_y)
+    plt.grid()
+    plt.title('Residuals vs coordinate for DUT %d' % actual_dut)
+    plt.xlabel('Column [um]' if i == 0 else 'Row [um]')
+    plt.ylabel('Residual Column [um]' if j == 0 else 'Residual Row [um]')
+
+    plt.hist2d(x,y,[xedges,yedges])
+    plt.legend(loc=0)
+    if output_fig is not None:
+        output_fig.savefig()
+    else:
+        plt.show()
+        
+def plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitted, selected_data, fit, pcov, output_fig):
+    f = lambda x: fit[0] + fit[1] * x
+    #f = lambda x: 0*x
+    plt.clf()
+    plot_range_x = (xedges[0], xedges[-1])
+    plt.xlim(plot_range_x)
+    plot_range_y = (yedges[0], yedges[-1])
+    plt.ylim(plot_range_y)
+    plt.grid()
+    plt.title('Residuals vs coordinate for DUT %d' % actual_dut)
+    plt.xlabel('x [um]' if i == 0 else 'y [um]')
+    plt.ylabel('Residual x [um]' if j == 0 else 'Residual y [um]')
+
+    plt.plot(xedges[selected_data],mean_fitted[selected_data],'-o', Label = "data")
+    if fit is not None and pcov is not None:
+        fit_legend = 'Fit: \np0=$%.6f\pm%.6f$\np1=$%.6f\pm%.6f$\n' % (fit[0], np.absolute(pcov[0][0] ** 0.5), fit[1], np.absolute(pcov[1][1] ** 0.5))
+        plt.plot(xedges, f(xedges), '-', label=fit_legend, linewidth=2)
+    plt.legend(loc=0)
+    if output_fig is not None:
+        output_fig.savefig()
+    else:
+        plt.show()
 
 def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.

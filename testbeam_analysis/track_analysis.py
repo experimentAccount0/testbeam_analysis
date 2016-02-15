@@ -10,9 +10,17 @@ from numba import njit
 from multiprocessing import Pool, cpu_count
 from matplotlib.backends.backend_pdf import PdfPages
 
+from cmath import log
+
 from testbeam_analysis import plot_utils
 from testbeam_analysis import analysis_utils
+from testbeam_analysis import geometry_utils
+from pykalman.standard import KalmanFilter
+from scipy.optimize import curve_fit
 
+def gauss(x, *p):
+    A, mu, sigma = p
+    return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
 def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_range=None, chunk_size=1000000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
@@ -237,7 +245,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], geometryFile='data/Geometry.h5', chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -270,6 +278,11 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
         if None plots are printed to screen
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
+    method: string
+        Defines the method for hit prediction:
+            "Interpolation": chi2 minimization with straight line
+            "Kalman": Kalman filter
+    geometryFile: the file containing the geometry parameters (relative translation and angles)
     '''
 
     logging.info('=== Fit tracks ===')
@@ -287,6 +300,10 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
             description.append(('offset_%d' % dimension, np.float))
         for dimension in range(3):
             description.append(('slope_%d' % dimension, np.float))
+        for index in range(n_duts):
+            description.append(('predicted_x%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('predicted_y%d' % index, np.float))
         description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.uint8)])
 
         # Define structure of track_array
@@ -298,12 +315,54 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
             tracks_array['column_dut_%d' % index] = good_track_candidates['column_dut_%d' % index]
             tracks_array['row_dut_%d' % index] = good_track_candidates['row_dut_%d' % index]
             tracks_array['charge_dut_%d' % index] = good_track_candidates['charge_dut_%d' % index]
+            intersection = offsets + slopes / slopes[:, 2, np.newaxis] * (z_positions[index] - offsets[:, 2, np.newaxis])  # intersection track with DUT plane
+            tracks_array['predicted_x%d' % index] = intersection[:, 0]
+            tracks_array['predicted_y%d' % index] = intersection[:, 1]
         for dimension in range(3):
             tracks_array['offset_%d' % dimension] = offsets[:, dimension]
             tracks_array['slope_%d' % dimension] = slopes[:, dimension]
         tracks_array['track_chi2'] = chi2s
 
         return tracks_array
+
+    def create_results_array_kalman(good_track_candidates, track_estimates, chi2s, n_duts):
+        # Define description
+        description = [('event_number', np.int64)]
+        for index in range(n_duts):
+            description.append(('column_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('row_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('charge_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('predicted_x%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('predicted_y%d' % index, np.float))
+        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.uint8)])
+
+        # Define structure of track_array
+        tracks_array = np.zeros((n_tracks,), dtype=description)
+        tracks_array['event_number'] = good_track_candidates['event_number']
+        tracks_array['track_quality'] = good_track_candidates['track_quality']
+        tracks_array['n_tracks'] = good_track_candidates['n_tracks']
+        for index in range(n_duts):
+            tracks_array['column_dut_%d' % index] = good_track_candidates['column_dut_%d' % index]
+            tracks_array['row_dut_%d' % index] = good_track_candidates['row_dut_%d' % index]
+            tracks_array['charge_dut_%d' % index] = good_track_candidates['charge_dut_%d' % index]
+            tracks_array['predicted_x%d' % index] = track_estimates[:, index, 0]
+            tracks_array['predicted_y%d' % index] = track_estimates[:, index, 1]
+        tracks_array['track_chi2'] = chi2s
+
+        return tracks_array
+
+    if method != "Interpolation" and method != "Kalman":
+        print "Method '", method, "' not recognized! Abort!"
+        '''Wrong method definition can screw things up! '''
+        return
+    if method == "Kalman" and len(pixel_size) == 0:
+        print "Kalman filter requires to provide pixel size for error measurement matrix covariance! Abort!"
+        '''No pixel size no Kalman! '''
+        return
 
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
@@ -343,39 +402,89 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                             good_track_selection &= (track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
                             logging.info('Lost due to correlated cuts %d', good_track_selection.shape[0] - np.sum(track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24)))
 
-                        good_track_candidates = track_candidates_chunk[good_track_selection]
+                        good_track_candidates_chunk = track_candidates_chunk[good_track_selection]
 
                         # Prepare track hits array to be fitted
                         n_fit_duts = bin(dut_selection).count("1")
-                        index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
-                        track_hits = np.zeros((n_tracks, n_fit_duts, 3))
+                        index, n_tracks = 0, good_track_candidates_chunk['event_number'].shape[0]  # Index of tmp track hits array
+
+                        translations, rotations = geometry_utils.recontruct_geometry_from_file(geometryFile)
+
+                        if method == "Interpolation":
+                            track_hits = np.zeros((n_tracks, n_fit_duts, 3))
+                        elif method == "Kalman":
+                            track_hits = np.zeros((n_tracks, n_duts, 3))
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
-                            if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
-                                xyz = np.column_stack((good_track_candidates['column_dut_%s' % dut_index], good_track_candidates['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks)))
+                            if method == "Interpolation" and (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
+                                xr = good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 0, 0] + good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 0, 1] + translations[dut_index, 0]
+                                yr = good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 1, 1] + good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 1, 0] + translations[dut_index, 1]
+                                xyz = np.column_stack((xr, yr, np.repeat(z_positions[dut_index], n_tracks)))
+                                track_hits[:, index, :] = xyz
+                                index += 1
+                            elif method == "Kalman":
+                                if (1 << dut_index) & dut_selection == (1 << dut_index):  # TOCHECK! Not used = masked, OK, but also DUT must be masked...
+                                    # xyz = np.column_stack(np.ma.array((good_track_candidates_chunk['column_dut_%s' % dut_index], good_track_candidates_chunk['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks))))
+                                    xr = good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 0, 0] + good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 0, 1] + translations[dut_index, 0]
+                                    yr = good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 1, 1] + good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 1, 0] + translations[dut_index, 1]
+                                    xyz = np.column_stack(np.ma.array((xr, yr, np.repeat(z_positions[dut_index], n_tracks))))
+                                else:
+                                    xr = good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 0, 0] + good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 0, 1] + translations[dut_index, 0]
+                                    yr = good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 1, 1] + good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 1, 0] + translations[dut_index, 1]
+                                    xyz = np.column_stack(np.ma.array((xr, yr, np.repeat(z_positions[dut_index], n_tracks)), mask=np.ones((n_tracks, 3))))
                                 track_hits[:, index, :] = xyz
                                 index += 1
 
                         # Split data and fit on all available cores
                         n_slices = cpu_count()
                         slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
-                        slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+
                         pool = Pool(n_slices)
-                        results = pool.map(_fit_tracks_loop, slices)
+                        if method == "Interpolation":
+                            slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+                            results = pool.map(_fit_tracks_loop, slices)
+                        elif method == "Kalman":
+                            slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+                            # arg = (slices, pixel_size, z_positions)
+                            args = [(track_hits[i:i + slice_length], pixel_size, z_positions) for i in range(0, n_tracks, slice_length)]
+                            # args = [(data_files[i], n_pixels[i][0], n_pixels[i][1], 16, 14) for i in range(0, len(data_files))]
+                            results = pool.map(_function_wrapper_fit_tracks_kalman_loop, args)
                         pool.close()
                         pool.join()
                         del track_hits
 
                         # Store results
-                        offsets = np.concatenate([i[0] for i in results])  # merge offsets from all cores in results
-                        slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
-                        chi2s = np.concatenate([i[2] for i in results])  # merge chi2 from all cores in results
-
-                        tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts)
-
-                        if tracklets_table is None:
+                        if method == "Interpolation":
+                            offsets = np.concatenate([i[0] for i in results])  # merge offsets from all cores in results
+                            slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
+                            chi2s = np.concatenate([i[2] for i in results])  # merge chi2 from all cores in results
+                            tracks_array = create_results_array(good_track_candidates_chunk, slopes, offsets, chi2s, n_duts)
                             tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-
-                        tracklets_table.append(tracks_array)
+                            tracklets_table.append(tracks_array)
+                            for i in range(2):
+                                mean, rms = np.mean(slopes[:, i]), np.std(slopes[:, i])
+                                hist, edges = np.histogram(slopes[:, i], range=(mean - 5. * rms, mean + 5. * rms), bins=1000)
+                                fit_ok = False
+                                try:
+                                    coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
+                                    fit_ok = True
+                                except:
+                                    fit_ok = False
+                                plot_utils.plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matrix, output_fig, fit_dut, parName='Slope')
+                                meano, rmso = np.mean(offsets[:, i]), np.std(offsets[:, i])
+                                histo, edgeso = np.histogram(offsets[:, i], range=(meano - 5. * rmso, meano + 5. * rmso), bins=1000)
+                                fit_ok = False
+                                try:
+                                    coeffo, var_matrixo = curve_fit(gauss, edgeso[:-1], histo, p0=[np.amax(histo), meano, rmso])
+                                    fit_ok = True
+                                except:
+                                    fit_ok = False
+                                plot_utils.plot_tracks_parameter(offsets, edgeso, i, histo, fit_ok, coeffo, gauss, var_matrixo, output_fig, fit_dut, parName='Offset')
+                        elif method == "Kalman":
+                            track_estimates = np.concatenate([i[0] for i in results])  # merge predicted x,y pos from all cores in results
+                            chi2s = np.concatenate([i[1] for i in results])  # merge chi2 from all cores in results
+                            tracks_array_k = create_results_array_kalman(good_track_candidates_chunk, track_estimates, chi2s, n_duts)
+                            tracklets_table_k = out_file_h5.create_table(out_file_h5.root, name='Tracks_Kalman_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array_k.dtype).dtype, title='Tracks Kalman-smoothed for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                            tracklets_table_k.append(tracks_array_k)
 
                         # Plot chi2 distribution
                         plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
@@ -394,7 +503,7 @@ def _set_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, act
         elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # Low quality track hits
             actual_track.track_quality |= (257 << dut_index)
     else:
-        actual_track.track_quality &= (~ (65793 << dut_index))  # Unset track quality
+        actual_track.track_quality &= (~(65793 << dut_index))  # Unset track quality
 
 
 @njit
@@ -490,9 +599,9 @@ def _fit_tracks_loop(track_hits):
         chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
         return datamean, slope, chi2
 
-    slope = np.zeros((track_hits.shape[0], 3, ))
-    offset = np.zeros((track_hits.shape[0], 3, ))
-    chi2 = np.zeros((track_hits.shape[0], ))
+    slope = np.zeros((track_hits.shape[0], 3,))
+    offset = np.zeros((track_hits.shape[0], 3,))
+    chi2 = np.zeros((track_hits.shape[0],))
 
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
         try:
@@ -505,3 +614,92 @@ def _fit_tracks_loop(track_hits):
 
 def _function_wrapper_find_tracks_loop(args):  # Needed for multiprocessing call with arguments
     return _find_tracks_loop(*args)
+
+def _function_wrapper_fit_tracks_kalman_loop(args):  # Needed for multiprocessing call with arguments
+    return _fit_tracks_kalman_loop(*args)
+
+def _kalman_fit_3d(hits, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance, sigma):
+
+    kf = KalmanFilter(
+        transition_matrix, observation_matrix, transition_covariance, observation_covariance, transition_offset, observation_offset,
+        initial_state_mean, initial_state_covariance
+            )
+
+    nplanes = hits.shape[0]
+    meas = np.c_[hits, np.zeros((nplanes))]
+    # kf = kf.em(meas, n_iter=5)
+    smoothed_state_estimates = kf.smooth(meas)[0]
+
+    chi2 = 0
+    chi2 += np.sum(np.dot(np.square(meas[:, 0] - smoothed_state_estimates[:, 0]), np.square(1 / sigma)), dtype=np.double)
+
+    return smoothed_state_estimates[:, 0], chi2
+
+def _fit_tracks_kalman_loop(track_hits, pitches, plane_pos):
+    nplanes = track_hits.shape[1]
+    thickness_si = [50. for i in range(nplanes)]
+    thickness_al = [600. for j in range(nplanes)]
+    thicknesses = thickness_si + thickness_al
+    sigma = np.dot([pitches[i] for i in range(nplanes)], 1 / sqrt(12.))  # Resolution of each telescope plane
+    # TOFIX
+    tmp_plane_pos = [plane_pos[i] for i in range(nplanes)]
+    # TOFIX : these two happens in case more planes are provided than dut files...
+
+    ''' Calculations for multiple scattering'''
+    X0si = 93600.  # radiation length in Silicon = 9.36 cm (Google Introduction to silicon trackers at LHC - TDX)
+    X0al = 89000.  # in Aluminum
+    energy = 100000.  # energy in MeV
+    mass = 0.511  # mass in MeV
+    momentum = sqrt(energy * energy - mass * mass)
+    # beta = momentum / energy
+    x0s = np.dot(thickness_si, 1 / X0si) + np.dot(thickness_al, 1 / X0al)
+    thetas = np.zeros(nplanes, dtype=np.double)
+    for i, xx in enumerate(x0s):
+        thetat = ((13.6 / momentum) * sqrt(xx) * (1 + 0.038 * log(xx)))  # from formula
+        thetas[i] = thetat.real
+    print "Thetas: "
+    print thetas
+
+    '''Kalman filter parameters'''
+    transition_matrix = np.zeros((nplanes, 2, 2))
+    for i, z in enumerate(plane_pos):
+        transition_matrix[i] = [[1, 0], [0, 1]]
+        if i < nplanes - 1:
+            transition_matrix[i, 0, 1] = plane_pos[i + 1] - z
+        else:
+            transition_matrix[i, 0, 1] = transition_matrix[i - 1, 0, 1]
+        if i >= nplanes - 1:
+            break  # TOFIX
+
+    transition_covariance = np.zeros((nplanes, 2, 2))
+    for j, t in enumerate(thetas):
+        transition_covariance[j] = [[t * t * thicknesses[j] * thicknesses[j] / 3, t * t * thicknesses[j] / 2], [t * t * thicknesses[j] / 2, t * t]]  # from some calculations
+
+    transition_offset = [0, 0]
+    # transition_covariance = [[theta * theta * thickness * thickness / 3, theta * theta * thickness / 2], [theta * theta * thickness / 2, theta * theta]]  # from some calculations
+    observation_matrix = [[1, 0], [0, 0]]
+    observation_offset = transition_offset
+    observation_covariance_x = np.zeros((sigma.shape[0], 2, 2))
+    observation_covariance_y = np.zeros((sigma.shape[0], 2, 2))
+    observation_covariance_x[:, 0, 0] = np.square(sigma[:, 0])
+    observation_covariance_y[:, 0, 0] = np.square(sigma[:, 1])
+
+    ''' Initial state: first hit with slope 0, error: its sigma and a large one for slope '''
+    initial_state_covariance_x = [[sigma[0, 0] ** 2, 0], [0, 0.01]]
+    initial_state_covariance_y = [[sigma[0, 1] ** 2, 0], [0, 0.01]]
+
+    track_estimates = np.zeros((track_hits.shape))
+
+    chi2 = np.zeros((track_hits.shape[0]))
+
+    for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
+        initial_state_mean_x = [actual_hits[0, 0], 0]
+        initial_state_mean_y = [actual_hits[0, 1], 0]
+        track_estimates_x, chi2x = _kalman_fit_3d(actual_hits[:, 0], transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance_x, observation_offset, initial_state_mean_x, initial_state_covariance_x, sigma[:, 0])
+        track_estimates_y, chi2y = _kalman_fit_3d(actual_hits[:, 1], transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance_y, observation_offset, initial_state_mean_y, initial_state_covariance_y, sigma[:, 1])
+        chi2[index] = chi2x + chi2y
+        track_estimates[index, :, 0] = track_estimates_x
+        track_estimates[index, :, 1] = track_estimates_y
+        track_estimates[index, :, 2] = tmp_plane_pos
+
+    return track_estimates, chi2
