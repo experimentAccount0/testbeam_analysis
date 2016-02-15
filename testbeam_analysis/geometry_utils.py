@@ -48,7 +48,8 @@ def create_initial_geometry (outFile, zpos, initial_translation = None, initial_
     
         geo_table = geoFile.create_table(geoFile.root, name='Geometry', title='File containing all the geometry parameters', description=np.zeros((1,), dtype=geo_pars.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         geo_table.append(geo_pars)
-        
+
+
 def recontruct_geometry_from_file(fileName):    
     with tb.open_file(fileName, mode='r') as geoFile:
         

@@ -14,9 +14,12 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if os.name != 'nt':
-            from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
-            cls.vdisplay = Xvfb()
-            cls.vdisplay.start()
+            try:
+                from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
+                cls.vdisplay = Xvfb()
+                cls.vdisplay.start()
+            except (ImportError, EnvironmentError):
+                pass
         cls.noisy_data_file = tests_data_folder + 'TestBeamData_Mimosa26_DUT0_small.h5'
         cls.data_files = [tests_data_folder + 'TestBeamData_FEI4_DUT0_small.h5',
                           tests_data_folder + 'TestBeamData_FEI4_DUT1_small.h5',

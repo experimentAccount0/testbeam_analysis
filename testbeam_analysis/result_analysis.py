@@ -15,7 +15,7 @@ def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
-def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method = "Interpolation", geometryFile = 'data/Geometry.h5'):
+def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method = "Interpolation", geometryFile = None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------

@@ -14,9 +14,12 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if os.name != 'nt':
-            from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
-            cls.vdisplay = Xvfb()
-            cls.vdisplay.start()
+            try:
+                from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
+                cls.vdisplay = Xvfb()
+                cls.vdisplay.start()
+            except (ImportError, EnvironmentError):
+                pass
         cls.data_files = [tests_data_folder + 'TestBeamData_FEI4_DUT0_small.h5',
                           tests_data_folder + 'TestBeamData_FEI4_DUT1_small.h5',
                           tests_data_folder + 'TestBeamData_FEI4_DUT2_small.h5',
@@ -69,6 +72,6 @@ class TestHitAnalysis(unittest.TestCase):
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
-    tests_data_folder = r'C:\\Users\DavidLP\\git\\testbeam_analysis\\tests\\test_dut_alignment\\'
+    tests_data_folder = r'test_dut_alignment/'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)
