@@ -2,7 +2,7 @@
 from __future__ import division
 
 import logging
-import collections
+import os.path
 
 import tables as tb
 import numpy as np
@@ -10,10 +10,10 @@ from scipy.ndimage import median_filter
 
 from pixel_clusterizer.clusterizer import HitClusterizer
 from testbeam_analysis import analysis_utils
-from plot_utils import plot_noisy_pixel
+from plot_utils import plot_noisy_pixels
 
 
-def remove_noisy_pixel(data_file, n_pixel, threshold=(20, 5, 2), chunk_size=1000000):
+def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold=10.0, chunk_size=1000000):
     '''Removes noisy pixel from the data file containing the hit table.
     The hit table is read in chunks and for each chunk the noisy pixel are determined and removed.
 
@@ -26,9 +26,10 @@ def remove_noisy_pixel(data_file, n_pixel, threshold=(20, 5, 2), chunk_size=1000
     threshold : number
         The threshold when the pixel is removed given in sigma distance from the median occupancy.
     '''
-    logging.info('=== Removing noisy pixel in %s ===', data_file)
+    logging.info('=== Removing noisy pixel in %s ===', input_raw_data_file)
     occupancy = None
-    with tb.open_file(data_file, 'r') as input_file_h5:
+    # calculating occupancy array
+    with tb.open_file(input_raw_data_file, 'r') as input_file_h5:
         for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
             col, row = hits['column'], hits['row']
             chunk_occ = analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixel)
@@ -37,35 +38,41 @@ def remove_noisy_pixel(data_file, n_pixel, threshold=(20, 5, 2), chunk_size=1000
             else:
                 occupancy = occupancy + chunk_occ
 
-    if not isinstance(threshold, collections.Iterable):
-        threshold = [threshold]
-    blurred = median_filter(occupancy.astype(np.int32), size=2, mode='constant')
-    difference = occupancy - blurred
+    # run median filter across data, assuming 0 filling past the edges
+    blurred = median_filter(occupancy.astype(np.int32), size=2, mode='constant', cval=0.0)
+    difference = np.ma.masked_array(occupancy - blurred)
 
-    difference = np.ma.masked_array(difference)
-    for thr in threshold:
-        std = np.ma.std(difference)
-        threshold = thr * std
-        occupancy = np.ma.masked_where(difference > threshold, occupancy)
-        logging.info('Removed a total of %d hot pixel at threshold %.1f in %s', np.ma.count_masked(occupancy), thr, data_file)
-        difference = np.ma.masked_array(difference, mask=np.ma.getmask(occupancy))
+    std = np.ma.std(difference)
+    abs_occ_threshold = threshold * std
+    occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
+    logging.info('Removed a total of %d hot pixel at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_raw_data_file)
+    difference = np.ma.masked_array(difference, mask=np.ma.getmask(occupancy))
 
-    hot_pixel = np.nonzero(np.ma.getmask(occupancy))
-    noisy_pix_1d = (hot_pixel[0] + 1) * n_pixel[1] + (hot_pixel[1] + 1)  # map 2d array (col, row) to 1d array to increase selection speed
+    # generate tuple col / row array of hot pixels
+    noisy_pixels = np.nonzero(np.ma.getmask(occupancy))
+    # check for any noisy pixels
+    if noisy_pixels[0].shape[0] != 0:
+        # map 2d array (col, row) to 1d array to increase selection speed
+        noisy_pixels_1d = (noisy_pixels[0] + 1) * n_pixel[1] + (noisy_pixels[1] + 1)
+    else:
+        noisy_pixels_1d = []
 
-    with tb.open_file(data_file, 'r') as input_file_h5:
-        with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'w') as out_file_h5:
+    # storing putput files
+    with tb.open_file(input_raw_data_file, 'r') as input_file_h5:
+        output_raw_data_file = os.path.splitext(input_raw_data_file)[0] + '_noisy_pixels.h5'
+        with tb.open_file(output_raw_data_file, 'w') as out_file_h5:
             hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
                 # Select not noisy pixel
                 hits_1d = hits['column'].astype(np.uint32) * n_pixel[1] + hits['row']  # change dtype to fit new number
-                hits = hits[np.in1d(hits_1d, noisy_pix_1d, invert=True)]
+                hits = hits[np.in1d(hits_1d, noisy_pixels_1d, invert=True)]
 
                 hit_table_out.append(hits)
 
             logging.info('Reducing data by a factor of %.2f in %s', hit_table_out.nrows / input_file_h5.root.Hits.nrows, out_file_h5.filename)
 
-    plot_noisy_pixel(occupancy, data_file[:-3] + '_hot_pixel.pdf')
+    output_pdf_file = os.path.splitext(input_raw_data_file)[0] + '_noisy_pixels.pdf'
+    plot_noisy_pixels(occupancy, output_pdf_file, pixel_size)
 
 # testing output file
 #     occupancy = None
@@ -80,12 +87,12 @@ def remove_noisy_pixel(data_file, n_pixel, threshold=(20, 5, 2), chunk_size=1000
 #
 #     occupancy = np.ma.masked_where(occupancy == 0, occupancy)
 #     plt.figure()
-#     plt.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))
+#     plt.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, np.percentile(occupancy, 99)))
 #     plt.show()
 
 
-def remove_noisy_pixel_wrapper(args):
-    return remove_noisy_pixel(**args)
+def remove_noisy_pixels_wrapper(args):
+    return remove_noisy_pixels(**args)
 
 
 def cluster_hits_wrapper(args):

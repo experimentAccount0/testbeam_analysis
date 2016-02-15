@@ -54,32 +54,42 @@ def plot_noisy_pixel(occupancy, noisy_pixel, threshold, filename):
     fig.savefig(filename)
 
 
-def plot_noisy_pixel(occupancy, filename):
+def plot_noisy_pixels(occupancy, filename, pixel_size=None):
+    if pixel_size:
+        aspect = pixel_size[0] / pixel_size[1]
+    else:
+        aspect = "auto"
+
     with PdfPages(filename) as output_pdf:
         plt.figure()
-        ax1 = plt.subplot(121)
-        ax2 = plt.subplot(122)
+        ax = plt.subplot(111)
 
         cmap = cm.get_cmap('viridis')
     #     cmap.set_bad('w')
     #     norm = colors.LogNorm()
         norm = None
+        c_max = np.percentile(occupancy, 99)
 
-        hot_pixel = np.nonzero(np.ma.getmask(occupancy))
-#         for y, x in zip(hot_pixel[0], hot_pixel[1]):
-        ax1.plot(hot_pixel[1], hot_pixel[0], 'ro', mfc='none', mec='r', ms=10)
-        ax1.set_title('Data with %d hot pixel' % np.ma.count_masked(occupancy))
-        ax1.imshow(np.ma.getdata(occupancy), cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))
-        ax1.set_xlim(-0.5, occupancy.shape[1] - 0.5)
-        ax1.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        noisy_pixels = np.nonzero(np.ma.getmask(occupancy))
+        # check for any noisy pixels
+        if noisy_pixels[0].shape[0] != 0:
+            ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)
+        ax.set_title('Data with %d noisy pixel' % np.ma.count_masked(occupancy))
+        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
+        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
 
-        ax2.set_title('Data with %d hot pixel removed' % np.ma.count_masked(occupancy))
-        ax2.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, 2 * np.ma.median(occupancy)))  # , extent=(0, n_pixel[1], 0, n_pixel[0]))
+        output_pdf.savefig()
+
+        plt.figure()
+        ax = plt.subplot(111)
+
+        ax.set_title('Data with %d noisy pixel removed' % np.ma.count_masked(occupancy))
+        ax.imshow(occupancy, aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
     #     np.ma.filled(occupancy, fill_value=0)
-        ax2.set_xlim(-0.5, occupancy.shape[1] - 0.5)
-        ax2.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
 
-#         plt.show()
         output_pdf.savefig()
 
 

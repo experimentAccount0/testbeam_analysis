@@ -1,8 +1,8 @@
-''' Example script to run a full analysis on telescope data. The original data can be found in the example folder of the EuTelescope framework. 
-The telescope consists of 6 planes with 15 cm distance between the planes. The residuals for the second plane (DUT 1) are about 8 um and comparable 
+''' Example script to run a full analysis on telescope data. The original data can be found in the example folder of the EuTelescope framework.
+The telescope consists of 6 planes with 15 cm distance between the planes. The residuals for the second plane (DUT 1) are about 8 um and comparable
 to the residuals from EuTelescope (6 um).
 
-The other plane residuals are not that small depicting a worse performance in device algnment and track fitting. 
+The other plane residuals are not that small depicting a worse performance in device algnment and track fitting.
 '''
 
 import os
@@ -59,9 +59,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
     args = [{'data_file': data_files[i],
-             'n_pixel': n_pixel[i]} for i in range(0, len(data_files))]
+             'n_pixel': n_pixel[i],
+             'pixel_size': pixel_size[i]} for i in range(0, len(data_files))]
     pool = Pool()
-    pool.map(hit_analysis.remove_noisy_pixel_wrapper, args)  # delete noisy hits in DUT data files in parallel on multiple cores
+    pool.map(hit_analysis.remove_noisy_pixels_wrapper, args)  # delete noisy hits in DUT data files in parallel on multiple cores
     pool.close()
     pool.join()
 
