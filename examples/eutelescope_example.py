@@ -9,7 +9,7 @@ import os
 import logging
 from multiprocessing import Pool
 
-from testbeam_analysis import hit_analysis
+from testbeam_analysis import hit_analysis, geometry_utils
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
 from testbeam_analysis import result_analysis
@@ -45,8 +45,18 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
-
+    geoFile = r'data/MimosaGeometry.h5'
+    
     # The following shows a complete test beam analysis by calling the seperate function in correct order
+
+    #Create the initial geometry (to be done once)
+    geometry_utils.create_initial_geometry (geoFile, z_positions)
+                            
+    geometry_utils.update_rotation_angle(geoFile, 0, -0.00104)
+    geometry_utils.update_rotation_angle(geoFile, 1, 0.00104)
+    geometry_utils.update_rotation_angle(geoFile, 2, 0.00102)
+    geometry_utils.update_translation_val(geoFile, 1, -10.7, 19.4)
+    geometry_utils.update_translation_val(geoFile, 2, -12.1, 17.4)
 
     # Remove hot pixels, only needed for devices wih noisy pixels like Mimosa 26
     Pool().map(hit_analysis.remove_noisy_pixels, data_files)  # delete noisy hits in DUT data files in parallel on multiple cores
@@ -102,11 +112,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
                               include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
-                              track_quality=2)
+                              track_quality=2,
+                              method='Interpolation',
+                              pixel_size=pixel_size,
+                              geometryFile=geoFile)
 
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(tracks_file=output_folder + r'/Tracks.h5',
                                         output_pdf=output_folder + r'/Residuals.pdf',
                                         z_positions=z_positions,
                                         use_duts=None,
-                                        max_chi2=None)
+                                        max_chi2=None,
+                                        method='Interpolation',
+                                        geometryFile=geoFile)
