@@ -9,7 +9,8 @@ import os
 import logging
 from multiprocessing import Pool
 
-from testbeam_analysis import hit_analysis, geometry_utils
+from testbeam_analysis import hit_analysis
+from testbeam_analysis import geometry_utils
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
 from testbeam_analysis import result_analysis
