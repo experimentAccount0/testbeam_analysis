@@ -70,7 +70,7 @@ def plot_noisy_pixels(occupancy, filename, pixel_size=None):
         norm = None
         c_max = np.percentile(occupancy, 99)
 
-        noisy_pixels = np.nonzero(np.ma.getmask(occupancy))
+        noisy_pixels = np.nonzero(np.ma.getmaskarray(occupancy))
         # check for any noisy pixels
         if noisy_pixels[0].shape[0] != 0:
             ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)

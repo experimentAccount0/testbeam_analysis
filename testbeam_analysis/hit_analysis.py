@@ -54,8 +54,10 @@ def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold
     occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
     logging.info('Removed a total of %d hot pixel at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_raw_data_file)
 
-    # generate tuple col / row array of hot pixels
-    noisy_pixels = np.nonzero(np.ma.getmask(occupancy))
+    # generate tuple col / row array of hot pixels, do not use getmask()
+    noisy_pixels_mask = np.ma.getmaskarray(occupancy)
+    # generate pair of col / row arrays
+    noisy_pixels = np.nonzero(noisy_pixels_mask)
     # check for any noisy pixels
     if noisy_pixels[0].shape[0] != 0:
         # map 2d array (col, row) to 1d array to increase selection speed
