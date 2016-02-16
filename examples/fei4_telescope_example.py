@@ -8,6 +8,7 @@ import logging
 from multiprocessing import Pool
 
 from testbeam_analysis import hit_analysis
+from testbeam_analysis import geometry_utils
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
 from testbeam_analysis import result_analysis
@@ -30,9 +31,14 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     z_positions = [0., 19500, 108800, 128300]  # in um; optional, can be also deduced from data, but usually not with high precision (~ mm)
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
-    cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
+    cluster_files = [os.path.splitext(data_file)[0] + '_cluster.h5' for data_file in data_files]
 
-    # The following shows a complete test beam analysis by calling the separate function in correct order
+    geo_file = os.path.join(output_folder, 'FEI4Geometry.h5')
+
+    # The following shows a complete test beam analysis by calling the seperate function in correct order
+
+    # Create the initial geometry (to be done once)
+    geometry_utils.create_initial_geometry(geo_file, z_positions)
 
     # Cluster hits off all DUTs
     args = [{'data_file': data_files[i],
@@ -45,77 +51,78 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.close()
     pool.join()
     plot_utils.plot_cluster_size(cluster_files,
-                                 output_pdf=output_folder + r'/Cluster_Size.pdf')
+                                 output_pdf=os.path.join(output_folder, '/Cluster_Size.pdf'))
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(data_files,
-                                 alignment_file=output_folder + r'/Correlation.h5')
-    plot_utils.plot_correlations(alignment_file=output_folder + r'/Correlation.h5',
-                                 output_pdf=output_folder + r'/Correlations.pdf')
+                                 alignment_file=os.path.join(output_folder, '/Correlation.h5'))
+    plot_utils.plot_correlations(alignment_file=os.path.join(output_folder, '/Correlation.h5'),
+                                 output_pdf=os.path.join(output_folder, '/Correlations.pdf'))
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.align_hits(correlation_file=output_folder + r'/Correlation.h5',
-                             alignment_file=output_folder + r'/Alignment.h5',
-                             output_pdf=output_folder + r'/Alignment.pdf',
+    dut_alignment.align_hits(correlation_file=os.path.join(output_folder, '/Correlation.h5'),
+                             alignment_file=os.path.join(output_folder, '/Alignment.h5'),
+                             output_pdf=os.path.join(output_folder, '/Alignment.pdf'),
                              pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(cluster_files,
-                                     alignment_file=output_folder + r'/Alignment.h5',
-                                     tracklets_file=output_folder + r'/Tracklets.h5',
+                                     alignment_file=os.path.join(output_folder, '/Alignment.h5'),
+                                     tracklets_file=os.path.join(output_folder, '/Tracklets.h5'),
                                      pixel_size=pixel_size)
 
-    dut_alignment.check_hit_alignment(tracklets_file=output_folder + r'/Tracklets.h5',
-                                      output_pdf=output_folder + r'/Alignment_Check.pdf',
+    dut_alignment.check_hit_alignment(tracklets_file=os.path.join(output_folder, '/Tracklets.h5'),
+                                      output_pdf=os.path.join(output_folder, '/Alignment_Check.pdf'),
                                       combine_n_hits=1000000)
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
-    track_analysis.find_tracks(tracklets_file=output_folder + r'/Tracklets.h5',
-                               alignment_file=output_folder + r'/Alignment.h5',
-                               track_candidates_file=output_folder + r'/TrackCandidates.h5')
+    track_analysis.find_tracks(tracklets_file=os.path.join(output_folder, '/Tracklets.h5'),
+                               alignment_file=os.path.join(output_folder, '/Alignment.h5'),
+                               track_candidates_file=os.path.join(output_folder, '/TrackCandidates.h5'))
 
     # Fit the track candidates and create new track table
-    track_analysis.fit_tracks(track_candidates_file=output_folder + r'/TrackCandidates.h5',
-                              tracks_file=output_folder + r'/Tracks.h5',
-                              output_pdf=output_folder + r'/Tracks.pdf',
+    track_analysis.fit_tracks(track_candidates_file=os.path.join(output_folder, '/TrackCandidates.h5'),
+                              tracks_file=os.path.join(output_folder, '/Tracks.h5'),
+                              output_pdf=os.path.join(output_folder, '/Tracks.pdf'),
+                              geometry_file=geo_file,
                               z_positions=z_positions,
                               fit_duts=[0, 1, 2, 3],
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
-    plot_utils.plot_events(track_file=output_folder + r'/Tracks.h5',
-                           output_pdf=output_folder + r'/Event.pdf',
+    plot_utils.plot_events(track_file=os.path.join(output_folder, '/Tracks.h5'),
+                           output_pdf=os.path.join(output_folder, '/Event.pdf'),
                            z_positions=z_positions,
                            event_range=(0, 10),
                            dut=1)
 
     # Calculate the residuals to check the alignment
-    result_analysis.calculate_residuals(tracks_file=output_folder + r'/Tracks.h5',
-                                        output_pdf=output_folder + r'/Residuals.pdf',
+    result_analysis.calculate_residuals(tracks_file=os.path.join(output_folder, '/Tracks.h5'),
+                                        output_pdf=os.path.join(output_folder, '/Residuals.pdf'),
                                         z_positions=z_positions,
                                         max_chi2=10000)
 
     # Plot the track density on selected DUT planes
-    plot_utils.plot_track_density(tracks_file=output_folder + r'/Tracks.h5',
-                                  output_pdf=output_folder + r'/TrackDensity.pdf',
+    plot_utils.plot_track_density(tracks_file=os.path.join(output_folder, '/Tracks.h5'),
+                                  output_pdf=os.path.join(output_folder, '/TrackDensity.pdf'),
                                   z_positions=z_positions,
                                   dim_x=80,
                                   dim_y=336,
                                   pixel_size=pixel_size,
                                   use_duts=None)
 
-    plot_utils.plot_charge_distribution(trackcandidates_file=output_folder + r'/TrackCandidates.h5',
-                                        output_pdf=output_folder + r'/ChargeDistribution.pdf',
+    plot_utils.plot_charge_distribution(trackcandidates_file=os.path.join(output_folder, '/TrackCandidates.h5'),
+                                        output_pdf=os.path.join(output_folder, '/ChargeDistribution.pdf'),
                                         dim_x=(80, 80, 80, 80),
                                         dim_y=(336, 336, 336, 336),
                                         pixel_size=pixel_size)
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
-    result_analysis.calculate_efficiency(tracks_file=output_folder + r'/Tracks.h5',
-                                         output_pdf=output_folder + r'/Efficiency.pdf',
+    result_analysis.calculate_efficiency(tracks_file=os.path.join(output_folder, '/Tracks.h5'),
+                                         output_pdf=os.path.join(output_folder, '/Efficiency.pdf'),
                                          z_positions=z_positions,
                                          bin_size=(250, 50),
                                          minimum_track_density=2,

@@ -46,17 +46,17 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
-    geoFile = r'data/MimosaGeometry.h5'
+    geo_file = os.path.join(output_folder, 'MimosaGeometry.h5')
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
     # Create the initial geometry (to be done once)
-    geometry_utils.create_initial_geometry(geoFile, z_positions)
-    geometry_utils.update_rotation_angle(geoFile, 0, -0.00104)
-    geometry_utils.update_rotation_angle(geoFile, 1, 0.00104)
-    geometry_utils.update_rotation_angle(geoFile, 2, 0.00102)
-    geometry_utils.update_translation_val(geoFile, 1, -10.7, 19.4)
-    geometry_utils.update_translation_val(geoFile, 2, -12.1, 17.4)
+    geometry_utils.create_initial_geometry(geo_file, z_positions)
+    geometry_utils.update_rotation_angle(geo_file, 0, -0.00104)
+    geometry_utils.update_rotation_angle(geo_file, 1, 0.00104)
+    geometry_utils.update_rotation_angle(geo_file, 2, 0.00102)
+    geometry_utils.update_translation_val(geo_file, 1, -10.7, 19.4)
+    geometry_utils.update_translation_val(geo_file, 2, -12.1, 17.4)
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
     args = [{'data_file': data_files[i],
@@ -67,8 +67,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.close()
     pool.join()
 
-    data_files = [data_file[:-3] + '_hot_pixel.h5' for data_file in data_files]
-    cluster_files = [data_file[:-3] + '_cluster.h5' for data_file in data_files]
+    data_files = [os.path.splitext(data_file)[0] + '_hot_pixel.h5' for data_file in data_files]
+    cluster_files = [os.path.splitext(data_file)[0] + '_cluster.h5' for data_file in data_files]
 
     # Cluster hits off all DUTs
     args = [{'data_file': data_files[i],
@@ -82,50 +82,50 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.join()
 
     plot_utils.plot_cluster_size(cluster_files,
-                                 output_pdf=output_folder + r'/Cluster_Size.pdf')
+                                 output_pdf=os.path.join(output_folder, r'/Cluster_Size.pdf'))
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(data_files,
-                                 alignment_file=output_folder + r'/Correlation.h5', fraction=1)
-    plot_utils.plot_correlations(alignment_file=output_folder + r'/Correlation.h5',
-                                 output_pdf=output_folder + r'/Correlations.pdf')
+                                 alignment_file=os.path.join(output_folder, '/Correlation.h5'), fraction=1)
+    plot_utils.plot_correlations(alignment_file=os.path.join(output_folder, '/Correlation.h5'),
+                                 output_pdf=os.path.join(output_folder, '/Correlations.pdf'))
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.align_hits(correlation_file=output_folder + r'/Correlation.h5',
-                             alignment_file=output_folder + r'/Alignment.h5',
-                             output_pdf=output_folder + r'/Alignment.pdf',
+    dut_alignment.align_hits(correlation_file=os.path.join(output_folder, '/Correlation.h5'),
+                             alignment_file=os.path.join(output_folder, '/Alignment.h5'),
+                             output_pdf=os.path.join(output_folder, '/Alignment.pdf'),
                              pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(cluster_files,
-                                     alignment_file=output_folder + r'/Alignment.h5',
-                                     tracklets_file=output_folder + r'/Tracklets.h5',
+                                     alignment_file=os.path.join(output_folder, '/Alignment.h5'),
+                                     tracklets_file=os.path.join(output_folder, '/Tracklets.h5'),
                                      pixel_size=pixel_size)
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
-    track_analysis.find_tracks(tracklets_file=output_folder + r'/Tracklets.h5',
-                               alignment_file=output_folder + r'/Alignment.h5',
-                               track_candidates_file=output_folder + r'/TrackCandidates.h5')
+    track_analysis.find_tracks(tracklets_file=os.path.join(output_folder, '/Tracklets.h5'),
+                               alignment_file=os.path.join(output_folder, '/Alignment.h5'),
+                               track_candidates_file=os.path.join(output_folder, '/TrackCandidates.h5'))
 
     # Fit the track candidates and create new track table
-    track_analysis.fit_tracks(track_candidates_file=output_folder + r'/TrackCandidates.h5',
-                              tracks_file=output_folder + r'/Tracks.h5',
-                              output_pdf=output_folder + r'/Tracks.pdf',
+    track_analysis.fit_tracks(track_candidates_file=os.path.join(output_folder, '/TrackCandidates.h5'),
+                              tracks_file=os.path.join(output_folder, '/Tracks.h5'),
+                              output_pdf=os.path.join(output_folder, '/Tracks.pdf'),
+                              geometry_file=geo_file,
                               z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
                               include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
                               track_quality=2,
                               method='Interpolation',
-                              pixel_size=pixel_size,
-                              geometryFile=geoFile)
+                              pixel_size=pixel_size)
 
     # Calculate the residuals to check the alignment
-    result_analysis.calculate_residuals(tracks_file=output_folder + r'/Tracks.h5',
-                                        output_pdf=output_folder + r'/Residuals.pdf',
+    result_analysis.calculate_residuals(tracks_file=os.path.join(output_folder, '/Tracks.h5'),
+                                        output_pdf=os.path.join(output_folder, '/Residuals.pdf'),
                                         z_positions=z_positions,
                                         use_duts=None,
                                         max_chi2=None,
                                         method='Interpolation',
-                                        geometryFile=geoFile)
+                                        geometryFile=geo_file)
