@@ -69,6 +69,7 @@ def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold
     with tb.open_file(input_raw_data_file, 'r') as input_file_h5:
         output_raw_data_file = os.path.splitext(input_raw_data_file)[0] + '_noisy_pixels.h5'
         with tb.open_file(output_raw_data_file, 'w') as out_file_h5:
+            # creating new hit table without noisy pixels
             hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
                 # Select not noisy pixel
@@ -78,6 +79,14 @@ def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold
                 hit_table_out.append(hits)
 
             logging.info('Reducing data by a factor of %.2f in %s', hit_table_out.nrows / input_file_h5.root.Hits.nrows, out_file_h5.filename)
+
+            # creating occupancy table without masking noisy pixels
+            occupancy_array_table = out_file_h5.createCArray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            occupancy_array_table[:] = np.ma.getdata(occupancy)
+
+            # creating noisy pixels table
+            noisy_pixels_table = out_file_h5.createCArray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            noisy_pixels_table[:] = noisy_pixels_mask
 
     output_pdf_file = os.path.splitext(input_raw_data_file)[0] + '_noisy_pixels.pdf'
     plot_noisy_pixels(occupancy, output_pdf_file, pixel_size)
