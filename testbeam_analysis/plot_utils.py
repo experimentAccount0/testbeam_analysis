@@ -99,19 +99,24 @@ def plot_cluster_size(cluster_files, output_pdf):
     with PdfPages(output_pdf) as output_fig:
         for cluster_file in cluster_files:
             with tb.open_file(cluster_file, 'r') as input_file_h5:
-                cluster = input_file_h5.root.Cluster[:]
+                cluster_n_hits = input_file_h5.root.Cluster[:]['n_hits']
                 # Save cluster size histogram
-                max_cluster_size = np.amax(cluster['n_hits'])
+                max_cluster_size = np.amax(cluster_n_hits)
                 plt.clf()
-                plt.bar(np.arange(max_cluster_size) + 0.6, analysis_utils.hist_1d_index(cluster['n_hits'] - 1, shape=(max_cluster_size,)))
-                plt.title('Cluster size of\n%s' % cluster_file)
+                left = np.arange(max_cluster_size + 1)
+                hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                plt.bar(left, hight, align='center')
+                plt.title('Cluster size of\n%s' % os.path.split(cluster_file)[1])
                 plt.xlabel('Cluster size')
                 plt.ylabel('#')
-                if max_cluster_size < 16:
-                    plt.xticks(np.arange(0, max_cluster_size + 1, 1))
                 plt.grid()
                 plt.yscale('log')
-                plt.ylim(1e-1, plt.ylim()[1])
+                plt.xlim(xmin=0.5)
+                plt.ylim(ymin=1e-1)
+                output_fig.savefig()
+                plt.yscale('linear')
+                plt.ylim(ymax=np.amax(hight))
+                plt.xlim(0.5, 10.5)
                 output_fig.savefig()
 
 
