@@ -510,13 +510,15 @@ def plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matr
             plt.show()
 
 
+def get_rms_from_histogram(counts, bin_positions):
+    values = []
+    for index, one_bin in enumerate(counts):
+        for _ in range(one_bin):
+            values.append(bin_positions[index])
+    return np.std(values)
+
+
 def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig):
-    def get_rms_from_histogram(counts, bin_positions):
-        values = []
-        for index, one_bin in enumerate(counts):
-            for _ in range(one_bin):
-                values.append(bin_positions[index])
-        return np.std(values)
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
         plot_range = (-5 * get_rms_from_histogram(hist, edges), 5. * get_rms_from_histogram(hist, edges))
