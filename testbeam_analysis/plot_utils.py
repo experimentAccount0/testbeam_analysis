@@ -224,10 +224,11 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
     ax.plot(x, offset * 10., 'go-', label='Offset x 10')  # Plot line fit offset
     offset_limit_plot, = ax.plot([np.min(x), np.max(x)], [offset_limit * 10., offset_limit * 10.], 'g--')  # Plot offset cut as a line
     error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit * 1000., error_limit * 1000.], 'r--')  # Plot error cut as a line
-    left_limit_plot, = ax.plot([left_limit, left_limit], [0, np.max(mean_fitted)], 'b-')  # Plot left cut as a vertical line
-    right_limit_plot, = ax.plot([right_limit, right_limit], [0, np.max(mean_fitted)], 'b-')  # Plot right cut as a vertical line
-    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * np.amax(mean_fitted), align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
+    left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-')  # Plot left cut as a vertical line
+    right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-')  # Plot right cut as a vertical line
+    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
 
+    plt.ylim(ymin=0.0)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel('DUT0')
