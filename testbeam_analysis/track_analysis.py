@@ -449,7 +449,6 @@ def fit_tracks(track_candidates_file, tracks_file, geometry_file, z_positions, f
                             results = pool.map(_function_wrapper_fit_tracks_kalman_loop, args)
                         pool.close()
                         pool.join()
-                        del track_hits
 
                         # Store results
                         if method == "interpolation":
