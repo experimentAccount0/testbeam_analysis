@@ -247,7 +247,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], geometryFile='data/Geometry.h5', chunk_size=1000000):
+def fit_tracks(track_candidates_file, tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -284,7 +284,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
         Defines the method for hit prediction:
             "Interpolation": chi2 minimization with straight line
             "Kalman": Kalman filter
-    geometryFile: the file containing the geometry parameters (relative translation and angles)
+    geometry_file: the file containing the geometry parameters (relative translation and angles)
     '''
 
     logging.info('=== Fit tracks ===')
@@ -357,14 +357,11 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
 
         return tracks_array
 
-    if method != "Interpolation" and method != "Kalman":
-        print "Method '", method, "' not recognized! Abort!"
-        '''Wrong method definition can screw things up! '''
-        return
-    if method == "Kalman" and len(pixel_size) == 0:
-        print "Kalman filter requires to provide pixel size for error measurement matrix covariance! Abort!"
-        '''No pixel size no Kalman! '''
-        return
+    method = method.lower()
+    if method != "interpolation" and method != "kalman":
+        raise ValueError('Method "%s" not recognized!' % method)
+    if method == "kalman" and not pixel_size:
+        raise ValueError('Kalman filter requires to provide pixel size for error measurement matrix covariance!')
 
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
@@ -410,20 +407,20 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         n_fit_duts = bin(dut_selection).count("1")
                         index, n_tracks = 0, good_track_candidates_chunk['event_number'].shape[0]  # Index of tmp track hits array
 
-                        translations, rotations = geometry_utils.recontruct_geometry_from_file(geometryFile)
+                        translations, rotations = geometry_utils.recontruct_geometry_from_file(geometry_file)
 
-                        if method == "Interpolation":
+                        if method == "interpolation":
                             track_hits = np.zeros((n_tracks, n_fit_duts, 3))
-                        elif method == "Kalman":
+                        elif method == "kalman":
                             track_hits = np.zeros((n_tracks, n_duts, 3))
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
-                            if method == "Interpolation" and (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
+                            if method == "interpolation" and (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
                                 xr = good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 0, 0] + good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 0, 1] + translations[dut_index, 0]
                                 yr = good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 1, 1] + good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 1, 0] + translations[dut_index, 1]
                                 xyz = np.column_stack((xr, yr, np.repeat(z_positions[dut_index], n_tracks)))
                                 track_hits[:, index, :] = xyz
                                 index += 1
-                            elif method == "Kalman":
+                            elif method == "kalman":
                                 if (1 << dut_index) & dut_selection == (1 << dut_index):  # TOCHECK! Not used = masked, OK, but also DUT must be masked...
                                     # xyz = np.column_stack(np.ma.array((good_track_candidates_chunk['column_dut_%s' % dut_index], good_track_candidates_chunk['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks))))
                                     xr = good_track_candidates_chunk['column_dut_%s' % dut_index] * rotations[dut_index, 0, 0] + good_track_candidates_chunk['row_dut_%s' % dut_index] * rotations[dut_index, 0, 1] + translations[dut_index, 0]
@@ -441,10 +438,10 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
 
                         pool = Pool(n_slices)
-                        if method == "Interpolation":
+                        if method == "interpolation":
                             slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
                             results = pool.map(_fit_tracks_loop, slices)
-                        elif method == "Kalman":
+                        elif method == "kalman":
                             slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
                             # arg = (slices, pixel_size, z_positions)
                             args = [(track_hits[i:i + slice_length], pixel_size, z_positions) for i in range(0, n_tracks, slice_length)]
@@ -455,7 +452,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         del track_hits
 
                         # Store results
-                        if method == "Interpolation":
+                        if method == "interpolation":
                             offsets = np.concatenate([i[0] for i in results])  # merge offsets from all cores in results
                             slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
                             chi2s = np.concatenate([i[2] for i in results])  # merge chi2 from all cores in results
@@ -481,7 +478,7 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                                 except:
                                     fit_ok = False
                                 plot_utils.plot_tracks_parameter(offsets, edgeso, i, histo, fit_ok, coeffo, gauss, var_matrixo, output_fig, fit_dut, parName='Offset')
-                        elif method == "Kalman":
+                        elif method == "kalman":
                             track_estimates = np.concatenate([i[0] for i in results])  # merge predicted x,y pos from all cores in results
                             chi2s = np.concatenate([i[1] for i in results])  # merge chi2 from all cores in results
                             tracks_array_k = create_results_array_kalman(good_track_candidates_chunk, track_estimates, chi2s, n_duts)
