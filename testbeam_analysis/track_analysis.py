@@ -456,7 +456,8 @@ def fit_tracks(track_candidates_file, tracks_file, geometry_file, z_positions, f
                             slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
                             chi2s = np.concatenate([i[2] for i in results])  # merge chi2 from all cores in results
                             tracks_array = create_results_array(good_track_candidates_chunk, slopes, offsets, chi2s, n_duts)
-                            tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                            if not tracklets_table:
+                                tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                             tracklets_table.append(tracks_array)
                             for i in range(2):
                                 mean, rms = np.mean(slopes[:, i]), np.std(slopes[:, i])
@@ -480,9 +481,10 @@ def fit_tracks(track_candidates_file, tracks_file, geometry_file, z_positions, f
                         elif method == "kalman":
                             track_estimates = np.concatenate([i[0] for i in results])  # merge predicted x,y pos from all cores in results
                             chi2s = np.concatenate([i[1] for i in results])  # merge chi2 from all cores in results
-                            tracks_array_k = create_results_array_kalman(good_track_candidates_chunk, track_estimates, chi2s, n_duts)
-                            tracklets_table_k = out_file_h5.create_table(out_file_h5.root, name='Tracks_Kalman_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array_k.dtype).dtype, title='Tracks Kalman-smoothed for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                            tracklets_table_k.append(tracks_array_k)
+                            tracks_array = create_results_array_kalman(good_track_candidates_chunk, track_estimates, chi2s, n_duts)
+                            if not tracklets_table:
+                                tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_Kalman_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks Kalman-smoothed for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                            tracklets_table.append(tracks_array)
 
                         # Plot chi2 distribution
                         plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
