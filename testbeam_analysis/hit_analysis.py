@@ -88,8 +88,7 @@ def remove_noisy_pixels(input_raw_data_file, n_pixel, pixel_size=None, threshold
             noisy_pixels_table = out_file_h5.createCArray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             noisy_pixels_table[:] = noisy_pixels_mask
 
-    output_pdf_file = os.path.splitext(input_raw_data_file)[0] + '_noisy_pixels.pdf'
-    plot_noisy_pixels(occupancy, output_pdf_file, pixel_size)
+    plot_noisy_pixels(occupancy, output_raw_data_file, pixel_size)
 
 # testing output file
 #     occupancy = None

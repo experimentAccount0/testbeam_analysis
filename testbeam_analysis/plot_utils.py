@@ -2,6 +2,7 @@ from __future__ import division
 
 import logging
 import re
+import os.path
 from math import sqrt, ceil
 
 import numpy as np
@@ -60,7 +61,8 @@ def plot_noisy_pixels(occupancy, filename, pixel_size=None):
     else:
         aspect = "auto"
 
-    with PdfPages(filename) as output_pdf:
+    pdf_filename = os.path.splitext(filename)[0] + '.pdf'
+    with PdfPages(pdf_filename) as output_pdf:
         plt.figure()
         ax = plt.subplot(111)
 
@@ -74,7 +76,7 @@ def plot_noisy_pixels(occupancy, filename, pixel_size=None):
         # check for any noisy pixels
         if noisy_pixels[0].shape[0] != 0:
             ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)
-        ax.set_title('Data with %d noisy pixel' % np.ma.count_masked(occupancy))
+        ax.set_title('%s with %d noisy pixel' % (os.path.split(filename)[1], np.ma.count_masked(occupancy)))
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
