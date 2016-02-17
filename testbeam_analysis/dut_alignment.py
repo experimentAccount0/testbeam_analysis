@@ -62,10 +62,6 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
                     # Correlation of x against x and y against y
                     col_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['column_ref'] - 1, shape=(n_col_dut, n_col_reference))
                     row_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['row_ref'] - 1, shape=(n_row_dut, n_row_reference))
-#                     TODO: implement rotated devices
-# Correlation of x against y and y against x (should be constant exepct the sensor is rotated)
-#                     row_col_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['column_ref'] - 1, shape=(n_row_dut, n_col_reference))
-#                     col_row_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['row_ref'] - 1, shape=(n_col_dut, n_row_reference))
                     out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % index, title='Column Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     out_row = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % index, title='Row Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     out_col.attrs.filenames = [str(hit_files[0]), str(hit_files[index])]
@@ -140,7 +136,7 @@ def coarse_alignment(correlation_file, alignment_file, output_pdf, pixel_size):
                         coeff, var_matrix = curve_fit(gauss, x_hist_fit, data[index, :], p0=p0)
                         mean_fitted[index] = coeff[1]
                         mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
-                        sigma_fitted[index] = coeff[2]
+                        sigma_fitted[index] = np.abs(coeff[2])
                         n_hits[index] = data[index, :].sum()
                         if index == data.shape[0] / 2:
                             plot_utils.plot_correlation_fit(x_hist_fit, data[index, :], coeff, var_matrix, 'DUT 0 at DUT %s = %d' % (result[node_index]['dut_x'], index), node.title, output_fig)
@@ -210,10 +206,9 @@ def fine_alignment(track_candidates_file, alignment_file, output_pdf):
         The output file for correlation data.
     output_pdf : pdf file
         File name for the alignment plots
-    pixel_size: iterable of column, row pairs if devices have different pixel sizes or one column, row iterable if the pixel size is the same
-        e.g. [(10, 20), (30, 40)] for two devices with pixel size 10x20 um and 30x40 um
     '''
     logging.info('=== Fine align the DUTs using line fit residuals ===')
+    raise NotImplementedError('Comming soon')
 
 
 def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size, chunk_size=5000000):
