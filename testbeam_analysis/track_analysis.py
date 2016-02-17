@@ -30,16 +30,20 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_ran
     be able to cut on good tracks.
     This function is uses numba to increase the speed on the inner loop (_find_tracks_loop()).
 
+    This function can also be called on TrackCandidates arrays. That is usefull if an additional alignment step
+    was done and the track finding has to be repeated.
+
     Parameters
     ----------
     tracklets_file : string
-        Input file name with merged cluster hit table from all DUTs
+        Input file name with merged cluster hit table from all DUTs (tracklets file)
+        Or track candidates file.
     alignment_file : string
         File containing the alignment information
     track_candidates_file : string
         Output file name for track candidate array
     '''
-    logging.info('=== Build tracks from tracklets ===')
+    logging.info('=== Find tracks ===')
 
     # Get alignment errors from file
     with tb.open_file(alignment_file, mode='r') as in_file_h5:
@@ -52,11 +56,18 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_ran
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
     with tb.open_file(tracklets_file, mode='r') as in_file_h5:
+        try:
+            tracklets_node = in_file_h5.root.Tracklets
+        except tb.exceptions.NoSuchNodeError:
+            tracklets_node = in_file_h5.root.TrackCandidates
+            track_candidates_file = track_candidates_file[:-3] + '_2.h5'
+            logging.info('Additional find track run on track candidates file %s', tracklets_file)
+            logging.info('Ouitput file with new track candidates file %s', track_candidates_file)
         with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
-            track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.Tracklets.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            n_duts = sum(['column' in col for col in in_file_h5.root.Tracklets.dtype.names])
+            track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=tracklets_node.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            n_duts = sum(['column' in col for col in tracklets_node.dtype.names])
 
-            for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Tracklets, chunk_size=chunk_size):
+            for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(tracklets_node, chunk_size=chunk_size):
                 tracklets_data_chunk = tracklets_data_chunk.view(np.recarray)
 
                 # Prepare data for track finding, create arrays for column, row and charge data
@@ -70,6 +81,8 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_ran
                 tr_column = np.transpose(tr_column)
                 tr_row = np.transpose(tr_row)
                 tr_charge = np.transpose(tr_charge)
+
+                tracklets_data_chunk.track_quality = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
                 # Perform the track finding with jitted loop
                 tracklets_data_chunk, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
