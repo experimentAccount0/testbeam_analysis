@@ -247,7 +247,151 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(track_candidates_file, tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
+def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, chunk_size=1000000):
+    '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
+    The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
+
+    Parameters
+    ----------
+    track_candidates_file : string
+        file name with the track candidates table
+    tracks_file : string
+        file name of the created track file having the track table
+    z_position : iterable
+        the positions of the devices in z in cm
+    fit_duts : iterable
+        the duts to fit tracks for. If None all duts are used
+    ignore_duts : iterable
+        the duts that are not taken in a fit. Needed to exclude bad planes from track fit. Also included Duts are ignored!
+    include_duts : iterable
+        the relative dut positions of dut to use in the track fit. The position is relative to the actual dut the tracks are fitted for
+        e.g. actual track fit dut = 2, include_duts = [-3, -2, -1, 1] means that duts 0, 1, 3 are used for the track fit
+    max_tracks : int, None
+        only events with tracks <= max tracks are taken
+    track_quality : int
+        0: All tracks with hits in DUT and references are taken
+        1: The track hits in DUT and reference are within 5-sigma of the correlation
+        2: The track hits in DUT and reference are within 2-sigma of the correlation
+        Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each 'quality stage', one digit per DUT.
+        E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
+    pixel_size : iterable, (x dimensions, y dimension)
+        the size in um of the pixels, needed for chi2 calculation
+    output_pdf : pdf file name object
+        if None plots are printed to screen
+    correlated_only : bool
+        Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
+    '''
+
+    logging.info('=== Fit tracks ===')
+
+    def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
+        # Define description
+        description = [('event_number', np.int64)]
+        for index in range(n_duts):
+            description.append(('column_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('row_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('charge_dut_%d' % index, np.float))
+        for dimension in range(3):
+            description.append(('offset_%d' % dimension, np.float))
+        for dimension in range(3):
+            description.append(('slope_%d' % dimension, np.float))
+        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.uint8)])
+
+        # Define structure of track_array
+        tracks_array = np.zeros((n_tracks,), dtype=description)
+        tracks_array['event_number'] = good_track_candidates['event_number']
+        tracks_array['track_quality'] = good_track_candidates['track_quality']
+        tracks_array['n_tracks'] = good_track_candidates['n_tracks']
+        for index in range(n_duts):
+            tracks_array['column_dut_%d' % index] = good_track_candidates['column_dut_%d' % index]
+            tracks_array['row_dut_%d' % index] = good_track_candidates['row_dut_%d' % index]
+            tracks_array['charge_dut_%d' % index] = good_track_candidates['charge_dut_%d' % index]
+        for dimension in range(3):
+            tracks_array['offset_%d' % dimension] = offsets[:, dimension]
+            tracks_array['slope_%d' % dimension] = slopes[:, dimension]
+        tracks_array['track_chi2'] = chi2s
+
+        return tracks_array
+
+    with PdfPages(output_pdf) as output_fig:
+        with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
+            with tb.open_file(tracks_file, mode='w') as out_file_h5:
+                n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
+                fit_duts = fit_duts if fit_duts else range(n_duts)
+                for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
+                    logging.info('Fit tracks for DUT %d', fit_dut)
+                    tracklets_table = None
+                    for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
+
+                        # Select track candidates
+                        dut_selection = 0  # DUTs to be used in the fit
+                        quality_mask = 0  # Masks DUTs to check track quality for
+                        for include_dut in include_duts:  # Calculate mask to select DUT hits for fitting
+                            if fit_dut + include_dut < 0 or ((ignore_duts and fit_dut + include_dut in ignore_duts) or fit_dut + include_dut >= n_duts):
+                                continue
+                            if include_dut >= 0:
+                                dut_selection |= ((1 << fit_dut) << include_dut)
+                            else:
+                                dut_selection |= ((1 << fit_dut) >> abs(include_dut))
+
+                            quality_mask = dut_selection | (1 << fit_dut)  # Include the DUT where the track is fitted for in quality check
+
+                        if bin(dut_selection).count("1") < 2:
+                            logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
+                            continue
+
+                        # Select tracks based on given track_quality
+                        good_track_selection = (track_candidates_chunk['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
+                        if max_tracks:  # Option to neglect events with too many hits
+                            good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] <= max_tracks)
+
+                        logging.info('Lost %d tracks due to track quality cuts, %d percent ', good_track_selection.shape[0] - np.count_nonzero(good_track_selection), (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
+
+                        if use_correlated:  # Reduce track selection to correlated DUTs only
+                            good_track_selection &= (track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
+                            logging.info('Lost due to correlated cuts %d', good_track_selection.shape[0] - np.sum(track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24)))
+
+                        good_track_candidates = track_candidates_chunk[good_track_selection]
+
+                        # Prepare track hits array to be fitted
+                        n_fit_duts = bin(dut_selection).count("1")
+                        index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
+                        track_hits = np.zeros((n_tracks, n_fit_duts, 3))
+                        for dut_index in range(0, n_duts):  # Fill index loop of new array
+                            if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
+                                xyz = np.column_stack((good_track_candidates['column_dut_%s' % dut_index], good_track_candidates['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks)))
+                                track_hits[:, index, :] = xyz
+                                index += 1
+
+                        # Split data and fit on all available cores
+                        n_slices = cpu_count()
+                        slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
+                        slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+                        pool = Pool(n_slices)
+                        results = pool.map(_fit_tracks_loop, slices)
+                        pool.close()
+                        pool.join()
+                        del track_hits
+
+                        # Store results
+                        offsets = np.concatenate([i[0] for i in results])  # merge offsets from all cores in results
+                        slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
+                        chi2s = np.concatenate([i[2] for i in results])  # merge chi2 from all cores in results
+
+                        tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts)
+
+                        if tracklets_table is None:
+                            tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+                        tracklets_table.append(tracks_array)
+
+                        # Plot chi2 distribution
+                        plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
+
+
+def fit_tracks_kalman(track_candidates_file, tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
