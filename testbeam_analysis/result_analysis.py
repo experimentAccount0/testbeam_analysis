@@ -17,6 +17,8 @@ def gauss(x, *p):
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
 # FIXME: calculate_residuals should not care how the tracks were fitted; thus this function is not needed
+
+
 def calculate_residuals_kalman(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method="Interpolation", geometryFile=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
@@ -149,15 +151,17 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
                 mean, rms = np.mean(difference[:, i]), np.std(difference[:, i])
                 hist, edges = np.histogram(difference[:, i], range=(mean - 5. * rms, mean + 5. * rms), bins=1000)
                 fit_ok = False
+                coeff, var_matrix = None, None
                 try:
                     coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
                     fit_ok = True
+                    residuals.append(np.abs(coeff[2]))
                 except:
                     fit_ok = False
+                    residuals.append(-1)
 
                 if output_pdf is not False:
                     plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
-                residuals.append(np.abs(coeff[2]))
 
     if output_fig:
         output_fig.close()
@@ -205,9 +209,9 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     else:
         fit, pcov = None, None
 
-    print "Linear fit:"
-    print fit
-    print pcov
+    print("Linear fit:")
+    print(fit)
+    print(pcov)
 
     return mean_fitted, selected_data, fit, pcov
 
