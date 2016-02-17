@@ -46,11 +46,11 @@ class TestHitAnalysis(unittest.TestCase):
         self.assertTrue(data_equal, msg=error_msg)
 
     @unittest.SkipTest  # Unclear how to check interactive alignment automatically
-    def test_hit_alignment(self):  # Check the hit alignment function
-        dut_alignment.align_hits(correlation_file=os.path.join(tests_data_folder + 'Correlation_result.h5'),
-                                 alignment_file=os.path.join(self.output_folder + 'Alignment.h5'),
-                                 output_pdf=os.path.join(self.output_folder + 'Alignment.pdf'),
-                                 pixel_size=self.pixel_size)
+    def test_coarse_alignment(self):  # Check the hit alignment function
+        dut_alignment.coarse_alignment(correlation_file=os.path.join(tests_data_folder + 'Correlation_result.h5'),
+                                       alignment_file=os.path.join(self.output_folder + 'Alignment.h5'),
+                                       output_pdf=os.path.join(self.output_folder + 'Alignment.pdf'),
+                                       pixel_size=self.pixel_size)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Alignment_result.h5'), os.path.join(self.output_folder + 'Alignment.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
