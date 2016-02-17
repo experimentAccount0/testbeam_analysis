@@ -34,15 +34,15 @@ def create_initial_geometry(outFile, zpos, initial_translation=None, initial_rot
         if (initial_translation is not None and len(zpos) == initial_translation.shape[0]) or initial_translation is None:
             xy_translation = np.c_[xy_translation_t, zpos]
         else:
-            print "create_initial_geometry: number of planes in initial translation doesn't match the one given by zpos"
-            print "create_initial_geometry: setting all translations to 0"
+            print("create_initial_geometry: number of planes in initial translation doesn't match the one given by zpos")
+            print("create_initial_geometry: setting all translations to 0")
 
         if initial_rotation is not None:
             if initial_rotation.shape == rotation_matrixes.shape:
                 rotation_matrixes = initial_rotation
             else:
-                print "create_initial_geometry: initial_rotation must have shape (n_planes,3,3)"
-                print "create_initial_geometry: setting all rotations to Identity"
+                print("create_initial_geometry: initial_rotation must have shape (n_planes,3,3)")
+                print("create_initial_geometry: setting all rotations to Identity")
 
         for index in range(3):
             geo_pars['translation_%d' % index] = xy_translation[:, index]
@@ -123,7 +123,7 @@ def update_rotation_angle(geoFile, dut, val, mode="Absolute", angle="Gamma"):
                 [...]'''
 
     if angle is not "Alpha" and angle is not "Beta" and angle is not "Gamma":
-        print "update_rotation_angle: angle ", angle, " not recognized. Not applying any rotation."
+        print("update_rotation_angle: angle ", angle, " not recognized. Not applying any rotation.")
         return
     xy_translation, rotation_matrixes = recontruct_geometry_from_file(geoFile)
     nplanes = xy_translation.shape[0]
@@ -169,5 +169,5 @@ def update_translation_val(geoFile, dut, xval, yval, mode="Absolute"):
         xy_translation[dut, 0] += xval
         xy_translation[dut, 1] += yval
     else:
-        print "update_translation_val: mode not recognized. Not applying any translation."
+        print("update_translation_val: mode not recognized. Not applying any translation.")
     update_geometry(geoFile, dut, xy_translation, rotation_matrixes, nplanes)
