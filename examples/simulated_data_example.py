@@ -1,9 +1,6 @@
-''' Example script to run a full analysis on FE-I4 telescope data. The original data was recorded at DESY with pyBar.
-The telescope consists of 6 DUTs with ~ 2 cm distance between the planes. Only the first two and last two planes were taken here.
-The first and last plane were IBL n-in-n planar sensors and the 2 devices in the middle 3D CNM/FBK sensors.
+''' Example script to run a full analysis on simulated data.
 '''
 
-import os
 import logging
 from multiprocessing import Pool
 
@@ -20,7 +17,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
     # Simulate 1000000 events with std. settings
-    simulate_data = SimulateData(0)  # Start simulator with seed = 0
+    simulate_data = SimulateData(0)  # Start simulator with random seed = 0
+    simulate_data.dut_efficiencies = [1., 0.99, 0.90, 0.8, 0.98, 1.]
     simulate_data.create_data_and_store('simulated_data', n_events=1000000)
 
     # The location of the data files, one file per DUT
@@ -88,7 +86,6 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                               tracks_file='Tracks.h5',
                               output_pdf='Tracks.pdf',
                               z_positions=z_positions,
-                              fit_duts=[0, 1, 2, 3],
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
 
@@ -102,33 +99,17 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(tracks_file='Tracks.h5',
                                         output_pdf='Residuals.pdf',
-                                        z_positions=z_positions,
-                                        max_chi2=10000)
-
-    # Plot the track density on selected DUT planes
-    plot_utils.plot_track_density(tracks_file='Tracks.h5',
-                                  output_pdf='TrackDensity.pdf',
-                                  z_positions=z_positions,
-                                  dim_x=80,
-                                  dim_y=336,
-                                  pixel_size=pixel_size,
-                                  use_duts=None)
-
-    plot_utils.plot_charge_distribution(trackcandidates_file='TrackCandidates.h5',
-                                        output_pdf='ChargeDistribution.pdf',
-                                        dim_x=(80, 80, 80, 80),
-                                        dim_y=(336, 336, 336, 336),
-                                        pixel_size=pixel_size)
+                                        z_positions=z_positions)
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     result_analysis.calculate_efficiency(tracks_file='Tracks.h5',
                                          output_pdf='Efficiency.pdf',
                                          z_positions=z_positions,
-                                         bin_size=(250, 50),
+                                         bin_size=(50, 50),
                                          minimum_track_density=2,
                                          use_duts=None,
-                                         cut_distance=500,
+                                         cut_distance=None,
                                          max_distance=500,
-                                         col_range=(1250, 17500),
-                                         row_range=(1000, 16000))
+                                         col_range=None,
+                                         row_range=None)
