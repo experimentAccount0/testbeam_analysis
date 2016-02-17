@@ -74,9 +74,12 @@ def correlate_hits(hit_files, alignment_file, fraction=1, event_range=0):
                     out_row[:] = row_corr
 
 
-def align_hits(correlation_file, alignment_file, output_pdf, pixel_size):
-    '''Takes the correlation histograms, fits the correlations and stores the correlation parameters. The user can define cuts on the fit error and straight line offset
-    in an interactive way.
+def coarse_alignment(correlation_file, alignment_file, output_pdf, pixel_size):
+    '''Takes the correlation histograms, fits the correlations and stores the correlation parameters.
+    The user can define cuts on the fit error and straight line offset in an interactive way.
+
+    This is a coarse alignment that uses the hit correlation and corrects for translations between the planes and beam divergences.
+    The alignment of the plane rotation needs the the fine alignment function.
 
     Parameters
     ----------
@@ -89,7 +92,7 @@ def align_hits(correlation_file, alignment_file, output_pdf, pixel_size):
     pixel_size: iterable of column, row pairs if devices have different pixel sizes or one column, row iterable if the pixel size is the same
         e.g. [(10, 20), (30, 40)] for two devices with pixel size 10x20 um and 30x40 um
     '''
-    logging.info('=== Align hit coordinates ===')
+    logging.info('=== Coarse align the DUTs using hit coordinates ===')
 
     def gauss(x, *p):
         A, mu, sigma, offset = p
@@ -192,6 +195,25 @@ def align_hits(correlation_file, alignment_file, output_pdf, pixel_size):
                     result_table.append(result)
                 except tb.exceptions.NodeError:
                     logging.warning('Correlation table exists already. Do not create new.')
+
+
+def fine_alignment(track_candidates_file, alignment_file, output_pdf):
+    '''Takes the track candidates, and fits a track for each DUT using the neigbouring DUTs in an iterative way.
+    Plots the residuals in x / y as a function of x / y to deduce rotation and translation parameters.
+    These parameters are set in the aligment file and used to correct the hit positions in the track candidates array.
+
+    Parameters
+    ----------
+    track_candidates_file : pytbales file
+        The input file with the track candidates.
+    alignment_file : pytables file
+        The output file for correlation data.
+    output_pdf : pdf file
+        File name for the alignment plots
+    pixel_size: iterable of column, row pairs if devices have different pixel sizes or one column, row iterable if the pixel size is the same
+        e.g. [(10, 20), (30, 40)] for two devices with pixel size 10x20 um and 30x40 um
+    '''
+    logging.info('=== Fine align the DUTs using line fit residuals ===')
 
 
 def merge_cluster_data(cluster_files, alignment_file, tracklets_file, pixel_size, chunk_size=5000000):
