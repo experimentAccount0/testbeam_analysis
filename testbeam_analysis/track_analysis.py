@@ -818,8 +818,8 @@ def _fit_tracks_kalman_loop(track_hits, pitches, plane_pos):
     for i, xx in enumerate(x0s):
         thetat = ((13.6 / momentum) * sqrt(xx) * (1 + 0.038 * log(xx)))  # from formula
         thetas[i] = thetat.real
-    print "Thetas: "
-    print thetas
+    print("Thetas: ")
+    print(thetas)
 
     '''Kalman filter parameters'''
     transition_matrix = np.zeros((nplanes, 2, 2))
