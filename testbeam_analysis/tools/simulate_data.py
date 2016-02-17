@@ -117,12 +117,21 @@ class SimulateData(object):
             dut_hits -= np.array(self.offsets[dut_index])  # Add DUT offset
             dut_hits /= np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
             dut_hits = dut_hits.astype(np.int32) + 1  # Pixel discretization, column/row index start from 1
+
             # Mask hit outside of the DUT
             selection_x = np.logical_or(dut_hits.T[0] < 1, dut_hits.T[0] > self.dut_n_pixel[dut_index][0])  # Hits that are outside the x dimension of the DUT
             selection_y = np.logical_or(dut_hits.T[1] < 1, dut_hits.T[1] > self.dut_n_pixel[dut_index][1])  # Hits that are outside the y dimension of the DUT
+            selection = np.logical_or(selection_x, selection_y)
             mask = np.zeros_like(dut_hits, dtype=np.bool)
-            mask[np.logical_or(selection_x, selection_y)] = 1
-            dut_hits = np.ma.array(dut_hits, dtype=np.uint16, mask=mask)  # Mask all hits outside of the DUT
+            mask[selection] = 1
+
+            # Mask hits due to inefficiency
+            hit_indices = np.where(~selection)[0]  # Indices of not masked hits
+            np.random.shuffle(hit_indices)  # shuffle these indeces
+            n_inefficient_hit = int(hit_indices.shape[0] * (1. - self.dut_efficiencies[dut_index]))
+            mask[hit_indices[:n_inefficient_hit]] = 1
+
+            dut_hits = np.ma.array(dut_hits, dtype=np.uint16, mask=mask)
             digitized_hits.append(dut_hits)
 
         return digitized_hits
