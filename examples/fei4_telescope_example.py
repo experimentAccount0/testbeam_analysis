@@ -33,12 +33,12 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
     cluster_files = [os.path.splitext(data_file)[0] + '_cluster.h5' for data_file in data_files]
 
-    geo_file = os.path.join(output_folder, 'FEI4Geometry.h5')
-
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-    # Create the initial geometry (to be done once)
-    geometry_utils.create_initial_geometry(geo_file, z_positions)
+# FIXME: need major rework
+# Create the initial geometry (to be done once)
+#     geometry_utils.create_initial_geometry(geo_file, z_positions)
+#     geo_file = os.path.join(output_folder, 'FEI4Geometry.h5')
 
     # Cluster hits off all DUTs
     args = [{'data_file': data_files[i],
@@ -61,10 +61,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.align_hits(correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                             alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                             output_pdf=os.path.join(output_folder, 'Alignment.pdf'),
-                             pixel_size=pixel_size)
+    dut_alignment.coarse_alignment(correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                   alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                   output_pdf=os.path.join(output_folder, 'Alignment.pdf'),
+                                   pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(cluster_files,
@@ -85,7 +85,6 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf=os.path.join(output_folder, 'Tracks.pdf'),
-                              geometry_file=geo_file,
                               z_positions=z_positions,
                               fit_duts=[0, 1, 2, 3],
                               include_duts=[-3, -2, -1, 1, 2, 3],

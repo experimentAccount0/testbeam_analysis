@@ -46,17 +46,18 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
-    geo_file = os.path.join(output_folder, 'MimosaGeometry.h5')
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-    # Create the initial geometry (to be done once)
-    geometry_utils.create_initial_geometry(geo_file, z_positions)
-    geometry_utils.update_rotation_angle(geo_file, 0, -0.00104)
-    geometry_utils.update_rotation_angle(geo_file, 1, 0.00104)
-    geometry_utils.update_rotation_angle(geo_file, 2, 0.00102)
-    geometry_utils.update_translation_val(geo_file, 1, -10.7, 19.4)
-    geometry_utils.update_translation_val(geo_file, 2, -12.1, 17.4)
+# FIMXE: this is not ok
+# Create the initial geometry (to be done once)
+# geo_file = os.path.join(output_folder, 'MimosaGeometry.h5')
+#     geometry_utils.create_initial_geometry(geo_file, z_positions)
+#     geometry_utils.update_rotation_angle(geo_file, 0, -0.00104)
+#     geometry_utils.update_rotation_angle(geo_file, 1, 0.00104)
+#     geometry_utils.update_rotation_angle(geo_file, 2, 0.00102)
+#     geometry_utils.update_translation_val(geo_file, 1, -10.7, 19.4)
+#     geometry_utils.update_translation_val(geo_file, 2, -12.1, 17.4)
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
     args = [{'input_raw_data_file': data_files[i],
@@ -92,10 +93,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.align_hits(correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                             alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                             output_pdf=os.path.join(output_folder, 'Alignment.pdf'),
-                             pixel_size=pixel_size)
+    dut_alignment.coarse_alignment(correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                   alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                   output_pdf=os.path.join(output_folder, 'Alignment.pdf'),
+                                   pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(cluster_files,
@@ -112,20 +113,15 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf=os.path.join(output_folder, 'Tracks.pdf'),
-                              geometry_file=geo_file,
                               z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
                               include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
-                              track_quality=2,
-                              method='Interpolation',
-                              pixel_size=pixel_size)
+                              track_quality=2)
 
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         output_pdf=os.path.join(output_folder, 'Residuals.pdf'),
                                         z_positions=z_positions,
                                         use_duts=None,
-                                        max_chi2=None,
-                                        method='Interpolation',
-                                        geometryFile=geo_file)
+                                        max_chi2=None)
