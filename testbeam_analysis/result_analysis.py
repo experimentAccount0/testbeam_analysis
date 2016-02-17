@@ -16,8 +16,8 @@ def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
-
-def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method="Interpolation", geometryFile=None):
+# FIXME: calculate_residuals should not care how the tracks were fitted; thus this function is not needed
+def calculate_residuals_kalman(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method="Interpolation", geometryFile=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
@@ -93,6 +93,71 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
                     # if j != i:
                     mean_fitted, selected_data, fit, pcov = calculate_correlation_fromplot(hits[:, i], difference[:, j], xedges, yedges, dofit=True)
                     plot_utils.plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitted, selected_data, fit, pcov, output_fig)
+
+    if output_fig:
+        output_fig.close()
+
+    return residuals
+
+
+def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
+    '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
+    Parameters
+    ----------
+    tracks_file : string
+        File name with the tracks table
+    z_position : iterable
+        The positions of the devices in z in cm
+    use_duts : iterable
+        The duts to calculate residuals for. If None all duts in the tracks_file are used
+    max_chi2 : int
+        Use only converged fits (cut on chi2)
+    output_pdf : pdf file name
+        If None plots are printed to screen.
+        If False no plots are created.
+    Returns
+    -------
+    A list of residuals in column row. e.g.: [Col residual DUT 0, Row residual DUT 0, Col residual DUT 1, Row residual DUT 1, ...]
+    '''
+    logging.info('=== Calculate residuals ===')
+
+    def gauss(x, *p):
+        A, mu, sigma = p
+        return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+
+    output_fig = PdfPages(output_pdf) if output_pdf else None
+
+    residuals = []
+
+    with tb.open_file(tracks_file, mode='r') as in_file_h5:
+        for node in in_file_h5.root:
+            actual_dut = int(node.name[-1:])
+            if use_duts and actual_dut not in use_duts:
+                continue
+            logging.info('Calculate residuals for DUT %d', actual_dut)
+
+            track_array = node[:]
+
+            if max_chi2:
+                track_array = track_array[track_array['track_chi2'] <= max_chi2]
+            track_array = track_array[np.logical_and(track_array['column_dut_%d' % actual_dut] != 0., track_array['row_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
+            hits, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
+            intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+            difference = intersection - hits
+
+            for i in range(2):  # col / row
+                mean, rms = np.mean(difference[:, i]), np.std(difference[:, i])
+                hist, edges = np.histogram(difference[:, i], range=(mean - 5. * rms, mean + 5. * rms), bins=1000)
+                fit_ok = False
+                try:
+                    coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
+                    fit_ok = True
+                except:
+                    fit_ok = False
+
+                if output_pdf is not False:
+                    plot_utils.plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig=output_fig)
+                residuals.append(np.abs(coeff[2]))
 
     if output_fig:
         output_fig.close()
