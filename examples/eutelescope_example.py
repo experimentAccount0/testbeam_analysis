@@ -59,7 +59,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     geometry_utils.update_translation_val(geo_file, 2, -12.1, 17.4)
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
-    args = [{'data_file': data_files[i],
+    args = [{'input_raw_data_file': data_files[i],
              'n_pixel': n_pixel[i],
              'pixel_size': pixel_size[i]} for i in range(0, len(data_files))]
     pool = Pool()
@@ -67,7 +67,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.close()
     pool.join()
 
-    data_files = [os.path.splitext(data_file)[0] + '_hot_pixel.h5' for data_file in data_files]
+    data_files = [os.path.splitext(data_file)[0] + '_noisy_pixels.h5' for data_file in data_files]
     cluster_files = [os.path.splitext(data_file)[0] + '_cluster.h5' for data_file in data_files]
 
     # Cluster hits off all DUTs
@@ -82,7 +82,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.join()
 
     plot_utils.plot_cluster_size(cluster_files,
-                                 output_pdf=os.path.join(output_folder, r'/Cluster_Size.pdf'))
+                                 output_pdf=os.path.join(output_folder, '/Cluster_Size.pdf'))
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(data_files,
