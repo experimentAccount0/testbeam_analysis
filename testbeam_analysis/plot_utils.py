@@ -810,11 +810,10 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
 
     plt.clf()
     plt.grid()
-    plt.title('Efficiency per pixel')
+    plt.title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
     plt.xlabel('Efficiency [%]')
     plt.ylabel('#')
     plt.yscale('log')
-    plt.title('Efficiency for DUT %d' % actual_dut)
     plt.xlim([-0.5, 101.5])
-    plt.hist(efficiency.ravel(), bins=100, range=(1, 100))
+    plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
     output_fig.savefig()
