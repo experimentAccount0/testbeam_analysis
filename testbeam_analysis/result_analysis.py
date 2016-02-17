@@ -212,7 +212,7 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     return mean_fitted, selected_data, fit, pcov
 
 
-def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None):
+def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -264,11 +264,14 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                 # Allow different bin_sizes for every plane
                 bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
                 if len(bin_size) != 1:
-                    n_bin_x = dimensions[0] / bin_size[index][0]
-                    n_bin_y = dimensions[1] / bin_size[index][1]
+                    actual_bin_size_x = bin_size[index][0]
+                    actual_bin_size_y = bin_size[index][1]
                 else:
-                    n_bin_x = dimensions[0] / bin_size[0][0]
-                    n_bin_y = dimensions[1] / bin_size[0][1]
+                    actual_bin_size_x = bin_size[0][0]
+                    actual_bin_size_y = bin_size[0][1]
+
+                n_bin_x = dimensions[0] / actual_bin_size_x
+                n_bin_y = dimensions[1] / actual_bin_size_y
 
                 # Cut in Chi 2 of the track fit
                 if max_chi2:
@@ -285,10 +288,10 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                     index = 0
                 if len(row_range) == 1:
                     index = 0
-                if None not in col_range:
+                if col_range[index] is not None:
                     selection = np.logical_and(intersection[:, 0] >= col_range[index][0], intersection[:, 0] <= col_range[index][1])
                     hits, intersection = hits[selection], intersection[selection]
-                if None not in row_range:
+                if row_range[index] is not None:
                     selection = np.logical_and(intersection[:, 1] >= row_range[index][0], intersection[:, 1] <= row_range[index][1])
                     hits, intersection = hits[selection], intersection[selection]
 
@@ -297,8 +300,8 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                 distance = np.sqrt(np.dot(np.square(intersection - hits), scale))  # array with distances between DUT hit and track hit for each event. Values in um
 
                 col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                distance_array = np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5], [0, max_distance]])[0]
-                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5]])
+                distance_array = np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[0, dimensions[0]], [0, dimensions[1]], [0, max_distance]])[0]
+                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
 
                 # Calculate distances between hit and intersection
                 distance_mean_array = np.average(distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
@@ -314,15 +317,33 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                 else:
                     intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
 
-                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5]])
-                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[0] + 0.5], [1.5, dimensions[1] + 0.5]])
+                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
+                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
                 efficiency = np.zeros_like(track_density_with_DUT_hit)
                 efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
 
-                plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, dimensions, cut_distance, output_fig)
+                plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
 
                 logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
 
+                if output_file:
+                    with tb.open_file(output_file, 'a') as out_file_h5:
+                        actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+                        out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                        out_efficiency_mask = out_file_h5.createCArray(actual_dut_folder, name='Efficiency_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.mask.dtype), shape=efficiency.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                        # Store parameters used for efficiency calculation
+                        out_efficiency.attrs.z_positions = z_positions
+                        out_efficiency.attrs.bin_size = bin_size
+                        out_efficiency.attrs.minimum_track_density = minimum_track_density
+                        out_efficiency.attrs.sensor_size = sensor_size
+                        out_efficiency.attrs.use_duts = use_duts
+                        out_efficiency.attrs.max_chi2 = max_chi2
+                        out_efficiency.attrs.cut_distance = cut_distance
+                        out_efficiency.attrs.max_distance = max_distance
+                        out_efficiency.attrs.col_range = col_range
+                        out_efficiency.attrs.row_range = row_range
+                        out_efficiency[:] = efficiency.T
+                        out_efficiency_mask[:] = efficiency.mask.T
     return efficiencies
