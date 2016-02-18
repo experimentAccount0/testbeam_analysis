@@ -13,7 +13,7 @@ init:
   - cmd: msiexec /i C:\VCForPython27.msi /quiet /qn
   - set PATH=C:\Miniconda-x64;C:\Miniconda-x64\\Scripts;%PATH%  # Miniconda is already installed on appveyor: https://github.com/appveyor/ci/issues/359
   - conda install --yes numpy cython pytables scipy matplotlib pandas nose numba=0.22.1
-  - pip install progressbar-latest pixel_clusterizer pykalman
+  - pip install progressbar-latest pixel_clusterizer pykalman pylandau
   - conda info -a
   - conda list
 
