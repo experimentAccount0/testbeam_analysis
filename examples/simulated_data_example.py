@@ -18,8 +18,32 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
     # Simulate 1000000 events with std. settings
     simulate_data = SimulateData(0)  # Start simulator with random seed = 0
-    simulate_data.dut_efficiencies = [1., 0.99, 0.90, 0.8, 0.98, 1.]
-    simulate_data.create_data_and_store('simulated_data', n_events=1000000)
+
+    # All simulator settings are listed here and can be changed
+    # Setup settings
+    simulate_data.n_duts = 6
+    simulate_data.z_positions = [i * 10000 for i in range(simulate_data.n_duts)]  # in um; std: every 10 cm
+    simulate_data.offsets = [(-2500, -2500)] * simulate_data.n_duts  # in x, y in mu
+    simulate_data.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
+    # Beam settings
+    simulate_data.beam_position = (0, 0)  # Average beam position in x, y at z = 0 in mu
+    simulate_data.beam_position_sigma = (2000, 2000)  # in x, y at z = 0 in mu
+    simulate_data.beam_angle = 0  # Average beam angle in theta at z = 0 in mRad
+    simulate_data.beam_angle_sigma = 1  # Deviation from e average beam angle in theta at z = 0 in mRad
+    simulate_data.tracks_per_event = 1  # Average number of tracks per event
+    simulate_data.tracks_per_event_sigma = 1  # Deviation from the average number of tracks, makes no track pe event possible!
+    # Device settings
+    simulate_data.dut_bias = [50] * simulate_data.n_duts  # Sensor bias voltage for each device in volt
+    simulate_data.dut_thickness = [100] * simulate_data.n_duts  # Sensor thickness for each device in um
+    simulate_data.dut_threshold = [0] * simulate_data.n_duts  # Detection threshold for each device in electrons, influences efficiency!
+    simulate_data.dut_noise = [50] * simulate_data.n_duts  # Noise for each device in electrons
+    simulate_data.dut_pixel_size = [(50, 50)] * simulate_data.n_duts  # Pixel size for each device in x / y in um
+    simulate_data.dut_n_pixel = [(1000, 1000)] * simulate_data.n_duts  # Number of pixel for each device in x / y
+    simulate_data.dut_efficiencies = [1.] * simulate_data.n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
+    # Digitization settings
+    simulate_data.digitization_charge_sharing = True
+
+    simulate_data.create_data_and_store('simulated_data', n_events=100000)
 
     # The location of the data files, one file per DUT
     data_files = [r'simulated_data_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system, called internally DUT0
