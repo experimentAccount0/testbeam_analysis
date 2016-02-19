@@ -50,6 +50,9 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'dut_name': dut_name[i]} for i in range(0, len(data_files))]
     pool = Pool()
     multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
+    # free resources
+    pool.close()
+    pool.join()
     cluster_files = [res.get() for res in multiple_results]
 
     # Correlate the row / column of each DUT
