@@ -71,10 +71,13 @@ class TestHitAnalysis(unittest.TestCase):
             for dut_index in range(self.simulate_data.n_duts):  # Loop over DUTs
                 mpv_charge = 77 * self.simulate_data.dut_thickness[dut_index]  # 77 electrons per um in silicon
                 x = np.arange(0, 10, 0.1) * mpv_charge
-                y = landau.langau(x, mu=mpv_charge, eta=0.2 * mpv_charge, sigma=self.simulate_data.dut_noise[dut_index])
+                if self.simulate_data.dut_noise[dut_index]:
+                    y = landau.langau(x, mu=mpv_charge, eta=0.2 * mpv_charge, sigma=self.simulate_data.dut_noise[dut_index])
+                else:
+                    y = landau.landau(x, mu=mpv_charge, eta=0.2 * mpv_charge)
                 with tb.open_file('simulated_data_DUT%d.h5' % dut_index, 'r') as in_file_h5:
                     charge = in_file_h5.root.Hits[:]['charge'] * 10.  # 1 LSB corresponds to 10 electrons
-                    charge_hist, _ = np.histogram(charge, bins=100, range=(x[0], x[-1]))
+                    charge_hist, edges = np.histogram(charge, bins=100, range=(x[0], x[-1]))
 #                     import matplotlib.pyplot as plt
 #                     plt.plot(edges[:-1], charge_hist)
 #                     plt.plot(x, y / np.amax(y) * np.amax(charge_hist))
@@ -82,7 +85,16 @@ class TestHitAnalysis(unittest.TestCase):
 #                     plt.show()
                     self.assertTrue(np.allclose(y / np.amax(y) * np.amax(charge_hist), charge_hist, rtol=1, atol=10))
 
+        # Check Landau for different device thickness
         self.simulate_data.dut_thickness = [(i + 1) * 100 for i in range(self.simulate_data.n_duts)]  # Create charge distribution in different device thicknesses, thus Landau MPW should change
+        self.simulate_data.digitization_charge_sharing = False  # To judge deposited charge, charge sharing has to be off
+        self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+        check_charge()
+
+        # Check Landau for different device noiose
+        self.simulate_data.reset()
+        self.simulate_data.dut_thickness = [200 for i in range(self.simulate_data.n_duts)]  # Fix device thickness
+        self.simulate_data.dut_noise = [i * 1000 for i in range(self.simulate_data.n_duts)]  # Create charge distribution in different device noise, thus Langau sigma should change
         self.simulate_data.digitization_charge_sharing = False  # To judge deposited charge, charge sharing has to be off
         self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
         check_charge()
