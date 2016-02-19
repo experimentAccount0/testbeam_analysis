@@ -192,6 +192,27 @@ def coarse_alignment(correlation_file, alignment_file, output_pdf, pixel_size):
                 except tb.exceptions.NodeError:
                     logging.warning('Correlation table exists already. Do not create new.')
 
+                # Create transilation / rotation table that can be can be overwritten later in the fine alignment step; initial values define no translation and no rotation
+                description = [('DUT', np.int)]
+                for index in range(3):  # Translation has 3 dimensions
+                    description.append(('translation_%d' % index, np.float))
+                for i in range(3):  # Rotation matrix of the DUT
+                    for j in range(3):
+                        description.append(('rotation_%d_%d' % (i, j), np.float))
+
+                trans_rot_parameters = np.zeros((n_duts,), dtype=description)
+
+                # Rotation matrix without effect has 1s in the diagonal
+                trans_rot_parameters[:]['rotation_0_0'] = np.ones((n_duts,))
+                trans_rot_parameters[:]['rotation_1_1'] = np.ones((n_duts,))
+                trans_rot_parameters[:]['rotation_2_2'] = np.ones((n_duts,))
+
+                try:
+                    geometry_table = out_file_h5.create_table(out_file_h5.root, name='Geometry', title='File containing the fine alignment geometry parameters', description=np.zeros((1,), dtype=trans_rot_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    geometry_table.append(trans_rot_parameters)
+                except tb.exceptions.NodeError:
+                    logging.warning('Correlation table exists already. Do not create new.')
+
 
 def fine_alignment(track_candidates_file, alignment_file, output_pdf):
     '''Takes the track candidates, and fits a track for each DUT using the neigbouring DUTs in an iterative way.
