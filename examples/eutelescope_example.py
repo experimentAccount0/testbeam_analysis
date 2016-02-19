@@ -44,6 +44,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                (1152, 576)]  # Number of pixel on column, row for DUT 5
 
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
+    dut_name = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
 
@@ -60,33 +61,29 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 #     geometry_utils.update_translation_val(geo_file, 2, -12.1, 17.4)
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
-    args = [{'input_raw_data_file': data_files[i],
-             'n_pixel': n_pixel[i],
-             'pixel_size': pixel_size[i]} for i in range(0, len(data_files))]
+    kwargs = [{
+        'input_data_file': data_files[i],
+        'n_pixel': n_pixel[i],
+        'pixel_size': pixel_size[i],
+        'dut_name': dut_name[i]} for i in range(0, len(data_files))]
     pool = Pool()
-    pool.map(hit_analysis.remove_noisy_pixels_wrapper, args)  # delete noisy hits in DUT data files in parallel on multiple cores
-    pool.close()
-    pool.join()
-
-    data_files = [os.path.splitext(data_file)[0] + '_noisy_pixels.h5' for data_file in data_files]
-    cluster_files = [os.path.splitext(data_file)[0] + '_cluster.h5' for data_file in data_files]
+    multiple_results = [pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwarg) for kwarg in kwargs]
+    noisy_pixels_files = [res.get() for res in multiple_results]
 
     # Cluster hits off all DUTs
-    args = [{'data_file': data_files[i],
-             'max_x_distance': 3,
-             'max_y_distance': 3,
-             'max_time_distance': 2,
-             'max_cluster_hits':1000000} for i in range(0, len(data_files))]
+    kwargs = [{
+        'input_data_file': noisy_pixels_files[i],
+        'max_x_distance': 3,
+        'max_y_distance': 3,
+        'max_time_distance': 2,
+        'max_cluster_hits': 1000000,
+        'dut_name': dut_name[i]} for i in range(0, len(data_files))]
     pool = Pool()
-    Pool().map(hit_analysis.cluster_hits_wrapper, args)  # find cluster on all DUT data files in parallel on multiple cores
-    pool.close()
-    pool.join()
-
-    plot_utils.plot_cluster_size(cluster_files,
-                                 output_pdf=os.path.join(output_folder, 'Cluster_Size.pdf'))
+    multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
+    noisy_pixels_cluster_files = [res.get() for res in multiple_results]
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(data_files,
+    dut_alignment.correlate_hits(noisy_pixels_files,
                                  alignment_file=os.path.join(output_folder, 'Correlation.h5'), fraction=1)
     plot_utils.plot_correlations(alignment_file=os.path.join(output_folder, 'Correlation.h5'),
                                  output_pdf=os.path.join(output_folder, 'Correlations.pdf'))
@@ -99,7 +96,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                    pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(cluster_files,
+    dut_alignment.merge_cluster_data(noisy_pixels_cluster_files,
                                      alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                      tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
                                      pixel_size=pixel_size)

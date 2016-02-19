@@ -29,9 +29,9 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pixel_size = [(250, 50), (250, 50), (250, 50), (250, 50)]  # in um
     n_pixel = [(80, 336), (80, 336), (80, 336), (80, 336)]
     z_positions = [0., 19500, 108800, 128300]  # in um; optional, can be also deduced from data, but usually not with high precision (~ mm)
+    dut_name = ("Tel_0", "Tel_1", "Tel_2", "Tel_3")
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
-    cluster_files = [os.path.splitext(data_file)[0] + '_cluster.h5' for data_file in data_files]
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
@@ -41,17 +41,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 #     geo_file = os.path.join(output_folder, 'FEI4Geometry.h5')
 
     # Cluster hits off all DUTs
-    args = [{'data_file': data_files[i],
-             'max_x_distance': 2,
-             'max_y_distance': 1,
-             'max_time_distance': 2,
-             'max_cluster_hits':1000} for i in range(0, len(data_files))]
+    kwargs = [{
+        'input_data_file': data_files[i],
+        'max_x_distance': 2,
+        'max_y_distance': 1,
+        'max_time_distance': 2,
+        'max_cluster_hits':1000,
+        'dut_name': dut_name[i]} for i in range(0, len(data_files))]
     pool = Pool()
-    pool.map(hit_analysis.cluster_hits_wrapper, args)  # find cluster on all DUT data files in parallel on multiple cores
-    pool.close()
-    pool.join()
-    plot_utils.plot_cluster_size(cluster_files,
-                                 output_pdf=os.path.join(output_folder, 'Cluster_Size.pdf'))
+    multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
+    cluster_files = [res.get() for res in multiple_results]
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(data_files,

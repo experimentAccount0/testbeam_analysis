@@ -43,26 +43,22 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
 
 
-def plot_noisy_pixel(occupancy, noisy_pixel, threshold, filename):
-    # Plot noisy pixel
-    plot_range = (occupancy.shape[0], occupancy.shape[1])
-    fig = Figure()
-    fig.patch.set_facecolor('white')
-    ax = fig.add_subplot(111)
-#     print 'occupancy', np.median(occupancy) + np.std(occupancy), np.std(occupancy[occupancy < 10]), np.mean(occupancy), occupancy
-    plot_2d_pixel_hist(fig, ax, occupancy.T, plot_range, title='Pixel map (%d hot pixel)' % noisy_pixel[0].shape[0], z_min=0, z_max=np.std(occupancy[occupancy < 10]) * threshold)
-    fig.tight_layout()
-    fig.savefig(filename)
+def plot_noisy_pixels(data_file, pixel_size=None, output_pdf_file=None, dut_name=None):
+    with tb.open_file(data_file, 'r') as input_file_h5:
+        occupancy = np.ma.masked_array(input_file_h5.root.HistOcc[:], mask=input_file_h5.root.NoisyPixelsMask[:])
 
-
-def plot_noisy_pixels(occupancy, filename, pixel_size=None):
     if pixel_size:
         aspect = pixel_size[0] / pixel_size[1]
     else:
         aspect = "auto"
 
-    pdf_filename = os.path.splitext(filename)[0] + '.pdf'
-    with PdfPages(pdf_filename) as output_pdf:
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(data_file)[0] + '.pdf'
+
+    if not dut_name:
+        dut_name = os.path.split(data_file)[1]
+
+    with PdfPages(output_pdf_file) as output_pdf:
         plt.figure()
         ax = plt.subplot(111)
 
@@ -76,7 +72,7 @@ def plot_noisy_pixels(occupancy, filename, pixel_size=None):
         # check for any noisy pixels
         if noisy_pixels[0].shape[0] != 0:
             ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)
-        ax.set_title('%s with %d noisy pixel' % (os.path.split(filename)[1], np.ma.count_masked(occupancy)))
+        ax.set_title('%s with %d noisy pixel' % (dut_name, np.ma.count_masked(occupancy)))
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
@@ -86,7 +82,7 @@ def plot_noisy_pixels(occupancy, filename, pixel_size=None):
         plt.figure()
         ax = plt.subplot(111)
 
-        ax.set_title('Data with %d noisy pixel removed' % np.ma.count_masked(occupancy))
+        ax.set_title('%s with %d noisy pixel removed' % (dut_name, np.ma.count_masked(occupancy)))
         ax.imshow(occupancy, aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
     #     np.ma.filled(occupancy, fill_value=0)
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
@@ -95,29 +91,34 @@ def plot_noisy_pixels(occupancy, filename, pixel_size=None):
         output_pdf.savefig()
 
 
-def plot_cluster_size(cluster_files, output_pdf):
-    with PdfPages(output_pdf) as output_fig:
-        for cluster_file in cluster_files:
-            with tb.open_file(cluster_file, 'r') as input_file_h5:
-                cluster_n_hits = input_file_h5.root.Cluster[:]['n_hits']
-                # Save cluster size histogram
-                max_cluster_size = np.amax(cluster_n_hits)
-                plt.clf()
-                left = np.arange(max_cluster_size + 1)
-                hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                plt.bar(left, hight, align='center')
-                plt.title('Cluster size of\n%s' % os.path.split(cluster_file)[1])
-                plt.xlabel('Cluster size')
-                plt.ylabel('#')
-                plt.grid()
-                plt.yscale('log')
-                plt.xlim(xmin=0.5)
-                plt.ylim(ymin=1e-1)
-                output_fig.savefig()
-                plt.yscale('linear')
-                plt.ylim(ymax=np.amax(hight))
-                plt.xlim(0.5, 10.5)
-                output_fig.savefig()
+def plot_cluster_size(cluster_file, output_pdf_file=None, dut_name=None):
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(cluster_file)[0] + '.pdf'
+
+    if not dut_name:
+        dut_name = os.path.split(cluster_file)[1]
+
+    with PdfPages(output_pdf_file) as output_pdf:
+        with tb.open_file(cluster_file, 'r') as input_file_h5:
+            cluster_n_hits = input_file_h5.root.Cluster[:]['n_hits']
+            # Save cluster size histogram
+            max_cluster_size = np.amax(cluster_n_hits) + 1
+            plt.clf()
+            left = np.arange(max_cluster_size)
+            hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size,))
+            plt.bar(left, hight, align='center')
+            plt.title('Cluster size of %s' % dut_name)
+            plt.xlabel('Cluster size')
+            plt.ylabel('#')
+            plt.grid()
+            plt.yscale('log')
+            plt.xlim(xmin=0.5)
+            plt.ylim(ymin=1e-1)
+            output_pdf.savefig()
+            plt.yscale('linear')
+            plt.ylim(ymax=np.amax(hight))
+            plt.xlim(0.5, min(10, max_cluster_size - 1) + 0.5)
+            output_pdf.savefig()
 
 
 def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
