@@ -377,7 +377,8 @@ class SimulateData(object):
             actual_event_number = actual_event_number[selection]
 
             # Add noise to charge
-            dut_hits_digits[:, 2] += np.random.normal(0, self.dut_noise[dut_index], dut_hits_digits[:, 2].shape[0])
+            if self.dut_noise[dut_index] != 0:
+                dut_hits_digits[:, 2] += np.random.normal(0, self.dut_noise[dut_index], dut_hits_digits[:, 2].shape[0])
 
             # Delete hits below threshold
             actual_event_number = actual_event_number[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
