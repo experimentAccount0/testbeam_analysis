@@ -78,35 +78,35 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.close()
     pool.join()
     cluster_files = [res.get() for res in multiple_results]
- 
+
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(input_hits_files=data_files,
                                  output_correlation_file='Correlation.h5')
     plot_utils.plot_correlations(input_correlation_file='Correlation.h5',
                                  output_pdf='Correlations.pdf')
- 
+
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file='Correlation.h5',
                                    output_alignment_file='Alignment.h5',
                                    output_pdf='Alignment.pdf',
                                    pixel_size=pixel_size)
- 
+
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=cluster_files,
                                      input_alignment_file='Alignment.h5',
                                      output_tracklets_file='Tracklets.h5',
                                      pixel_size=pixel_size)
- 
+
     dut_alignment.check_hit_alignment(input_tracklets_file='Tracklets.h5',
                                       output_pdf='Alignment_Check.pdf',
                                       combine_n_hits=1000000)
- 
+
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
     track_analysis.find_tracks(input_tracklets_file='Tracklets.h5',
                                input_alignment_file='Alignment.h5',
                                output_track_candidates_file='TrackCandidates.h5')
- 
+
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file='TrackCandidates.h5',
                               output_tracks_file='Tracks.h5',
@@ -114,14 +114,14 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                               z_positions=z_positions,
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
- 
+
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file='Tracks.h5',
                            output_pdf='Event.pdf',
                            z_positions=z_positions,
                            event_range=(0, 10),
                            dut=1)
- 
+
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file='Tracks.h5',
                                         output_pdf='Residuals.pdf',
