@@ -48,17 +48,17 @@ class TestHitAnalysis(unittest.TestCase):
             self.assertTrue(np.allclose(expected_mean_column, mean_column, rtol=0.01, atol=10))
             self.assertTrue(np.allclose(expected_mean_row, mean_row, rtol=0.01, atol=10))
 
-        # Check different DUT offsets
+        # Test 1: Check different DUT offsets
         self.simulate_data.offsets = [(-35000, -35000), (-30000, -30000), (-25000, -25000), (-20000, -20000), (-15000, -15000), (-10000, -10000)]  # Set DUT offsets with respect to beam
         self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
         check_position()
 
-        # Check different beam offset
+        # Test 2: Check different beam offset
         self.simulate_data.beam_position = (500, 500)  # Shift beam position
         self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
         check_position()
 
-        # Check different beam parameter
+        # Test 3: Check different beam parameter
         self.simulate_data.beam_position_sigma = (0, 0)  # beam position sigma
         self.simulate_data.beam_position = (0, 0)  # Shift beam position
         self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
@@ -98,6 +98,66 @@ class TestHitAnalysis(unittest.TestCase):
         self.simulate_data.digitization_charge_sharing = False  # To judge deposited charge, charge sharing has to be off
         self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
         check_charge()
+
+    def test_beam_angle(self):
+        self.simulate_data.reset()
+
+        def check_beam_angle():
+            # Expected offsets in x, y at DUT planes due to initial beam angle theta and direction distribution phi = (start, stop)
+            expected_offsets_x, expected_offsets_y = [], []
+            if self.simulate_data.beam_direction[0] < self.simulate_data.beam_direction[1]:
+                mean_direction_cos = np.cos(np.arange(self.simulate_data.beam_direction[0], self.simulate_data.beam_direction[1], 0.01)).mean()  # A mean angle does not translate linearly to a mean offset
+                mean_direction_sin = np.sin(np.arange(self.simulate_data.beam_direction[0], self.simulate_data.beam_direction[1], 0.01)).mean()
+            else:
+                mean_direction_cos = np.cos(self.simulate_data.beam_direction[0])
+                mean_direction_sin = np.sin(self.simulate_data.beam_direction[0])
+            for dut_index in range(self.simulate_data.n_duts):
+                offset = self.simulate_data.beam_position[0] - self.simulate_data.offsets[dut_index][0]
+                expected_offsets_x.append(offset + mean_direction_cos * np.tan(self.simulate_data.beam_angle / 1000.) * self.simulate_data.z_positions[dut_index])
+                expected_offsets_y.append(offset + mean_direction_sin * np.tan(self.simulate_data.beam_angle / 1000.) * self.simulate_data.z_positions[dut_index])
+
+            # Extract results
+            mean_column, mean_row = [], []
+            for dut_index in range(self.simulate_data.n_duts):
+                with tb.open_file('simulated_data_DUT%d.h5' % dut_index, 'r') as in_file_h5:
+                    mean_column.append((in_file_h5.root.Hits[:]['column'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][0])
+                    mean_row.append((in_file_h5.root.Hits[:]['row'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][1])
+
+            # Check for similarity, on pixel width error expected (binning error)
+            self.assertTrue(np.allclose(expected_offsets_x, mean_column, rtol=0.001, atol=self.simulate_data.dut_pixel_size[0][0]))
+            self.assertTrue(np.allclose(expected_offsets_y, mean_row, rtol=0.001, atol=self.simulate_data.dut_pixel_size[0][0]))
+
+        # Test 1: Fixed theta angle, different fixed phi
+        self.simulate_data.beam_angle = 5  # If the angle is too small this tests fails due to pixel discretisation error
+        self.simulate_data.dut_pixel_size = [(1, 1)] * self.simulate_data.n_duts  # If the pixel size is too big this tests fails due to pixel discretisation error
+        self.simulate_data.dut_n_pixel = [(10000, 10000)] * self.simulate_data.n_duts  # If the sensor is too small the mean cannot be easily calculated
+        self.simulate_data.beam_angle_sigma = 0
+        self.simulate_data.beam_position_sigma = (0, 0)
+        self.simulate_data.dut_material_budget = [0] * self.simulate_data.n_duts  # Turn off mulitple scattering
+        self.simulate_data.digitization_charge_sharing = False  # Simplify position reconstruction
+
+        for phi in [0, np.pi / 4., np.pi / 2., 3. / 4. * np.pi, np.pi, 5. * np.pi / 4., 3 * np.pi / 2.]:
+            self.simulate_data.beam_direction = (phi, phi)
+            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            check_beam_angle()
+
+        # Test 2: Fixed theta angle, different phi ranges
+        for phi_max in [0, np.pi / 4., np.pi / 2., 3. / 4. * np.pi, np.pi, 5. * np.pi / 4., 3 * np.pi / 2.]:
+            self.simulate_data.beam_direction = (0, phi_max)
+            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            check_beam_angle()
+
+        # Test 3: Fixed theta angle, different phi ranges
+        for phi_max in [0, np.pi / 4., np.pi / 2., 3. / 4. * np.pi, np.pi, 5. * np.pi / 4., 3 * np.pi / 2.]:
+            self.simulate_data.beam_direction = (0, phi_max)
+            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            check_beam_angle()
+
+        # Test 4: Gaussian dstributed theta angle, full phi range
+        self.simulate_data.beam_angle_sigma = 2
+        self.simulate_data.beam_direction = (0, 2. * np.pi)
+        self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+        check_beam_angle()
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
