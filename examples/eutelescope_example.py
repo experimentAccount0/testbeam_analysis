@@ -62,7 +62,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
     kwargs = [{
-        'input_data_file': data_files[i],
+        'input_hits_file': data_files[i],
         'n_pixel': n_pixel[i],
         'pixel_size': pixel_size[i],
         'dut_name': dut_name[i]} for i in range(0, len(data_files))]
@@ -72,7 +72,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Cluster hits off all DUTs
     kwargs = [{
-        'input_data_file': noisy_pixels_files[i],
+        'input_hits_file': noisy_pixels_files[i],
         'max_x_distance': 3,
         'max_y_distance': 3,
         'max_time_distance': 2,
@@ -85,32 +85,32 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     noisy_pixels_cluster_files = [res.get() for res in multiple_results]
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(noisy_pixels_files,
-                                 alignment_file=os.path.join(output_folder, 'Correlation.h5'), fraction=1)
-    plot_utils.plot_correlations(alignment_file=os.path.join(output_folder, 'Correlation.h5'),
+    dut_alignment.correlate_hits(input_hits_files=noisy_pixels_files,
+                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'), fraction=1)
+    plot_utils.plot_correlations(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                  output_pdf=os.path.join(output_folder, 'Correlations.pdf'))
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.coarse_alignment(correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                                   alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+    dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                   output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                    output_pdf=os.path.join(output_folder, 'Alignment.pdf'),
                                    pixel_size=pixel_size)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(noisy_pixels_cluster_files,
-                                     alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                     tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
+    dut_alignment.merge_cluster_data(input_cluster_files=noisy_pixels_cluster_files,
+                                     input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                     output_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
                                      pixel_size=pixel_size)
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
-    track_analysis.find_tracks(tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
-                               alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                               track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'))
+    track_analysis.find_tracks(input_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
+                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                               output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
     # Fit the track candidates and create new track table
-    track_analysis.fit_tracks(track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
-                              tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+    track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
+                              output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf=os.path.join(output_folder, 'Tracks.pdf'),
                               z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
@@ -119,7 +119,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                               track_quality=2)
 
     # Calculate the residuals to check the alignment
-    result_analysis.calculate_residuals(tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+    result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         output_pdf=os.path.join(output_folder, 'Residuals.pdf'),
                                         z_positions=z_positions,
                                         use_duts=None,

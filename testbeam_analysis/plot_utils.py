@@ -43,8 +43,8 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
 
 
-def plot_noisy_pixels(data_file, pixel_size=None, output_pdf_file=None, dut_name=None):
-    with tb.open_file(data_file, 'r') as input_file_h5:
+def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, dut_name=None):
+    with tb.open_file(input_hits_file, 'r') as input_file_h5:
         occupancy = np.ma.masked_array(input_file_h5.root.HistOcc[:], mask=input_file_h5.root.NoisyPixelsMask[:])
 
     if pixel_size:
@@ -53,10 +53,10 @@ def plot_noisy_pixels(data_file, pixel_size=None, output_pdf_file=None, dut_name
         aspect = "auto"
 
     if not output_pdf_file:
-        output_pdf_file = os.path.splitext(data_file)[0] + '.pdf'
+        output_pdf_file = os.path.splitext(input_hits_file)[0] + '.pdf'
 
     if not dut_name:
-        dut_name = os.path.split(data_file)[1]
+        dut_name = os.path.split(input_hits_file)[1]
 
     with PdfPages(output_pdf_file) as output_pdf:
         plt.figure()
@@ -91,15 +91,15 @@ def plot_noisy_pixels(data_file, pixel_size=None, output_pdf_file=None, dut_name
         output_pdf.savefig()
 
 
-def plot_cluster_size(cluster_file, output_pdf_file=None, dut_name=None):
+def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
     if not output_pdf_file:
-        output_pdf_file = os.path.splitext(cluster_file)[0] + '.pdf'
+        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '.pdf'
 
     if not dut_name:
-        dut_name = os.path.split(cluster_file)[1]
+        dut_name = os.path.split(input_cluster_file)[1]
 
     with PdfPages(output_pdf_file) as output_pdf:
-        with tb.open_file(cluster_file, 'r') as input_file_h5:
+        with tb.open_file(input_cluster_file, 'r') as input_file_h5:
             cluster_n_hits = input_file_h5.root.Cluster[:]['n_hits']
             # Save cluster size histogram
             max_cluster_size = np.amax(cluster_n_hits) + 1
@@ -289,18 +289,18 @@ def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitte
     output_fig.savefig()
 
 
-def plot_correlations(alignment_file, output_pdf, pixel_size=None):
+def plot_correlations(input_correlation_file, output_pdf, pixel_size=None):
     '''Takes the correlation histograms and plots them
 
     Parameters
     ----------
-    alignment_file : pytables file
-        The input file with the correlation histograms and also the output file for correlation data.
+    input_correlation_file : pytables file
+        The input file with the correlation histograms.
     output_pdf : pdf file name object
     '''
     logging.info('Plotting Correlations')
     with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(alignment_file, mode="r") as in_file_h5:
+        with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
                 try:
                     indices = re.findall(r'\d+', node.name)
@@ -380,12 +380,12 @@ def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, 
     output_fig.savefig()
 
 
-def plot_events(track_file, z_positions, event_range, dut=None, max_chi2=None, output_pdf=None):
+def plot_events(input_tracks_file, z_positions, event_range, dut=None, max_chi2=None, output_pdf=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
     ----------
-    track_file : pytables file with tracks
+    input_tracks_file : pytables file with tracks
     z_positions : iterable
     event_range : iterable:
         (start event number, stop event number(
@@ -398,7 +398,7 @@ def plot_events(track_file, z_positions, event_range, dut=None, max_chi2=None, o
 
     output_fig = PdfPages(output_pdf) if output_pdf else None
 
-    with tb.open_file(track_file, "r") as in_file_h5:
+    with tb.open_file(input_tracks_file, "r") as in_file_h5:
         fitted_tracks = False
         try:  # data has track candidates
             table = in_file_h5.root.TrackCandidates
@@ -590,11 +590,11 @@ def plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitte
         plt.show()
 
 
-def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
+def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
     Parameters
     ----------
-    tracks_file : string
+    input_tracks_file : string
         file name with the tracks table
     output_pdf : pdf file name object
     z_positions : iterable
@@ -612,7 +612,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
     '''
     logging.info('Plot track density')
     with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(tracks_file, mode='r') as in_file_h5:
+        with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
             plot_ref_dut = False
             dimensions = []
 
@@ -625,7 +625,7 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
 
                 plot_range = (dimensions[index][0], dimensions[index][1])
 
-                actual_dut = int(node.name[-1:])
+                actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.info('Plot track density for DUT %d', actual_dut)
@@ -683,11 +683,11 @@ def plot_track_density(tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel
                 output_fig.savefig(fig)
 
 
-def plot_charge_distribution(trackcandidates_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
+def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
     '''Takes the data and plots the charge distribution for selected DUTs.
     Parameters
     ----------
-    tracks_file : string
+    input_track_candidates_file : string
         file name with the tracks table
     output_pdf : pdf file name object
     dim_x, dim_y : integer
@@ -701,11 +701,11 @@ def plot_charge_distribution(trackcandidates_file, output_pdf, dim_x, dim_y, pix
     '''
     logging.info('Plot charge distribution')
     with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(trackcandidates_file, mode='r') as in_file_h5:
+        with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             dimensions = []
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
                 if 'charge' in table_column:
-                    actual_dut = int(table_column[-1:])
+                    actual_dut = int(re.findall(r'\d+', table_column)[-1])
                     index = actual_dut
 
                     # allow one channel value for all planes or one value for each plane

@@ -2,6 +2,8 @@
 from __future__ import division
 
 import logging
+import re
+from collections import Iterable
 
 import tables as tb
 import numpy as np
@@ -19,16 +21,16 @@ def gauss(x, *p):
 # FIXME: calculate_residuals should not care how the tracks were fitted; thus this function is not needed
 
 
-def calculate_residuals_kalman(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method="Interpolation", geometryFile=None):
+def calculate_residuals_kalman(input_tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None, method="Interpolation", geometryFile=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
-    tracks_file : string
+    input_tracks_file : string
         File name with the tracks table
     z_position : iterable
         The positions of the devices in z in cm
     use_duts : iterable
-        The duts to calculate residuals for. If None all duts in the tracks_file are used
+        The duts to calculate residuals for. If None all duts in the input_tracks_file are used
     max_chi2 : int
         Use only converged fits (cut on chi2)
     output_pdf : pdf file name
@@ -48,10 +50,10 @@ def calculate_residuals_kalman(tracks_file, z_positions, use_duts=None, max_chi2
 
     residuals = []
 
-    with tb.open_file(tracks_file, mode='r') as in_file_h5:
+    with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
         translations, rotations = geometry_utils.recontruct_geometry_from_file(geometryFile)
         for node in in_file_h5.root:
-            actual_dut = int(node.name[-1:])
+            actual_dut = int(re.findall(r'\d+', node.name)[-1])
             if use_duts and actual_dut not in use_duts:
                 continue
             logging.info('Calculate residuals for DUT %d', actual_dut)
@@ -102,16 +104,16 @@ def calculate_residuals_kalman(tracks_file, z_positions, use_duts=None, max_chi2
     return residuals
 
 
-def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
+def calculate_residuals(input_tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
-    tracks_file : string
+    input_tracks_file : string
         File name with the tracks table
     z_position : iterable
         The positions of the devices in z in cm
     use_duts : iterable
-        The duts to calculate residuals for. If None all duts in the tracks_file are used
+        The duts to calculate residuals for. If None all duts in the input_tracks_file are used
     max_chi2 : int
         Use only converged fits (cut on chi2)
     output_pdf : pdf file name
@@ -131,9 +133,9 @@ def calculate_residuals(tracks_file, z_positions, use_duts=None, max_chi2=None, 
 
     residuals = []
 
-    with tb.open_file(tracks_file, mode='r') as in_file_h5:
+    with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
         for node in in_file_h5.root:
-            actual_dut = int(node.name[-1:])
+            actual_dut = int(re.findall(r'\d+', node.name)[-1])
             if use_duts and actual_dut not in use_duts:
                 continue
             logging.info('Calculate residuals for DUT %d', actual_dut)
@@ -216,11 +218,11 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     return mean_fitted, selected_data, fit, pcov
 
 
-def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
+def calculate_efficiency(input_tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
-    tracks_file : string
+    input_tracks_file : string
         file name with the tracks table
     output_pdf : pdf file name object
     z_positions : iterable
@@ -242,13 +244,13 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
     col_range, row_range : iterable
         column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation)
     '''
-
     logging.info('=== Calculate efficiency ===')
+
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
-        with tb.open_file(tracks_file, mode='r') as in_file_h5:
+        with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
             for index, node in enumerate(in_file_h5.root):
-                actual_dut = int(node.name[-1:])
+                actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.info('Calculate efficiency for DUT %d', actual_dut)
@@ -256,6 +258,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
 
                 # Get pixel and bin sizes for calculations and plotting
                 # Allow different sensor sizes for every plane
+                # TODO: confusing code
                 if not sensor_size:
                     dimensions = (np.amax(track_array['column_dut_%d' % actual_dut]), np.amax(track_array['row_dut_%d' % actual_dut]))
                 else:
@@ -266,6 +269,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                         dimensions = dimensions[index]
 
                 # Allow different bin_sizes for every plane
+                # TODO: confusing code
                 bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
                 if len(bin_size) != 1:
                     actual_bin_size_x = bin_size[index][0]
@@ -286,6 +290,7 @@ def calculate_efficiency(tracks_file, output_pdf, z_positions, bin_size, minimum
                 intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
 
                 # Select hits from column row range (e.g. to supress edge pixels)
+                # TODO: confusing code
                 col_range = [col_range, ] if not isinstance(col_range, list) else col_range
                 row_range = [row_range, ] if not isinstance(row_range, list) else row_range
                 if len(col_range) == 1:

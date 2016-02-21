@@ -85,25 +85,24 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
                 checks_passed = False
                 error_msg += 'The number of nodes in the file is wrong.\n'
             for node in second_h5_file.root:  # loop over all nodes and compare each node, do not abort if one node is wrong
-                node_name = node.name
                 try:
-                    expected_data = first_h5_file.get_node(first_h5_file.root, node_name)[:]
-                    data = second_h5_file.get_node(second_h5_file.root, node_name)[:]
+                    expected_data = first_h5_file.get_node(first_h5_file.root, node.name)[:]
+                    data = second_h5_file.get_node(second_h5_file.root, node.name)[:]
                     if exact:  # exact comparison if exact is set and on recarray data (np.allclose does not work on recarray)
                         if not np.array_equal(expected_data, data):  # compare the arrays for each element
                             checks_passed = False
-                            error_msg += node_name
+                            error_msg += node.name
                             if detailed_comparison:
                                 error_msg += get_array_differences(expected_data, data)
                             error_msg += '\n'
                     else:
                         if not array_close(expected_data, data):
                             checks_passed = False
-                            error_msg += node_name
+                            error_msg += node.name
                             if detailed_comparison:
                                 error_msg += get_array_differences(expected_data, data)
                             error_msg += '\n'
                 except tb.NoSuchNodeError:
                     checks_passed = False
-                    error_msg += 'Unknown node ' + node_name + '\n'
+                    error_msg += 'Unknown node ' + node.name + '\n'
     return checks_passed, error_msg

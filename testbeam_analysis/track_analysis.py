@@ -6,6 +6,8 @@ import progressbar
 from multiprocessing import Pool, cpu_count
 from math import sqrt
 from cmath import log
+import re
+import os.path
 
 from pykalman.standard import KalmanFilter
 import tables as tb
@@ -24,7 +26,7 @@ def gauss(x, *p):
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
 
-def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_range=None, chunk_size=1000000):
+def find_tracks(input_tracklets_file, input_alignment_file, output_track_candidates_file, event_range=None, chunk_size=1000000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is given to
     be able to cut on good tracks.
@@ -35,18 +37,18 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_ran
 
     Parameters
     ----------
-    tracklets_file : string
+    input_tracklets_file : string
         Input file name with merged cluster hit table from all DUTs (tracklets file)
         Or track candidates file.
-    alignment_file : string
+    input_alignment_file : string
         File containing the alignment information
-    track_candidates_file : string
+    output_track_candidates_file : string
         Output file name for track candidate array
     '''
     logging.info('=== Find tracks ===')
 
     # Get alignment errors from file
-    with tb.open_file(alignment_file, mode='r') as in_file_h5:
+    with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
         row_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
@@ -55,15 +57,15 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_ran
             column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
-    with tb.open_file(tracklets_file, mode='r') as in_file_h5:
+    with tb.open_file(input_tracklets_file, mode='r') as in_file_h5:
         try:
             tracklets_node = in_file_h5.root.Tracklets
         except tb.exceptions.NoSuchNodeError:
             tracklets_node = in_file_h5.root.TrackCandidates
-            track_candidates_file = track_candidates_file[:-3] + '_2.h5'
-            logging.info('Additional find track run on track candidates file %s', tracklets_file)
-            logging.info('Ouitput file with new track candidates file %s', track_candidates_file)
-        with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
+            output_track_candidates_file = os.path.splitext(output_track_candidates_file)[0] + '_2.h5'
+            logging.info('Additional find track run on track candidates file %s', input_tracklets_file)
+            logging.info('Output file with new track candidates file %s', output_track_candidates_file)
+        with tb.open_file(output_track_candidates_file, mode='w') as out_file_h5:
             track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=tracklets_node.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             n_duts = sum(['column' in col for col in tracklets_node.dtype.names])
 
@@ -94,7 +96,7 @@ def find_tracks(tracklets_file, alignment_file, track_candidates_file, event_ran
                 track_candidates.append(combined)
 
 
-def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixel_size):
+def find_tracks_corr(input_tracklets_file, input_alignment_file, output_track_candidates_file, pixel_size):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     Works on corrected Tracklets file, is identical to the find_tracks function.
     The output is the same array with resorted hits into tracks. A track quality is given to
@@ -105,17 +107,17 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
 
     Parameters
     ----------
-    tracklets_file : string
+    input_tracklets_file : string
         Input file name with merged cluster hit table from all DUTs
-    alignment_file : string
+    input_alignment_file : string
         File containing the alignment information
-    track_candidates_file : string
+    output_track_candidates_file : string
         Output file name for track candidate array
     '''
     logging.info('=== Build tracks from TrackCandidates ===')
 
     # Get alignment errors from file
-    with tb.open_file(alignment_file, mode='r') as in_file_h5:
+    with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
         row_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
@@ -124,7 +126,7 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
             column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
-    with tb.open_file(tracklets_file, mode='r') as in_file_h5:
+    with tb.open_file(input_tracklets_file, mode='r') as in_file_h5:
         tracklets = in_file_h5.root.TrackCandidates
         n_duts = sum(['column' in col for col in tracklets.dtype.names])
 
@@ -148,12 +150,12 @@ def find_tracks_corr(tracklets_file, alignment_file, track_candidates_file, pixe
         combined = np.column_stack((tracklets.event_number, tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
 
-        with tb.open_file(track_candidates_file, mode='w') as out_file_h5:
+        with tb.open_file(output_track_candidates_file, mode='w') as out_file_h5:
             track_candidates2 = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.TrackCandidates.description, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             track_candidates2.append(combined)
 
 
-def optimize_track_alignment(trackcandidates_file, alignment_file, fraction=1, correlated_only=False):
+def optimize_track_alignment(input_track_candidates_file, input_alignment_file, fraction=1, correlated_only=False):
     '''This step should not be needed but alignment checks showed an offset between the hit positions after alignment
     especially for DUTs that have a flipped orientation. This function corrects for the offset (c0 in the alignment).
     Does the same as optimize_hit_alignment but works on TrackCandidates file.
@@ -162,9 +164,9 @@ def optimize_track_alignment(trackcandidates_file, alignment_file, fraction=1, c
 
     Parameters
     ----------
-    tracklets_file : string
+    input_track_candidates_file : string
         Input file name with merged cluster hit table from all DUTs
-    alignment_file : string
+    input_alignment_file : string
         Input file with alignment data
     use_fraction : float
         Use only every fraction-th hit for the alignment correction. For speed up. 1 means all hits are used
@@ -172,14 +174,14 @@ def optimize_track_alignment(trackcandidates_file, alignment_file, fraction=1, c
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
     '''
     logging.info('=== Optimize track alignment ===')
-    with tb.open_file(trackcandidates_file, mode="r+") as in_file_h5:
+    with tb.open_file(input_track_candidates_file, mode="r+") as in_file_h5:
         particles = in_file_h5.root.TrackCandidates[:]
-        with tb.open_file(alignment_file, 'r+') as alignment_file_h5:
+        with tb.open_file(input_alignment_file, 'r+') as alignment_file_h5:
             alignment_data = alignment_file_h5.root.Alignment[:]
             n_duts = alignment_data.shape[0] / 2
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
-                    actual_dut = int(table_column[-1:])
+                    actual_dut = int(re.findall(r'\d+', table_column)[-1])
                     ref_dut_column = table_column[:-1] + '0'
                     logging.info('Optimize alignment for % s', table_column)
                     particle_selection = particles[::fraction][np.logical_and(particles[::fraction][ref_dut_column] > 0, particles[::fraction][table_column] > 0)]  # only select events with hits in both DUTs
@@ -208,7 +210,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
 
     Parameters
     ----------
-    trackcandidates_file : string
+    input_track_candidates_file : string
         Input file name with merged cluster hit table from all DUTs
     output_pdf : pdf file name object
     combine_n_hits : int
@@ -260,15 +262,15 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
     Parameters
     ----------
-    track_candidates_file : string
+    input_track_candidates_file : string
         file name with the track candidates table
-    tracks_file : string
+    output_tracks_file : string
         file name of the created track file having the track table
     z_position : iterable
         the positions of the devices in z in cm
@@ -329,8 +331,8 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
         return tracks_array
 
     with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
-            with tb.open_file(tracks_file, mode='w') as out_file_h5:
+        with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
+            with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
                 fit_duts = fit_duts if fit_duts else range(n_duts)
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
@@ -404,15 +406,15 @@ def fit_tracks(track_candidates_file, tracks_file, z_positions, fit_duts=None, i
                         plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
 
 
-def fit_tracks_kalman(track_candidates_file, tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
+def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
     Parameters
     ----------
-    track_candidates_file : string
+    input_track_candidates_file : string
         file name with the track candidates table
-    tracks_file : string
+    output_tracks_file : string
         file name of the created track file having the track table
     z_position : iterable
         the positions of the devices in z in cm
@@ -521,8 +523,8 @@ def fit_tracks_kalman(track_candidates_file, tracks_file, geometry_file, z_posit
         raise ValueError('Kalman filter requires to provide pixel size for error measurement matrix covariance!')
 
     with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
-            with tb.open_file(tracks_file, mode='w') as out_file_h5:
+        with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
+            with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
                 fit_duts = fit_duts if fit_duts else range(n_duts)
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
