@@ -1,7 +1,13 @@
-''' This module provides a class that is able to simulate data via Monte Carlo. A random seed can be set.
+''' This module provides a class that is able to simulate data via Monte Carlo with a decend approximation of the reality. A random seed can be set.
+
 The deposited charge follows a user defined function (e.g. a Landau function). Special processes like delta electrons
-are not simulated and also the track angle is not takeb into account. 
-Charge sharing between pixels is calculated using Einsteins diffusion equation solved at equidistand z position within the sensor.
+are not simulated.
+
+Multiple scattering is approximated with the assumption of gaussian distributed scattering angles theta. Scattering is
+only calculated at the planes and not in between (scattering in air).
+
+Charge sharing between pixels is approximated using Einsteins diffusion equation solved at the center z position within the sensor.
+Track angles within the sensor do not influence the charge sharing.
 '''
 
 import numpy as np
@@ -313,7 +319,7 @@ class SimulateData(object):
         if (self.beam_direction[0] != self.beam_direction[1]):
             track_angles_phi = np.random.uniform(self.beam_direction[0], self.beam_direction[1], size=n_tracks)  # Flat distributed in phi
         else:
-            track_angles_phi = np.repeat(self.beam_direction[0] / 1000., repeats=n_tracks)  # Constant phi = self.beam_direction
+            track_angles_phi = np.repeat(self.beam_direction[0], repeats=n_tracks)  # Constant phi = self.beam_direction
 
         return track_positions_x, track_positions_y, track_angles_phi, track_angles_theta
 
@@ -331,49 +337,30 @@ class SimulateData(object):
         track_positions = np.column_stack((track_positions_x, track_positions_y))  # Track position at z = 0
 
 #         for z_position in self.z_positions:
-#             r = z_position / np.cos(track_angles_theta)  # r in spherical coordinates at actual z_position
+# r = z_position / np.cos(track_angles_theta)  # r in spherical coordinates at actual z_position
 #             extrapolate = (r * np.array([np.cos(track_angles_phi) * np.sin(track_angles_theta), np.sin(track_angles_phi) * np.sin(track_angles_theta)])).T
 #             intersections.append(track_positions + extrapolate)
-            
+
         # Multiple scattering changes the angle at each plane, thus these temporary array have to be filled
         actual_track_angles_phi = track_angles_phi
         actual_track_angles_theta = track_angles_theta
- 
-        for dut_index, z_position in enumerate(self.z_positions):
-            if dut_index == 0:  # Track does not scatter before first plane
+
+        for dut_index, z_position in enumerate(self.z_positions):  # Loop over DUTs
+            if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from z = 0 to this plane
                 r = z_position / np.cos(actual_track_angles_theta)  # r in spherical coordinates at actual z_position from z = 0
                 extrapolate = (r * np.array([np.cos(actual_track_angles_phi) * np.sin(actual_track_angles_theta), np.sin(actual_track_angles_phi) * np.sin(actual_track_angles_theta)])).T
-                intersections.append(track_positions + extrapolate)
-            else:
+                actual_intersections = track_positions + extrapolate
+            else:  # Extrapolat from last plane position with last track angle to this plane
                 r = (z_position - self.z_positions[dut_index - 1]) / np.cos(actual_track_angles_theta)  # r in spherical coordinates at actual z_position from last z_position
                 extrapolate = (r * np.array([np.cos(actual_track_angles_phi) * np.sin(actual_track_angles_theta), np.sin(actual_track_angles_phi) * np.sin(actual_track_angles_theta)])).T
-                intersections.append(intersections[-1] + extrapolate)
- 
-            if self.dut_material_budget[dut_index] != 0:  # Omit virtual planes (material_budget = 0) do not scatter the track --> do not change track angles
+                actual_intersections = intersections[-1] + extrapolate
+
+            if self.dut_material_budget[dut_index] != 0:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
                 actual_track_angles_phi = np.random.random(size=actual_track_angles_phi.shape[0]) * 2 * np.pi  # Flat distributed phi = [0, Pi[
                 theta_0 = self._scattering_angle_sigma(material_budget=self.dut_material_budget[dut_index])
                 actual_track_angles_theta += np.random.normal(0, theta_0, actual_track_angles_theta.shape[0])
-            
-       
-#         print self.beam_position[0] + np.tan(self.beam_angle / 1000.) * np.array(self.z_positions)
-#         print self.beam_position[1] + np.tan(self.beam_angle / 1000.) * np.array(self.z_positions)
-#         
-#         import matplotlib.pyplot as plt
-#         print track_positions_x[0], track_positions_y[0]
-#         print track_angles_phi[0], track_angles_theta[0]
-#           
-#         y = []
-#         x = []
-#          
-#         for i in intersections:
-#            x.append(i[0][0])
-#            y.append(i[0][1])
-#          
-#         plt.plot(self.z_positions, x, '.-', label='x')
-#         plt.plot(self.z_positions, y, '.-', label='y')
-#         plt.ylim((-100, 100))
-#         
-#         plt.show()
+
+            intersections.append(actual_intersections)  # Add intersections of actual DUT to result
 
         return intersections
 
@@ -461,7 +448,7 @@ class SimulateData(object):
 
     def _get_charge_deposited(self, dut_index, n_entries, eta=0.2):
         ''' Calculates the charge distribution wich is approximated by a Landau and returns n_entries random samples from this
-        distribution. The device thickness defines the MPV 
+        distribution. The device thickness defines the MPV.
 
         '''
         x = np.arange(0, 10, 0.1)
@@ -487,16 +474,15 @@ class SimulateData(object):
 
 if __name__ == '__main__':
     simulate_data = SimulateData(0)
-    simulate_data.beam_angle=1
-    simulate_data.beam_angle_sigma=0
-    #simulate_data.beam_position=(110, 150)
-    simulate_data.beam_direction=(0, 0)
+    simulate_data.beam_angle = 1
+    simulate_data.beam_angle_sigma = 0
+    simulate_data.beam_direction = (0, 0)
     simulate_data.dut_material_budget = [0] * simulate_data.n_duts
     simulate_data.dut_material_budget[3] = 0.013
-    
-    simulate_data.beam_position_sigma=(0, 0)
+
+    simulate_data.beam_position_sigma = (0, 0)
     simulate_data.digitization_charge_sharing = False
-    simulate_data.create_data_and_store('simulated_data', n_events=1000000)
+    simulate_data.create_data_and_store('simulated_data', n_events=100000)
 
 
 #     x = np.arange(0, 10, 0.1)
