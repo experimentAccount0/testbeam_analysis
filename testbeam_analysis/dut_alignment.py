@@ -100,7 +100,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
         with tb.open_file(input_correlation_file, mode="r+") as in_file_h5:
             n_nodes = sum(1 for _ in enumerate(in_file_h5.root))  # Determine number of nodes, is there a better way?
             n_duts = int(n_nodes / 2 + 1)
-            result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('c2', np.float), ('c2_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
+            result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
             for node_index, node in enumerate(in_file_h5.root):
                 try:
                     indices = re.findall(r'\d+', node.name)
@@ -169,10 +169,12 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
                     chi2 = chi2[selected_data]
                     n_hits = n_hits[selected_data]
 
-                # Refit with higher polynomial, describes sometimes the correlation better (TODO: Why?)
+                # linear fit, usually describes correlation very well
+                # with low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
+                # to be insvetigated...
                 # Use results from straight line fit as start values for last fit
-                g = lambda x, c0, c1, c2: c0 + c1 * x + c2 * x ** 2
-                fit, pcov = curve_fit(g, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1], 0.])
+                f = lambda x, c0, c1: c0 + c1 * x
+                fit, pcov = curve_fit(f, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
                 fit_fn = np.poly1d(fit[::-1])
 
                 # Calculate mean sigma (is somewhat a residual) and its error and store the actual data in result array
@@ -182,7 +184,6 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
                 # Write fit results to array
                 result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
                 result[node_index]['c1'], result[node_index]['c1_error'] = fit[1], np.absolute(pcov[1][1]) ** 0.5
-                result[node_index]['c2'], result[node_index]['c2_error'] = fit[2], np.absolute(pcov[2][2]) ** 0.5
 
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
 
@@ -309,9 +310,8 @@ def merge_cluster_data(input_cluster_files, input_alignment_file, output_trackle
                             # Apply alignment information
                             c0 = alignment[alignment['dut_x'] == (dut_index + 1)]['c0']
                             c1 = alignment[alignment['dut_x'] == (dut_index + 1)]['c1']
-                            c2 = alignment[alignment['dut_x'] == (dut_index + 1)]['c2']
-                            tracklets_array['column_dut_%d' % (dut_index + 1)][selection] = (c2[0] * actual_mean_column ** 2 + c1[0] * actual_mean_column + c0[0])
-                            tracklets_array['row_dut_%d' % (dut_index + 1)][selection] = (c2[1] * actual_mean_row ** 2 + c1[1] * actual_mean_row + c0[1])
+                            tracklets_array['column_dut_%d' % (dut_index + 1)][selection] = (c1[0] * actual_mean_column + c0[0])
+                            tracklets_array['row_dut_%d' % (dut_index + 1)][selection] = (c1[1] * actual_mean_row + c0[1])
                             tracklets_array['charge_dut_%d' % (dut_index + 1)][selection] = actual_cluster['charge'][selection]
 
                 np.nan_to_num(tracklets_array)
