@@ -38,8 +38,8 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder + 'Tracklets_2.h5'))
 
     def test_hit_correlation(self):  # check the hit correlation function
-        dut_alignment.correlate_hits(self.data_files,
-                                     alignment_file=os.path.join(self.output_folder + 'Correlation.h5'),
+        dut_alignment.correlate_hits(input_hits_files=self.data_files,
+                                     output_correlation_file=os.path.join(self.output_folder + 'Correlation.h5'),
                                      fraction=1,
                                      event_range=0)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Correlation_result.h5'), os.path.join(self.output_folder + 'Correlation.h5'), exact=False)
@@ -47,8 +47,8 @@ class TestHitAnalysis(unittest.TestCase):
 
     @unittest.SkipTest  # Unclear how to check interactive alignment automatically
     def test_coarse_alignment(self):  # Check the hit alignment function
-        dut_alignment.coarse_alignment(correlation_file=os.path.join(tests_data_folder + 'Correlation_result.h5'),
-                                       alignment_file=os.path.join(self.output_folder + 'Alignment.h5'),
+        dut_alignment.coarse_alignment(input_correlation_file=os.path.join(tests_data_folder + 'Correlation_result.h5'),
+                                       output_alignment_file=os.path.join(self.output_folder + 'Alignment.h5'),
                                        output_pdf=os.path.join(self.output_folder + 'Alignment.pdf'),
                                        pixel_size=self.pixel_size)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Alignment_result.h5'), os.path.join(self.output_folder + 'Alignment.h5'), exact=False)
@@ -57,15 +57,15 @@ class TestHitAnalysis(unittest.TestCase):
     def test_cluster_merging(self):
         cluster_files = [os.path.join(tests_data_folder + 'Cluster_DUT%d_cluster.h5') % i for i in range(4)]
         dut_alignment.merge_cluster_data(cluster_files,
-                                         alignment_file=os.path.join(tests_data_folder + 'Alignment_result.h5'),
-                                         tracklets_file=os.path.join(self.output_folder + 'Tracklets.h5'),
+                                         input_alignment_file=os.path.join(tests_data_folder + 'Alignment_result.h5'),
+                                         output_tracklets_file=os.path.join(self.output_folder + 'Tracklets.h5'),
                                          pixel_size=self.pixel_size)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Tracklets_result.h5'), os.path.join(self.output_folder + 'Tracklets.h5'))
         self.assertTrue(data_equal, msg=error_msg)
         # Retest with tiny chunk size to force chunked merging
         dut_alignment.merge_cluster_data(cluster_files,
-                                         alignment_file=os.path.join(tests_data_folder + 'Alignment_result.h5'),
-                                         tracklets_file=os.path.join(self.output_folder + 'Tracklets_2.h5'),
+                                         input_alignment_file=os.path.join(tests_data_folder + 'Alignment_result.h5'),
+                                         output_tracklets_file=os.path.join(self.output_folder + 'Tracklets_2.h5'),
                                          pixel_size=self.pixel_size,
                                          chunk_size=293)
 
