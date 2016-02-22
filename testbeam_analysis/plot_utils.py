@@ -277,7 +277,7 @@ def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitte
     plt.errorbar(x, mean_fitted, yerr=mean_error_fitted, fmt='.')
     plt.plot(x, mean_error_fitted * 1000., 'ro-', label='Error x 1000')
     plt.errorbar(x, (fit_fn(x) - mean_fitted) * 10., mean_error_fitted * 10., fmt='go-', label='Offset x 10')
-    fit_legend_entry = 'fit: c0+c1x+c2x^2\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$\nc2=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5, fit[2], np.absolute(pcov[2][2]) ** 0.5)
+    fit_legend_entry = 'fit: c0+c1 *x\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     plt.plot(x, fit_fn(x), '-', label=fit_legend_entry)
     plt.plot(x, chi2 / 1.e7)
     plt.legend(loc=0)
