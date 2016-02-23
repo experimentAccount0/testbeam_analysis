@@ -94,7 +94,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
 
     def gauss(x, *p):
         A, mu, sigma, offset = p
-        return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2)) + offset
+        return A * np.exp(-(x - mu) ** 2 / (2.0 * sigma ** 2.0)) + offset
 
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(input_correlation_file, mode="r+") as in_file_h5:
@@ -142,7 +142,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
                         mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
                         sigma_fitted[index] = np.abs(coeff[2])
                         n_hits[index] = data[index, :].sum()
-                        if index == data.shape[0] / 2:
+                        if index == int(data.shape[0] / 2):
                             plot_utils.plot_correlation_fit(x_hist_fit, data[index, :], coeff, var_matrix, 'DUT 0 at DUT %s = %d' % (result[node_index]['dut_x'], index), node.title, output_fig)
                     except RuntimeError:
                         pass
@@ -237,7 +237,7 @@ def fine_alignment(input_track_candidates_file, output_alignment_file, output_pd
     raise NotImplementedError('Comming soon')
 
 
-def merge_cluster_data(input_cluster_files, input_alignment_file, output_tracklets_file, pixel_size, chunk_size=5000000):
+def merge_cluster_data(input_cluster_files, input_alignment_file, output_tracklets_file, pixel_size, chunk_size=4999999):
     '''Takes the cluster from all cluster files and merges them into one big table onto the event number.
     Empty entries are signaled with charge = 0. The position is referenced from the correlation data to the first plane.
     Function uses easily several GB of RAM. If memory errors occur buy a better PC or chunk this function.
@@ -270,8 +270,8 @@ def merge_cluster_data(input_cluster_files, input_alignment_file, output_trackle
         description.append(('charge_dut_%d' % index, np.float))
     description.extend([('track_quality', np.uint32), ('n_tracks', np.uint8)])
 
-    start_indices = [0] * (len(input_cluster_files) - 1)  # Store the loop indices for speed up
-    start_indices_2 = [0] * (len(input_cluster_files) - 1)  # Additional indices for second loop
+    start_indices = [0] * len(input_cluster_files)  # Store the loop indices for speed up
+    start_indices_2 = [0] * len(input_cluster_files)  # Additional indices for second loop
 
     # Merge the cluster data from different DUTs into one table
     with tb.open_file(output_tracklets_file, mode='w') as out_file_h5:
@@ -285,13 +285,13 @@ def merge_cluster_data(input_cluster_files, input_alignment_file, output_trackle
 
                 # First loop: calculate the minimum event number indices needed to merge all cluster from all files to this event number index
                 common_event_numbers = actual_event_numbers
-                for dut_index, cluster_file in enumerate(input_cluster_files[1:]):  # Loop over the other cluster files
+                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
                         for actual_cluster, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
                 tracklets_array = np.zeros((common_event_numbers.shape[0],), dtype=description)  # Result array to be filled. For no hit: column = row = 0
                 # Fill result array with DUT 0 data
-                tracklets_array['event_number'] = common_event_numbers
+                tracklets_array['event_number'] = common_event_numbers[:]
                 actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
                 selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
                 tracklets_array['column_dut_0'][selection] = pixel_size[0][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
@@ -300,19 +300,19 @@ def merge_cluster_data(input_cluster_files, input_alignment_file, output_trackle
 
                 # Fill result array with other DUT data
                 # Second loop: get the cluster from all files and merge them to the common event number
-                for dut_index, cluster_file in enumerate(input_cluster_files[1:]):  # Loop over the other cluster files
+                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
                         for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
                             selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
-                            actual_mean_column = pixel_size[dut_index + 1][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
-                            actual_mean_row = pixel_size[dut_index + 1][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
+                            actual_mean_column = pixel_size[dut_index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
+                            actual_mean_row = pixel_size[dut_index][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
                             # Apply alignment information
-                            c0 = alignment[alignment['dut_x'] == (dut_index + 1)]['c0']
-                            c1 = alignment[alignment['dut_x'] == (dut_index + 1)]['c1']
-                            tracklets_array['column_dut_%d' % (dut_index + 1)][selection] = (c1[0] * actual_mean_column + c0[0])
-                            tracklets_array['row_dut_%d' % (dut_index + 1)][selection] = (c1[1] * actual_mean_row + c0[1])
-                            tracklets_array['charge_dut_%d' % (dut_index + 1)][selection] = actual_cluster['charge'][selection]
+                            c0 = alignment[alignment['dut_x'] == (dut_index)]['c0']
+                            c1 = alignment[alignment['dut_x'] == (dut_index)]['c1']
+                            tracklets_array['column_dut_%d' % (dut_index)][selection] = (c1[0] * actual_mean_column + c0[0])
+                            tracklets_array['row_dut_%d' % (dut_index)][selection] = (c1[1] * actual_mean_row + c0[1])
+                            tracklets_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
 
                 np.nan_to_num(tracklets_array)
                 tracklets_table.append(tracklets_array)
@@ -346,10 +346,11 @@ def fix_event_alignment(input_tracklets_file, tracklets_corr_file, input_alignme
     # Get alignment errors
     with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
         correlations = in_file_h5.root.Alignment[:]
-        column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
-        row_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
+        n_duts = int(correlations.shape[0] / 2 + 1)
+        column_sigma = np.zeros(shape=n_duts)
+        row_sigma = np.zeros(shape=n_duts)
         column_sigma[0], row_sigma[0] = 0, 0  # DUT0 has no correlation error
-        for index in range(1, correlations.shape[0] / 2 + 1):
+        for index in range(1, n_duts):
             column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
@@ -419,7 +420,7 @@ def optimize_hit_alignment(input_tracklets_file, input_alignment_file, fraction=
         particles = in_file_h5.root.Tracklets[:]
         with tb.open_file(input_alignment_file, 'r+') as alignment_file_h5:
             alignment_data = alignment_file_h5.root.Alignment[:]
-            n_duts = alignment_data.shape[0] / 2
+            n_duts = int(alignment_data.shape[0] / 2)
             for table_column in in_file_h5.root.Tracklets.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
                     actual_dut = int(re.findall(r'\d+', table_column)[-1])
@@ -553,7 +554,7 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
         except tb.NodeError:
             logging.warning('Z position are do already exist. Do not overwrite.')
 
-    z_positions_rec = np.add(([0.] + results[:]['z_position_row'].tolist() + [1.]), ([0.] + results[:]['z_position_column'].tolist() + [1.])) / 2.
+    z_positions_rec = np.add(([0.0] + results[:]['z_position_row'].tolist() + [1.0]), ([0.0] + results[:]['z_position_column'].tolist() + [1.0])) / 2.0
 
     if z_positions is not None:  # check reconstructed z against measured z
         z_positions_rec_abs = [i * z_positions[-1] for i in z_positions_rec]
