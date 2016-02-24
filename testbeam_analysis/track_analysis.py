@@ -729,14 +729,14 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                                 continue
 
                             # Check if old hit is closer, then do not move
-                            if tracklets[hit_index].track_quality & (257 << dut_index) == (257 << dut_index):  
+                            if tracklets[hit_index].track_quality & (257 << dut_index) == (257 << dut_index):
                                 column_distance_old, row_distance_old = abs(column - tr_column[hit_index][0]), abs(row - tr_row[hit_index][0])
                                 hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
                                 if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track
                                     _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
                                     continue
 
-                            # The actual hit can be taken as a first close hit, so swap and set hit distance
+                            # The actual hit can be taken as a first close hit, so swap if needed and set hit distance
                             if track_index != hit_index:  # Check if hit swapping is needed
                                 _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge)
                             best_hit_distance = hit_distance
@@ -747,7 +747,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                                 _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge)
                             best_hit_distance = hit_distance
 
-                    _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
+            _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
 
         # Set number of tracks of last event
         for i in range(n_actual_tracks):
