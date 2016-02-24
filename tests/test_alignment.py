@@ -32,10 +32,10 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder + 'Correlation.h5'))
-#         os.remove(cls.output_folder + 'Alignment.h5')
-#         os.remove(cls.output_folder + 'Alignment.pdf')
         os.remove(os.path.join(cls.output_folder + 'Tracklets.h5'))
         os.remove(os.path.join(cls.output_folder + 'Tracklets_2.h5'))
+#         os.remove(cls.output_folder + 'Alignment.h5')
+#         os.remove(cls.output_folder + 'Alignment.pdf')
 
     def test_hit_correlation(self):  # check the hit correlation function
         dut_alignment.correlate_hits(input_hits_files=self.data_files,
@@ -68,7 +68,7 @@ class TestHitAnalysis(unittest.TestCase):
                                          output_tracklets_file=os.path.join(self.output_folder + 'Tracklets_2.h5'),
                                          pixel_size=self.pixel_size,
                                          chunk_size=293)
-
+ 
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets_2.h5')
         self.assertTrue(data_equal, msg=error_msg)
 
