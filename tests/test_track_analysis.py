@@ -28,6 +28,7 @@ class TestTrackAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder + 'TrackCandidates.h5'))
+        os.remove(os.path.join(cls.output_folder + 'TrackCandidates_2.h5'))
         os.remove(os.path.join(cls.output_folder + 'Tracks.h5'))
         os.remove(os.path.join(cls.output_folder + 'Tracks.pdf'))
 
