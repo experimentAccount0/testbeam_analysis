@@ -76,6 +76,7 @@ tmp
 *.h5
 !data/
 !test_hit_analysis/
+!test_dut_alignment/
 !test_track_analysis/
 !test_result_analysis/
 !test_correlation_fixing/
