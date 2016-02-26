@@ -1,8 +1,14 @@
-''' Example script to run a full analysis on telescope data. The original data can be found in the example folder of the EuTelescope framework.
-The telescope consists of 6 planes with 15 cm distance between the planes. The residuals for the second plane (DUT 1) are about 8 um and comparable
-to the residuals from EuTelescope (6 um).
+'''Example script to run a full analysis on telescope data. The original data can be found in the example folder of the EuTelescope framework.
+The telescope consists of 6 planes with 15 cm clearance between the planes. The residual for the second plane (DUT 1) is about 8 um and comparable
+to the residuals from EuTelescope software (6 um).
 
-The other plane residuals are not that small depicting a worse performance in device algnment and track fitting.
+The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
+The total size of the chip is 21.5mm x 13.7mm x 0.036mm (radiation length 9.3660734)
+
+The matrix is divided into 4 areas. For each area the threshold can be set up individually.
+The quartes are from column 0-287, 288,575, 576-863 and 864-1151.
+
+The Mimosa26 detects ionizing particle with a density of up to 10^6 hits / cm^2 / s. The hit rate for a beam telescope is ~5 hits / frame.
 '''
 
 import os
@@ -21,30 +27,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
     # The location of the data files, one file per DUT
-    data_files = [r'data/TestBeamData_Mimosa26_DUT0.h5',  # The first DUT (DUT 0) is the reference DUT defining the coordinate system
-                  r'data/TestBeamData_Mimosa26_DUT1.h5',  # Data file of DUT 1
-                  r'data/TestBeamData_Mimosa26_DUT2.h5',  # Data file of DUT 2
-                  r'data/TestBeamData_Mimosa26_DUT3.h5',  # Data file of DUT 3
-                  r'data/TestBeamData_Mimosa26_DUT4.h5',  # Data file of DUT 4
-                  r'data/TestBeamData_Mimosa26_DUT5.h5',  # Data file of DUT 5
-                  ]
+    data_files = [('data/TestBeamData_Mimosa26_DUT' + str(i) + '.h5') for i in range(6)]  # The first device is the reference for the coordinate system
 
     # Pixel dimesions and matrix size of the DUTs
-    pixel_size = [(18.4, 18.4),  # Column, row pixel pitch in um of DUT 0
-                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 1
-                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 2
-                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 3
-                  (18.4, 18.4),  # Column, row pixel pitch in um of DUT 4
-                  (18.4, 18.4)]  # Column, row pixel pitch in um of DUT 5
-    n_pixel = [(1152, 576),  # Number of pixel on column, row for DUT 0
-               (1152, 576),  # Number of pixel on column, row for DUT 1
-               (1152, 576),  # Number of pixel on column, row for DUT 2
-               (1152, 576),  # Number of pixel on column, row for DUT 3
-               (1152, 576),  # Number of pixel on column, row for DUT 4
-               (1152, 576)]  # Number of pixel on column, row for DUT 5
+    pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
+    n_pixel = [(1152, 576)] * 6  # Number of pixel on column, row
 
-    z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # in um optional, can be also deduced from data, but usually not with high precision (~ mm)
-    dut_name = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
+    z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # z position in um, can be also deduced from data, but usually not with high precision (~ mm)
+    dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
 
@@ -65,7 +55,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'input_hits_file': data_files[i],
         'n_pixel': n_pixel[i],
         'pixel_size': pixel_size[i],
-        'dut_name': dut_name[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     multiple_results = [pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwarg) for kwarg in kwargs]
     noisy_pixels_files = [res.get() for res in multiple_results]
@@ -77,7 +67,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'max_y_distance': 3,
         'max_time_distance': 2,
         'max_cluster_hits': 1000000,
-        'dut_name': dut_name[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
     # free resources
     pool.close()
