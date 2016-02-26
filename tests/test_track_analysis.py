@@ -31,6 +31,8 @@ class TestTrackAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder + 'TrackCandidates_2.h5'))
         os.remove(os.path.join(cls.output_folder + 'Tracks.h5'))
         os.remove(os.path.join(cls.output_folder + 'Tracks.pdf'))
+        os.remove(os.path.join(cls.output_folder + 'Tracks_2.h5'))
+        os.remove(os.path.join(cls.output_folder + 'Tracks_2.pdf'))
 
     def test_track_finding(self):
         track_analysis.find_tracks(input_tracklets_file=os.path.join(tests_data_folder + 'Tracklets_small.h5'),
@@ -46,7 +48,6 @@ class TestTrackAnalysis(unittest.TestCase):
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_track_fitting(self):
-        # Fit the track candidates and create new track table
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder + 'TrackCandidates_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder + 'Tracks.h5'),
                                   output_pdf=os.path.join(self.output_folder + 'Tracks.pdf'),
@@ -57,6 +58,18 @@ class TestTrackAnalysis(unittest.TestCase):
                                   track_quality=1,
                                   use_correlated=False)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Tracks_result.h5'), os.path.join(self.output_folder + 'Tracks.h5'), exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
+        track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder + 'TrackCandidates_result.h5'),
+                                  output_tracks_file=os.path.join(self.output_folder + 'Tracks_2.h5'),
+                                  output_pdf=os.path.join(self.output_folder + 'Tracks_2.pdf'),
+                                  z_positions=self.z_positions,
+                                  fit_duts=None,
+                                  include_duts=[-3, -2, -1, 1, 2, 3],
+                                  ignore_duts=None,
+                                  track_quality=1,
+                                  use_correlated=False,
+                                  chunk_size=4999)
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Tracks_result.h5'), os.path.join(self.output_folder + 'Tracks_2.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
