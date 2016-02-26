@@ -651,7 +651,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
 
 # Helper functions that are not meant to be called during analysis
 @njit
-def _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
+def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
     # Set track quality of actual DUT from actual DUT hit
     column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
     if row != 0:  # row = 0 is no hit
@@ -666,7 +666,38 @@ def _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index,
 
 
 @njit
-def _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge):
+def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, hit_index, actual_column_sigma, actual_row_sigma):
+    # Recalculate track quality of already assigned hit, needed if hits are swapped
+    first_dut_index = _get_first_dut_index(tr_column, hit_index)
+
+    actual_track_column, actual_track_row = tr_column[hit_index][first_dut_index], tr_row[hit_index][first_dut_index]
+    actual_track = tracklets[hit_index]
+    column, row = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index]
+
+    if row != 0:  # row = 0 is no hit
+        actual_track.track_quality |= (1 << dut_index)  # Set track with hit
+        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
+        if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # High quality track hits
+            actual_track.track_quality |= (65793 << dut_index)
+        elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # Low quality track hits
+            actual_track.track_quality |= (257 << dut_index)
+    else:
+        actual_track.track_quality &= (~(65793 << dut_index))  # Unset track quality
+
+
+@njit
+def _get_first_dut_index(tr_column, index):
+    ''' Returns the first DUT that has a hit for the track at index '''
+    dut_index = 0
+    for dut_index in range(tr_column.shape[1]):  # Loop over duts, to get first DUT hit of track
+        if tr_column[index][dut_index] != 0:
+            break
+    return dut_index
+
+
+@njit
+def _swap_hits(tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge):
+    #     print 'Swap hits', tr_column[track_index][dut_index], tr_column[hit_index][dut_index]
     tmp_column, tmp_row, tmp_charge = tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_charge[track_index][dut_index]
     tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_charge[track_index][dut_index] = column, row, charge
     tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index] = tmp_column, tmp_row, tmp_charge
@@ -688,9 +719,9 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
     actual_track_column, actual_track_row = 0., 0.
     column_distance, row_distance = 0., 0.
     hit_distance = 0.
-    best_hit_distance = 0.
 
     for track_index, actual_track in enumerate(tracklets):  # Loop over all possible tracks
+        #         print 'ACTUAL TRACK', track_index
         # Set variables for new event
         if actual_track.event_number != actual_event_number:  # Detect new event
             actual_event_number = actual_track.event_number
@@ -700,54 +731,45 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
             actual_hit_track_index = track_index
 
         n_actual_tracks += 1
-        first_hit_set = False
+        reference_hit_set = False  # The first real hit (column, row != 0) is the reference hit of the actual track
+        n_track_hits = 0
 
         for dut_index in range(n_duts):  # loop over all DUTs in the actual track
-
             actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
 
-            if not first_hit_set and tr_row[track_index][dut_index] != 0:  # search for first DUT that registered a hit (row != 0)
+            if not reference_hit_set and tr_row[track_index][dut_index] != 0:  # Search for first DUT that registered a hit (row != 0)
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
-                first_hit_set = True
+                reference_hit_set = True
                 tracklets[track_index].track_quality |= (65793 << dut_index)  # First track hit has best quality by definition
-            elif first_hit_set:  # First hit found, now find best (closest) DUT hit
-                close_hit_found = False  # Reset flag that signals that a close hit was found (wthin 5 sigma) for the actual hit (actual_track_column, actual_track_row) in the actual dut (dut_index)
+                n_track_hits += 1
+            elif reference_hit_set:  # First hit found, now find best (closest) DUT hit
+                shortest_hit_distance = -1  # The shortest hit distance to the actual hit; -1 means not assigned
                 for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # Loop over all not sorted hits of actual DUT
                     if tracklets[hit_index].event_number != actual_event_number:  # Abort condition
                         break
                     column, row, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index]
-                    column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-                    hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
-
                     if row != 0:  # Check for hit (row != 0)
-                        # Close track hit (5 sigma search region)
-                        if not close_hit_found and column_distance < 5. * actual_column_sigma and row_distance < 5. * actual_row_sigma:
-
-                            # Check if hit is already a close hit, then do not move
-                            if tracklets[hit_index].track_quality & (65793 << dut_index) == (65793 << dut_index):
-                                _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
-                                continue
-
-                            # Check if old hit is closer, then do not move
-                            if tracklets[hit_index].track_quality & (257 << dut_index) == (257 << dut_index):
-                                column_distance_old, row_distance_old = abs(column - tr_column[hit_index][0]), abs(row - tr_row[hit_index][0])
-                                hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
-                                if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track
-                                    _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
-                                    continue
-
-                            # The actual hit can be taken as a first close hit, so swap if needed and set hit distance
+                        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
+                        hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
+                        if shortest_hit_distance < 0 or hit_distance < shortest_hit_distance:  # Check if the hit is closer to reference hit
                             if track_index != hit_index:  # Check if hit swapping is needed
-                                _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge)
-                            best_hit_distance = hit_distance
-                            close_hit_found = True
-                        # Close track hit exists but the actual one is event better, thus swap
-                        elif close_hit_found and hit_distance < best_hit_distance:
-                            if track_index != hit_index:  # Check if hit swapping is needed
-                                _swap_hits(tracklets, tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge)
-                            best_hit_distance = hit_distance
+                                if track_index > hit_index:  # Check if hit is already assigned to other track
+                                    first_dut_index = _get_first_dut_index(tr_column, hit_index)  # Get reference DUT index of other track
+                                    # Calculate hit distance to reference hit of other track
+                                    column_distance_old, row_distance_old = abs(column - tr_column[hit_index][first_dut_index]), abs(row - tr_row[hit_index][first_dut_index])
+                                    hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
+                                    if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track; otherwise leave it with other track
+                                        continue
+                                _swap_hits(tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge)
+                                if track_index > hit_index:  # Check if hit is already assigned to other track
+                                    _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, hit_index, actual_column_sigma, actual_row_sigma)
+                            shortest_hit_distance = hit_distance
+                            n_track_hits += 1
 
-            _set_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
+#             if reference_dut_index == n_duts - 1:  # Special case: If there is only one hit in the last DUT, check if this hit fits better to any other track of this event
+#                 pass
+
+            _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
 
         # Set number of tracks of last event
         for i in range(n_actual_tracks):
