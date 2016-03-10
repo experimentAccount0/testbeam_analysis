@@ -5,8 +5,9 @@ import tables as tb
 import numpy as np
 import unittest
 from pyLandau import landau
+from scipy.optimize import curve_fit
 
-from testbeam_analysis.tools.simulate_data import SimulateData
+from testbeam_analysis.tools import simulate_data
 
 
 class TestHitAnalysis(unittest.TestCase):
@@ -21,7 +22,7 @@ class TestHitAnalysis(unittest.TestCase):
             except (ImportError, EnvironmentError):
                 pass
 
-        self.simulate_data = SimulateData(0)
+        self.simulate_data = simulate_data.SimulateData(0)
         self.simulate_data.n_duts = 6
 
     @classmethod
@@ -133,7 +134,7 @@ class TestHitAnalysis(unittest.TestCase):
         self.simulate_data.dut_n_pixel = [(10000, 10000)] * self.simulate_data.n_duts  # If the sensor is too small the mean cannot be easily calculated
         self.simulate_data.beam_angle_sigma = 0
         self.simulate_data.beam_position_sigma = (0, 0)
-        self.simulate_data.dut_material_budget = [0] * self.simulate_data.n_duts  # Turn off mulitple scattering
+        self.simulate_data.dut_material_budget = [0] * self.simulate_data.n_duts  # Turn off multiple scattering
         self.simulate_data.digitization_charge_sharing = False  # Simplify position reconstruction
 
         for phi in [0, np.pi / 4., np.pi / 2., 3. / 4. * np.pi, np.pi, 5. * np.pi / 4., 3 * np.pi / 2.]:
@@ -158,6 +159,84 @@ class TestHitAnalysis(unittest.TestCase):
         self.simulate_data.beam_direction = (0, 2. * np.pi)
         self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
         check_beam_angle()
+
+    def test_multiple_scattering(self):
+        self.simulate_data.reset()
+
+        # Set two planes and check the scattering angle due to the material budget of the first plane
+        self.simulate_data.n_duts = 2
+        self.simulate_data.set_std_settings()
+        self.simulate_data.beam_angle = 0
+        self.simulate_data.beam_angle_sigma = 0
+        self.simulate_data.beam_position_sigma = (0, 0)
+        self.simulate_data.z_positions = [i * 1000000 + 1000 for i in range(self.simulate_data.n_duts)]  # 1m distance to see scattering better
+        self.simulate_data.dut_pixel_size = [(1, 1)] * self.simulate_data.n_duts  # If the pixel size is too big this tests fails due to pixel discretisation error
+        self.simulate_data.dut_n_pixel = [(10000, 10000)] * self.simulate_data.n_duts
+
+        self.simulate_data.digitization_charge_sharing = False  # Simplify position reconstruction
+
+        def gauss(x, A, mu, sigma):  # Scattering angle theta fit function
+            return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+
+        def check_scattering_angle():
+            # Expected scattering angle theta_0
+            theta_0 = self.simulate_data._scattering_angle_sigma(self.simulate_data.dut_material_budget[0], charge_number=1) * 1000
+
+            # Extract theta from simulation results by using the hit positions
+            with tb.open_file('simulated_data_DUT0.h5', 'r') as in_file_h5:
+                dut0_x = (in_file_h5.root.Hits[:]['column'] - 1) * self.simulate_data.dut_pixel_size[0][0]
+                dut0_y = (in_file_h5.root.Hits[:]['row'] - 1) * self.simulate_data.dut_pixel_size[0][1]
+
+            with tb.open_file('simulated_data_DUT1.h5', 'r') as in_file_h5:
+                dut1_x = (in_file_h5.root.Hits[:]['column'] - 1) * self.simulate_data.dut_pixel_size[1][0]
+                dut1_y = (in_file_h5.root.Hits[:]['row'] - 1) * self.simulate_data.dut_pixel_size[1][1]
+
+            # Calculate theta in spherical coordinates from data
+            dx = dut1_x.astype(np.float) - dut0_x.astype(np.int)
+            dy = dut1_y.astype(np.float) - dut0_y.astype(np.float)
+            dz = np.ones_like(dx) * (self.simulate_data.z_positions[1] - self.simulate_data.z_positions[0])
+            _, theta, _ = simulate_data._cartesian_to_spherical(dx, dy, dz)
+
+            if theta_0 == 0:  # Special case: no material budget thus not scattering, theta has to be beam angle
+                self.assertTrue(np.allclose(self.simulate_data.beam_angle, theta * 1000., atol=0.01))
+                return
+
+            if self.simulate_data.beam_angle == 0:
+                hist, bins = np.histogram(theta * 1000, range=(0, np.pi), bins=1000)  # Histogramm scattering angle distribution
+                x, y = (bins[:-1] + bins[1:]) / 2., hist
+    #             import matplotlib.pyplot as plt
+    #             plt.bar(x, y, width=np.diff(x)[0])
+    #             plt.plot(x, gauss(x, *(np.amax(y), 0, theta_0)), 'r-', linewidth=2)
+    #             plt.legend()
+    #             plt.show()
+                # Fit scatterign distribution
+                coeff, _ = curve_fit(gauss, x, y, p0=[np.amax(hist), 0, theta_0])  # Fit theta distribution
+                self.assertTrue(np.allclose(theta_0, coeff[2], atol=0.02), 'The scattering angle for multiple scattering is wrong')  # Check for similarity, slight differences most likely due to pixel position binning
+            else:  # TODO: this is maybe a bug, the theta distribution with starting beam angle does not look gaussian; just check the mean here;
+                self.assertTrue(np.allclose(np.mean(theta * 1000.), self.simulate_data.beam_angle, atol=0.05), 'The beam direction with multiple scattering is wrong')
+
+        # Test 1: Check scattering for different device thickness from 50 um to 1000 um
+        for device_thickness in range(0, 1000, 50):  # Change the thickness
+            self.simulate_data.dut_thickness = [device_thickness] * self.simulate_data.n_duts
+            self.simulate_data.dut_material_budget = [self.simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(self.simulate_data.n_duts)]  # Assume silicon sensor
+            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            check_scattering_angle()
+
+        # Test 2: Check scattering for different device z positions
+        for z_position in ([[i, i + 1000000] for i in range(0, 1000000, 250000)]):  # Put planes at different positions
+            self.simulate_data.z_positions = z_position
+            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            check_scattering_angle()
+
+        # Test 3: Check with beam angle
+        for beam_angle in range(5):
+            self.simulate_data.beam_angle = beam_angle
+            self.simulate_data.z_positions = [0, 100000]
+            self.simulate_data.dut_thickness = [1000] * self.simulate_data.n_duts
+            self.simulate_data.dut_material_budget = [self.simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(self.simulate_data.n_duts)]
+            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            check_scattering_angle()
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
