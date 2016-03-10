@@ -16,7 +16,7 @@
 bool _debug = false;
 bool _info = false;
 
-// counts from the event number column of the cluster table how often a cluster occurs in every event
+// Counts from the event number column of the cluster table how often a cluster occurs in every event
 unsigned int getNclusterInEvents(int64_t*& rEventNumber, const unsigned int& rSize, int64_t*& rResultEventNumber, unsigned int*& rResultCount)
 {
 	unsigned int tResultIndex = 0;
@@ -39,7 +39,7 @@ unsigned int getNclusterInEvents(int64_t*& rEventNumber, const unsigned int& rSi
 	return tResultIndex + 1;
 }
 
-//takes two event arrays and calculates an intersection array of event numbers occurring in both arrays
+// Takes two event arrays and calculates an intersection array of event numbers occurring in both arrays
 unsigned int getEventsInBothArrays(int64_t*& rEventArrayOne, const unsigned int& rSizeArrayOne, int64_t*& rEventArrayTwo, const unsigned int& rSizeArrayTwo, int64_t*& rEventArrayIntersection)
 {
 	int64_t tActualEventNumber = -1;
@@ -63,7 +63,7 @@ unsigned int getEventsInBothArrays(int64_t*& rEventArrayOne, const unsigned int&
 	return tActualResultIndex++;
 }
 
-//takes two event number arrays and returns a event number array with the maximum occurrence of each event number in array one and two
+// Takes two event number arrays and returns a event number array with the maximum occurrence of each event number in array one and two
 unsigned int getMaxEventsInBothArrays(int64_t*& rEventArrayOne, const unsigned int& rSizeArrayOne, int64_t*& rEventArrayTwo, const unsigned int& rSizeArrayTwo, int64_t*& result, const unsigned int& rSizeArrayResult)
 {
 	int64_t tFirstActualEventNumber = rEventArrayOne[0];
@@ -160,7 +160,7 @@ unsigned int getMaxEventsInBothArrays(int64_t*& rEventArrayOne, const unsigned i
 	return tActualResultIndex;
 }
 
-//does the same as np.in1d but uses the fact that the arrays are sorted
+// Does the same as np.in1d but uses the fact that the arrays are sorted
 void in1d_sorted(int64_t*& rEventArrayOne, const unsigned int& rSizeArrayOne, int64_t*& rEventArrayTwo, const unsigned int& rSizeArrayTwo, uint8_t*& rSelection)
 {
 	rSelection[0] = true;
@@ -181,12 +181,15 @@ void in1d_sorted(int64_t*& rEventArrayOne, const unsigned int& rSizeArrayOne, in
 	}
 }
 
-// fast 1d index histograming (bin size = 1, values starting from 0)
+// Fast 1d index histograming (bin size = 1, values starting from 0)
 void histogram_1d(int*& x, const unsigned int& rSize, const unsigned int& rNbinsX, uint32_t*& rResult)
 {
 	for (unsigned int i = 0; i < rSize; ++i) {
-		if (x[i] >= rNbinsX)
-			throw std::out_of_range("The histogram indices are out of range");
+		if (x[i] >= rNbinsX){
+			std::stringstream errorString;
+			errorString << "The histogram index x=" << x[i] << " is out of range.";
+			throw std::out_of_range(errorString.str());
+		}
 		if (rResult[x[i]] < 4294967295)
 			++rResult[x[i]];
 		else
@@ -194,12 +197,15 @@ void histogram_1d(int*& x, const unsigned int& rSize, const unsigned int& rNbins
 	}
 }
 
-// fast 2d index histograming (bin size = 1, values starting from 0)
+// Fast 2d index histograming (bin size = 1, values starting from 0)
 void histogram_2d(int*& x, int*& y, const unsigned int& rSize, const unsigned int& rNbinsX, const unsigned int& rNbinsY, uint32_t*& rResult)
 {
 	for (unsigned int i = 0; i < rSize; ++i) {
-		if (x[i] >= rNbinsX || y[i] >= rNbinsY)
-			throw std::out_of_range("The histogram indices are out of range");
+		if (x[i] >= rNbinsX || y[i] >= rNbinsY){
+			std::stringstream errorString;
+			errorString << "The histogram indices (x/y)=(" << x[i] << "/" << y[i] << ") are out of range.";
+			throw std::out_of_range(errorString.str());
+		}
 		if (rResult[x[i] * rNbinsY + y[i]] < 4294967295)
 			++rResult[x[i] * rNbinsY + y[i]];
 		else
@@ -207,7 +213,7 @@ void histogram_2d(int*& x, int*& y, const unsigned int& rSize, const unsigned in
 	}
 }
 
-// fast 3d index histograming (bin size = 1, values starting from 0)
+// Fast 3d index histograming (bin size = 1, values starting from 0)
 void histogram_3d(int*& x, int*& y, int*& z, const unsigned int& rSize, const unsigned int& rNbinsX, const unsigned int& rNbinsY, const unsigned int& rNbinsZ, uint16_t*& rResult)
 {
 	for (unsigned int i = 0; i < rSize; ++i) {
@@ -223,8 +229,30 @@ void histogram_3d(int*& x, int*& y, int*& z, const unsigned int& rSize, const un
 	}
 }
 
-// fast mapping of cluster hits to event numbers
-void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, ClusterInfo*& rClusterInfo, const unsigned int& rClusterInfoSize, ClusterInfo*& rMappedClusterInfo, const unsigned int& rMappedClusterInfoSize)
+
+// Fast mapping of hits to event numbers
+void mapHits(int64_t*& rEventArray, const unsigned int& rEventArraySize, HitInfo*& rHitInfo, const unsigned int& rHitInfoSize, HitInfo*& rMappedHitInfo)
+{
+	unsigned int j = 0;
+	for (unsigned int i = 0; i < rEventArraySize; ++i) {
+		for (j; j < rHitInfoSize; ++j) {
+			if (rHitInfo[j].eventNumber == rEventArray[i]) {
+				if (i < rEventArraySize) {
+					rMappedHitInfo[i] = rHitInfo[j];
+					++i;
+				}
+				else
+					return;
+			}
+			else
+				break;
+		}
+	}
+}
+
+
+// Fast mapping of cluster hits to event numbers
+void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, ClusterInfo*& rClusterInfo, const unsigned int& rClusterInfoSize, ClusterInfo*& rMappedClusterInfo)
 {
 	unsigned int j = 0;
 	for (unsigned int i = 0; i < rEventArraySize; ++i) {
@@ -242,6 +270,7 @@ void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, Clus
 		}
 	}
 }
+
 
 // loop over the refHit, Hit arrays and compare the hits of same event number. If they are similar (within an error) correlation is assumed. If more than nBadEvents are not correlated, broken correlation is assumed.
 // True/False is returned for correlated/not correlated data. The iRefHit index is the index of the first not correlated hit.

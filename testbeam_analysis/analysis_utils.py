@@ -34,6 +34,19 @@ def get_max_events_in_both_arrays(events_one, events_two):
     return event_result[:count]
 
 
+def map_hits(events, hits):
+    """
+    Maps the hits on events. Not existing hits in events have all values set to 0
+
+    """
+    hits = np.ascontiguousarray(hits)
+    events = np.ascontiguousarray(events)
+    mapped_hits = np.zeros((events.shape[0], ), dtype=tb.dtype_from_descr(data_struct.HitInfoTable))
+    mapped_hits = np.ascontiguousarray(mapped_hits)
+    analysis_functions.map_hits(events, hits, mapped_hits)
+    return mapped_hits
+
+
 def map_cluster(events, cluster):
     """
     Maps the cluster hits on events. Not existing hits in events have all values set to 0
