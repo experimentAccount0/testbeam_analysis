@@ -72,12 +72,72 @@ def correlate_hits(input_hits_files, output_correlation_file, fraction=1, event_
                     out_row[:] = row_corr
 
 
+def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk_size=4999999):
+    '''Histograms the hit column (row) of two different devices on an event basis. If the hits are correlated a line should be seen.
+    Permutations are not considered (not all hits of the first device are correlated with all hits of the second device).
+
+    Parameters
+    ----------
+    input_hits_files : pytables file
+        Input file with hit data.
+    output_correlation_file : pytables file
+        Output file with the correlation histograms.
+    n_pixel : list of tuples
+        One tuple per DUT describing the number of pixels in column,row direction 
+        e.g. for 2 DUTs: n_pixel = [(80, 336), (80, 336)]
+    chunk_size: int
+        Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
+    '''
+    logging.info('=== Correlate the position of %d DUTs ===', len(input_hits_files))
+    with tb.open_file(output_correlation_file, mode="w") as out_file_h5:
+        n_duts = len(input_hits_files)
+
+        # Result arrays to be filled
+        column_correlations = [None] * (n_duts - 1)
+        row_correlations = [None] * (n_duts - 1)
+
+        with tb.open_file(input_hits_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
+            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Hits.shape[0], term_width=80)
+            progress_bar.start()
+            start_indices = [0] * len(input_hits_files)  # Store the loop indices for speed up
+            for hits_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Hits, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+                actual_event_numbers = hits_dut_0[:]['event_number']
+
+                # Calculate the common event number of each device with the reference device and correlate the hits of this events
+                for dut_index, hit_file in enumerate(input_hits_files[1:], start=1):  # Loop over the other hit files
+                    with tb.open_file(hit_file, mode='r') as actual_in_file_h5:  # Open other DUT hit file
+                        for actual_dut_hits, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Hits, start=start_indices[dut_index], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the hits in the actual hit file in chunks
+                            common_event_numbers = analysis_utils.get_max_events_in_both_arrays(actual_event_numbers, actual_dut_hits[:]['event_number'])
+
+                            dut_0_hits = analysis_utils.map_hits(common_event_numbers, hits_dut_0)
+                            actual_dut_hits = analysis_utils.map_hits(common_event_numbers, actual_dut_hits)
+                            selection = np.logical_and(dut_0_hits['column'] != 0, actual_dut_hits['column'] != 0)
+
+                            if not column_correlations[dut_index - 1]:
+                                column_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits[selection]['column'] - 1, dut_0_hits[selection]['column'] - 1, shape=(n_pixel[dut_index][0], n_pixel[0][0]))
+                                row_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits[selection]['row'] - 1, dut_0_hits[selection]['row'] - 1, shape=(n_pixel[dut_index][1], n_pixel[0][1]))
+                            else:
+                                column_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits[selection]['column'] - 1, dut_0_hits[selection]['column'] - 1, shape=(n_pixel[dut_index][0], n_pixel[0][0]))
+                                row_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits[selection]['row'] - 1, dut_0_hits[selection]['row'] - 1, shape=(n_pixel[dut_index][1], n_pixel[0][1]))
+
+                progress_bar.update(index)
+
+            # Store the correlation histograms
+            for dut_index in range(n_duts - 1):
+                out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % (dut_index + 1), title='Column Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(column_correlations[dut_index].dtype), shape=column_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                out_row = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % (dut_index + 1), title='Row Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(row_correlations[dut_index].dtype), shape=row_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                out_col.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[dut_index])]
+                out_row.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[dut_index])]
+                out_col[:] = column_correlations[dut_index]
+                out_row[:] = row_correlations[dut_index]
+            progress_bar.finish()
+
+
 def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, pixel_size):
-    '''Takes the correlation histograms, fits the correlations and stores the correlation parameters.
+    '''Takes the correlation histograms to deduce the translation in x and y of the planes
     The user can define cuts on the fit error and straight line offset in an interactive way.
 
-    This is a coarse alignment that uses the hit correlation and corrects for translations between the planes and beam divergences.
-    The alignment of the plane rotation needs the the fine alignment function.
+    The fine alignment that includes the plane rotation needs the the fine alignment function and has to be called after track finding.
 
     Parameters
     ----------
@@ -169,10 +229,10 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
                     chi2 = chi2[selected_data]
                     n_hits = n_hits[selected_data]
 
-                # linear fit, usually describes correlation very well
-                # with low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
-                # to be insvetigated...
-                # Use results from straight line fit as start values for last fit
+                # Linear fit, usually describes correlation very well
+                # With low energy beam and / or beam with diverging beam, the correlation will not be straight
+
+                # Use results from straight line fit as start values for this final fit
                 f = lambda x, c0, c1: c0 + c1 * x
                 fit, pcov = curve_fit(f, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
                 fit_fn = np.poly1d(fit[::-1])
