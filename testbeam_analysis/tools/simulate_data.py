@@ -229,10 +229,36 @@ def _add_charge_sharing_hits(relative_position, hits_digits, max_column, max_row
     return result_hits[:result_index], n_hits_per_seed_hit
 
 
+@njit()
+def shuffle_event_hits(event_number, n_tracks_per_event, hits):
+    ''' Takes the hits of all DUTs and shuffles them for each event
+    '''
+
+    index = 0
+    indeces = np.arange(hits.shape[0])  # Hack to allow np.shuffle on a multidimesnional array, http://numba.pydata.org/numba-doc/dev/reference/numpysupported.html#simple-random-data
+
+    while index < hits.shape[0]:  # Loop over actual DUT hits
+        if n_tracks_per_event[index] == 1:  # One cannot shuffle one hit
+            index += 1
+            continue
+
+        np.random.shuffle(indeces[index:index + n_tracks_per_event[index]])  # Happens inplace
+
+        while index < hits.shape[0] - 1:  # Actual event is shuffled, increase index until new event
+            if event_number[index] != event_number[index + 1]:
+                break
+            index += 1
+
+        index += 1
+
+    return hits[indeces]  # copy instruction, inplace not possible due to numba limitations
+
+
 class SimulateData(object):
 
     def __init__(self, random_seed=None):
-        np.random.seed(random_seed)  # Set the random number seed to be able to rerun with same data
+        self.random_seed = random_seed
+        np.random.seed(self.random_seed)  # Set the random number seed to be able to rerun with same data
         self._n_duts = 6  # Std. setting fot the number of DUTs
         self.reset()
 
@@ -382,7 +408,7 @@ class SimulateData(object):
         actual_track_angles_theta = track_angles_theta
 
         for dut_index, z_position in enumerate(self.z_positions):  # Loop over DUTs
-            if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from z = 0 to this plane
+            if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to this plane
                 r = float(z_position) / np.cos(actual_track_angles_theta)  # r from origin to first plane, position vector
                 x, y, _ = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=r)
                 extrapolate = np.column_stack((x, y))
@@ -396,7 +422,7 @@ class SimulateData(object):
             if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
                 # Calculated the change of the direction vector due to multiple scattering, TODO: needs cross check
                 # Vector addition in spherical coordinates needs transformation into cartesian space: http://math.stackexchange.com/questions/790057/how-to-sum-2-vectors-in-spherical-coordinate-system
-                x, y, z = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=11.)  # r should not matter for a direction change in x,y?
+                x, y, z = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=1.)  # r should not matter for a direction change in x,y?
 
                 # Calculate scattering in spherical coordinates
                 scattering_phi = np.random.uniform(0, 2. * np.pi, size=actual_track_angles_phi.shape[0])
@@ -404,7 +430,7 @@ class SimulateData(object):
                 scattering_theta = np.abs(np.random.normal(0, theta_0, actual_track_angles_theta.shape[0]))  # Change theta angles due to scattering, abs because theta is defined [0..np.pi]
 
                 # Add scattering to direction vector in cartesian coordinates
-                dx, dy, _ = _spherical_to_cartesian(scattering_phi, scattering_theta, r=11.)  # r should not matter for a direction change in x,y?
+                dx, dy, _ = _spherical_to_cartesian(scattering_phi, scattering_theta, r=1.)  # r should not matter for a direction change in x,y?
                 x += dx
                 y += dy
 
@@ -445,7 +471,7 @@ class SimulateData(object):
             # Create cluster from seed hits arising from charge sharing
             if self.digitization_charge_sharing:
                 relative_position = dut_hits - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
-                dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position.T,
+                dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position.T,  # This function takes 75 % of the time
                                                                              hits_digits=dut_hits_digits,
                                                                              max_column=self.dut_n_pixel[dut_index][0],
                                                                              max_row=self.dut_n_pixel[dut_index][1],
@@ -456,7 +482,7 @@ class SimulateData(object):
                                                                              bias=self.dut_bias[dut_index])
                 actual_event_number = np.repeat(actual_event_number, n_hits_per_event)
 
-            # Mask hits outside of the DUT
+            # Delete hits outside of the DUT
             selection_x = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[0] <= self.dut_n_pixel[dut_index][0])  # Hits that are inside the x dimension of the DUT
             selection_y = np.logical_and(dut_hits_digits.T[1] > 0, dut_hits_digits.T[1] <= self.dut_n_pixel[dut_index][1])  # Hits that are inside the y dimension of the DUT
             selection = np.logical_and(selection_x, selection_y)
@@ -466,7 +492,7 @@ class SimulateData(object):
             # Mask hits due to inefficiency
             selection = np.ones_like(actual_event_number, dtype=np.bool)
             hit_indices = np.arange(actual_event_number.shape[0])  # Indices of hits
-            np.random.shuffle(hit_indices)  # shuffle these indeces
+            np.random.shuffle(hit_indices)  # shuffle hit indeces
             n_inefficient_hit = int(hit_indices.shape[0] * (1. - self.dut_efficiencies[dut_index]))
             selection[hit_indices[:n_inefficient_hit]] = False
 
@@ -490,7 +516,10 @@ class SimulateData(object):
 
     def _create_data(self, start_event_number=0, n_events=10000):
         # Calculate the number of tracks per event
-        n_tracks_per_event = np.random.normal(self.tracks_per_event, self.tracks_per_event_sigma, n_events).astype(np.int)
+        if self.tracks_per_event_sigma > 0:
+            n_tracks_per_event = np.random.normal(self.tracks_per_event, self.tracks_per_event_sigma, n_events).astype(np.int)
+        else:
+            n_tracks_per_event = np.ones(n_events, dtype=np.int) * self.tracks_per_event
         n_tracks_per_event[n_tracks_per_event < 0] = 0  # One cannot have less than 0 tracks per event, this will be triggered events without a track
 
         # Create event number
@@ -498,11 +527,19 @@ class SimulateData(object):
         event_number = np.repeat(events, n_tracks_per_event).astype(np.int64)  # Create an event number of events with tracks
         event_number += start_event_number
 
+        # Reduce to n_tracks_per_event > 0
+        n_tracks = n_tracks_per_event.sum()
+        n_tracks_per_event = np.repeat(n_tracks_per_event, n_tracks_per_event)  # Create per event n track info, needed for hit shuffling
+
         # Create tracks
-        track_positions_x, track_positions_y, track_angles_phi, track_angles_theta = self._create_tracks(n_tracks_per_event.sum())
+        track_positions_x, track_positions_y, track_angles_phi, track_angles_theta = self._create_tracks(n_tracks)
 
         # Create MC hits
         hits = self._create_hits_from_tracks(track_positions_x, track_positions_y, track_angles_phi, track_angles_theta)
+
+        # Suffle event hits to simulate unordered hit data per trigger
+        for index, actual_dut_hits in enumerate(hits):
+            hits[index] = shuffle_event_hits(event_number, n_tracks_per_event, actual_dut_hits)
 
         # Create detector response: digitized hits
         hits_digitized = self._digitize_hits(event_number, hits)
@@ -539,14 +576,6 @@ class SimulateData(object):
 
 if __name__ == '__main__':
     simulate_data = SimulateData(0)
-    simulate_data.beam_angle = 0
-    simulate_data.beam_angle_sigma = 0
-    simulate_data.beam_direction = (0, 0)
-    simulate_data.dut_material_budget = [0.013] * simulate_data.n_duts
-    simulate_data.dut_material_budget[3] = 0.013
-
-    simulate_data.beam_position_sigma = (0, 0)
-    simulate_data.digitization_charge_sharing = False
     simulate_data.create_data_and_store('simulated_data', n_events=100000)
 
 
