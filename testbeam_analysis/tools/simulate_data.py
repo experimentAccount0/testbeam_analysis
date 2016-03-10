@@ -22,6 +22,31 @@ from pyLandau import landau
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
+def _cartesian_to_spherical(x, y, z):
+    r = np.sqrt(x * x + y * y + z * z)
+    phi = np.zeros_like(r)  # define phi = 0 for x = 0
+    theta = np.zeros_like(r)  # theta = 0 for r = 0
+    # Avoid division by zero
+    phi[x != 0] = np.arctan2(y[x != 0], x[x != 0])  # https://en.wikipedia.org/wiki/Atan2
+    phi[phi < 0] += 2. * np.pi  # map to phi = [0 .. 2 pi[
+    theta[r != 0] = np.arccos(z[r != 0] / r[r != 0])
+    return phi, theta, r
+
+
+def _spherical_to_cartesian(phi, theta, r):
+    if np.any(r < 0):
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because r < 0')
+    if np.any(theta < 0) or np.any(theta >= np.pi):
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because theta exceeds [0, Pi[')
+    if np.any(phi < 0) or np.any(phi >= 2 * np.pi):
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because phi exceeds [0, 2*Pi[')
+    x = r * np.cos(phi) * np.sin(theta)
+    y = r * np.sin(phi) * np.sin(theta)
+    z = r * np.cos(theta)
+
+    return x, y, z
+
+
 # Jitted function for fast calculations
 @njit()
 def _calc_sigma_diffusion(distance, temperature, bias):
@@ -208,13 +233,24 @@ class SimulateData(object):
 
     def __init__(self, random_seed=None):
         np.random.seed(random_seed)  # Set the random number seed to be able to rerun with same data
+        self._n_duts = 6  # Std. setting fot the number of DUTs
         self.reset()
+
+    @property
+    def n_duts(self):
+        return self._n_duts
+
+    @n_duts.setter
+    def n_duts(self, value):
+        if value > self._n_duts:
+            logging.warning('Number of DUTs increased, reset settings!')
+            self.set_std_settings()
+        self._n_duts = value
 
     def set_std_settings(self):
         # Setup settings
-        self.n_duts = 6
-        self.z_positions = [i * 10000 for i in range(self.n_duts)]  # in um; st: every 10 cm
-        self.offsets = [(-2500, -2500)] * self.n_duts  # in x, y in mu
+        self.z_positions = [i * 10000 for i in range(self._n_duts)]  # in um; st: every 10 cm
+        self.offsets = [(-2500, -2500)] * self._n_duts  # in x, y in mu
         self.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
 
         # Beam settings
@@ -228,14 +264,14 @@ class SimulateData(object):
         self.tracks_per_event_sigma = 1  # Deviation from the average number of tracks, makes no track pe event possible!
 
         # Device settings
-        self.dut_bias = [50] * self.n_duts  # Sensor bias voltage for each device in volt
-        self.dut_thickness = [100] * self.n_duts  # Sensor thickness for each device in um
-        self.dut_threshold = [0] * self.n_duts  # Detection threshold for each device in electrons, influences efficiency!
-        self.dut_noise = [50] * self.n_duts  # Noise for each device in electrons
-        self.dut_pixel_size = [(50, 50)] * self.n_duts  # Pixel size for each device in x / y in um
-        self.dut_n_pixel = [(1000, 1000)] * self.n_duts  # Number of pixel for each device in x / y
-        self.dut_efficiencies = [1.] * self.n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
-        self.dut_material_budget = [0] * self.n_duts  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering
+        self.dut_bias = [50] * self._n_duts  # Sensor bias voltage for each device in volt
+        self.dut_thickness = [100] * self._n_duts  # Sensor thickness for each device in um
+        self.dut_threshold = [0] * self._n_duts  # Detection threshold for each device in electrons, influences efficiency!
+        self.dut_noise = [50] * self._n_duts  # Noise for each device in electrons
+        self.dut_pixel_size = [(50, 50)] * self._n_duts  # Pixel size for each device in x / y in um
+        self.dut_n_pixel = [(1000, 1000)] * self._n_duts  # Number of pixel for each device in x / y
+        self.dut_efficiencies = [1.] * self._n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
+        self.dut_material_budget = [self.dut_thickness[i] * 1e-4 / 9.370 for i in range(self._n_duts)]  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering; std. setting is the sensor thickness made of silicon as material budget
 
         # Digitization settings
         self.digitization_charge_sharing = True
@@ -249,11 +285,11 @@ class SimulateData(object):
         self._hit_files = None
 
     def create_data_and_store(self, base_file_name, n_events, chunk_size=100000):
-        logging.info('Simulate %d events with %d DUTs', n_events, self.n_duts)
+        logging.info('Simulate %d events with %d DUTs', n_events, self._n_duts)
         # Create output h5 files with emtpy hit ta
         output_files = []
         hit_tables = []
-        for dut_index in range(self.n_duts):
+        for dut_index in range(self._n_duts):
             output_files.append(tb.open_file(base_file_name + '_DUT%d.h5' % dut_index, 'w'))
             hit_tables.append(output_files[dut_index].createTable(output_files[dut_index].root, name='Hits', description=self._hit_dtype, title='Simulated hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)))
 
@@ -262,7 +298,7 @@ class SimulateData(object):
         # Fill output files in chunks
         for chunk_index, _ in enumerate(range(0, n_events, chunk_size)):
             actual_events, actual_digitized_hits = self._create_data(start_event_number=chunk_index * chunk_size, n_events=chunk_size)
-            for dut_index in range(self.n_duts):
+            for dut_index in range(self._n_duts):
                 actual_dut_events, actual_dut_hits = actual_events[dut_index], actual_digitized_hits[dut_index]
                 actual_hits = np.zeros(shape=actual_dut_events.shape[0], dtype=self._hit_dtype)
                 actual_hits['event_number'] = actual_dut_events
@@ -312,9 +348,13 @@ class SimulateData(object):
             track_angles_theta = np.repeat(self.beam_angle / 1000., repeats=n_tracks)  # Constant theta = 0
 
         # Cut down to theta = 0 .. Pi
+        iterations = 0
         while(np.any(track_angles_theta > np.pi) or np.any(track_angles_theta < 0)):
             track_angles_theta[track_angles_theta > np.pi] = np.random.normal(self.beam_angle, self.beam_angle_sigma, size=track_angles_theta[track_angles_theta > np.pi].shape[0])
             track_angles_theta[track_angles_theta < 0] = np.random.normal(self.beam_angle, self.beam_angle_sigma, size=track_angles_theta[track_angles_theta < 0].shape[0])
+            iterations += 1
+            if iterations > 1000:
+                raise RuntimeError('Cannot create theta between [0, 2 Pi[, decrease track angle sigma!')
 
         if (self.beam_direction[0] != self.beam_direction[1]):
             track_angles_phi = np.random.uniform(self.beam_direction[0], self.beam_direction[1], size=n_tracks)  # Flat distributed in phi
@@ -324,7 +364,8 @@ class SimulateData(object):
         return track_positions_x, track_positions_y, track_angles_phi, track_angles_theta
 
     def _create_hits_from_tracks(self, track_positions_x, track_positions_y, track_angles_phi, track_angles_theta):
-        '''Creates exact intersection points (x, y) at the given DUT z_positions for the given tracks. The tracks are defined with with the position at z = 0 (track_positions_x, track_positions_y) and
+        '''Creates exact intersection points (x, y) at the given DUT z_positions for the given tracks.
+        The tracks are defined with the position at z = 0 (track_positions_x, track_positions_y) and
         an angle (track_angles_phi, track_angles_theta).
 
         Returns
@@ -336,31 +377,51 @@ class SimulateData(object):
         intersections = []
         track_positions = np.column_stack((track_positions_x, track_positions_y))  # Track position at z = 0
 
-#         for z_position in self.z_positions:
-# r = z_position / np.cos(track_angles_theta)  # r in spherical coordinates at actual z_position
-#             extrapolate = (r * np.array([np.cos(track_angles_phi) * np.sin(track_angles_theta), np.sin(track_angles_phi) * np.sin(track_angles_theta)])).T
-#             intersections.append(track_positions + extrapolate)
-
         # Multiple scattering changes the angle at each plane, thus these temporary array have to be filled
         actual_track_angles_phi = track_angles_phi
         actual_track_angles_theta = track_angles_theta
 
         for dut_index, z_position in enumerate(self.z_positions):  # Loop over DUTs
             if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from z = 0 to this plane
-                r = z_position / np.cos(actual_track_angles_theta)  # r in spherical coordinates at actual z_position from z = 0
-                extrapolate = (r * np.array([np.cos(actual_track_angles_phi) * np.sin(actual_track_angles_theta), np.sin(actual_track_angles_phi) * np.sin(actual_track_angles_theta)])).T
+                r = float(z_position) / np.cos(actual_track_angles_theta)  # r from origin to first plane, position vector
+                x, y, _ = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=r)
+                extrapolate = np.column_stack((x, y))
                 actual_intersections = track_positions + extrapolate
             else:  # Extrapolat from last plane position with last track angle to this plane
-                r = (z_position - self.z_positions[dut_index - 1]) / np.cos(actual_track_angles_theta)  # r in spherical coordinates at actual z_position from last z_position
-                extrapolate = (r * np.array([np.cos(actual_track_angles_phi) * np.sin(actual_track_angles_theta), np.sin(actual_track_angles_phi) * np.sin(actual_track_angles_theta)])).T
-                actual_intersections = intersections[-1] + extrapolate
+                r = float(z_position - self.z_positions[dut_index - 1]) / np.cos(actual_track_angles_theta)  # r in spherical coordinates at actual z_position from last z_position, direction vector
+                x, y, _ = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=r)
+                extrapolate = np.column_stack((x, y))
+                actual_intersections = intersections[-1] + extrapolate  # Actual intersection = Last intersection + extrapolation
 
-            if self.dut_material_budget[dut_index] != 0:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
-                actual_track_angles_phi = np.random.random(size=actual_track_angles_phi.shape[0]) * 2 * np.pi  # Flat distributed phi = [0, Pi[
-                theta_0 = self._scattering_angle_sigma(material_budget=self.dut_material_budget[dut_index])
-                actual_track_angles_theta += np.random.normal(0, theta_0, actual_track_angles_theta.shape[0])
+            if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
+                # Calculated the change of the direction vector due to multiple scattering, TODO: needs cross check
+                # Vector addition in spherical coordinates needs transformation into cartesian space: http://math.stackexchange.com/questions/790057/how-to-sum-2-vectors-in-spherical-coordinate-system
+                x, y, z = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=11.)  # r should not matter for a direction change in x,y?
+
+                # Calculate scattering in spherical coordinates
+                scattering_phi = np.random.uniform(0, 2. * np.pi, size=actual_track_angles_phi.shape[0])
+                theta_0 = self._scattering_angle_sigma(material_budget=self.dut_material_budget[dut_index])  # Scattering distribution theta_0, calculated from DUT material budget
+                scattering_theta = np.abs(np.random.normal(0, theta_0, actual_track_angles_theta.shape[0]))  # Change theta angles due to scattering, abs because theta is defined [0..np.pi]
+
+                # Add scattering to direction vector in cartesian coordinates
+                dx, dy, _ = _spherical_to_cartesian(scattering_phi, scattering_theta, r=11.)  # r should not matter for a direction change in x,y?
+                x += dx
+                y += dy
+
+                actual_track_angles_phi, actual_track_angles_theta, _ = _cartesian_to_spherical(x, y, z)
 
             intersections.append(actual_intersections)  # Add intersections of actual DUT to result
+
+#         import matplotlib.pyplot as plt
+#         for j in range(10):
+#             plt.clf()
+#             z = self.z_positions
+#             x = [intersections[i][j][0] for i in range(self._n_duts)]
+#             y = [intersections[i][j][1] for i in range(self._n_duts)]
+#             plt.plot(z, x, '.-', label='x')
+#             plt.plot(z, y, '.-', label='y')
+#             plt.legend()
+#             plt.show()
 
         return intersections
 
@@ -417,8 +478,9 @@ class SimulateData(object):
                 dut_hits_digits[:, 2] += np.random.normal(0, self.dut_noise[dut_index], dut_hits_digits[:, 2].shape[0])
 
             # Delete hits below threshold
-            actual_event_number = actual_event_number[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
-            dut_hits_digits = dut_hits_digits[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
+            if self.dut_threshold[dut_index] != 0:
+                actual_event_number = actual_event_number[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
+                dut_hits_digits = dut_hits_digits[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
 
             # Append results
             digitized_hits.append(dut_hits_digits)
@@ -470,35 +532,22 @@ class SimulateData(object):
         charge number: int
             charge number of scattering particles, usually 1
         '''
+
+        if material_budget == 0:
+            return 0
         return 13.6 / self.beam_momentum * charge_number * np.sqrt(material_budget) * (1 + 0.038 * np.log(material_budget))
 
 if __name__ == '__main__':
     simulate_data = SimulateData(0)
-    simulate_data.beam_angle = 1
+    simulate_data.beam_angle = 0
     simulate_data.beam_angle_sigma = 0
     simulate_data.beam_direction = (0, 0)
-    simulate_data.dut_material_budget = [0] * simulate_data.n_duts
+    simulate_data.dut_material_budget = [0.013] * simulate_data.n_duts
     simulate_data.dut_material_budget[3] = 0.013
 
     simulate_data.beam_position_sigma = (0, 0)
     simulate_data.digitization_charge_sharing = False
     simulate_data.create_data_and_store('simulated_data', n_events=100000)
-
-
-#     x = np.arange(0, 10, 0.1)
-# y = landau.landau(x, mu=1. - 0.22278298, eta=0.2)  # MPV is at mu + 0.22278298; eta is different according to the device thickness; this is neglected here
-# p = y / np.sum(y)  # Propability
-#     mpv = 77 * 100
-#     charge = x * mpv
-#
-#
-#     c = np.random.choice(charge, 1000, p=p)
-#
-#
-# #
-# plt.plot(x, y)
-#     plt.hist(c, bins=1000, range=(charge[0], charge[-1]))
-#     plt.show()
 
 
 # TEST: Plot charge sharing
