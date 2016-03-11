@@ -36,7 +36,26 @@ def get_max_events_in_both_arrays(events_one, events_two):
 
 def map_hits(events, hits):
     """
-    Maps the hits on events. Not existing hits in events have all values set to 0
+    Maps the hits on events. Not existing hits in events have all values set to 0. Too many hits per event for the event number are omitted
+    and lost!
+
+    Parameters
+    ----------
+    events : numpy array
+        One dimensional event number array with increasing event numbers.
+    hits : np.recarray
+        Recarray with cluster info. The event number is increasing.
+
+    Example
+    -------
+    event = [ 0  1  1  2  3  3 ]
+    hits.event_number = [ 0  1  2  2  3  4 ]
+
+    gives mapped_hits.event_number = [ 0  1  0  2  3  0 ]
+
+    Returns
+    -------
+    Hits array with given length of the events array.
 
     """
     hits = np.ascontiguousarray(hits)
@@ -49,7 +68,26 @@ def map_hits(events, hits):
 
 def map_cluster(events, cluster):
     """
-    Maps the cluster hits on events. Not existing hits in events have all values set to 0
+    Maps the cluster hits on events. Not existing cluster in events have all values set to 0. Too many cluster per event for the event number are omitted
+    and lost!
+
+    Parameters
+    ----------
+    events : numpy array
+        One dimensional event number array with increasing event numbers.
+    cluster : np.recarray
+        Recarray with cluster info. The event number is increasing.
+
+    Example
+    -------
+    event = [ 0  1  1  2  3  3 ]
+    cluster.event_number = [ 0  1  2  2  3  4 ]
+
+    gives mapped_cluster.event_number = [ 0  1  0  2  3  0 ]
+
+    Returns
+    -------
+    Cluster array with given length of the events array.
 
     """
     cluster = np.ascontiguousarray(cluster)
@@ -77,6 +115,7 @@ def hist_1d_index(x, shape):
     Fast 1d histogram of 1D indices with C++ inner loop optimization.
     Is more than 2 orders faster than np.histogram().
     The indices are given in coordinates and have to fit into a histogram of the dimensions shape.
+
     Parameters
     ----------
     x : array like

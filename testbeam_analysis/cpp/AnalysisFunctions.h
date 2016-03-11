@@ -235,18 +235,19 @@ void mapHits(int64_t*& rEventArray, const unsigned int& rEventArraySize, HitInfo
 {
 	unsigned int j = 0;
 	for (unsigned int i = 0; i < rEventArraySize; ++i) {
-		for (j; j < rHitInfoSize; ++j) {
-			if (rHitInfo[j].eventNumber == rEventArray[i]) {
-				if (i < rEventArraySize) {
-					rMappedHitInfo[i] = rHitInfo[j];
-					++i;
-				}
-				else
-					return;
-			}
-			else
-				break;
+		// Find first Hit with a fitting event number
+		while ((j < rHitInfoSize) && (rHitInfo[j].eventNumber < rEventArray[i])) {  // Catch up to actual event number rEventArray[i]
+			++j;
 		}
+
+		if (j < rHitInfoSize){
+			if (rHitInfo[j].eventNumber == rEventArray[i]){
+				rMappedHitInfo[i] = rHitInfo[j];
+				++j;
+			}
+		}
+		else
+			return;  // Speed up
 	}
 }
 
@@ -256,18 +257,19 @@ void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, Clus
 {
 	unsigned int j = 0;
 	for (unsigned int i = 0; i < rEventArraySize; ++i) {
-		for (j; j < rClusterInfoSize; ++j) {
-			if (rClusterInfo[j].eventNumber == rEventArray[i]) {
-				if (i < rEventArraySize) {
-					rMappedClusterInfo[i] = rClusterInfo[j];
-					++i;
-				}
-				else
-					return;
-			}
-			else
-				break;
+		// Find first Hit with a fitting event number
+		while ((j < rClusterInfoSize) && (rClusterInfo[j].eventNumber < rEventArray[i])) {  // Catch up to actual event number rEventArray[i]
+			++j;
 		}
+
+		if (j < rClusterInfoSize){
+			if (rClusterInfo[j].eventNumber == rEventArray[i]){
+				rMappedClusterInfo[i] = rClusterInfo[j];
+				++j;
+			}
+		}
+		else
+			return;  // Speed up
 	}
 }
 
