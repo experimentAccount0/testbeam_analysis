@@ -139,7 +139,7 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     output_fig.savefig()
 
 
-def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
+def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_name, title):
     # Global variables needed to manipulate them within a matplotlib QT slot function
     global selected_data
     global fit
@@ -150,6 +150,9 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
     global right_limit
 
     do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
+
+    def f(x, c0, c1):
+        return c0 + c1 * x
 
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
         global selected_data  # Globals needed to manipulate them
@@ -210,7 +213,6 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
-    f = lambda x, c0, c1: c0 + c1 * x  # Fit function: straight line
     fit, _ = curve_fit(f, x, mean_fitted)  # Fit stragiht line
     fit_fn = np.poly1d(fit[::-1])
     offset = np.abs(fit_fn(x) - mean_fitted)  # Calculate straight line fit offset
@@ -231,8 +233,8 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
 
     plt.ylim(ymin=0.0)
     ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel('DUT0')
+    ax.set_xlabel(dut_name)
+    ax.set_ylabel(ref_name)
     ax.legend(loc=0)
     ax.grid()
 
@@ -272,21 +274,22 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title):
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, title, output_fig):
+def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
     plt.clf()
     plt.errorbar(x, mean_fitted, yerr=mean_error_fitted, fmt='.')
-    plt.plot(x, mean_error_fitted * 1000., 'ro-', label='Error x 1000')
-    plt.errorbar(x, (fit_fn(x) - mean_fitted) * 10., mean_error_fitted * 10., fmt='go-', label='Offset x 10')
-    fit_legend_entry = 'fit: c0+c1 *x\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
+    plt.plot(x, mean_error_fitted * 1000.0, 'ro-', label='Error x1000')
+    plt.errorbar(x, (fit_fn(x) - mean_fitted) * 10., mean_error_fitted * 10., fmt='go-', label='Offset x10')
+    fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
+#     fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
     plt.plot(x, fit_fn(x), '-', label=fit_legend_entry)
     plt.plot(x, chi2 / 1.e7)
     plt.legend(loc=0)
     plt.title(title)
-    plt.xlabel('DUT %s [um]' % result[node_index]['dut_x'])
-    plt.ylabel('DUT %s [um]' % result[node_index]['dut_y'])
-    # plt.xlim((0, x.shape[0]))
+    plt.xlabel('%s [um]' % dut_name)
+    plt.ylabel('%s [um]' % ref_name)
+#     plt.xlim((0, x.shape[0]))
     plt.grid()
-    output_fig.savefig()
+    output_pdf.savefig()
 
 
 def plot_correlations(input_correlation_file, output_pdf, pixel_size=None):

@@ -4,12 +4,13 @@ from __future__ import division
 import logging
 import re
 import progressbar
+import os.path
+
+import matplotlib.pyplot as plt
 import tables as tb
 import numpy as np
 import pandas as pd
-
-
-from scipy.optimize import curve_fit, minimize_scalar
+from scipy.optimize import curve_fit, minimize_scalar, leastsq
 from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis import analysis_utils
@@ -133,11 +134,12 @@ def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk
             progress_bar.finish()
 
 
-def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, pixel_size):
-    '''Takes the correlation histograms to deduce the translation in x and y of the planes
+def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None):
+    '''Takes the correlation histograms, fits the correlations and stores the correlation parameters.
     The user can define cuts on the fit error and straight line offset in an interactive way.
 
-    The fine alignment that includes the plane rotation needs the the fine alignment function and has to be called after track finding.
+    This is a coarse alignment that uses the hit correlation and corrects for translations between the planes and beam divergences.
+    The alignment of the plane rotation needs the the fine alignment function.
 
     Parameters
     ----------
@@ -145,67 +147,122 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
         The input file with the correlation histograms.
     output_alignment_file : pytables file
         The output file for correlation data.
-    output_pdf : pdf file
-        File name for the alignment plots
-    pixel_size: iterable of column, row pairs if devices have different pixel sizes or one column, row iterable if the pixel size is the same
-        e.g. [(10, 20), (30, 40)] for two devices with pixel size 10x20 um and 30x40 um
+    pixel_size: iterable
+        List of tuples with column and row pixel size. In um.
+    dut_names: iterable
+        List of names of the DUTs.
+    output_pdf_file : string
+        File name for the output plots.
+
     '''
-    logging.info('=== Coarse align the DUTs using hit coordinates ===')
+    logging.info('=== Coarse aligning the DUTs ===')
 
-    def gauss(x, *p):
-        A, mu, sigma, offset = p
-        return A * np.exp(-(x - mu) ** 2 / (2.0 * sigma ** 2.0)) + offset
+    def gauss_offset(x, *p):
+        A, mu, sigma, offset, slope = p
+        return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0)) + offset + x * slope
 
-    with PdfPages(output_pdf) as output_fig:
-        with tb.open_file(input_correlation_file, mode="r+") as in_file_h5:
-            n_nodes = sum(1 for _ in enumerate(in_file_h5.root))  # Determine number of nodes, is there a better way?
-            n_duts = int(n_nodes / 2 + 1)
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(output_alignment_file)[0] + '.pdf'
+
+    with PdfPages(output_pdf_file) as output_pdf:
+        with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
+            n_nodes = len(in_file_h5.list_nodes("/"))
             result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
-            for node_index, node in enumerate(in_file_h5.root):
-                try:
-                    indices = re.findall(r'\d+', node.name)
-                    result[node_index]['dut_x'] = int(indices[0])
-                    result[node_index]['dut_y'] = int(indices[1])
-                except AttributeError:
-                    continue
-                logging.info('Align %s', node.name)
-
-                # TODO: allow pixel_size for each DUT or one size for all DUTs
-                if 'Col' in node.title:  # differ between column and row for sensors with rectangular pixels
-                    pixel_length, pixel_length_ref = pixel_size[node_index + 1][0], pixel_size[0][0]
+            for node in in_file_h5.root:
+                indices = re.findall(r'\d+', node.name)
+                dut_idx = int(indices[0])
+                ref_idx = int(indices[1])
+                if "column" in node.name.lower():
+                    node_index = dut_idx - 1
                 else:
-                    pixel_length, pixel_length_ref = pixel_size[node_index - n_duts + 2][1], pixel_size[0][1]
+                    node_index = dut_idx - 1 + int(n_nodes / 2)
+                result[node_index]['dut_x'] = dut_idx
+                result[node_index]['dut_y'] = ref_idx
+                dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
+                ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
+                logging.info('Aligning %s', node.name)
+
+                if "column" in node.name.lower():
+                    pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][0], pixel_size[ref_idx][0]
+                else:
+                    pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][1], pixel_size[ref_idx][1]
 
                 data = node[:]
 
                 # Start values for fitting
-                mus = np.argmax(data, axis=1)
-                As = np.max(data, axis=1)
+                mu_start = np.argmax(data, axis=1)
+                A_start = np.max(data, axis=1)
+                A_mean = np.mean(data, axis=1)
+                mu_median = np.average(data, axis=1, weights=range(0, data.shape[1])) * sum(range(0, data.shape[1])) / np.sum(data, axis=1)
 
-                # Fit result arrays have -1 for bad fit
-                mean_fitted = np.array([-1. for _ in range(data.shape[0])])
-                mean_error_fitted = np.array([-1. for _ in range(data.shape[0])])
-                sigma_fitted = np.array([-1. for _ in range(data.shape[0])])
-                chi2 = np.array([-1. for _ in range(data.shape[0])])
-                n_hits = np.array([-1. for _ in range(data.shape[0])])
+                def gauss2(x, *p):
+                    A, mu, sigma = p
+                    return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
+
+                def res(p, y, x):
+                    a_mean, a, mean, peak, sigma1, sigma2 = p
+                    y_fit = gauss2(x, *(a_mean, mean, sigma1)) + gauss2(x, *(a, peak, sigma2))
+                    err = y - y_fit
+                    return err
+
+                # Fit result arrays have -1.0 for a bad fit
+                mean_fitted = np.array([-1.0 for _ in range(data.shape[0])])
+                mean_error_fitted = np.array([-1.0 for _ in range(data.shape[0])])
+                sigma_fitted = np.array([-1.0 for _ in range(data.shape[0])])
+                chi2 = np.array([-1.0 for _ in range(data.shape[0])])
+                n_hits = np.array([-1.0 for _ in range(data.shape[0])])
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
                 # Get values with highest correlation for alignment fit
                 # Do this with channel indices, later convert to um
-                x_hist_fit = np.arange(1.5, data.shape[1] + 1.5)  # Set bin centers as data points
+                # from clusterizer: origin pixel cluster mean is 1.5 / 1.5
+                x_hist_fit = np.arange(1.5, data.shape[1] + 1.5)
+                # getting the beam spot for plotting
+                ref_beam_center = np.argmax(np.sum(data, axis=1))
 
                 for index in np.arange(data.shape[0]):
-                    p0 = [As[index], mus[index], 1., 0.]
+                    fit = None
                     try:
-                        coeff, var_matrix = curve_fit(gauss, x_hist_fit, data[index, :], p0=p0)
-                        mean_fitted[index] = coeff[1]
-                        mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
-                        sigma_fitted[index] = np.abs(coeff[2])
+                        p = [A_mean[index], A_start[index], mu_median[index], mu_start[index], 500.0, 5.0]
+                        plsq = leastsq(res, p, args=(data[index, :], x_hist_fit), full_output=True)
+                        y_est = gauss2(x_hist_fit, plsq[0][0], plsq[0][2], plsq[0][4]) + gauss2(x_hist_fit, plsq[0][1], plsq[0][3], plsq[0][5])
+                        if plsq[1] is None:
+                            raise RuntimeError
+                        mean_fitted[index] = plsq[0][3]
+                        mean_error_fitted[index] = np.sqrt(np.abs(np.diag(plsq[1])))[3]
+                        sigma_fitted[index] = np.abs(plsq[0][5])
                         n_hits[index] = data[index, :].sum()
-                        if index == int(data.shape[0] / 2):
-                            plot_utils.plot_correlation_fit(x_hist_fit, data[index, :], coeff, var_matrix, 'DUT 0 at DUT %s = %d' % (result[node_index]['dut_x'], index), node.title, output_fig)
+                        fit = 1
                     except RuntimeError:
-                        pass
+                        try:
+                            p0 = [A_start[index], mu_start[index], 5.0, A_mean[index], 0.0]
+                            coeff, var_matrix = curve_fit(gauss_offset, x_hist_fit, data[index, :], p0=p0)
+                            mean_fitted[index] = coeff[1]
+                            mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
+                            sigma_fitted[index] = np.abs(coeff[2])
+                            n_hits[index] = data[index, :].sum()
+                            fit = 2
+                        except RuntimeError:
+                            pass
+                    finally:
+                        # create plot in the center of the mean data
+                        if index == int(ref_beam_center):
+                            plt.clf()
+                            if fit == 1:
+                                plt.plot(x_hist_fit, y_est, 'g.', label='Fit: Gauss-Gauss')
+                            elif fit == 2:
+                                plt.plot(x_hist_fit, gauss_offset(x_hist_fit, *coeff), 'g.', label='Fit: Gauss-Offset')
+                            plt.plot(x_hist_fit, data[index, :], 'r', label='Real Data')
+                            title = "Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name, "column" if "column" in node.name.lower() else "row", index)
+                            plt.title(title)
+                            xlabel = '%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name)
+                            plt.xlabel(xlabel)
+                            plt.ylabel('#')
+                            plt.grid()
+                            plt.legend()
+#                             plt.show()
+                            output_pdf.savefig()
+#                             plot_utils.plot_correlation_fit(x=x_hist_fit, y=data[index, :], coeff=coeff, var_matrix=var_matrix, xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name), title="Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name, "column" if "column" in node.name.lower() else "row", index), output_pdf=output_pdf)
 
                 # Unset invalid data
                 mean_fitted[~np.isfinite(mean_fitted)] = -1
@@ -219,9 +276,9 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
                 # Let the user change the cuts (error limit, offset limit) and refit until result looks good
                 refit = True
                 selected_data = np.ones_like(mean_fitted, dtype=np.bool)
-                x = np.arange(1.5, mean_fitted.shape[0] + 1.5) * pixel_length
+                x = np.arange(1.5, mean_fitted.shape[0] + 1.5) * pixel_length_dut
                 while(refit):
-                    selected_data, fit, refit = plot_utils.plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, 'DUT%d' % result[node_index]['dut_x'], node.title)
+                    selected_data, fit, refit = plot_utils.plot_alignments(x=x, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, n_hits=n_hits, ref_name=ref_name, dut_name=dut_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name))
                     x = x[selected_data]
                     mean_fitted = mean_fitted[selected_data]
                     mean_error_fitted = mean_error_fitted[selected_data]
@@ -229,54 +286,42 @@ def coarse_alignment(input_correlation_file, output_alignment_file, output_pdf, 
                     chi2 = chi2[selected_data]
                     n_hits = n_hits[selected_data]
 
-                # Linear fit, usually describes correlation very well
-                # With low energy beam and / or beam with diverging beam, the correlation will not be straight
-
-                # Use results from straight line fit as start values for this final fit
-                f = lambda x, c0, c1: c0 + c1 * x
-                fit, pcov = curve_fit(f, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
-                fit_fn = np.poly1d(fit[::-1])
+                # linear fit, usually describes correlation very well
+                # with low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
+                # to be insvetigated...
+                # Use results from straight line fit as start values for last fit
+                def f(x, c0, c1):
+                    return c0 + c1 * x
+#                 def f_pos(x, c0):
+#                     return c0 + 1.0 * x
+#
+#                 def f_neg(x, c0):
+#                     return c0 - 1.0 * x
+#
+#                 if fit[1] >= 0.0:
+#                     f = f_pos
+#                 else:
+#                     f = f_neg
+                re_fit, re_fit_pcov = curve_fit(f, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
+                fit_fn = np.poly1d(re_fit[::-1])
 
                 # Calculate mean sigma (is somewhat a residual) and its error and store the actual data in result array
                 mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted))
                 mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)) / np.sqrt(np.array(sigma_fitted).shape[0])
 
                 # Write fit results to array
-                result[node_index]['c0'], result[node_index]['c0_error'] = fit[0], np.absolute(pcov[0][0]) ** 0.5
-                result[node_index]['c1'], result[node_index]['c1_error'] = fit[1], np.absolute(pcov[1][1]) ** 0.5
+                result[node_index]['c0'], result[node_index]['c0_error'] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
+                result[node_index]['c1'], result[node_index]['c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
+#                 result[node_index]['c1'], result[node_index]['c1_error'] = 1.0 if fit[1] >= 0.0 else -1.0, 0.0
 
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Plot selected data with fit
-                plot_utils.plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, result, node_index, node.title, output_fig)
+                plot_utils.plot_alignment_fit(x=x, mean_fitted=mean_fitted, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
 
             with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
-                try:
-                    result_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', description=result.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    result_table.append(result)
-                except tb.exceptions.NodeError:
-                    logging.warning('Correlation table exists already. Do not create new.')
-
-                # Create transilation / rotation table that can be can be overwritten later in the fine alignment step; initial values define no translation and no rotation
-                description = [('DUT', np.int)]
-                for index in range(3):  # Translation has 3 dimensions
-                    description.append(('translation_%d' % index, np.float))
-                for i in range(3):  # Rotation matrix of the DUT
-                    for j in range(3):
-                        description.append(('rotation_%d_%d' % (i, j), np.float))
-
-                trans_rot_parameters = np.zeros((n_duts,), dtype=description)
-
-                # Rotation matrix without effect has 1s in the diagonal
-                trans_rot_parameters[:]['rotation_0_0'] = np.ones((n_duts,))
-                trans_rot_parameters[:]['rotation_1_1'] = np.ones((n_duts,))
-                trans_rot_parameters[:]['rotation_2_2'] = np.ones((n_duts,))
-
-                try:
-                    geometry_table = out_file_h5.create_table(out_file_h5.root, name='Geometry', title='File containing the fine alignment geometry parameters', description=np.zeros((1,), dtype=trans_rot_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    geometry_table.append(trans_rot_parameters)
-                except tb.exceptions.NodeError:
-                    logging.warning('Correlation table exists already. Do not create new.')
+                result_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', description=result.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                result_table.append(result)
 
 
 def fine_alignment(input_track_candidates_file, output_alignment_file, output_pdf):
