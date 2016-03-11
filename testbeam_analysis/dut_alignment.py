@@ -17,7 +17,7 @@ from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
 
 
-def correlate_hits(input_hits_files, output_correlation_file, fraction=1, event_range=0):
+def correlate_hits(input_hits_files, output_correlation_file, n_pixels=None, fraction=1, event_range=0, pixel_size=None, dut_names=None, output_pdf=None):
     '''Histograms the hit column (row)  of two different devices on an event basis. If the hits are correlated a line should be seen.
     The correlation is done very simple. Not all hits of the first device are correlated with all hits of the second device. This is sufficient
     as long as you do not have too many hits per event.
@@ -41,7 +41,7 @@ def correlate_hits(input_hits_files, output_correlation_file, fraction=1, event_
         for index, hit_file in enumerate(input_hits_files):
             with tb.open_file(hit_file, 'r') as in_file_h5:
                 # Set event selection
-                # TODO: confusing code
+                # FIXME: confusing code
                 event_range = [event_range, ] if not isinstance(event_range, list) else event_range
                 if len(event_range) == 2:
                     event_start, event_end = event_range[0], event_range[1]
@@ -55,13 +55,19 @@ def correlate_hits(input_hits_files, output_correlation_file, fraction=1, event_
                 hit_table = in_file_h5.root.Hits[event_start:event_end:fraction]
                 if index == 0:
                     first_reference = pd.DataFrame({'event_number': hit_table[:]['event_number'], 'column_ref': hit_table[:]['column'], 'row_ref': hit_table[:]['row'], 'tot_ref': hit_table[:]['charge']})
-                    n_col_reference, n_row_reference = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
+                    if n_pixels:
+                        n_col_reference, n_row_reference = n_pixels[index][0], n_pixels[index][1]
+                    else:
+                        n_col_reference, n_row_reference = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
                 else:
-                    logging.info('Correlate detector %d with detector %d', index, 0)
+                    logging.info('Correlation of DUT %d with DUT %d', index, 0)
                     dut = pd.DataFrame({'event_number': hit_table[:]['event_number'], 'column_dut': hit_table[:]['column'], 'row_dut': hit_table[:]['row'], 'tot_dut': hit_table[:]['charge']})
                     df = first_reference.merge(dut, how='left', on='event_number')
                     df.dropna(inplace=True)
-                    n_col_dut, n_row_dut = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
+                    if n_pixels:
+                        n_col_dut, n_row_dut = n_pixels[index][0], n_pixels[index][1]
+                    else:
+                        n_col_dut, n_row_dut = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
                     # Correlation of x against x and y against y
                     col_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['column_ref'] - 1, shape=(n_col_dut, n_col_reference))
                     row_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['row_ref'] - 1, shape=(n_row_dut, n_row_reference))
@@ -71,7 +77,10 @@ def correlate_hits(input_hits_files, output_correlation_file, fraction=1, event_
                     out_row.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[index])]
                     out_col[:] = col_corr
                     out_row[:] = row_corr
+                    out_col.flush()
+                    out_row.flush()
 
+    plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
 
 def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk_size=4999999):
     '''Histograms the hit column (row) of two different devices on an event basis. If the hits are correlated a line should be seen.

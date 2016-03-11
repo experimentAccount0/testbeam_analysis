@@ -292,24 +292,26 @@ def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitte
     output_pdf.savefig()
 
 
-def plot_correlations(input_correlation_file, output_pdf, pixel_size=None):
+def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
     '''Takes the correlation histograms and plots them
 
     Parameters
     ----------
     input_correlation_file : pytables file
         The input file with the correlation histograms.
-    output_pdf : pdf file name object
+    output_pdf_file : pdf file name
     '''
-    logging.info('Plotting Correlations')
-    with PdfPages(output_pdf) as output_fig:
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_correlation_file)[0] + '.pdf'
+
+    with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
                 try:
                     indices = re.findall(r'\d+', node.name)
                     dut_idx = int(indices[0])
                     ref_idx = int(indices[1])
-                    if "Column" in node.name:
+                    if "column" in node.name.lower():
                         column = True
                     else:
                         column = False
@@ -318,7 +320,7 @@ def plot_correlations(input_correlation_file, output_pdf, pixel_size=None):
                 data = node[:]
                 plt.clf()
                 cmap = cm.get_cmap('viridis')
-                cmap.set_bad('w')
+#                 cmap.set_bad('w')
                 norm = colors.LogNorm()
                 if pixel_size:
                     aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
@@ -326,16 +328,18 @@ def plot_correlations(input_correlation_file, output_pdf, pixel_size=None):
                     aspect = "auto"
                 im = plt.imshow(data.T, cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
                 plt.gca().invert_yaxis()
-                plt.title(node.title)
-                plt.xlabel('DUT %s' % dut_idx)
-                plt.ylabel('DUT %s' % ref_idx)
+                dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
+                ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
+                plt.title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", dut_name, ref_name))
+                plt.xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
+                plt.ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
                 # do not append to axis to preserve aspect ratio
-                plt.colorbar(im, fraction=0.04, pad=0.05)
+                plt.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
 #                 divider = make_axes_locatable(plt.gca())
 #                 cax = divider.append_axes("right", size="5%", pad=0.1)
 #                 z_max = np.amax(data)
 #                 plt.colorbar(im, cax=cax, ticks=np.linspace(start=0, stop=z_max, num=9, endpoint=True))
-                output_fig.savefig()
+                output_pdf.savefig()
 
 
 def plot_hit_alignment(title, difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100):
