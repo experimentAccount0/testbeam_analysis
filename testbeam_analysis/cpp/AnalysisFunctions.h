@@ -230,28 +230,6 @@ void histogram_3d(int*& x, int*& y, int*& z, const unsigned int& rSize, const un
 }
 
 
-// Fast mapping of hits to event numbers
-void mapHits(int64_t*& rEventArray, const unsigned int& rEventArraySize, HitInfo*& rHitInfo, const unsigned int& rHitInfoSize, HitInfo*& rMappedHitInfo)
-{
-	unsigned int j = 0;
-	for (unsigned int i = 0; i < rEventArraySize; ++i) {
-		// Find first Hit with a fitting event number
-		while ((j < rHitInfoSize) && (rHitInfo[j].eventNumber < rEventArray[i])) {  // Catch up to actual event number rEventArray[i]
-			++j;
-		}
-
-		if (j < rHitInfoSize){
-			if (rHitInfo[j].eventNumber == rEventArray[i]){
-				rMappedHitInfo[i] = rHitInfo[j];
-				++j;
-			}
-		}
-		else
-			return;  // Speed up
-	}
-}
-
-
 // Fast mapping of cluster hits to event numbers
 void mapCluster(int64_t*& rEventArray, const unsigned int& rEventArraySize, ClusterInfo*& rClusterInfo, const unsigned int& rClusterInfoSize, ClusterInfo*& rMappedClusterInfo)
 {
