@@ -6,9 +6,72 @@ import logging
 import numpy as np
 import numexpr as ne
 import tables as tb
+from numba import njit
 
 from testbeam_analysis import analysis_functions
 from testbeam_analysis.cpp import data_struct
+
+
+@njit()
+def merge_on_event_number(data_1, data_2):
+    """
+    Merges the data_2 with data_1 on an event basis with all permutations
+    That means: merge all hits of every event in data_2 on all hits of the same event in data_1.
+
+    Does the same than the merge of the pandas package:
+        df = data_1.merge(data_2, how='left', on='event_number')
+        df.dropna(inplace=True)
+    But results in 4 x faster code.
+
+    Parameter
+    --------
+
+    data_1, data_2: np.recarray with event_number column
+
+    Returns
+    -------
+
+    Tuple np.recarray, np.recarray
+        Is the data_1, data_2 array extended by the permutations.
+
+    """
+    result_array_size = 0
+    event_index_data_2 = 0
+
+    for index_data_1 in range(data_1.shape[0]):
+
+        while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:
+            event_index_data_2 += 1
+
+        for index_data_2 in range(event_index_data_2, data_2.shape[0]):
+            if data_1[index_data_1]['event_number'] == data_2[index_data_2]['event_number']:
+                result_array_size += 1
+            else:
+                break
+
+    # Create result array with correct size
+    result_1 = np.zeros(shape=(result_array_size,), dtype=data_1.dtype)
+    result_2 = np.zeros(shape=(result_array_size,), dtype=data_2.dtype)
+
+    result_index_1 = 0
+    result_index_2 = 0
+    event_index_data_2 = 0
+
+    for index_data_1 in range(data_1.shape[0]):
+
+        while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:
+            event_index_data_2 += 1
+
+        for index_data_2 in range(event_index_data_2, data_2.shape[0]):
+            if data_1[index_data_1]['event_number'] == data_2[index_data_2]['event_number']:
+                result_1[result_index_1] = data_1[index_data_1]
+                result_2[result_index_2] = data_2[index_data_2]
+                result_index_1 += 1
+                result_index_2 += 1
+            else:
+                break
+
+    return result_1, result_2
 
 
 def in1d_events(ar1, ar2):
@@ -32,38 +95,6 @@ def get_max_events_in_both_arrays(events_one, events_two):
     event_result = np.empty(shape=(events_one.shape[0] + events_two.shape[0], ), dtype=events_one.dtype)
     count = analysis_functions.get_max_events_in_both_arrays(events_one, events_two, event_result)
     return event_result[:count]
-
-
-def map_hits(events, hits):
-    """
-    Maps the hits on events. Not existing hits in events have all values set to 0. Too many hits per event for the event number are omitted
-    and lost!
-
-    Parameters
-    ----------
-    events : numpy array
-        One dimensional event number array with increasing event numbers.
-    hits : np.recarray
-        Recarray with cluster info. The event number is increasing.
-
-    Example
-    -------
-    event = [ 0  1  1  2  3  3 ]
-    hits.event_number = [ 0  1  2  2  3  4 ]
-
-    gives mapped_hits.event_number = [ 0  1  0  2  3  0 ]
-
-    Returns
-    -------
-    Hits array with given length of the events array.
-
-    """
-    hits = np.ascontiguousarray(hits)
-    events = np.ascontiguousarray(events)
-    mapped_hits = np.zeros((events.shape[0], ), dtype=tb.dtype_from_descr(data_struct.HitInfoTable))
-    mapped_hits = np.ascontiguousarray(mapped_hits)
-    analysis_functions.map_hits(events, hits, mapped_hits)
-    return mapped_hits
 
 
 def map_cluster(events, cluster):
@@ -157,6 +188,9 @@ def hist_2d_index(x, y, shape):
     if len(shape) != 2:
         raise NotImplementedError('The shape has to describe a 2-d histogram')
 
+    if x.shape != y.shape:
+        raise ValueError('The dimensions in x / y have to match')
+
     # change memory alignment for c++ library
     x = np.ascontiguousarray(x.astype(np.int32))
     y = np.ascontiguousarray(y.astype(np.int32))
@@ -185,6 +219,10 @@ def hist_3d_index(x, y, z, shape):
     """
     if len(shape) != 3:
         raise NotImplementedError('The shape has to describe a 3-d histogram')
+
+    if x.shape != y.shape or x.shape != z.shape:
+        raise ValueError('The dimensions in x / y / z have to match')
+
     # change memory alignment for c++ library
     x = np.ascontiguousarray(x.astype(np.int32))
     y = np.ascontiguousarray(y.astype(np.int32))
