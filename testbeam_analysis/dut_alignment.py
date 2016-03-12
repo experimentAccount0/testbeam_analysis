@@ -177,7 +177,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                         fit = 1
                     except RuntimeError:
                         try:
-                            p0 = [A_start[index], mu_start[index], 5.0, A_mean[index], 0.0]
+                            p0 = [A_start[index], mu_start[index], 5.0, A_mean[index], 0.0]  # FIXME: hard coded start value
                             coeff, var_matrix = curve_fit(gauss_offset, x_hist_fit, data[index, :], p0=p0)
                             mean_fitted[index] = coeff[1]
                             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
