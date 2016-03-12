@@ -1,10 +1,9 @@
 cython  # for C++ extensions
-pandas  # for merging on event number for correlations
 tables  # the data format
 scipy   # analysis functions
 numpy   # for C array object and fast algorithms
 matplotlib  # for plotting
-numba==0.22.1   # for speedup of python loops, 0.22.1 was working
+numba>=0.24   # for speedup of python loops, 0.22.1 was working
 future  # Python 2/3 compatibility
 pixel_clusterizer>=2.3  # to cluster pixel hits
 pykalman  # for track fitting
