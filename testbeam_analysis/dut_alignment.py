@@ -148,11 +148,11 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                     return err
 
                 # Fit result arrays have -1.0 for a bad fit
-                mean_fitted = np.array([-1.0 for _ in range(data.shape[0])])
-                mean_error_fitted = np.array([-1.0 for _ in range(data.shape[0])])
-                sigma_fitted = np.array([-1.0 for _ in range(data.shape[0])])
-                chi2 = np.array([-1.0 for _ in range(data.shape[0])])
-                n_hits = np.array([-1.0 for _ in range(data.shape[0])])
+                mean_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Peak of the Gaussfit
+                mean_error_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Error of the fit of the peak
+                sigma_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Sigma of the Gaussfit
+                chi2 = np.array([-1.0 for _ in range(data.shape[0])])  # Chi2 of the fit
+                n_hits = np.array([-1.0 for _ in range(data.shape[0])])  # Number of hits per bin
 
                 # Loop over all row/row or column/column slices and fit a gaussian to the profile
                 # Get values with highest correlation for alignment fit
@@ -165,7 +165,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 for index in np.arange(data.shape[0]):
                     fit = None
                     try:
-                        p = [A_mean[index], A_start[index], mu_median[index], mu_start[index], 500.0, 5.0]
+                        p = [A_mean[index], A_start[index], mu_median[index], mu_start[index], 500.0, 5.0]  # FIXME: hard coded starting values
                         plsq = leastsq(res, p, args=(data[index, :], x_hist_fit), full_output=True)
                         y_est = gauss2(x_hist_fit, plsq[0][0], plsq[0][2], plsq[0][4]) + gauss2(x_hist_fit, plsq[0][1], plsq[0][3], plsq[0][5])
                         if plsq[1] is None:
@@ -189,12 +189,12 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                     finally:
                         # create plot in the center of the mean data
                         if index == int(ref_beam_center):
-                            plt.clf()
+                            plt.clf()  # FIXME: plotting should be in plot_utils
                             if fit == 1:
-                                plt.plot(x_hist_fit, y_est, 'g.', label='Fit: Gauss-Gauss')
+                                plt.plot(x_hist_fit, y_est, 'g-', linewidth=2, label='Fit: Gauss-Gauss')
                             elif fit == 2:
-                                plt.plot(x_hist_fit, gauss_offset(x_hist_fit, *coeff), 'g.', label='Fit: Gauss-Offset')
-                            plt.plot(x_hist_fit, data[index, :], 'r', label='Real Data')
+                                plt.plot(x_hist_fit, gauss_offset(x_hist_fit, *coeff), 'g-', linewidth=2, label='Fit: Gauss-Offset')
+                            plt.plot(x_hist_fit, data[index, :], 'r.-', label='Real Data')
                             title = "Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name, "column" if "column" in node.name.lower() else "row", index)
                             plt.title(title)
                             xlabel = '%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name)
