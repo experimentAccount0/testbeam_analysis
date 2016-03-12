@@ -17,72 +17,7 @@ from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
 
 
-def correlate_hits(input_hits_files, output_correlation_file, n_pixels=None, fraction=1, event_range=0, pixel_size=None, dut_names=None, output_pdf=None):
-    '''Histograms the hit column (row)  of two different devices on an event basis. If the hits are correlated a line should be seen.
-    The correlation is done very simple. Not all hits of the first device are correlated with all hits of the second device. This is sufficient
-    as long as you do not have too many hits per event.
-
-    Parameters
-    ----------
-    input_hits_files : pytables file
-        Input file with hit data.
-    output_correlation_file : pytables file
-        Output file with the correlation histograms.
-    fraction: int
-        Take only every fraction-th hit to save time. Not needed with low statistics runs.
-    event_range: int or iterable
-        select events for which the correlation is done
-        if 0: select all events
-        if int: select first int events
-        if list of int (length 2): select events from first list item to second list item
-    '''
-    logging.info('=== Correlate the position of %d DUTs ===', len(input_hits_files))
-    with tb.open_file(output_correlation_file, mode="w") as out_file_h5:
-        for index, hit_file in enumerate(input_hits_files):
-            with tb.open_file(hit_file, 'r') as in_file_h5:
-                # Set event selection
-                # FIXME: confusing code
-                event_range = [event_range, ] if not isinstance(event_range, list) else event_range
-                if len(event_range) == 2:
-                    event_start, event_end = event_range[0], event_range[1]
-                else:
-                    event_start = 0
-                    if event_range[0] == 0:
-                        event_end = None
-                    else:
-                        event_end = event_range[0]
-
-                hit_table = in_file_h5.root.Hits[event_start:event_end:fraction]
-                if index == 0:
-                    first_reference = pd.DataFrame({'event_number': hit_table[:]['event_number'], 'column_ref': hit_table[:]['column'], 'row_ref': hit_table[:]['row'], 'tot_ref': hit_table[:]['charge']})
-                    if n_pixels:
-                        n_col_reference, n_row_reference = n_pixels[index][0], n_pixels[index][1]
-                    else:
-                        n_col_reference, n_row_reference = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
-                else:
-                    logging.info('Correlation of DUT %d with DUT %d', index, 0)
-                    dut = pd.DataFrame({'event_number': hit_table[:]['event_number'], 'column_dut': hit_table[:]['column'], 'row_dut': hit_table[:]['row'], 'tot_dut': hit_table[:]['charge']})
-                    df = first_reference.merge(dut, how='left', on='event_number')
-                    df.dropna(inplace=True)
-                    if n_pixels:
-                        n_col_dut, n_row_dut = n_pixels[index][0], n_pixels[index][1]
-                    else:
-                        n_col_dut, n_row_dut = np.amax(hit_table[:]['column']), np.amax(hit_table[:]['row'])
-                    # Correlation of x against x and y against y
-                    col_corr = analysis_utils.hist_2d_index(df['column_dut'] - 1, df['column_ref'] - 1, shape=(n_col_dut, n_col_reference))
-                    row_corr = analysis_utils.hist_2d_index(df['row_dut'] - 1, df['row_ref'] - 1, shape=(n_row_dut, n_row_reference))
-                    out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % index, title='Column Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(col_corr.dtype), shape=col_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    out_row = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % index, title='Row Correlation between DUT %d and %d' % (index, 0), atom=tb.Atom.from_dtype(row_corr.dtype), shape=row_corr.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    out_col.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[index])]
-                    out_row.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[index])]
-                    out_col[:] = col_corr
-                    out_row[:] = row_corr
-                    out_col.flush()
-                    out_row.flush()
-
-    plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
-
-def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk_size=4999999):
+def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, output_pdf=None, chunk_size=4999999):
     '''Histograms the hit column (row) of two different devices on an event basis. If the hits are correlated a line should be seen.
     Permutations are not considered (not all hits of the first device are correlated with all hits of the second device).
 
@@ -93,11 +28,12 @@ def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk
     output_correlation_file : pytables file
         Output file with the correlation histograms.
     n_pixel : list of tuples
-        One tuple per DUT describing the number of pixels in column,row direction 
+        One tuple per DUT describing the number of pixels in column, row direction
         e.g. for 2 DUTs: n_pixel = [(80, 336), (80, 336)]
     chunk_size: int
         Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
     '''
+
     logging.info('=== Correlate the position of %d DUTs ===', len(input_hits_files))
     with tb.open_file(output_correlation_file, mode="w") as out_file_h5:
         n_duts = len(input_hits_files)
@@ -106,29 +42,24 @@ def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk
         column_correlations = [None] * (n_duts - 1)
         row_correlations = [None] * (n_duts - 1)
 
-        with tb.open_file(input_hits_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
+        with tb.open_file(input_hits_files[0], mode='r') as in_file_h5:  # Open DUT0 hit file
             progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Hits.shape[0], term_width=80)
             progress_bar.start()
-            start_indices = [0] * len(input_hits_files)  # Store the loop indices for speed up
-            for hits_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Hits, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+            start_indices = [0] * (n_duts - 1)  # Store the loop indices for speed up
+            for hits_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Hits, chunk_size=chunk_size):  # Loop over the hits of DUT0 in chunks
                 actual_event_numbers = hits_dut_0[:]['event_number']
-
                 # Calculate the common event number of each device with the reference device and correlate the hits of this events
                 for dut_index, hit_file in enumerate(input_hits_files[1:], start=1):  # Loop over the other hit files
                     with tb.open_file(hit_file, mode='r') as actual_in_file_h5:  # Open other DUT hit file
-                        for actual_dut_hits, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Hits, start=start_indices[dut_index], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the hits in the actual hit file in chunks
-                            common_event_numbers = analysis_utils.get_max_events_in_both_arrays(actual_event_numbers, actual_dut_hits[:]['event_number'])
+                        for actual_dut_hits, start_indices[dut_index - 1] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Hits, start=start_indices[dut_index - 1], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the hits in the actual hit file in chunks
+                            dut_0_hits, actual_dut_hits = analysis_utils.merge_on_event_number(hits_dut_0, actual_dut_hits)
 
-                            dut_0_hits = analysis_utils.map_hits(common_event_numbers, hits_dut_0)
-                            actual_dut_hits = analysis_utils.map_hits(common_event_numbers, actual_dut_hits)
-                            selection = np.logical_and(dut_0_hits['column'] != 0, actual_dut_hits['column'] != 0)
-
-                            if not column_correlations[dut_index - 1]:
-                                column_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits[selection]['column'] - 1, dut_0_hits[selection]['column'] - 1, shape=(n_pixel[dut_index][0], n_pixel[0][0]))
-                                row_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits[selection]['row'] - 1, dut_0_hits[selection]['row'] - 1, shape=(n_pixel[dut_index][1], n_pixel[0][1]))
+                            if not np.any(column_correlations[dut_index - 1]):
+                                column_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits['column'] - 1, dut_0_hits['column'] - 1, shape=(n_pixels[dut_index][0], n_pixels[0][0]))
+                                row_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits['row'] - 1, dut_0_hits['row'] - 1, shape=(n_pixels[dut_index][1], n_pixels[0][1]))
                             else:
-                                column_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits[selection]['column'] - 1, dut_0_hits[selection]['column'] - 1, shape=(n_pixel[dut_index][0], n_pixel[0][0]))
-                                row_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits[selection]['row'] - 1, dut_0_hits[selection]['row'] - 1, shape=(n_pixel[dut_index][1], n_pixel[0][1]))
+                                column_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits['column'] - 1, dut_0_hits['column'] - 1, shape=(n_pixels[dut_index][0], n_pixels[0][0]))
+                                row_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits['row'] - 1, dut_0_hits['row'] - 1, shape=(n_pixels[dut_index][1], n_pixels[0][1]))
 
                 progress_bar.update(index)
 
@@ -141,6 +72,8 @@ def correlate_hits_new(input_hits_files, output_correlation_file, n_pixel, chunk
                 out_col[:] = column_correlations[dut_index]
                 out_row[:] = row_correlations[dut_index]
             progress_bar.finish()
+
+    plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
 
 
 def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None):
