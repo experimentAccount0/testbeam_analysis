@@ -1,21 +1,20 @@
 # Testbeam_Analysis [![BuildStatus](https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=development)](https://travis-ci.org/SiLab-Bonn/testbeam_analysis) [![Build Status](https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis)](https://ci.appveyor.com/project/DavidLP/testbeam-analysis) [![Coverage Status](https://coveralls.io/repos/SiLab-Bonn/testbeam_analysis/badge.svg?branch=development&service=github)](https://coveralls.io/github/SiLab-Bonn/testbeam_analysis?branch=development)
-A _very_ simple analysis of pixel-sensor data from test beams. All steps of a full analysis are included in very few lines of Python code. If you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. 
+A simple analysis of pixel-sensors data in particle beams. All steps of a complete analysis are implemented with a few independent python functions. If you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope dara reconstruction this code might help. 
 If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. _EUTelescope_. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code.
 For a quick first impression check the example plots in the wiki.
 
 In future releases it is forseen to make the code more readable and to implement a Kalman Filter to have the best possible track fit results.
 
 # Installation
-You have to have Python 2.7 and the following modules installed:
+You have to have Python 2/3 with the following modules installed:
 - cython
-- pandas
 - tables
 - scipy
 - matplotlib
 - numba
 
 If you are new to Python please look at the installation guide in the wiki.
-Since it is recommended to change the one and only file according to your needs you should install the module with
+Since it is recommended to change example files according to your needs you should install the module with
 ```bash
 python setup.py develop
 ```
