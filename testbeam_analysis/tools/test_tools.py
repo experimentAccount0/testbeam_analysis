@@ -49,7 +49,10 @@ def get_array_differences(first_array, second_array):
 def array_close(array_1, array_2):
     '''Compares two numpy arrays elementwise for similarity with small differences.'''
     if not array_1.dtype.names:
-        return np.allclose(array_1, array_2)  # Only works on non recarrays
+        try:
+            return np.allclose(array_1, array_2)  # Only works on non recarrays
+        except ValueError:  # Raised if shape is incompatible
+            return False
     results = []
     for column in array_1.dtype.names:
         results.append(np.allclose(array_1[column], array_2[column]))
