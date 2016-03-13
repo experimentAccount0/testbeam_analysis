@@ -76,7 +76,7 @@ def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_si
     plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
 
 
-def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None):
+def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None, non_interactive=False, iterations=3):
     '''Takes the correlation histograms, fits the correlations and stores the correlation parameters.
     The user can define cuts on the fit error and straight line offset in an interactive way.
 
@@ -95,7 +95,10 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
         List of names of the DUTs.
     output_pdf_file : string
         File name for the output plots.
-
+    non_interactive : boolean
+        Deactivate user interaction and apply cuts automatically
+    iterations : number
+        Only used in non interactive mode. Sets how often automatic cuts are applied.
     '''
     logging.info('=== Coarse aligning the DUTs ===')
 
@@ -219,14 +222,27 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 refit = True
                 selected_data = np.ones_like(mean_fitted, dtype=np.bool)
                 x = np.arange(1.5, mean_fitted.shape[0] + 1.5) * pixel_length_dut
+                actual_iteration = 0  # Refit counter for non interactive mode
                 while(refit):
-                    selected_data, fit, refit = plot_utils.plot_alignments(x=x, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, n_hits=n_hits, ref_name=ref_name, dut_name=dut_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name))
+                    selected_data, fit, refit = plot_utils.plot_alignments(x=x, 
+                                                                           mean_fitted=mean_fitted, 
+                                                                           mean_error_fitted=mean_error_fitted, 
+                                                                           n_hits=n_hits, 
+                                                                           ref_name=ref_name, 
+                                                                           dut_name=dut_name, 
+                                                                           title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name),
+                                                                           non_interactive=non_interactive)
                     x = x[selected_data]
                     mean_fitted = mean_fitted[selected_data]
                     mean_error_fitted = mean_error_fitted[selected_data]
                     sigma_fitted = sigma_fitted[selected_data]
                     chi2 = chi2[selected_data]
                     n_hits = n_hits[selected_data]
+                    # Stop in non interactive mode if the number of refits (iterations) is reached
+                    if non_interactive:
+                        actual_iteration += 1
+                        if actual_iteration > iterations:
+                            break
 
                 # linear fit, usually describes correlation very well
                 # with low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
@@ -491,7 +507,7 @@ def optimize_hit_alignment(input_tracklets_file, input_alignment_file, fraction=
         corrected_tracklets_table.append(particles)
 
 
-def check_hit_alignment(input_tracklets_file, output_pdf, combine_n_hits=100000, correlated_only=False):
+def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=100000, correlated_only=False):
     '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
     for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
     (with the event number).
@@ -500,7 +516,7 @@ def check_hit_alignment(input_tracklets_file, output_pdf, combine_n_hits=100000,
     ----------
     input_tracklets_file : string
         Input file name with merged cluster hit table from all DUTs
-    output_pdf : pdf file name object
+    output_pdf_file : pdf file name object
     combine_n_hits : int
         The number of events to combine for the hit position check
     correlated_only : bool
@@ -508,7 +524,7 @@ def check_hit_alignment(input_tracklets_file, output_pdf, combine_n_hits=100000,
     '''
     logging.info('=== Check hit alignment ===')
     with tb.open_file(input_tracklets_file, mode="r") as in_file_h5:
-        with PdfPages(output_pdf) as output_fig:
+        with PdfPages(output_pdf_file) as output_fig:
             for table_column in in_file_h5.root.Tracklets.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
                     median, mean, std, alignment, correlation = [], [], [], [], []
