@@ -27,30 +27,40 @@ class TestHitAnalysis(unittest.TestCase):
                           os.path.join(tests_data_folder + 'TestBeamData_FEI4_DUT3_small.h5')
                           ]
         cls.output_folder = tests_data_folder
+        cls.n_pixels = ((80, 336), (80, 336), (80, 336), (80, 336))
         cls.pixel_size = ((250, 50), (250, 50), (250, 50), (250, 50))  # in um
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(os.path.join(cls.output_folder + 'Correlation.h5'))
-        os.remove(os.path.join(cls.output_folder + 'Tracklets.h5'))
-        os.remove(os.path.join(cls.output_folder + 'Tracklets_2.h5'))
-#         os.remove(cls.output_folder + 'Alignment.h5')
-#         os.remove(cls.output_folder + 'Alignment.pdf')
+         os.remove(os.path.join(cls.output_folder + 'Correlation.h5'))
+         os.remove(os.path.join(cls.output_folder + 'Correlation.pdf'))
+         os.remove(os.path.join(cls.output_folder + 'Tracklets.h5'))
+         os.remove(os.path.join(cls.output_folder + 'Tracklets_2.h5'))
+         os.remove(cls.output_folder + 'Alignment.h5')
+         os.remove(cls.output_folder + 'Alignment.pdf')
 
     def test_hit_correlation(self):  # check the hit correlation function
         dut_alignment.correlate_hits(input_hits_files=self.data_files,
                                      output_correlation_file=os.path.join(self.output_folder + 'Correlation.h5'),
-                                     fraction=1,
-                                     event_range=0)
-        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Correlation_result.h5'), os.path.join(self.output_folder + 'Correlation.h5'), exact=False)
+                                     n_pixels=self.n_pixels
+                                     )
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Correlation_result.h5'), os.path.join(self.output_folder + 'Correlation.h5'), exact=True)
+        self.assertTrue(data_equal, msg=error_msg)
+        # Retest with tiny chunk size to force chunked correlation
+        dut_alignment.correlate_hits(input_hits_files=self.data_files,
+                                     output_correlation_file=os.path.join(self.output_folder + 'Correlation_2.h5'),
+                                     n_pixels=self.n_pixels,
+                                     chunk_size=293
+                                     )
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Correlation_result.h5'), os.path.join(self.output_folder + 'Correlation_2.h5'), exact=True)
         self.assertTrue(data_equal, msg=error_msg)
 
-    @unittest.SkipTest  # Unclear how to check interactive alignment automatically
     def test_coarse_alignment(self):  # Check the hit alignment function
         dut_alignment.coarse_alignment(input_correlation_file=os.path.join(tests_data_folder + 'Correlation_result.h5'),
                                        output_alignment_file=os.path.join(self.output_folder + 'Alignment.h5'),
-                                       output_pdf=os.path.join(self.output_folder + 'Alignment.pdf'),
-                                       pixel_size=self.pixel_size)
+                                       output_pdf_file=os.path.join(self.output_folder + 'Alignment.pdf'),
+                                       pixel_size=self.pixel_size,
+                                       non_interactive=True)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Alignment_result.h5'), os.path.join(self.output_folder + 'Alignment.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
@@ -68,7 +78,7 @@ class TestHitAnalysis(unittest.TestCase):
                                          output_tracklets_file=os.path.join(self.output_folder + 'Tracklets_2.h5'),
                                          pixel_size=self.pixel_size,
                                          chunk_size=293)
- 
+
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets_2.h5')
         self.assertTrue(data_equal, msg=error_msg)
 
