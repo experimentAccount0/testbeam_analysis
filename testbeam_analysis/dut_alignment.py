@@ -9,7 +9,6 @@ import os.path
 import matplotlib.pyplot as plt
 import tables as tb
 import numpy as np
-import pandas as pd
 from scipy.optimize import curve_fit, minimize_scalar, leastsq
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -224,12 +223,12 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 x = np.arange(1.5, mean_fitted.shape[0] + 1.5) * pixel_length_dut
                 actual_iteration = 0  # Refit counter for non interactive mode
                 while(refit):
-                    selected_data, fit, refit = plot_utils.plot_alignments(x=x, 
-                                                                           mean_fitted=mean_fitted, 
-                                                                           mean_error_fitted=mean_error_fitted, 
-                                                                           n_hits=n_hits, 
-                                                                           ref_name=ref_name, 
-                                                                           dut_name=dut_name, 
+                    selected_data, fit, refit = plot_utils.plot_alignments(x=x,
+                                                                           mean_fitted=mean_fitted,
+                                                                           mean_error_fitted=mean_error_fitted,
+                                                                           n_hits=n_hits,
+                                                                           ref_name=ref_name,
+                                                                           dut_name=dut_name,
                                                                            title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name),
                                                                            non_interactive=non_interactive)
                     x = x[selected_data]
