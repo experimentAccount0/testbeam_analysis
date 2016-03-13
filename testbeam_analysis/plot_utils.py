@@ -139,11 +139,8 @@ def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
     output_fig.savefig()
 
 
-def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_name, title):
+def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_name, title, non_interactive=False):
     '''PLots the correlation and lets the user cut on the data in an interactive way.
-
-    To call this function on 8 cores in parallel with chunk_size=1000000 the following RAM is needed:
-    11 byte * 8 * 1000000 = 88 Mb
 
     Parameters
     ----------
@@ -159,6 +156,10 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
         DUT name
     title : string
         Plot title
+    non_interactive : boolean
+        Deactivate user interaction to apply cuts
+    iterations : number
+        Only used in non interactive mode. Sets how often automatic cuts are applied.
     '''
 
     # Global variables needed to manipulate them within a matplotlib QT slot function
@@ -223,7 +224,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
         selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
         update_plot(selected_data)
 
-    def update_auto(right_limit_new):  # Function called when left auto button is pressed
+    def update_auto(event):  # Function called when auto button is pressed
         # This function automatically applies cuts according to these percentiles
         n_hit_percentile = 5
         mean_error_percentile = 95
@@ -247,10 +248,10 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
             min_cut = cons[0][-1]
             max_cut = cons[-1][0]
 
-            # Validity check, needed if there are areas without data
-            if min_cut > max_cut:
+            # Validity check, needed e.g. if there are areas without data
+            if min_cut > max_cut or min_cut > np.where(n_hits == np.amax(n_hits))[0]:
                 min_cut = 0
-            if max_cut < min_cut:
+            if max_cut < min_cut or max_cut < np.where(n_hits == np.amax(n_hits))[0]:
                 max_cut = n_hits.shape[0] - 1
 
             if min_cut:
@@ -274,7 +275,10 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
         if np.count_nonzero(selected_data) > 1:
             mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
         else:
-            logging.info('Cuts are too tight. Not enough point to fit')
+            if non_interactive:
+                raise RuntimeError('Coarse alignment in non interactive mode failed. Rerun with less iterations or in interactive mode!')
+            else:
+                logging.info('Cuts are too tight. Not enough data to fit')
 
     # Calculate and plot selected data + fit + fit offset and gauss fit error
     selected_data = (mean_error_fitted > 1e-3)  # Require the gaussian fit arror to be reasonable
@@ -339,8 +343,11 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
     refit_button.on_clicked(refit)
     ok_button.on_clicked(finish)
 
-    plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
-    plt.show()
+    if non_interactive:
+        update_auto(True)
+    else:
+        plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
+        plt.show()
 
     return selected_data, fit, do_refit  # Return cut data for further processing
 
