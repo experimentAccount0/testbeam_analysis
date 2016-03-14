@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
-    # Simulate 1000000 events with std. settings
+    # Simulate 100000 events with std. settings
     simulate_data = SimulateData(0)  # Start simulator with random seed = 0
 
     # All simulator std. settings are listed here and can be changed
@@ -44,7 +44,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Digitization settings
     simulate_data.digitization_charge_sharing = True
 
-    simulate_data.create_data_and_store('simulated_data', n_events=1000000)
+    # Create the data
+    simulate_data.create_data_and_store('simulated_data', n_events=100000)
 
     # The simulated data files, one file per DUT
     data_files = [r'simulated_data_DUT%d.h5' % i for i in range(simulate_data.n_duts)]
@@ -60,34 +61,28 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'max_cluster_hits':1000,
         "dut_name": data_files[i]} for i in range(len(data_files))]
     pool = Pool()
-    multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
-    # free resources
+    for kwarg in kwargs:
+        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
     pool.close()
     pool.join()
-    cluster_files = [res.get() for res in multiple_results]
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(input_hits_files=data_files,
-                                 output_correlation_file='Correlation.h5')
-    plot_utils.plot_correlations(input_correlation_file='Correlation.h5',
-                                 output_pdf='Correlations.pdf')
+                                 output_correlation_file='Correlation.h5',
+                                 n_pixels=simulate_data.dut_n_pixel)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file='Correlation.h5',
                                    output_alignment_file='Alignment.h5',
-                                   output_pdf='Alignment.pdf',
-                                   pixel_size=simulate_data.dut_pixel_size)
+                                   pixel_size=simulate_data.dut_pixel_size,
+                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=cluster_files,
+    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
                                      input_alignment_file='Alignment.h5',
                                      output_tracklets_file='Tracklets.h5',
                                      pixel_size=simulate_data.dut_pixel_size)
-
-#     dut_alignment.check_hit_alignment(input_tracklets_file='Tracklets.h5',
-#                                       output_pdf='Alignment_Check.pdf',
-#                                       combine_n_hits=1000000)
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
     track_analysis.find_tracks(input_tracklets_file='Tracklets.h5',
