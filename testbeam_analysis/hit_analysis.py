@@ -56,7 +56,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     std = np.ma.std(difference)
     abs_occ_threshold = threshold * std
     occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
-    logging.info('Removed a total of %d hot pixel at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
+    logging.info('Removed %d hot pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
 
     # generate tuple col / row array of hot pixels, do not use getmask()
     noisy_pixels_mask = np.ma.getmaskarray(occupancy)
