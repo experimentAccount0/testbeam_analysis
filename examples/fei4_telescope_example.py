@@ -7,6 +7,7 @@ import os
 import logging
 from multiprocessing import Pool
 
+import testbeam_analysis
 from testbeam_analysis import hit_analysis
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
@@ -17,12 +18,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
+    # Get the absolute example path, only needed to test this example
+    tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(os.path.dirname(testbeam_analysis.__file__))) + r'/examples/data'))
     # The location of the data files, one file per DUT
-    data_files = [r'data/TestBeamData_FEI4_DUT0.h5',  # the first DUT is the reference DUT defining the coordinate system, called internally DUT0
-                  r'data/TestBeamData_FEI4_DUT1.h5',  # DUT1
-                  r'data/TestBeamData_FEI4_DUT4.h5',  # DUT2
-                  r'data/TestBeamData_FEI4_DUT5.h5'   # DUT3
-                  ]
+    data_files = [(os.path.join(tests_data_folder, r'TestBeamData_FEI4_DUT%d' % i + '.h5')) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
 
     # Dimensions
     pixel_size = [(250, 50)] * 4  # in um
@@ -34,11 +33,6 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-# FIXME: need major rework
-# Create the initial geometry (to be done once)
-#     geometry_utils.create_initial_geometry(geo_file, z_positions)
-#     geo_file = os.path.join(output_folder, 'FEI4Geometry.h5')
-
     # Cluster hits off all DUTs
     kwargs = [{
         'input_hits_file': data_files[i],
@@ -49,10 +43,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
-    # free resources
     pool.close()
     pool.join()
-    cluster_files = [res.get() for res in multiple_results]
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(input_hits_files=data_files,
@@ -65,12 +57,12 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                   output_pdf_file=os.path.join(output_folder, 'Alignment.pdf'),
                                    pixel_size=pixel_size,
+                                   dut_names=dut_names,
                                    non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=cluster_files,
+    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
                                      input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                      output_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
                                      pixel_size=pixel_size)
