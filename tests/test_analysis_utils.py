@@ -1,4 +1,4 @@
-''' Script to check the correctness of the analysis. The analysis is done on raw data and all results are compared to a recorded analysis.
+''' Script to check the correctness of the analysis utils that are written in C++.
 '''
 import os
 
@@ -42,15 +42,19 @@ class TestAnalysisUtils(unittest.TestCase):
         self.assertListEqual([0, 1, 1, 2, 3, 3, 4, 5, 6, 7], result.tolist())
 
     def test_map_cluster(self):  # check the compiled function against result
-        cluster = np.zeros((20, ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
+        clusters = np.zeros((20, ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
         result = np.zeros((20, ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
-        result[1]["event_number"], result[3]["event_number"], result[4]["event_number"], result[7]["event_number"] = 1, 2, 3, 4
+        result[1]["event_number"], result[3]["event_number"], result[7]["event_number"], result[8]["event_number"], result[9]["event_number"] = 1, 2, 4, 4, 19
+        result[0]["mean_column"], result[1]["mean_column"], result[3]["mean_column"], result[7]["mean_column"], result[8]["mean_column"], result[9]["mean_column"] = 1, 2, 3, 5, 6, 20
 
-        for index in range(cluster.shape[0]):
-            cluster[index]["event_number"] = index
+        for index, cluster in enumerate(clusters):
+            cluster['mean_column'] = index + 1
+            cluster["event_number"] = index
+        clusters[3]["event_number"] = 2
+        clusters[5]["event_number"] = 4
 
         common_event_number = np.array([0, 1, 1, 2, 3, 3, 3, 4, 4], dtype=np.int64)
-        self.assertTrue(np.all(analysis_utils.map_cluster(common_event_number, cluster) == result[:common_event_number.shape[0]]))
+        self.assertTrue(np.all(analysis_utils.map_cluster(common_event_number, clusters) == result[:common_event_number.shape[0]]))
 
     def test_analysis_utils_in1d_events(self):  # check compiled get_in1d_sorted function
         event_numbers = np.array([[0, 0, 2, 2, 2, 4, 5, 5, 6, 7, 7, 7, 8], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=np.int64)
