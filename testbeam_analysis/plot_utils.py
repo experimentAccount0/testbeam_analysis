@@ -355,13 +355,159 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
+def plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, xlabel, title, coord=None, res=None, xedges=None, yedges=None):
+    # Global variables needed to manipulate them within a matplotlib QT slot function
+    global selected_data
+    global fit
+    global do_refit
+    global error_limit
+    global offset_limit
+    global left_limit
+    global right_limit
+
+    do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
+
+    def update_offset(offset_limit_new):  # Function called when offset slider is moved
+        global selected_data  # Globals needed to manipulate them
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+        offset_limit = offset_limit_new
+        offset_limit_plot.set_ydata([offset_limit, offset_limit])
+        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
+        update_plot(selected_data)
+
+    def update_error(error_limit_new):  # Function called when error slider is moved
+        global selected_data  # Globals needed to manipulate them
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+        error_limit = error_limit_new
+        error_limit_plot.set_ydata([error_limit, error_limit])
+        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
+        update_plot(selected_data)
+
+    def update_left_limit(left_limit_new):  # Function called when left limit slider is moved
+        global selected_data  # Globals needed to manipulate them
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+        left_limit = left_limit_new
+        left_limit_plot.set_xdata([left_limit, left_limit])
+        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
+        update_plot(selected_data)
+
+    def update_right_limit(right_limit_new):  # Function called when left limit slider is moved
+        global selected_data  # Globals needed to manipulate them
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+        right_limit = right_limit_new
+        right_limit_plot.set_xdata([right_limit, right_limit])
+        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
+        update_plot(selected_data)
+
+    def update_plot(selected_data):  # Replot correlation data with new selection
+        if np.count_nonzero(selected_data) > 1:
+            mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
+        else:
+            logging.info('Cuts are too tight. Not enough point to fit')
+
+    # Calculate and plot selected data + fit + fit offset and gauss fit error
+    selected_data = (mean_error_fitted > 1e-3)  # Require the gaussian fit arror to be reasonable
+    plt.clf()
+    fig = plt.gcf()
+    if coord is not None and res is not None and xedges is not None and yedges is not None:
+        ax = fig.add_subplot(2, 1, 2)
+    else:
+        ax = fig.add_subplot(1, 1, 1)        
+    #f = lambda x, c0, c1, c2: c0 + c1 * x + c2 *x**2  # Fit function: straight line
+    f = lambda x, c0, c1: c0 + c1 * x  # Fit function: straight line
+    fit, _ = curve_fit(f, x, mean_fitted)  # Fit stragiht line
+    fit_fn = np.poly1d(fit[::-1])
+    offset = np.abs(fit_fn(x) - mean_fitted)  # Calculate straight line fit offset
+    offset_limit = np.amax(offset)  # Calculate starting offset cut
+    error_limit = np.amax(mean_error_fitted)  # Calculate starting fit error cut
+    left_limit = np.amin(x) - 1  # Calculate starting left cut
+    right_limit = np.amax(x) + 1  # Calculate starting right cut
+
+    mean_plot, = ax.plot(x, mean_fitted, 'o-', label='Data prefit')  # Plot correlatioin
+    #fit_label = "Poly2 Fit: p0=%.1f, p1=%.6f, p2=%.9f" % (fit[0], fit[1], fit[2])
+    fit_label = "Poly2 Fit: p0=%.1f, p1=%.6f" % (fit[0], fit[1])
+    ax.plot(x, fit_fn(x), '-', label=fit_label)  # Plot line fit
+    ax.plot(x, mean_error_fitted, 'ro-', label='Error')  # Plot gaussian fit error
+    ax.plot(x, offset, 'go-', label='Offset')  # Plot line fit offset
+    offset_limit_plot, = ax.plot([np.min(x), np.max(x)], [offset_limit, offset_limit], 'g--')  # Plot offset cut as a line
+    error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit, error_limit], 'r--')  # Plot error cut as a line
+    left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-')  # Plot left cut as a vertical line
+    right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-')  # Plot right cut as a vertical line
+    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
+    
+    if coord is not None and res is not None and xedges is not None and yedges is not None:
+        acr = fig.add_subplot(2, 1, 1)
+        acr.hist2d(coord, res, [xedges, yedges])
+
+    #plt.ylim(ymin=0.0)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel('DUT0')
+    ax.legend(loc=0)
+    ax.grid()
+
+    def finish(event):  # Fit result is ok
+        global do_refit
+        do_refit = False  # Set to signal that no refit is required anymore
+        plt.close()  # Close the plot to let the program continue (blocking)
+
+    def refit(event):
+        plt.close()  # Close the plot to let the program continue (blocking)
+
+    # Setup interactive sliders/buttons
+    ax_offset = plt.axes([0.325, 0.04, 0.3, 0.02], axisbg='white')
+    ax_error = plt.axes([0.325, 0.01, 0.3, 0.02], axisbg='white')
+    ax_left_limit = plt.axes([0.125, 0.04, 0.10, 0.02], axisbg='white')
+    ax_right_limit = plt.axes([0.125, 0.01, 0.10, 0.02], axisbg='white')
+    ax_button_refit = plt.axes([0.67, 0.01, 0.1, 0.05], axisbg='black')
+    ax_button_ok = plt.axes([0.80, 0.01, 0.1, 0.05], axisbg='black')
+    # Create widgets
+    offset_slider = Slider(ax_offset, 'Offset Cut', 0.0, offset_limit, valinit=offset_limit)
+    error_slider = Slider(ax_error, 'Error cut', 0.0, error_limit, valinit=error_limit)
+    left_slider = Slider(ax_left_limit, 'Left cut', left_limit, right_limit, valinit=left_limit)
+    right_slider = Slider(ax_right_limit, 'Right cut', left_limit, right_limit, valinit=right_limit)
+    refit_button = Button(ax_button_refit, 'Refit')
+    ok_button = Button(ax_button_ok, 'OK')
+    # Connect slots
+    offset_slider.on_changed(update_offset)
+    error_slider.on_changed(update_error)
+    left_slider.on_changed(update_left_limit)
+    right_slider.on_changed(update_right_limit)
+    refit_button.on_clicked(refit)
+    ok_button.on_clicked(finish)
+
+    plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
+    plt.show()
+    
+    return selected_data, fit, do_refit  # Return cut data for further processing
+
+
+
 def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
     plt.clf()
     plt.errorbar(x, mean_fitted, yerr=mean_error_fitted, fmt='.')
     plt.plot(x, mean_error_fitted * 1000.0, 'ro-', label='Error x1000')
     plt.errorbar(x, (fit_fn(x) - mean_fitted) * 10., mean_error_fitted * 10., fmt='go-', label='Offset x10')
-    fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
-#     fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
+    if len(pcov) > 1:
+        fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
+    else:
+        fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
     plt.plot(x, fit_fn(x), '-', label=fit_legend_entry)
     plt.plot(x, chi2 / 1.e7)
     plt.legend(loc=0)
@@ -370,7 +516,10 @@ def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitte
     plt.ylabel('%s [um]' % ref_name)
 #     plt.xlim((0, x.shape[0]))
     plt.grid()
-    output_pdf.savefig()
+    if output_pdf:
+        output_pdf.savefig()
+    else:
+        plt.show()
 
 
 def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
@@ -605,6 +754,34 @@ def get_rms_from_histogram(counts, bin_positions):
         for _ in range(one_bin):
             values.append(bin_positions[index])
     return np.std(values)
+
+
+def plot_track_slope(i, actual_dut, edges, hist, fit_ok, coeff, gauss, slopes, var_matrix, output_fig):
+    for plot_log in [False, True]:  # plot with log y or not
+        plt.clf()
+        plot_range = (-5 * get_rms_from_histogram(hist, edges), 5. * get_rms_from_histogram(hist, edges))
+        plt.xlim(plot_range)
+        plt.grid()
+        plt.title('Slopes for DUT %d' % actual_dut)
+        plt.xlabel('Slope x (rad)' if i == 0 else 'Slope y (rad)')
+        plt.ylabel('#')
+
+        if plot_log:
+            plt.ylim(1, int(ceil(np.amax(hist) / 10.0)) * 100)
+
+        plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
+        if fit_ok:
+            plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
+            plt.plot([np.median(slopes[:, i]), np.median(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='green', linewidth=2)
+            plt.plot([np.mean(slopes[:, i]), np.mean(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='red', linewidth=2)
+            gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.6f\pm %.6f$\nsigma=$%.6f\pm %.6f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            plt.legend(loc=0)
+            
+        if output_fig is not None:
+            output_fig.savefig()
+        else:
+            plt.show()
 
 
 def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig):
