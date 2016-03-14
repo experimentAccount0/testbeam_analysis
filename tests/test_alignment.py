@@ -27,8 +27,8 @@ class TestHitAnalysis(unittest.TestCase):
                           os.path.join(tests_data_folder + 'TestBeamData_FEI4_DUT3_small.h5')
                           ]
         cls.output_folder = tests_data_folder
-        cls.n_pixels = ((80, 336), (80, 336), (80, 336), (80, 336))
-        cls.pixel_size = ((250, 50), (250, 50), (250, 50), (250, 50))  # in um
+        cls.n_pixels = [(80, 336)] * 4
+        cls.pixel_size = [(250, 50)] * 4  # in um
 
     @classmethod
     def tearDownClass(cls):  # remove created files
@@ -61,7 +61,11 @@ class TestHitAnalysis(unittest.TestCase):
                                        output_pdf_file=os.path.join(self.output_folder + 'Alignment.pdf'),
                                        pixel_size=self.pixel_size,
                                        non_interactive=True)
-        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Alignment_result.h5'), os.path.join(self.output_folder + 'Alignment.h5'), exact=False)
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'Alignment_result.h5'), 
+                                                            os.path.join(self.output_folder + 'Alignment.h5'), 
+                                                            exact=False,
+                                                            rtol=0.05,  # 5 % error allowed
+                                                            atol=5)  # 5 um absolute tolerance allowed
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_cluster_merging(self):
@@ -78,7 +82,7 @@ class TestHitAnalysis(unittest.TestCase):
                                          output_tracklets_file=os.path.join(self.output_folder + 'Tracklets_2.h5'),
                                          pixel_size=self.pixel_size,
                                          chunk_size=293)
-
+ 
         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder + 'Tracklets_2.h5')
         self.assertTrue(data_equal, msg=error_msg)
 
