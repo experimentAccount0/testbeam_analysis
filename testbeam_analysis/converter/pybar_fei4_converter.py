@@ -13,7 +13,7 @@ from multiprocessing import Pool
 
 from pybar.analysis import analysis_utils
 from pybar.analysis.analyze_raw_data import AnalyzeRawData
-from pybar.analysis.RawDataConverter import data_struct
+from pybar_fei4_interpreter import data_struct
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
