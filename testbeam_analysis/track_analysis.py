@@ -262,7 +262,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -291,7 +291,7 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
         E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     pixel_size : iterable, (x dimensions, y dimension)
         the size in um of the pixels, needed for chi2 calculation
-    output_pdf : pdf file name object
+    output_pdf_file : pdf file name object
         if None plots are printed to screen
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
@@ -330,7 +330,7 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
 
         return tracks_array
 
-    with PdfPages(output_pdf) as output_fig:
+    with PdfPages(output_pdf_file) as output_fig:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
