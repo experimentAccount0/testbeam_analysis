@@ -46,20 +46,20 @@ def get_array_differences(first_array, second_array):
         return ': ' + return_str
 
 
-def array_close(array_1, array_2):
+def array_close(array_1, array_2, rtol=1.e-5, atol=1.e-8):
     '''Compares two numpy arrays elementwise for similarity with small differences.'''
     if not array_1.dtype.names:
         try:
-            return np.allclose(array_1, array_2)  # Only works on non recarrays
+            return np.allclose(array_1, array_2, rtol=1.e-5, atol=1.e-8)  # Only works on non recarrays
         except ValueError:  # Raised if shape is incompatible
             return False
     results = []
     for column in array_1.dtype.names:
-        results.append(np.allclose(array_1[column], array_2[column]))
+        results.append(np.allclose(array_1[column], array_2[column], rtol=1.e-5, atol=1.e-8))
     return np.all(results)
 
 
-def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comparison=True, exact=True):
+def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comparison=True, exact=True, rtol=1.e-5, atol=1.e-8):
     '''Takes two hdf5 files and check for equality of all nodes.
     Returns true if the node data is equal and the number of nodes is the number of expected nodes.
     It also returns a error string containing the names of the nodes that are not equal.
@@ -73,7 +73,16 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
     expected_nodes : Int
         The number of nodes expected in the second_file. If not specified the number of nodes expected in the second_file equals
         the number of nodes in the first file.
-
+    detailed_comparison : boolean
+        Print reason why the comparison failed
+    exact : boolean
+        True if the results have to match exactly. E.g. False for fit results.
+    rtol, atol: number
+        From numpy.allclose:
+        rtol : float
+            The relative tolerance parameter (see Notes).
+        atol : float
+            The absolute tolerance parameter (see Notes).
     Returns
     -------
     bool, string
@@ -99,7 +108,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
                                 error_msg += get_array_differences(expected_data, data)
                             error_msg += '\n'
                     else:
-                        if not array_close(expected_data, data):
+                        if not array_close(expected_data, data, rtol, atol):
                             checks_passed = False
                             error_msg += node.name
                             if detailed_comparison:
