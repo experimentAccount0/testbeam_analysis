@@ -248,13 +248,18 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
 
             cons = consecutive(n_hit_cut_index)
 
-            min_cut = cons[0][-1]
-            max_cut = cons[-1][0]
+            # Set the minimum, maximum  number of hits cut values
+            min_cut = cons[0][-1] if len(np.atleast_1d(cons[0][-1])) == 1 else cons[0][-1][0]
+            max_cut = cons[-1][0] if len(np.atleast_1d(cons[-1][0])) == 1 else cons[-1][0][0]
 
             # Validity check, needed e.g. if there are areas without data
-            if min_cut > max_cut or min_cut > np.where(n_hits == np.amax(n_hits))[0]:
+            n_hits_max = np.where(n_hits == np.amax(n_hits))[0]
+            n_hits_max_min_index = n_hits_max if len(np.atleast_1d(n_hits_max)) == 1 else n_hits_max[0]  # Cut down to first index with maximum entries
+            n_hits_max_max_index = n_hits_max if len(np.atleast_1d(n_hits_max)) == 1 else n_hits_max[-1]  # Cut down to first index with maximum entries
+
+            if min_cut > max_cut or min_cut > n_hits_max_min_index:
                 min_cut = 0
-            if max_cut < min_cut or max_cut < np.where(n_hits == np.amax(n_hits))[0]:
+            if max_cut < min_cut or max_cut < n_hits_max_max_index:
                 max_cut = n_hits.shape[0] - 1
 
             if min_cut:
