@@ -25,10 +25,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                   ]
 
     # Dimensions
-    pixel_size = [(250, 50), (250, 50), (250, 50), (250, 50)]  # in um
-    n_pixels = [(80, 336), (80, 336), (80, 336), (80, 336)]
+    pixel_size = [(250, 50)] * 4  # in um
+    n_pixels = [(80, 336)] * 4
     z_positions = [0., 19500, 108800, 128300]  # in um; optional, can be also deduced from data, but usually not with high precision (~ mm)
-    dut_name = ("Tel_0", "Tel_1", "Tel_2", "Tel_3")
+    dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3")
 
     output_folder = os.path.split(data_files[0])[0]  # define a folder where all output data and plots are stored
 
@@ -46,7 +46,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'max_y_distance': 1,
         'max_time_distance': 2,
         'max_cluster_hits':1000,
-        'dut_name': dut_name[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
     # free resources
@@ -54,8 +54,15 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.join()
     cluster_files = [res.get() for res in multiple_results]
 
+    # Correlate the row / column of each DUT
+    dut_alignment.correlate_hits(input_hits_files=data_files,
+                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                 n_pixels=n_pixels,
+                                 pixel_size=pixel_size,
+                                 dut_names=dut_names
+                                 )
+
     # Create alignment data for the DUT positions to the first DUT from the correlation data
-    # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                    output_pdf_file=os.path.join(output_folder, 'Alignment.pdf'),
