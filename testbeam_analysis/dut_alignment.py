@@ -4,19 +4,23 @@ from __future__ import division
 import logging
 import re
 import progressbar
+import warnings
 import os.path
 
 import matplotlib.pyplot as plt
 import tables as tb
 import numpy as np
-from scipy.optimize import curve_fit, minimize_scalar, leastsq
+from scipy.optimize import curve_fit, minimize_scalar, leastsq, OptimizeWarning
 from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
 
 
-def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, output_pdf=None, chunk_size=4999999):
+warnings.simplefilter("ignore", OptimizeWarning)  # Fit errors are handled internally, turn of warnings
+
+
+def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, output_pdf_file=None, chunk_size=4999999):
     '''Histograms the hit column (row) of two different devices on an event basis. If the hits are correlated a line should be seen.
     Permutations are not considered (not all hits of the first device are correlated with all hits of the second device).
 
@@ -26,9 +30,16 @@ def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_si
         Input file with hit data.
     output_correlation_file : pytables file
         Output file with the correlation histograms.
-    n_pixel : list of tuples
+    n_pixel : iterable of tuples
         One tuple per DUT describing the number of pixels in column, row direction
         e.g. for 2 DUTs: n_pixel = [(80, 336), (80, 336)]
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension in um in column, row direction
+        e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
+    dut_names : iterable of strings
+        To show the DUT names in the plot
+    output_pdf_file : string
+        File name for the output plots.
     chunk_size: int
         Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
     '''
@@ -137,7 +148,11 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 mu_start = np.argmax(data, axis=1)
                 A_start = np.max(data, axis=1)
                 A_mean = np.mean(data, axis=1)
-                mu_median = np.average(data, axis=1, weights=range(0, data.shape[1])) * sum(range(0, data.shape[1])) / np.sum(data, axis=1)
+
+                # Get mu start values for the Gauss fits
+                n_entries = np.sum(data, axis=1)
+                mu_mean = np.zeros_like(n_entries)
+                mu_mean[n_entries > 0] = np.average(data, axis=1, weights=range(0, data.shape[1]))[n_entries > 0] * sum(range(0, data.shape[1])) / n_entries[n_entries > 0]
 
                 def gauss2(x, *p):
                     A, mu, sigma = p
@@ -167,7 +182,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 for index in np.arange(data.shape[0]):
                     fit = None
                     try:
-                        p = [A_mean[index], A_start[index], mu_median[index], mu_start[index], 500.0, 5.0]  # FIXME: hard coded starting values
+                        p = [A_mean[index], A_start[index], mu_mean[index], mu_start[index], 500.0, 5.0]  # FIXME: hard coded starting values
                         plsq = leastsq(res, p, args=(data[index, :], x_hist_fit), full_output=True)
                         y_est = gauss2(x_hist_fit, plsq[0][0], plsq[0][2], plsq[0][4]) + gauss2(x_hist_fit, plsq[0][1], plsq[0][3], plsq[0][5])
                         if plsq[1] is None:
