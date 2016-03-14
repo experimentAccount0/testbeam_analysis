@@ -16,11 +16,9 @@ import logging
 from multiprocessing import Pool
 
 from testbeam_analysis import hit_analysis
-from testbeam_analysis import geometry_utils
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
 from testbeam_analysis import result_analysis
-from testbeam_analysis import plot_utils
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
@@ -31,7 +29,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Pixel dimesions and matrix size of the DUTs
     pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
-    n_pixel = [(1152, 576)] * 6  # Number of pixel on column, row
+    n_pixels = [(1152, 576)] * 6  # Number of pixel on column, row
 
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # z position in um, can be also deduced from data, but usually not with high precision (~ mm)
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
@@ -53,7 +51,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
     kwargs = [{
         'input_hits_file': data_files[i],
-        'n_pixel': n_pixel[i],
+        'n_pixel': n_pixels[i],
         'pixel_size': pixel_size[i],
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
@@ -76,16 +74,18 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(input_hits_files=noisy_pixels_files,
-                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'), fraction=1)
-    plot_utils.plot_correlations(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                                 output_pdf=os.path.join(output_folder, 'Correlations.pdf'))
+                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                 n_pixels=n_pixels,
+                                 pixel_size=pixel_size,
+                                 dut_names=dut_names)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                   output_pdf=os.path.join(output_folder, 'Alignment.pdf'),
-                                   pixel_size=pixel_size)
+                                   output_pdf_file=os.path.join(output_folder, 'Alignment.pdf'),
+                                   pixel_size=pixel_size,
+                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=noisy_pixels_cluster_files,
@@ -101,7 +101,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                              output_pdf=os.path.join(output_folder, 'Tracks.pdf'),
+                              output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
                               z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
                               include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
