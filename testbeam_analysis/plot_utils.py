@@ -3,6 +3,7 @@ from __future__ import division
 import logging
 import re
 import os.path
+import warnings
 from math import sqrt, ceil
 
 import numpy as np
@@ -12,12 +13,14 @@ from matplotlib.figure import Figure
 from matplotlib import colors, cm
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting
+from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting although it is shown as not used
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.widgets import Slider, Button, RadioButtons
+from matplotlib.widgets import Slider, Button
 from scipy.optimize import curve_fit
 
 from testbeam_analysis import analysis_utils
+
+warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")  # Plot backend error not important
 
 
 def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
