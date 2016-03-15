@@ -308,8 +308,73 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 plot_utils.plot_alignment_fit(x=x, mean_fitted=mean_fitted, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
 
             with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
-                result_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', description=result.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                result_table.append(result)
+                try:
+                    result_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', description=result.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    result_table.append(result)
+                except tb.exceptions.NodeError:
+                    logging.warning('Correlation table exists already. Do not create new.')
+
+                # Create transilation / rotation table that can be can be overwritten later in the fine alignment step; initial values define no translation and no rotation
+                description = [('DUT', np.int)]
+                for index in range(3):  # Translation has 3 dimensions
+                    description.append(('translation_%d' % index, np.float))
+                for i in range(3):  # Rotation matrix of the DUT
+                    for j in range(3):
+                        description.append(('rotation_%d_%d' % (i, j), np.float))
+
+                trans_rot_parameters = np.zeros((n_duts,), dtype=description)
+
+                # Rotation matrix without effect has 1s in the diagonal
+                trans_rot_parameters[:]['rotation_0_0'] = np.ones((n_duts,))
+                trans_rot_parameters[:]['rotation_1_1'] = np.ones((n_duts,))
+                trans_rot_parameters[:]['rotation_2_2'] = np.ones((n_duts,))
+
+                try:
+                    geometry_table = out_file_h5.create_table(out_file_h5.root, name='Geometry', title='File containing the fine alignment geometry parameters', description=np.zeros((1,), dtype=trans_rot_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    geometry_table.append(trans_rot_parameters)
+                except tb.exceptions.NodeError:
+                    logging.warning('Correlation table exists already. Do not create new.')
+
+
+def _fit_tracks_loop(track_hits):
+    ''' Do 3d line fit and calculate chi2 for each fit. '''
+    def line_fit_3d(hits):
+        datamean = hits.mean(axis=0)
+        offset, slope = datamean, np.linalg.svd(hits - datamean)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
+        intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # Fitted line and DUT plane intersections (here: points)
+        chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
+        return datamean, slope, chi2
+
+    slope = np.zeros((track_hits.shape[0], 3,))
+    offset = np.zeros((track_hits.shape[0], 3,))
+    chi2 = np.zeros((track_hits.shape[0],))
+
+    for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
+        try:
+            offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits)
+        except np.linalg.linalg.LinAlgError:
+            chi2[index] = 1e9
+
+    return offset, slope, chi2
+
+def fit_plot_tracks_slopes (slopes, actual_dut, output_fig):
+    def gauss(x, *p):
+        A, mu, sigma = p
+        return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+
+    for i in range(2):  # col / row
+        mean, rms = np.mean(slopes[:, i]), np.std(slopes[:, i])
+        hist, edges = np.histogram(slopes[:, i], range=(mean - 5. * rms, mean + 5. * rms), bins=1000)
+        fit_ok = False
+        coeff, var_matrix = None, None
+        try:
+            coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
+            fit_ok = True
+        except:
+            fit_ok = False
+
+        plot_utils.plot_track_slope(i, actual_dut, edges, hist, fit_ok, coeff, gauss, slopes, var_matrix, output_fig=output_fig)
+
 
 def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=0, max_tracks=None, use_correlated=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
