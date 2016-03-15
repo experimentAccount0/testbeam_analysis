@@ -23,7 +23,6 @@ from testbeam_analysis import plot_utils
 from testbeam_analysis import geometry_utils
 
 
-
 warnings.simplefilter("ignore", OptimizeWarning)  # Fit errors are handled internally, turn of warnings
 
 
@@ -93,7 +92,7 @@ def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_si
     plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
 
 
-def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None, non_interactive=False, iterations=3, fix_slope=False):
+def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None, non_interactive=False, iterations=3):
     '''Takes the correlation histograms, fits the correlations and stores the correlation parameters.
     The user can define cuts on the fit error and straight line offset in an interactive way.
 
@@ -129,6 +128,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
             n_nodes = len(in_file_h5.list_nodes("/"))
+            n_duts = int(n_nodes / 2) + 1
             result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
             for node in in_file_h5.root:
                 indices = re.findall(r'\d+', node.name)
@@ -178,57 +178,49 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 chi2 = np.array([-1.0 for _ in range(data.shape[0])])  # Chi2 of the fit
                 n_hits = np.array([-1.0 for _ in range(data.shape[0])])  # Number of hits per bin
 
-                # Loop over all row/row or column/column slices and fit a gaussian to the profile
-                # Get values with highest correlation for alignment fit
-                # Do this with channel indices, later convert to um
-                # from clusterizer: origin pixel cluster mean is 1.5 / 1.5
-                x_hist_fit = np.arange(1.5, data.shape[1] + 1.5)
-                # getting the beam spot for plotting
-                ref_beam_center = np.argmax(np.sum(data, axis=1))
+                # Loop over all row/row or column/column slices and fit a double gaussian or gaussian + offset to the profile
+                # Get values with highest correlation for alignment fit; do this with channel indices, later convert to um
+                # Origin pixel cluster mean is 1.5 / 1.5, since hits start from 1, 1 not 0, 0
 
-                for index in np.arange(data.shape[0]):
+                x_hist_fit = np.arange(1.5, data.shape[1] + 1.5)  # x bin positions
+                ref_beam_center = np.argmax(np.sum(data, axis=1))  # Get the beam spot for plotting
+
+                for index in np.arange(data.shape[0]):  # Loop over x dimension of correlation hitogram
                     fit = None
                     try:
                         p = [A_mean[index], A_start[index], mu_mean[index], mu_start[index], 500.0, 5.0]  # FIXME: hard coded starting values
                         plsq = leastsq(res, p, args=(data[index, :], x_hist_fit), full_output=True)
-                        y_est = gauss2(x_hist_fit, plsq[0][0], plsq[0][2], plsq[0][4]) + gauss2(x_hist_fit, plsq[0][1], plsq[0][3], plsq[0][5])
+                        y_fit = gauss2(x_hist_fit, plsq[0][0], plsq[0][2], plsq[0][4]) + gauss2(x_hist_fit, plsq[0][1], plsq[0][3], plsq[0][5])
                         if plsq[1] is None:
                             raise RuntimeError
                         mean_fitted[index] = plsq[0][3]
                         mean_error_fitted[index] = np.sqrt(np.abs(np.diag(plsq[1])))[3]
                         sigma_fitted[index] = np.abs(plsq[0][5])
                         n_hits[index] = data[index, :].sum()
-                        fit = 1
+                        fit_type = 1
                     except RuntimeError:
                         try:
                             p0 = [A_start[index], mu_start[index], 5.0, A_mean[index], 0.0]  # FIXME: hard coded start value
                             coeff, var_matrix = curve_fit(gauss_offset, x_hist_fit, data[index, :], p0=p0)
+                            y_fit = gauss_offset(x_hist_fit, *coeff)
                             mean_fitted[index] = coeff[1]
                             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
                             sigma_fitted[index] = np.abs(coeff[2])
                             n_hits[index] = data[index, :].sum()
-                            fit = 2
+                            fit_type = 2
                         except RuntimeError:
                             pass
                     finally:
-                        # create plot in the center of the mean data
+                        # Create plot in the center of the mean data
                         if index == int(ref_beam_center):
-                            plt.clf()  # FIXME: plotting should be in plot_utils
-                            if fit == 1:
-                                plt.plot(x_hist_fit, y_est, 'g-', linewidth=2, label='Fit: Gauss-Gauss')
-                            elif fit == 2:
-                                plt.plot(x_hist_fit, gauss_offset(x_hist_fit, *coeff), 'g-', linewidth=2, label='Fit: Gauss-Offset')
-                            plt.plot(x_hist_fit, data[index, :], 'r.-', label='Real Data')
-                            title = "Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name, "column" if "column" in node.name.lower() else "row", index)
-                            plt.title(title)
-                            xlabel = '%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name)
-                            plt.xlabel(xlabel)
-                            plt.ylabel('#')
-                            plt.grid()
-                            plt.legend()
-#                             plt.show()
-                            output_pdf.savefig()
-#                             plot_utils.plot_correlation_fit(x=x_hist_fit, y=data[index, :], coeff=coeff, var_matrix=var_matrix, xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name), title="Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name, "column" if "column" in node.name.lower() else "row", index), output_pdf=output_pdf)
+                            plot_utils.plot_correlation_fit(x=x_hist_fit,
+                                                            y=data[index, :],
+                                                            y_fit=y_fit,
+                                                            fit_type=fit_type,
+                                                            xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
+                                                            title="Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows",
+                                                                                                             ref_name, dut_name, "column" if "column" in node.name.lower() else "row", index),
+                                                            output_pdf=output_pdf)
 
                 # Unset invalid data
                 mean_fitted[~np.isfinite(mean_fitted)] = -1
@@ -265,46 +257,28 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                         if actual_iteration > iterations:
                             break
 
-                # linear fit, usually describes correlation very well
-                # with low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
-                # to be insvetigated...
-                # Use results from straight line fit as start values for last fit
+                # Linear fit, usually describes correlation very well
+                # With low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
+
                 def line(x, c0, c1):
                     return c0 + c1 * x
-                
-                def offset(x, c0):
-                    return c0 + x
 
-#                 def f_pos(x, c0):
-#                     return c0 + 1.0 * x
-#
-#                 def f_neg(x, c0):
-#                     return c0 - 1.0 * x
-#
-#                 if fit[1] >= 0.0:
-#                     f = f_pos
-#                 else:
-#                     f = f_neg
-                if fix_slope:
-                    re_fit, re_fit_pcov = curve_fit(offset, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0]])
-                    re_fit = np.append(re_fit, 1.)
-                    result[node_index]['c1'], result[node_index]['c1_error'] = 1., 0.
-                else:
-                    re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
-                    result[node_index]['c1'], result[node_index]['c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
-                    
-                fit_fn = np.poly1d(re_fit[::-1])
+                # Use results from straight line fit as start values for final fit
+                re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
 
                 # Write fit results to array
                 result[node_index]['c0'], result[node_index]['c0_error'] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
+                result[node_index]['c1'], result[node_index]['c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
 
-                # Calculate mean sigma (is somewhat a residual) and its error and store the actual data in result array
+                # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
+                # This error is needed for track finding
                 mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted))
                 mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)) / np.sqrt(np.array(sigma_fitted).shape[0])
 
                 result[node_index]['sigma'], result[node_index]['sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Plot selected data with fit
+                fit_fn = np.poly1d(re_fit[::-1])
                 plot_utils.plot_alignment_fit(x=x, mean_fitted=mean_fitted, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
 
             with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
@@ -442,8 +416,7 @@ def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, igno
         tracks_array['track_chi2'] = chi2s
 
         return tracks_array
-    
-    
+
     nplanes = len(z_positions)
     translations = np.zeros((nplanes, 3))
     rotations = np.zeros((nplanes, 3, 3))
@@ -452,13 +425,13 @@ def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, igno
     for i in range(3):
         for j in range(3):
             rotations[:, i, j] = geometry['rotation_%d_%d' % (i, j)]
-                
+
     with tb.open_file(track_candidates_file, mode='r') as in_file_h5:
         n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
         logging.info('Fit tracks for DUT %d', fit_dut)
         #tracklets_table = None
         offsets, slopes, dut_hits = [], [], []
-        n_chunk = 0#TOFIT this is a bypass...
+        n_chunk = 0  # TOFIT this is a bypass...
         for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
             # Select track candidates
             dut_selection = 0  # DUTs to be used in the fit
@@ -490,7 +463,7 @@ def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, igno
 
             good_track_candidates = track_candidates_chunk[good_track_selection]
             good_track_candidates = good_track_candidates[np.logical_and(good_track_candidates['column_dut_%d' % fit_dut] != 0., good_track_candidates['row_dut_%d' % fit_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
-             
+
             # Prepare track hits array to be fitted
             n_fit_duts = bin(dut_selection).count("1")
             index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
@@ -498,16 +471,16 @@ def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, igno
             dut_hits_t = np.zeros((n_tracks, 3))
             for dut_index in range(0, n_duts):  # Fill index loop of new array
                 if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
-                    xr = good_track_candidates['column_dut_%s' % dut_index]*rotations[fit_dut,0,0] + good_track_candidates['row_dut_%s' % dut_index]*rotations[fit_dut,0,1] + translations[fit_dut,0]
-                    yr = good_track_candidates['column_dut_%s' % dut_index]*rotations[fit_dut,1,0] + good_track_candidates['row_dut_%s' % dut_index]*rotations[fit_dut,1,1] + translations[fit_dut,1]
+                    xr = good_track_candidates['column_dut_%s' % dut_index] * rotations[fit_dut, 0, 0] + good_track_candidates['row_dut_%s' % dut_index] * rotations[fit_dut, 0, 1] + translations[fit_dut, 0]
+                    yr = good_track_candidates['column_dut_%s' % dut_index] * rotations[fit_dut, 1, 0] + good_track_candidates['row_dut_%s' % dut_index] * rotations[fit_dut, 1, 1] + translations[fit_dut, 1]
                     xyz = np.column_stack((xr, yr, np.repeat(z_positions[dut_index], n_tracks)))
                     track_hits[:, index, :] = xyz
                     index += 1
                 elif dut_index == fit_dut:
-                    xr = good_track_candidates['column_dut_%s' % dut_index]*rotations[fit_dut,0,0] + good_track_candidates['row_dut_%s' % dut_index]*rotations[fit_dut,0,1] + translations[fit_dut,0]
-                    yr = good_track_candidates['column_dut_%s' % dut_index]*rotations[fit_dut,1,0] + good_track_candidates['row_dut_%s' % dut_index]*rotations[fit_dut,1,1] + translations[fit_dut,1]
+                    xr = good_track_candidates['column_dut_%s' % dut_index] * rotations[fit_dut, 0, 0] + good_track_candidates['row_dut_%s' % dut_index] * rotations[fit_dut, 0, 1] + translations[fit_dut, 0]
+                    yr = good_track_candidates['column_dut_%s' % dut_index] * rotations[fit_dut, 1, 0] + good_track_candidates['row_dut_%s' % dut_index] * rotations[fit_dut, 1, 1] + translations[fit_dut, 1]
                     xyz = np.column_stack((xr, yr, np.repeat(z_positions[dut_index], n_tracks)))
-                    dut_hits_t = xyz                  
+                    dut_hits_t = xyz
 
             # Split data and fit on all available cores
             n_slices = cpu_count()
@@ -526,42 +499,21 @@ def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, igno
                 slopes = slopes_t
                 dut_hits = dut_hits_t
             else:
-                    offsets = np.concatenate([offsets, offsets_t])
-                    slopes = np.concatenate([slopes, slopes_t])
-                    dut_hits = np.concatenate([dut_hits, dut_hits_t])
+                offsets = np.concatenate([offsets, offsets_t])
+                slopes = np.concatenate([slopes, slopes_t])
+                dut_hits = np.concatenate([dut_hits, dut_hits_t])
             n_chunk += 1
-    
+
     return dut_hits, offsets, slopes
 
 
-def _fit_tracks_loop(track_hits):
-    ''' Do 3d line fit and calculate chi2 for each fit. '''
-    def line_fit_3d(hits):
-        datamean = hits.mean(axis=0)
-        offset, slope = datamean, np.linalg.svd(hits - datamean)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
-        intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # Fitted line and DUT plane intersections (here: points)
-        chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
-        return datamean, slope, chi2
-
-    slope = np.zeros((track_hits.shape[0], 3,))
-    offset = np.zeros((track_hits.shape[0], 3,))
-    chi2 = np.zeros((track_hits.shape[0],))
-
-    for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
-        try:
-            offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits)
-        except np.linalg.linalg.LinAlgError:
-            chi2[index] = 1e9
-
-    return offset, slope, chi2
-
-def align_by_residuals(track_candidates_file, geometry,  z_positions, fit_duts, include_duts, output_pdf):
+def align_by_residuals(track_candidates_file, geometry, z_positions, fit_duts, include_duts, output_pdf):
     logging.info('=== Fine align the DUT translation by residuals ===')
-    
+
     def gauss(x, *p):
         A, mu, sigma = p
         return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
-           
+
     nplanes = len(z_positions)
     translations = np.zeros((nplanes, 3))
     rotations = np.zeros((nplanes, 3, 3))
@@ -570,9 +522,9 @@ def align_by_residuals(track_candidates_file, geometry,  z_positions, fit_duts, 
         translations[:, index] = geometry['translation_%d' % index]
     for i in range(3):
         for j in range(3):
-            rotations[:, i, j] = geometry['rotation_%d_%d' % (i, j)]            
+            rotations[:, i, j] = geometry['rotation_%d_%d' % (i, j)]
 
-    corr_translation = np.zeros((nplanes,2))
+    corr_translation = np.zeros((nplanes, 2))
 
     output_fig = PdfPages(output_pdf) if output_pdf else None
     for actual_dut in fit_duts:
@@ -588,8 +540,8 @@ def align_by_residuals(track_candidates_file, geometry,  z_positions, fit_duts, 
         tmppr = intersection[:, 1] - translations[actual_dut, 1]
         tmpc = tmppc * rotations[actual_dut, 0, 0] + tmppr * rotations[actual_dut, 1, 0]
         tmpr = tmppc * rotations[actual_dut, 0, 1] + tmppr * rotations[actual_dut, 1, 1]
-        intersection[:,0] = tmpc
-        intersection[:,1] = tmpr
+        intersection[:, 0] = tmpc
+        intersection[:, 1] = tmpr
 
         difference = hits - intersection
         logging.info('Calculate residuals for DUT %d', actual_dut)
@@ -602,8 +554,8 @@ def align_by_residuals(track_candidates_file, geometry,  z_positions, fit_duts, 
             try:
                 #coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
                 coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), 0., 15.])
-                corr_translation[actual_dut,i] = -coeff[1]
-                    
+                corr_translation[actual_dut, i] = -coeff[1]
+
                 fit_ok = True
             except:
                 fit_ok = False
@@ -613,32 +565,11 @@ def align_by_residuals(track_candidates_file, geometry,  z_positions, fit_duts, 
 
     if output_fig:
         output_fig.close()
-        
+
     return corr_translation
 
 
-def fit_plot_tracks_slopes (slopes, actual_dut, output_fig):
-    def gauss(x, *p):
-        A, mu, sigma = p
-        return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
-
-    for i in range(2):  # col / row
-        mean, rms = np.mean(slopes[:, i]), np.std(slopes[:, i])
-        hist, edges = np.histogram(slopes[:, i], range=(mean - 5. * rms, mean + 5. * rms), bins=1000)
-        fit_ok = False
-        coeff, var_matrix = None, None
-        try:
-            coeff, var_matrix = curve_fit(gauss, edges[:-1], hist, p0=[np.amax(hist), mean, rms])
-            fit_ok = True
-        except:
-            fit_ok = False
-
-        plot_utils.plot_track_slope(i, actual_dut, edges, hist, fit_ok, coeff, gauss, slopes, var_matrix, output_fig=output_fig)
-
-
-
-
-def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, output_pdf, fit_duts = range(6), include_duts=[-5,-4,-3,-2,-1,1,2,3,4,5], ignore_duts=None, create_new_geometry=True):
+def fine_alignment(input_track_candidates_file, alignment_file, z_positions, output_pdf, fit_duts=range(6), include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], ignore_duts=None, create_new_geometry=True):
     '''Takes the track candidates, and fits a track for each DUT using the neigbouring DUTs in an iterative way.
     Plots the residuals in x / y as a function of x / y to deduce rotation and translation parameters.
     These parameters are set in the aligment file and used to correct the hit positions in the track candidates array.
@@ -662,26 +593,26 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
         if false the current one is used (then alignment_file must exist)
     '''
     logging.info('=== Fine align the DUTs using line fit residuals ===')
-    
+
     def gauss(x, *p):
         A, mu, sigma = p
         return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
-    
+
     def calculate_residuals_correlation(data1, data2, edges1, edges2, fit_dut, label, dofit=True):
         step = edges1[1] - edges1[0]
         nbins = len(edges1)
-        resx = [[]]*nbins
+        resx = [[]] * nbins
         for ind in range(nbins):
             resx[ind] = []
         mean_fitted = np.zeros(nbins)
         sigma_fitted = np.zeros(nbins)
         mean_error_fitted = np.zeros(nbins)
         n_hits = np.zeros(nbins)
-    
+
         for i, x in enumerate(data1):
             n = np.int((x - edges1[0]) / step)
             resx[n].append(data2[i])
-    
+
         for n in range(nbins):
             if len(resx[n]) == 0:
                 mean_fitted[n] = -1
@@ -698,23 +629,23 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
                 n_hits[n] = len(resx[n])
             except RuntimeError:
                 pass
-    
+
         mean_fitted[~np.isfinite(mean_fitted)] = -1
-        mean_error_fitted[mean_error_fitted>1000] = 1000
+        mean_error_fitted[mean_error_fitted > 1000] = 1000
         selected_data = np.where(np.logical_and(mean_fitted != -1, 1 > 0))[0]
-    
+
         f = lambda x, c0: c0 + x
         if dofit:
             fit, pcov = curve_fit(f, edges1[selected_data], mean_fitted[selected_data])
         else:
             fit, pcov = None, None
-            
+
         refit = True
         selected_data = np.ones_like(mean_fitted, dtype=np.bool)
 #        x = np.arange(1.5, mean_fitted.shape[0] + 1.5)
         x = edges1
         while(refit):
-            #print mean_fitted
+            # print mean_fitted
             selected_data, fit, refit = plot_utils.plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, label, 'DUT%d' % fit_dut, data1, data2, edges1, edges2)
             x = x[selected_data]
             mean_fitted = mean_fitted[selected_data]
@@ -722,11 +653,10 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
             sigma_fitted = sigma_fitted[selected_data]
             n_hits = n_hits[selected_data]
 
-    
-        #return mean_fitted, selected_data, fit, pcov
+        # return mean_fitted, selected_data, fit, pcov
         return fit
-    
-    def calculate_residuals_correlations_all(hits, offset, slope, actual_dut, z_positions, geometry, output_fig, use_duts=None, doFit = True):
+
+    def calculate_residuals_correlations_all(hits, offset, slope, actual_dut, z_positions, geometry, output_fig, use_duts=None, doFit=True):
         nplanes = len(z_positions)
 
         translations = np.zeros((nplanes, 3))
@@ -736,11 +666,11 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
             translations[:, index] = geometry['translation_%d' % index]
         for i in range(3):
             for j in range(3):
-                rotations[:, i, j] = geometry['rotation_%d_%d' % (i, j)]            
-                            
+                rotations[:, i, j] = geometry['rotation_%d_%d' % (i, j)]
+
         logging.info('Calculate residuals for DUT %d', actual_dut)
-        
-        fits = np.zeros((2,2,2))
+
+        fits = np.zeros((2, 2, 2))
 
         intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
         tmpc = hits[:, 0] * rotations[actual_dut, 0, 0] + hits[:, 1] * rotations[actual_dut, 0, 1] + translations[actual_dut, 0]
@@ -749,72 +679,72 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
         hits[:, 1] = tmpr
 
         difference = hits - intersection
-        
-        for i in range(2):  # col / row                    
+
+        for i in range(2):  # col / row
             for j in range(2):
                 mean, rms = np.mean(difference[:, j]), np.std(difference[:, j])
-                _, xedges, yedges = np.histogram2d(hits[:, i], difference[:, j], bins=[100, 1000], range=[[np.amin(hits[:, i]), np.amax(hits[:, i])], [mean - 3*rms, mean + 3*rms]])
+                _, xedges, yedges = np.histogram2d(hits[:, i], difference[:, j], bins=[100, 1000], range=[[np.amin(hits[:, i]), np.amax(hits[:, i])], [mean - 3 * rms, mean + 3 * rms]])
                 #_, xedges, yedges = np.histogram2d(hits[:, i], difference[:, j], bins=[100, 150], range=[[np.amin(hits[:, i]), np.amax(hits[:, i])], [-150,150]])
                 plot_utils.plot_residuals_correlations(i, j, actual_dut, xedges, yedges, hits[:, i], difference[:, j], output_fig)
                 label = "Residual "
-                if i==0:
+                if i == 0:
                     label += "col"
                 else:
                     label += "row"
                 label += " vs "
-                if j==0:
+                if j == 0:
                     label += "col"
                 else:
                     label += "row"
-                    
+
                 if doFit == True:
                     fit = calculate_residuals_correlation(hits[:, i], difference[:, j], xedges, yedges, actual_dut, label, dofit=True)
                 else:
                     fit = None
-                fits[i,j] = fit
+                fits[i, j] = fit
                 #plot_utils.plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitted, selected_data, fit, pcov)
-        
+
         if doFit == True:
             return fits
         else:
             return None
-    
+
     def calculate_geopars_from_fit(fitpars, verbose=False):
         translations = np.zeros(2)
         angles = np.zeros(3)
-        
-        translations[0] = -fitpars[1,0,0]
-        translations[1] = -fitpars[0,1,0]
-        
-        tangamma =  fitpars[0,1,1]/(1-np.abs(fitpars[0,0,1]))
-        singamma = np.sign(tangamma)*sqrt(tangamma**2/(1+tangamma**2))
+
+        translations[0] = -fitpars[1, 0, 0]
+        translations[1] = -fitpars[0, 1, 0]
+
+        tangamma = fitpars[0, 1, 1] / (1 - np.abs(fitpars[0, 0, 1]))
+        singamma = np.sign(tangamma) * sqrt(tangamma ** 2 / (1 + tangamma ** 2))
         angles[2] = asin(singamma)
-        cosbeta = (1-np.abs(fitpars[0,0,1]))/sqrt(1-singamma**2)
+        cosbeta = (1 - np.abs(fitpars[0, 0, 1])) / sqrt(1 - singamma ** 2)
         if cosbeta > 1:
-            cosbeta = 1 - (cosbeta-1)#sure it is fine?
-        angles[1] = asin(sqrt(1-cosbeta**2))
-        cosalpha = (-np.abs(fitpars[1,1,1]) - tangamma*fitpars[1,0,1] + 1)/(sqrt(1-singamma**2) + singamma*tangamma)
+            cosbeta = 1 - (cosbeta - 1)  # sure it is fine?
+        angles[1] = asin(sqrt(1 - cosbeta ** 2))
+        cosalpha = (-np.abs(fitpars[1, 1, 1]) - tangamma * fitpars[1, 0, 1] + 1) / (sqrt(1 - singamma ** 2) + singamma * tangamma)
         if cosalpha > 1:
-            cosalpha = 1 - (cosalpha-1)
-        angles[0] = asin(sqrt(1-cosalpha**2))
+            cosalpha = 1 - (cosalpha - 1)
+        angles[0] = asin(sqrt(1 - cosalpha ** 2))
 #        angles[0] = -asin(sinalpha)
         if verbose:
             print "Gamma: ", angles[2]
             print "Beta: ", angles[1]
             print "Alpha: ", angles[0]
-        
+
         return translations, angles
 
     if create_new_geometry == True:
         geometry_utils.create_initial_geometry(alignment_file, z_positions)
-    
+
     nplanes = len(z_positions)
-    
+
     with tb.open_file(alignment_file, mode='r') as alignment:
-        all_fits = np.zeros((nplanes,2,2,2))
-        corr_translations = np.zeros((nplanes,2))
-        corr_angles = np.zeros((nplanes,3))
-            
+        all_fits = np.zeros((nplanes, 2, 2, 2))
+        corr_translations = np.zeros((nplanes, 2))
+        corr_angles = np.zeros((nplanes, 3))
+
         geometry = alignment.root.Geometry[:]
         output_pdf0 = output_pdf[:-4]
         output_pdf0 += "_stage0.pdf"
@@ -827,20 +757,20 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
                 if fit is not None:
                     all_fits[fit_dut] = fit
                     corr_translations[fit_dut], corr_angles[fit_dut] = calculate_geopars_from_fit(fit)
-                    logging.info('Dut %d: translation correction: %.1f, %.1f', fit_dut, corr_translations[fit_dut,0], corr_translations[fit_dut,1])
-                    logging.info('Dut %d: angles correction: %.5f, %.5f, %.5f', fit_dut, corr_angles[fit_dut,0], corr_angles[fit_dut,1], corr_angles[fit_dut,2])
-              
+                    logging.info('Dut %d: translation correction: %.1f, %.1f', fit_dut, corr_translations[fit_dut, 0], corr_translations[fit_dut, 1])
+                    logging.info('Dut %d: angles correction: %.5f, %.5f, %.5f', fit_dut, corr_angles[fit_dut, 0], corr_angles[fit_dut, 1], corr_angles[fit_dut, 2])
+
     ''' Update geometry file'''
     for dut in range(nplanes):
-        geometry_utils.update_translation_val(alignment_file, dut, corr_translations[dut,0], corr_translations[dut,1], mode = "Relative")
-        geometry_utils.update_rotation_angles(alignment_file, dut, corr_angles[dut], mode = "Relative")
- 
+        geometry_utils.update_translation_val(alignment_file, dut, corr_translations[dut, 0], corr_translations[dut, 1], mode="Relative")
+        geometry_utils.update_rotation_angles(alignment_file, dut, corr_angles[dut], mode="Relative")
+
     ''' Correct eventual translation misalignment: shift positions by the residuals'''
     output_pdf0_res = output_pdf0[:-4] + "_residuals.pdf"
-    corr_trans = align_by_residuals(input_track_candidates_file, geometry,  z_positions, fit_duts, include_duts, output_pdf0_res)
+    corr_trans = align_by_residuals(input_track_candidates_file, geometry, z_positions, fit_duts, include_duts, output_pdf0_res)
     for dut in range(nplanes):
-        geometry_utils.update_translation_val(alignment_file, dut, corr_trans[dut,0], corr_trans[dut,1], mode = "Relative")
-     
+        geometry_utils.update_translation_val(alignment_file, dut, corr_trans[dut, 0], corr_trans[dut, 1], mode="Relative")
+
     ''' Remake the plots to verify the alignment'''
     with tb.open_file(alignment_file, mode='r') as alignment:
         geometry = alignment.root.Geometry[:]
@@ -853,8 +783,8 @@ def fine_alignment(input_track_candidates_file, alignment_file,  z_positions, ou
                 dut_hits, offsets, slopes = fit_tracks_align(input_track_candidates_file, z_positions, fit_dut, geometry, include_duts=include_duts, ignore_duts=ignore_duts, track_quality=1)
                 fit_plot_tracks_slopes(slopes, fit_dut, output_fig1)
                 calculate_residuals_correlations_all(dut_hits, offsets, slopes, fit_dut, z_positions, geometry, output_fig1, doFit=False)
-                
-    align_by_residuals(input_track_candidates_file, geometry,  z_positions, fit_duts, include_duts, output_pdf1_res)
+
+    align_by_residuals(input_track_candidates_file, geometry, z_positions, fit_duts, include_duts, output_pdf1_res)
 
 
 def merge_cluster_data(input_cluster_files, input_alignment_file, output_tracklets_file, pixel_size, chunk_size=4999999):
