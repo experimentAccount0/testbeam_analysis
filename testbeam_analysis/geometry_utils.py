@@ -1,6 +1,5 @@
 from __future__ import division
 
-import os
 import logging
 from math import sqrt
 
@@ -9,6 +8,214 @@ import numpy as np
 
 from math import sin
 from math import asin
+
+
+def rotation_matrix_x(angle):
+    ''' Calculates the rotation matrix for the rotation around the x axis by an angle
+    in a cartesian left-handed coordinate system
+
+    Paramter:
+    --------
+
+    angle : number
+        Angle in radians
+
+    Returns:
+    --------
+
+    np.array with shape 3, 3
+    '''
+
+    return np.array([[1, 0, 0],
+                     [0, np.cos(angle), np.sin(angle)],
+                     [0, -np.sin(angle), np.cos(angle)]]).T
+
+
+def rotation_matrix_y(angle):
+    ''' Calculates the rotation matrix for the rotation around the y axis by an angle
+    in a cartesian left-handed coordinate system
+
+    Paramter:
+    --------
+
+    angle : number
+        Angle in radians
+
+    Returns:
+    --------
+
+    np.array with shape 3, 3
+    '''
+    return np.array([[np.cos(angle), 0, - np.sin(angle)],
+                     [0, 1, 0],
+                     [np.sin(angle), 0, np.cos(angle)]]).T
+
+
+def rotation_matrix_z(angle):
+    ''' Calculates the rotation matrix for the rotation around the z axis by an angle
+    in a cartesian left-handed coordinate system
+
+    Paramter:
+    --------
+
+    gamma : number
+        Angle in radians
+
+    Returns:
+    --------
+
+    np.array with shape 3, 3
+    '''
+    return np.array([[np.cos(angle), np.sin(angle), 0],
+                     [-np.sin(angle), np.cos(angle), 0],
+                     [0, 0, 1]]).T
+
+
+def rotation_matrix(alpha, beta, gamma):
+    ''' Calculates the rotation matrix for the rotation around the three cartesian axis x, y, z
+    in a left-handed system. The rotation is done around x then y then z.
+
+    Remember:
+        - Transform to the locale coordinate system before applying rotations
+        - Rotations are associative but not commutative
+
+    Usage:
+    ------
+        A rotation by (alpha, beta, gamma) of the vector (x, y, z) in the local coordinate system can be done by:
+          np.dot(rotation_matrix(dx, dy, dz), np.array([x, y, z]))
+
+
+    Paramter:
+    --------
+
+    alpha : number
+        Angle in radians for rotation around x
+    beta : number
+        Angle in radians for rotation around y
+    gamma : number
+        Angle in radians for rotation around z
+
+    Returns:
+    --------
+
+    np.array with shape 3, 3
+    '''
+
+    return np.dot(rotation_matrix_x(alpha), np.dot(rotation_matrix_y(beta), rotation_matrix_z(gamma)))
+
+
+def translation_matrix(x, y, z):
+    ''' Calculates the translation matrix for the translation in x, y, z
+    in a cartesian left-handed system.
+
+    Remember:
+        - Translations are associative and commutative
+
+    Usage:
+    ------
+        A translation of a vector (x, y, z) by dx, dy, dz can be done by:
+          np.dot(translation_matrix(dx, dy, dz), np.array([x, y, z, 1]))
+
+
+    Paramter:
+    --------
+
+    x : number
+        Translation in x
+    y : number
+        Translation in y
+    z : number
+        Translation in z
+
+    Returns:
+    --------
+
+    np.array with shape 4, 4
+    '''
+
+    translation_matrix = np.eye(4, 4, 0)
+    translation_matrix[3, :3] = np.array([x, y, z])
+
+    return translation_matrix.T
+
+
+def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
+    ''' Calculates the transformation matrix that applies a translation by x, y, z
+    to the local coordinate system and then a rotation in the local coordinate system.
+
+    Remember:
+        - The resulting transformation matrix is 4 x 4
+        - Translation and Rotation operations do not commutative
+
+    Paramter:
+    --------
+
+    x : number
+        Translation in x
+    y : number
+        Translation in y
+    z : number
+        Translation in z
+    alpha : number
+        Angle in radians for rotation around x
+    beta : number
+        Angle in radians for rotation around y
+    gamma : number
+        Angle in radians for rotation around z
+
+    Returns:
+    --------
+    np.array with shape 4, 4
+    '''
+
+    # Extend rotation matrix R by one dimension
+    R = np.eye(4, 4, 0)
+    R[:3, :3] = rotation_matrix(alpha, beta, gamma)
+
+    # Get translation matrix T
+    T = translation_matrix(x, y, z)
+
+    return np.dot(T, R)
+
+
+def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
+    ''' Calculates the transformation matrix that applies an inverse rotation in the local coordinate system
+    followed by an inverse translation by x, y, z to the global coordinate system.
+
+    Remember:
+        - The resulting transformation matrix is 4 x 4
+        - Translation and Rotation operations do not commutative
+
+    Paramter:
+    --------
+
+    x : number
+        Translation in x
+    y : number
+        Translation in y
+    z : number
+        Translation in z
+    alpha : number
+        Angle in radians for rotation around x
+    beta : number
+        Angle in radians for rotation around y
+    gamma : number
+        Angle in radians for rotation around z
+
+    Returns:
+    --------
+    np.array with shape 4, 4
+    '''
+
+    # Extend inverse rotation matrix R by one dimension
+    R = np.eye(4, 4, 0)
+    R[:3, :3] = rotation_matrix(alpha, beta, gamma).T  # Inverse of a rotation matrix is also the transformed matrix, since Det = 1
+
+    # Get inverse translation matrix T
+    T = translation_matrix(-x, -y, -z)
+
+    return np.dot(R, T)
+
 
 def create_initial_geometry(outFile, zpos, initial_translation=None, initial_rotation=None):
     with tb.open_file(outFile, mode='w') as geoFile:
@@ -130,6 +337,8 @@ def update_rotation_angle(geoFile, dut, val, mode="Absolute", angle="Gamma"):
     xy_translation, rotation_matrixes = recontruct_geometry_from_file(geoFile)
     nplanes = xy_translation.shape[0]
     tangamma = rotation_matrixes[dut, 0, 1] / rotation_matrixes[dut, 0, 0]
+
+    # Extract the angles from the rotation matrix
     angles = {}
     angles["Gamma"] = asin(sqrt(tangamma ** 2 / (1 + tangamma ** 2)))
     angles["Beta"] = asin(-rotation_matrixes[dut, 0, 2])
@@ -139,7 +348,7 @@ def update_rotation_angle(geoFile, dut, val, mode="Absolute", angle="Gamma"):
         angles[angle] = val
     elif mode == "Relative":
         angles[angle] += val
-        
+
     singamma = sin(angles["Gamma"])
     sinbeta = sin(angles["Beta"])
     sinalpha = sin(angles["Alpha"])
@@ -147,6 +356,7 @@ def update_rotation_angle(geoFile, dut, val, mode="Absolute", angle="Gamma"):
     cosgamma = sqrt(1 - singamma ** 2)
     cosbeta = sqrt(1 - sinbeta ** 2)
     cosalpha = sqrt(1 - sinalpha ** 2)
+
     ''' Boring application: is there any method to produce rotation matrixes? '''
     rotation_matrixes[dut, 0, 0] = cosbeta * cosgamma
     rotation_matrixes[dut, 0, 1] = cosbeta * singamma
@@ -174,10 +384,10 @@ def update_rotation_angles(geoFile, dut, vals, mode="Absolute"):
     nplanes = xy_translation.shape[0]
     tangamma = rotation_matrixes[dut, 0, 1] / rotation_matrixes[dut, 0, 0]
     angles = np.zeros(3)
-    angles[2] = np.sign(tangamma)*asin(sqrt(tangamma ** 2 / (1 + tangamma ** 2)))
+    angles[2] = np.sign(tangamma) * asin(sqrt(tangamma ** 2 / (1 + tangamma ** 2)))
     angles[1] = asin(-rotation_matrixes[dut, 0, 2])
     angles[0] = asin(rotation_matrixes[dut, 1, 2] / sqrt(1 - angles[1] ** 2))
-    
+
     if mode == "Absolute":
         angles = vals
     elif mode == "Relative":
@@ -220,11 +430,12 @@ def update_translation_val(geoFile, dut, xval, yval, mode="Absolute"):
     else:
         print("update_translation_val: mode not recognized. Not applying any translation.")
     update_geometry(geoFile, dut, xy_translation, rotation_matrixes, nplanes)
-    
-def modifiy_alignment (alignment_file):
+
+
+def modifiy_alignment(alignment_file):
     with tb.open_file(alignment_file, mode='r') as alignment:
         corrs = alignment.root.Alignment[:]
-        
+
         for i in range(corrs.shape[0]):
             if corrs["c1"][i] > 0:
                 corrs["c1"][i] = 1
@@ -232,16 +443,15 @@ def modifiy_alignment (alignment_file):
                 corrs["c1"][i] = -1
             corrs["c1_error"][i] = 50000
             corrs["sigma"][i] = 500
-            
+
     with tb.open_file(alignment_file, mode='w') as alignment:
         try:
             result_table = alignment.create_table(alignment.root, name='Alignment', description=corrs.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             result_table.append(corrs)
         except tb.exceptions.NodeError:
             logging.warning('Correlation table exists already. Do not create new.')
-    
 
-    
+
 def reset_geometry(geometry, dut):
     for index in range(2):
         geometry['translation_%d' % index][dut] = 0.
