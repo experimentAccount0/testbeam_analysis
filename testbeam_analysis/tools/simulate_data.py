@@ -18,33 +18,10 @@ from numba import njit
 import math
 from pyLandau import landau
 
+from testbeam_analysis import geometry_utils
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
-
-
-def _cartesian_to_spherical(x, y, z):
-    r = np.sqrt(x * x + y * y + z * z)
-    phi = np.zeros_like(r)  # define phi = 0 for x = 0
-    theta = np.zeros_like(r)  # theta = 0 for r = 0
-    # Avoid division by zero
-    phi[x != 0] = np.arctan2(y[x != 0], x[x != 0])  # https://en.wikipedia.org/wiki/Atan2
-    phi[phi < 0] += 2. * np.pi  # map to phi = [0 .. 2 pi[
-    theta[r != 0] = np.arccos(z[r != 0] / r[r != 0])
-    return phi, theta, r
-
-
-def _spherical_to_cartesian(phi, theta, r):
-    if np.any(r < 0):
-        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because r < 0')
-    if np.any(theta < 0) or np.any(theta >= np.pi):
-        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because theta exceeds [0, Pi[')
-    if np.any(phi < 0) or np.any(phi >= 2 * np.pi):
-        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because phi exceeds [0, 2*Pi[')
-    x = r * np.cos(phi) * np.sin(theta)
-    y = r * np.sin(phi) * np.sin(theta)
-    z = r * np.cos(theta)
-
-    return x, y, z
 
 
 # Jitted function for fast calculations
@@ -130,7 +107,7 @@ def _calc_charge_fraction(position, position_z, pixel_index_x, pixel_index_y, pi
 @njit()
 def _create_charge_sharing_hits(relative_position, column, row, charge, max_column, max_row, thickness, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc, result_hits, index):
     ''' Create additional hits due to charge sharing.
-    Run time optimized loops using an abort condition utilizing that the charge sharing always decreases for increased 
+    Run time optimized loops using an abort condition utilizing that the charge sharing always decreases for increased
     distance to seed pixel and the fact that the total charge fraction sum is 1
     '''
 
@@ -275,8 +252,9 @@ class SimulateData(object):
 
     def set_std_settings(self):
         # Setup settings
-        self.z_positions = [i * 10000 for i in range(self._n_duts)]  # in um; st: every 10 cm
+        self.z_positions = [i * 10000 for i in range(self._n_duts)]  # in um; std: every 10 cm
         self.offsets = [(-2500, -2500)] * self._n_duts  # in x, y in mu
+        self.rotations = [(0, 0, 0)] * self._n_duts  # in rotation around x, y, z axis in Rad
         self.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
 
         # Beam settings
@@ -301,6 +279,7 @@ class SimulateData(object):
 
         # Digitization settings
         self.digitization_charge_sharing = True
+        self.digitization_shuffle_hits = True  # Shuffle hit per event to challange track finding
         self.digitization_sigma_cc = 1.35  # Correction factor for charge cloud sigma(z) to take into account also repulsion; for further info see NIMA 606 (2009) 508-516
 
         # Internals
@@ -390,7 +369,9 @@ class SimulateData(object):
         return track_positions_x, track_positions_y, track_angles_phi, track_angles_theta
 
     def _create_hits_from_tracks(self, track_positions_x, track_positions_y, track_angles_phi, track_angles_theta):
-        '''Creates exact intersection points (x, y) at the given DUT z_positions for the given tracks.
+        '''Creates exact intersection points (x, y, z) for the given DUT z_positions with the given DUT rotations for each track.
+        The DUT dimension are not taken into account, thus the DUT is an infinite large plane.
+
         The tracks are defined with the position at z = 0 (track_positions_x, track_positions_y) and
         an angle (track_angles_phi, track_angles_theta).
 
@@ -401,28 +382,47 @@ class SimulateData(object):
         logging.debug('Intersect tracks with DUTs to create hits')
 
         intersections = []
-        track_positions = np.column_stack((track_positions_x, track_positions_y))  # Track position at z = 0
+        track_positions = np.column_stack((track_positions_x, track_positions_y, np.zeros_like(track_positions_x)))  # Track position at z = 0
 
         # Multiple scattering changes the angle at each plane, thus these temporary array have to be filled
         actual_track_angles_phi = track_angles_phi
         actual_track_angles_theta = track_angles_theta
 
         for dut_index, z_position in enumerate(self.z_positions):  # Loop over DUTs
+
+            # Deduce geometry of actual DUT from settings
+            dut_position = np.array([self.offsets[dut_index][0], self.offsets[dut_index][1], z_position])  # Actual DUT position
+            # Plane direction vectors in global coordinate system, taking into account rotations
+            rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])
+            direction_plane_x_global = rotation_matrix.dot(np.array([1, 0, 0]))
+            direction_plane_y_global = rotation_matrix.dot(np.array([0, 1, 0]))
+            # Normal vector of the actual DUT plane in the global coordinate system, needed for line intersection
+            normal_plane = geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
+
             if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to this plane
-                r = float(z_position) / np.cos(actual_track_angles_theta)  # r from origin to first plane, position vector
-                x, y, _ = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=r)
-                extrapolate = np.column_stack((x, y))
-                actual_intersections = track_positions + extrapolate
-            else:  # Extrapolat from last plane position with last track angle to this plane
-                r = float(z_position - self.z_positions[dut_index - 1]) / np.cos(actual_track_angles_theta)  # r in spherical coordinates at actual z_position from last z_position, direction vector
-                x, y, _ = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=r)
-                extrapolate = np.column_stack((x, y))
-                actual_intersections = intersections[-1] + extrapolate  # Actual intersection = Last intersection + extrapolation
+                track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
+                                                                                          theta=actual_track_angles_theta,
+                                                                                          r=np.ones_like(actual_track_angles_phi))))  # r does not define a direction in spherical coordinates, any r > 0 can be used
+
+                actual_intersections = geometry_utils.get_line_intersections_with_plane(line_origins=track_positions,
+                                                                                        line_directions=track_directions,
+                                                                                        position_plane=dut_position,
+                                                                                        normal_plane=normal_plane)
+
+            else:  # Extrapolate from last plane position with last track angle to this plane
+                track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
+                                                                                          theta=actual_track_angles_theta,
+                                                                                          r=np.ones_like(actual_track_angles_phi))))  # r does not define a direction in spherical coordinates, any r > 0 can be used
+
+                actual_intersections = geometry_utils.get_line_intersections_with_plane(line_origins=intersections[-1],
+                                                                                        line_directions=track_directions,
+                                                                                        position_plane=dut_position,
+                                                                                        normal_plane=normal_plane)
 
             if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
                 # Calculated the change of the direction vector due to multiple scattering, TODO: needs cross check
                 # Vector addition in spherical coordinates needs transformation into cartesian space: http://math.stackexchange.com/questions/790057/how-to-sum-2-vectors-in-spherical-coordinate-system
-                x, y, z = _spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=1.)  # r should not matter for a direction change in x,y?
+                x, y, z = geometry_utils.spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=1.)  # r does not define a direction in spherical coordinates, any r > 0 can be used
 
                 # Calculate scattering in spherical coordinates
                 scattering_phi = np.random.uniform(0, 2. * np.pi, size=actual_track_angles_phi.shape[0])
@@ -430,11 +430,11 @@ class SimulateData(object):
                 scattering_theta = np.abs(np.random.normal(0, theta_0, actual_track_angles_theta.shape[0]))  # Change theta angles due to scattering, abs because theta is defined [0..np.pi]
 
                 # Add scattering to direction vector in cartesian coordinates
-                dx, dy, _ = _spherical_to_cartesian(scattering_phi, scattering_theta, r=1.)  # r should not matter for a direction change in x,y?
+                dx, dy, _ = geometry_utils.spherical_to_cartesian(scattering_phi, scattering_theta, r=1.)  # r does not define a direction in spherical coordinates, any r > 0 can be used
                 x += dx
                 y += dy
 
-                actual_track_angles_phi, actual_track_angles_theta, _ = _cartesian_to_spherical(x, y, z)
+                actual_track_angles_phi, actual_track_angles_theta, _ = geometry_utils.cartesian_to_spherical(x, y, z)
 
             intersections.append(actual_intersections)  # Add intersections of actual DUT to result
 
@@ -458,19 +458,23 @@ class SimulateData(object):
         event_numbers = []  # The event number index can be different for each DUT due to noisy pixel and charge sharing hits
 
         for dut_index, dut_hits in enumerate(hits):  # Loop over DUTs
-            # Transform hits position into pixel array
-            dut_hits -= np.array(self.offsets[dut_index])  # Add DUT offset
 
+            # Transform hit positions to local coordinate system
+            dut_hits -= np.append(self.offsets[dut_index], self.z_positions[dut_index])  # Translation to local coordinate system
+            rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])  # Rotation matrix of actual DUT
+            dut_hits = np.dot(rotation_matrix.T, dut_hits.T).T  # Rotation into local coordinate system
+
+            # Calculate discretized pixel hit position in x,y = column/row (digit)
             dut_hits_digits = np.zeros(shape=(dut_hits.shape[0], 3))  # Create new array with additional charge column
-            dut_hits_digits[:, :2] = dut_hits / np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
+            dut_hits_digits[:, :2] = dut_hits[:, :2] / np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
             dut_hits_digits[:, :2] = np.around(dut_hits_digits[:, :2] - 0.5) + 1  # Pixel discretization, column/row index start from 1
             dut_hits_digits[:, 2] = self._get_charge_deposited(dut_index, n_entries=dut_hits.shape[0])  # Fill charge column
 
             actual_event_number = event_number
 
-            # Create cluster from seed hits arising from charge sharing
+            # Create cluster from seed hits dut to charge sharing
             if self.digitization_charge_sharing:
-                relative_position = dut_hits - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
+                relative_position = dut_hits[:, :2] - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
                 dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position.T,  # This function takes 75 % of the time
                                                                              hits_digits=dut_hits_digits,
                                                                              max_column=self.dut_n_pixel[dut_index][0],
@@ -538,8 +542,9 @@ class SimulateData(object):
         hits = self._create_hits_from_tracks(track_positions_x, track_positions_y, track_angles_phi, track_angles_theta)
 
         # Suffle event hits to simulate unordered hit data per trigger
-        for index, actual_dut_hits in enumerate(hits):
-            hits[index] = shuffle_event_hits(event_number, n_tracks_per_event, actual_dut_hits)
+        if self.digitization_shuffle_hits:
+            for index, actual_dut_hits in enumerate(hits):
+                hits[index] = shuffle_event_hits(event_number, n_tracks_per_event, actual_dut_hits)
 
         # Create detector response: digitized hits
         hits_digitized = self._digitize_hits(event_number, hits)
@@ -576,7 +581,8 @@ class SimulateData(object):
 
 if __name__ == '__main__':
     simulate_data = SimulateData(0)
-    simulate_data.create_data_and_store('simulated_data', n_events=100000)
+    simulate_data.dut_material_budget = [0] * simulate_data.n_duts
+    simulate_data.create_data_and_store('simulated_data', n_events=1000000)
 
 
 # TEST: Plot charge sharing
