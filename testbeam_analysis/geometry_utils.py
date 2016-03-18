@@ -10,9 +10,140 @@ from math import sin
 from math import asin
 
 
+def get_plane_normal(direction_vector_1, direction_vector_2):
+    ''' Calculates the normal vector of a plane from two non parallel
+    direction vectors within that plane.
+
+    Paramter:
+    --------
+
+    direction_vector_1 : array like with 3 dimensions
+    direction_vector_2 : array like with 3 dimensions
+
+
+    Returns:
+    --------
+
+    array like with 3 dimension
+    '''
+
+    return np.cross(direction_vector_1, direction_vector_2)
+
+
+def get_line_intersections_with_plane(line_origins, line_directions, position_plane, normal_plane):
+    ''' Calculates the intersection of n lines with a plane (n >= 1).
+    If there is not a intersection point (line is parallel to plane or the line is in the plane)
+    the intersection point is set to NaN.
+
+    Link: http://stackoverflow.com/questions/4938332/line-plane-intersection-based-on-points
+
+    Paramter:
+    --------
+
+    line_origins : array like with n, 3 dimensions
+        A point of the line for n lines
+    line_directions : array like with n, 3 dimensions
+        The direction vector of the line for n lines
+    position_plane : array like with 3 dimensions
+        A vector to the plane
+    normal_plane : array like with 3 dimensions
+        The normal vector of the plane
+
+
+    Returns:
+    --------
+
+    array like with n, 3 dimension with the intersection point. If n = 1
+    '''
+
+    offsets = position_plane[np.newaxis, :] - line_origins  # Calculate offsets and extend in missing dimension
+
+#     print 'offsets', offsets
+#     print 'offsets.shape', offsets.shape
+#     print 'normal_plane', normal_plane.shape
+#     print 'normal_plane dot offsets', np.dot(normal_plane, offsets.T)
+#     print 'direction', line_directions
+#     print 'direction.shape', line_directions.shape
+#     print 'normal_plane.dot direction', np.dot(normal_plane, line_directions.T)
+
+    # Precalculate to be able to avoid division by 0 (line is parallel to the plane or in the plane)
+    normal_dot_offsets = np.dot(normal_plane, offsets.T)
+    normal_dot_directions = np.atleast_1d(np.dot(normal_plane, line_directions.T))  # Dot product is transformed to be at least 1D for n = 1
+
+    # Initialize to nan
+    t = np.empty_like(normal_dot_offsets)
+    t[:] = np.NAN
+
+    # Warn if some intersection cannot be calculated
+    if np.any(normal_dot_directions == 0):
+        logging.warning('Some line plane intersection could not be calculated')
+
+    # Apply dot product on all line entries simultaniously, avoid division by 0
+    t[normal_dot_directions != 0] = normal_dot_offsets[normal_dot_directions != 0] / normal_dot_directions[normal_dot_directions != 0]
+
+    # Calculate the intersections for each line with the plane
+    intersections = line_origins + line_directions * t[:, np.newaxis]
+
+    return np.squeeze(intersections)  # Reduce extra dimensions for the n = 1 case
+
+
+def cartesian_to_spherical(x, y, z):
+    ''' Does a transformation from cartesian to spherical coordinates.
+
+    Convention: r = 0 --> phi = theta = 0
+
+    Paramter:
+    --------
+
+    x, y, z : number
+        Position in cartesian space
+
+    Returns:
+    --------
+
+    spherical coordinates: phi, theta, r
+    '''
+
+    r = np.sqrt(x * x + y * y + z * z)
+    phi = np.zeros_like(r)  # define phi = 0 for x = 0
+    theta = np.zeros_like(r)  # theta = 0 for r = 0
+    # Avoid division by zero
+    phi[x != 0] = np.arctan2(y[x != 0], x[x != 0])  # https://en.wikipedia.org/wiki/Atan2
+    phi[phi < 0] += 2. * np.pi  # map to phi = [0 .. 2 pi[
+    theta[r != 0] = np.arccos(z[r != 0] / r[r != 0])
+    return phi, theta, r
+
+
+def spherical_to_cartesian(phi, theta, r):
+    ''' Does a transformation from spherical to cartesian coordinates and does error checks.
+
+    Paramter:
+    --------
+
+    phi, theta, r : number
+        Position in spherical space
+
+    Returns:
+    --------
+
+    cartesian coordinates: x, y, z
+    '''
+    if np.any(r < 0):
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because r < 0')
+    if np.any(theta < 0) or np.any(theta >= np.pi):
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because theta exceeds [0, Pi[')
+    if np.any(phi < 0) or np.any(phi >= 2 * np.pi):
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because phi exceeds [0, 2*Pi[')
+    x = r * np.cos(phi) * np.sin(theta)
+    y = r * np.sin(phi) * np.sin(theta)
+    z = r * np.cos(theta)
+
+    return x, y, z
+
+
 def rotation_matrix_x(angle):
     ''' Calculates the rotation matrix for the rotation around the x axis by an angle
-    in a cartesian left-handed coordinate system
+    in a cartesian right-handed coordinate system
 
     Paramter:
     --------
@@ -28,12 +159,12 @@ def rotation_matrix_x(angle):
 
     return np.array([[1, 0, 0],
                      [0, np.cos(angle), np.sin(angle)],
-                     [0, -np.sin(angle), np.cos(angle)]]).T
+                     [0, -np.sin(angle), np.cos(angle)]])
 
 
 def rotation_matrix_y(angle):
     ''' Calculates the rotation matrix for the rotation around the y axis by an angle
-    in a cartesian left-handed coordinate system
+    in a cartesian right-handed coordinate system
 
     Paramter:
     --------
@@ -48,12 +179,12 @@ def rotation_matrix_y(angle):
     '''
     return np.array([[np.cos(angle), 0, - np.sin(angle)],
                      [0, 1, 0],
-                     [np.sin(angle), 0, np.cos(angle)]]).T
+                     [np.sin(angle), 0, np.cos(angle)]])
 
 
 def rotation_matrix_z(angle):
     ''' Calculates the rotation matrix for the rotation around the z axis by an angle
-    in a cartesian left-handed coordinate system
+    in a cartesian right-handed coordinate system
 
     Paramter:
     --------
@@ -68,12 +199,12 @@ def rotation_matrix_z(angle):
     '''
     return np.array([[np.cos(angle), np.sin(angle), 0],
                      [-np.sin(angle), np.cos(angle), 0],
-                     [0, 0, 1]]).T
+                     [0, 0, 1]])
 
 
 def rotation_matrix(alpha, beta, gamma):
     ''' Calculates the rotation matrix for the rotation around the three cartesian axis x, y, z
-    in a left-handed system. The rotation is done around x then y then z.
+    in a right-handed system. The rotation is done around x then y then z.
 
     Remember:
         - Transform to the locale coordinate system before applying rotations
@@ -106,7 +237,7 @@ def rotation_matrix(alpha, beta, gamma):
 
 def translation_matrix(x, y, z):
     ''' Calculates the translation matrix for the translation in x, y, z
-    in a cartesian left-handed system.
+    in a cartesian right-handed system.
 
     Remember:
         - Translations are associative and commutative
@@ -215,6 +346,30 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
     T = translation_matrix(-x, -y, -z)
 
     return np.dot(R, T)
+
+
+def apply_transformation_matrix(x, y, z, transformation_matrix):
+    ''' Takes array in x, y, z and applies a transformation matrix
+
+    Paramter:
+    --------
+
+    x : number
+        Position in x
+    y : number
+        Position in y
+    z : number
+        Position in z
+
+    Returns:
+    --------
+    np.array with shape 3, 3
+    '''
+
+    positions = np.column_stack((x, y, z, np.ones_like(x))).T  # Add extra 4th dimension
+    positions_transformed = np.dot(transformation_matrix, positions).T[:, :-1]  # Transform and delete extra dimension
+
+    return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
 
 
 def create_initial_geometry(outFile, zpos, initial_translation=None, initial_rotation=None):
