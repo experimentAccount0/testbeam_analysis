@@ -1,6 +1,6 @@
 ''' This module provides a class that is able to simulate data via Monte Carlo with a decend approximation of the reality. A random seed can be set.
 
-The deposited charge follows a user defined function (e.g. a Landau function). Special processes like delta electrons
+The deposited charge follows a Landau * Gaus function. Special processes like delta electrons
 are not simulated.
 
 Multiple scattering is approximated with the assumption of gaussian distributed scattering angles theta. Scattering is
@@ -291,6 +291,10 @@ class SimulateData(object):
 
     def create_data_and_store(self, base_file_name, n_events, chunk_size=100000):
         logging.info('Simulate %d events with %d DUTs', n_events, self._n_duts)
+
+        if chunk_size > n_events:  # Special case: all events can be created at once
+            chunk_size = n_events
+
         # Create output h5 files with emtpy hit ta
         output_files = []
         hit_tables = []
@@ -369,15 +373,17 @@ class SimulateData(object):
         return track_positions_x, track_positions_y, track_angles_phi, track_angles_theta
 
     def _create_hits_from_tracks(self, track_positions_x, track_positions_y, track_angles_phi, track_angles_theta):
-        '''Creates exact intersection points (x, y, z) for the given DUT z_positions with the given DUT rotations for each track.
-        The DUT dimension are not taken into account, thus the DUT is an infinite large plane.
+        '''Creates exact intersection points (x, y, z) for each track taking into accout individual DUT z_positions and rotations.
+        The DUT dimension are approximated by a infinite expanding plane. Tracks not intersecting the planes in one point have the
+        intersection set to NaN.
 
-        The tracks are defined with the position at z = 0 (track_positions_x, track_positions_y) and
+        The tracks are defined in spherical coordinates with the position at z = 0 (track_positions_x, track_positions_y) and
         an angle (track_angles_phi, track_angles_theta).
 
         Returns
         -------
-        Two np.arrays with position, angle
+        Iterable of np.arrays
+            For each DUT: a np.array with intersections for each track
         '''
         logging.debug('Intersect tracks with DUTs to create hits')
 
@@ -390,19 +396,19 @@ class SimulateData(object):
 
         for dut_index, z_position in enumerate(self.z_positions):  # Loop over DUTs
 
-            # Deduce geometry of actual DUT from settings
-            dut_position = np.array([self.offsets[dut_index][0], self.offsets[dut_index][1], z_position])  # Actual DUT position
-            # Plane direction vectors in global coordinate system, taking into account rotations
+            # Deduce geometry in global coordinates of actual DUT from DUT position and rotation
+            dut_position = np.array([self.offsets[dut_index][0], self.offsets[dut_index][1], z_position])  # Actual DUT position in global coordinates
+            # Plane direction vectors in global coordinate system, taking into account DUT rotations around x/y axis
+            # z-axis rotations do not influence the intersection with a plane not expanding in z
             rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])
             direction_plane_x_global = rotation_matrix.dot(np.array([1, 0, 0]))
             direction_plane_y_global = rotation_matrix.dot(np.array([0, 1, 0]))
             # Normal vector of the actual DUT plane in the global coordinate system, needed for line intersection
             normal_plane = geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
-
             if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to this plane
                 track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
                                                                                           theta=actual_track_angles_theta,
-                                                                                          r=np.ones_like(actual_track_angles_phi))))  # r does not define a direction in spherical coordinates, any r > 0 can be used
+                                                                                          r=1.)))  # r does not define a direction in spherical coordinates, any r > 0 can be used
 
                 actual_intersections = geometry_utils.get_line_intersections_with_plane(line_origins=track_positions,
                                                                                         line_directions=track_directions,
@@ -412,7 +418,7 @@ class SimulateData(object):
             else:  # Extrapolate from last plane position with last track angle to this plane
                 track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
                                                                                           theta=actual_track_angles_theta,
-                                                                                          r=np.ones_like(actual_track_angles_phi))))  # r does not define a direction in spherical coordinates, any r > 0 can be used
+                                                                                          r=1.)))  # r does not define a direction in spherical coordinates, any r > 0 can be used
 
                 actual_intersections = geometry_utils.get_line_intersections_with_plane(line_origins=intersections[-1],
                                                                                         line_directions=track_directions,
@@ -434,21 +440,28 @@ class SimulateData(object):
                 x += dx
                 y += dy
 
-                actual_track_angles_phi, actual_track_angles_theta, _ = geometry_utils.cartesian_to_spherical(x, y, z)
+                actual_track_angles_phi, actual_track_angles_theta, _ = geometry_utils.cartesian_to_spherical(x, y, z)  # r does not define a direction in spherical coordinates and is omitted
 
             intersections.append(actual_intersections)  # Add intersections of actual DUT to result
-
+#         print intersections[0].shape
+#         import matplotlib.pyplot as plt
+#         plt.hist(intersections[0][:, 0], bins=100, alpha=0.2)
+#         plt.hist(intersections[0][:, 1], bins=100, alpha=0.2)
+# #         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
+#         plt.hist(intersections[1][:, 0], bins=100, alpha=0.2)
+#         plt.hist(intersections[1][:, 1], bins=100, alpha=0.2)
+#         plt.hist(intersections[1][:, 2], bins=100, alpha=0.2)
+#         plt.show()
 #         import matplotlib.pyplot as plt
 #         for j in range(10):
 #             plt.clf()
-#             z = self.z_positions
 #             x = [intersections[i][j][0] for i in range(self._n_duts)]
 #             y = [intersections[i][j][1] for i in range(self._n_duts)]
+#             z = [intersections[i][j][2] for i in range(self._n_duts)]
 #             plt.plot(z, x, '.-', label='x')
 #             plt.plot(z, y, '.-', label='y')
 #             plt.legend()
 #             plt.show()
-
         return intersections
 
     def _digitize_hits(self, event_number, hits):
@@ -458,11 +471,17 @@ class SimulateData(object):
         event_numbers = []  # The event number index can be different for each DUT due to noisy pixel and charge sharing hits
 
         for dut_index, dut_hits in enumerate(hits):  # Loop over DUTs
-
-            # Transform hit positions to local coordinate system
-            dut_hits -= np.append(self.offsets[dut_index], self.z_positions[dut_index])  # Translation to local coordinate system
-            rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])  # Rotation matrix of actual DUT
-            dut_hits = np.dot(rotation_matrix.T, dut_hits.T).T  # Rotation into local coordinate system
+            # Transform hits from global coordinate system into local coordinate system of actual DUT
+            transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=self.offsets[dut_index][0],  # Get the transformation matrix
+                                                                                         y=self.offsets[dut_index][1],
+                                                                                         z=self.z_positions[dut_index],
+                                                                                         alpha=self.rotations[dut_index][0],
+                                                                                         beta=self.rotations[dut_index][1],
+                                                                                         gamma=self.rotations[dut_index][2])
+            dut_hits[:, 0], dut_hits[:, 1], dut_hits[:, 2] = geometry_utils.apply_transformation_matrix(x=dut_hits[:, 0],
+                                                                                                        y=dut_hits[:, 1],
+                                                                                                        z=dut_hits[:, 2],
+                                                                                                        transformation_matrix=transformation_matrix)
 
             # Calculate discretized pixel hit position in x,y = column/row (digit)
             dut_hits_digits = np.zeros(shape=(dut_hits.shape[0], 3))  # Create new array with additional charge column
@@ -582,6 +601,9 @@ class SimulateData(object):
 if __name__ == '__main__':
     simulate_data = SimulateData(0)
     simulate_data.dut_material_budget = [0] * simulate_data.n_duts
+    simulate_data.rotations[1] = (-np.pi / 6., 0., 0.)
+    simulate_data.beam_angle_sigma = 100
+    simulate_data.beam_position_sigma = (0, 0)
     simulate_data.create_data_and_store('simulated_data', n_events=1000000)
 
 
