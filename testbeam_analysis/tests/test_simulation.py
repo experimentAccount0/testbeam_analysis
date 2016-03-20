@@ -7,7 +7,13 @@ import unittest
 from pyLandau import landau
 from scipy.optimize import curve_fit
 
+import matplotlib.pyplot as plt
+
 from testbeam_analysis.tools import simulate_data
+from testbeam_analysis import geometry_utils
+
+from testbeam_analysis import analysis_utils
+from testbeam_analysis import plot_utils
 
 
 class TestHitAnalysis(unittest.TestCase):
@@ -195,7 +201,7 @@ class TestHitAnalysis(unittest.TestCase):
             dx = dut1_x.astype(np.float) - dut0_x.astype(np.int)
             dy = dut1_y.astype(np.float) - dut0_y.astype(np.float)
             dz = np.ones_like(dx) * (self.simulate_data.z_positions[1] - self.simulate_data.z_positions[0])
-            _, theta, _ = simulate_data._cartesian_to_spherical(dx, dy, dz)
+            _, theta, _ = geometry_utils.cartesian_to_spherical(dx, dy, dz)
 
             if theta_0 == 0:  # Special case: no material budget thus not scattering, theta has to be beam angle
                 self.assertTrue(np.allclose(self.simulate_data.beam_angle, theta * 1000., atol=0.01))
@@ -204,11 +210,11 @@ class TestHitAnalysis(unittest.TestCase):
             if self.simulate_data.beam_angle == 0:
                 hist, bins = np.histogram(theta * 1000, range=(0, np.pi), bins=1000)  # Histogramm scattering angle distribution
                 x, y = (bins[:-1] + bins[1:]) / 2., hist
-    #             import matplotlib.pyplot as plt
-    #             plt.bar(x, y, width=np.diff(x)[0])
-    #             plt.plot(x, gauss(x, *(np.amax(y), 0, theta_0)), 'r-', linewidth=2)
-    #             plt.legend()
-    #             plt.show()
+#                 import matplotlib.pyplot as plt
+#                 plt.bar(x, y, width=np.diff(x)[0])
+#                 plt.plot(x, gauss(x, *(np.amax(y), 0, theta_0)), 'r-', linewidth=2)
+#                 plt.legend()
+#                 plt.show()
                 # Fit scatterign distribution
                 coeff, _ = curve_fit(gauss, x, y, p0=[np.amax(hist), 0, theta_0])  # Fit theta distribution
                 self.assertTrue(np.allclose(theta_0, coeff[2], atol=0.02), 'The scattering angle for multiple scattering is wrong')  # Check for similarity, slight differences most likely due to pixel position binning
@@ -219,13 +225,13 @@ class TestHitAnalysis(unittest.TestCase):
         for device_thickness in range(0, 1000, 50):  # Change the thickness
             self.simulate_data.dut_thickness = [device_thickness] * self.simulate_data.n_duts
             self.simulate_data.dut_material_budget = [self.simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(self.simulate_data.n_duts)]  # Assume silicon sensor
-            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            self.simulate_data.create_data_and_store('simulated_data', n_events=100000)
             check_scattering_angle()
 
         # Test 2: Check scattering for different device z positions
         for z_position in ([[i, i + 1000000] for i in range(0, 1000000, 250000)]):  # Put planes at different positions
             self.simulate_data.z_positions = z_position
-            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            self.simulate_data.create_data_and_store('simulated_data', n_events=100000)
             check_scattering_angle()
 
         # Test 3: Check with beam angle
@@ -234,8 +240,128 @@ class TestHitAnalysis(unittest.TestCase):
             self.simulate_data.z_positions = [0, 100000]
             self.simulate_data.dut_thickness = [1000] * self.simulate_data.n_duts
             self.simulate_data.dut_material_budget = [self.simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(self.simulate_data.n_duts)]
-            self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+            self.simulate_data.create_data_and_store('simulated_data', n_events=100000)
             check_scattering_angle()
+    #@unittest.SkipTest
+
+    def test_dut_rotation(self):
+        self.simulate_data.reset()
+
+        # Set two planes and check the scattering angle due to the material budget of the first plane
+        self.simulate_data.n_duts = 2
+        self.simulate_data.set_std_settings()
+        self.simulate_data.tracks_per_event_sigma = 0
+        self.simulate_data.beam_angle = 0
+        self.simulate_data.beam_angle_sigma = 0
+        self.simulate_data.dut_pixel_size = [(1, 1)] * self.simulate_data.n_duts  # If the pixel size is too big this tests fails due to pixel discretisation error
+        self.simulate_data.dut_n_pixel = [(10000, 10000)] * self.simulate_data.n_duts
+        self.simulate_data.tracks_per_event = 1
+        self.simulate_data.tracks_per_event_sigma = 0
+        self.simulate_data.digitization_charge_sharing = False  # Not needed, save time
+        self.dut_material_budget = [0] * self.simulate_data.n_duts  # Turn off multiple scattering
+
+        def check_rotations():  # Rotations are checked by column / row correlation of the devices and analysing these correlation
+            def line(x, c0, c1):  # Correlation line fit
+                return c1 * x + c0
+            with tb.open_file('simulated_data_DUT0.h5', 'r') as in_file_1_h5:
+                with tb.open_file('simulated_data_DUT1.h5', 'r') as in_file_2_h5:
+                    # Merge data on event basis for correlation, since one cannot assume that every plane is always hit
+                    hits_0, hits_1 = analysis_utils.merge_on_event_number(in_file_1_h5.root.Hits[:], in_file_2_h5.root.Hits[:])
+
+                    column_0, column_1 = hits_0['column'], hits_1['column']
+                    row_0, row_1 = hits_0['row'], hits_1['row']
+
+                    coeff_column, error_column = curve_fit(line, column_1, column_0, p0=[0, 1.])
+                    coeff_row, error_row = curve_fit(line, row_1, row_0, p0=[0, 1.])
+
+#                     plt.plot(row_1, row_0, '.')
+#                     plt.plot(column_1, column_0, '.')
+#                     plt.plot(column_1, line(column_1, *coeff_column), '-', label='column')
+#                     plt.plot(row_1, line(row_1, *coeff_row), '-', label='row')
+#                     plt.xlabel('DUT 1')
+#                     plt.ylabel('DUT 0')
+#                     plt.legend(loc=0)
+#                     plt.show()
+
+                    if coeff_column[1] > 1 and np.allclose(coeff_column[1], 1., atol=0.01):  # Can happen if first DUT is rotated or fitting precision
+                        coeff_column[1] = 1
+
+                    if coeff_row[1] > 1 and np.allclose(coeff_row[1], 1., atol=0.01):  # Can happen if first DUT is rotated or fitting precision
+                        coeff_row[1] = 1
+
+#                     print 'offset column', coeff_column[0]
+#                     print 'want column', self.simulate_data.offsets[1][0] - self.simulate_data.offsets[0][0]
+#                     print 'slope column', coeff_column[1]
+#                     print 'want column', self.simulate_data.rotations[1][1]
+#                     print 'have column', np.arccos(coeff_column[1])
+#                     print 'slope row', coeff_row[1]
+#                     print 'want row', self.simulate_data.rotations[1][0]
+#                     print 'have row', np.arccos(coeff_row[1])
+
+                    # Check column / row relative offsets from line fit offsets with 1 mu precision
+                    self.assertAlmostEqual(self.simulate_data.offsets[1][0] - self.simulate_data.offsets[0][0], coeff_column[0], delta=1.)  # Check with 10 mRad precision
+                    self.assertAlmostEqual(self.simulate_data.offsets[1][1] - self.simulate_data.offsets[0][1], coeff_row[0], delta=1.)  # Check with 10 mRad precision
+                    # Check alpha / beta angles with from line fit slopes with 10 mRad precision
+                    self.assertAlmostEqual(self.simulate_data.rotations[1][1], np.arccos(coeff_column[1]), delta=0.01)  # Check with 10 mRad precision
+                    self.assertAlmostEqual(self.simulate_data.rotations[1][0], np.arccos(coeff_row[1]), delta=0.01)  # Check with 10 mRad precision
+
+        # Test 1: Check correlation for different alpha angles (x-axis rotation) and different relative offsets in x/y between the planes
+        for alpha in [0, np.pi / 8., np.pi / 6., np.pi / 4., np.pi / 3.]:
+            for offset_x in range(-1000, 100, 1001):
+                for offset_y in range(-1000, 100, 1001):
+                    self.simulate_data.rotations[1] = (alpha, 0., 0.)
+                    self.simulate_data.offsets[1] = (self.simulate_data.offsets[0][0] + offset_x, self.simulate_data.offsets[0][1] + offset_y)  # Set x/y shift with respect to DUT 0
+                    self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+                    check_rotations()
+
+        # Test 2: Check correlation for different beta angles (y-axis rotation) and different relative offsets in x/y between the planes
+        for beta in [0, np.pi / 8., np.pi / 6., np.pi / 4., np.pi / 3.]:
+            for offset_x in range(-1000, 100, 1001):
+                for offset_y in range(-1000, 100, 1001):
+                    self.simulate_data.rotations[1] = (0., beta, 0.)
+                    self.simulate_data.offsets[1] = (self.simulate_data.offsets[0][0] + offset_x, self.simulate_data.offsets[0][1] + offset_y)  # Set x/y shift with respect to DUT 0
+                    self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+                    check_rotations()
+
+
+#         with tb.open_file('simulated_data_DUT0.h5', 'r') as in_file_1_h5:
+#             with tb.open_file('simulated_data_DUT1.h5', 'r') as in_file_2_h5:
+#                 hits_1, hits_2 = analysis_utils.merge_on_event_number(in_file_1_h5.root.Hits[:], in_file_2_h5.root.Hits[:])
+#
+#                 column_1, column_2 = hits_1['column'], hits_2['column']
+#                 row_1, row_2 = hits_1['row'], hits_2['row']
+#
+#                 plt.plot(row_2, row_1, '.')
+#                 plt.plot(column_2, column_1, '.')
+# #
+#                 coeff, err = curve_fit(line, column_2, column_1, p0=[0, 1.])
+#                 plt.plot(column_2, line(column_2, *coeff), '-', label='column')
+#
+#                 print 'slope', coeff[1]
+#                 print 'want', self.simulate_data.rotations[1][1]
+#                 print np.arccos(coeff[1])
+#
+#                 coeff, err = curve_fit(line, row_2, row_1, p0=[0, 1.])
+#                 plt.plot(row_2, line(row_2, *coeff), '-', label='row')
+# #
+#                 plt.xlabel('DUT 1')
+#                 plt.ylabel('DUT 0')
+#                 plt.legend(loc=0)
+#
+#                 print 'slope', coeff[1]
+#                 print 'want', self.simulate_data.rotations[1][0]
+#                 print 'have', np.arccos(coeff[1])
+
+#                 print column_1.shape
+#                 fig = plt.gca()
+#                 hist2d = analysis_utils.hist_2d_index(column_2, row_2, shape=self.simulate_data.dut_n_pixel[0])
+#                 extent = [0.5, self.simulate_data.dut_n_pixel[0][0] + .5, self.simulate_data.dut_n_pixel[0][1] + .5, 0.5]
+#                 im = plt.imshow(hist2d, interpolation='none', aspect="auto")
+
+#                 print 'offset', coeff[0]
+#                 print 'have', self.simulate_data.offsets[1][0] / ( 1.- np.arccos(coeff[1]))
+
+#                 plt.show()
 
 
 if __name__ == '__main__':
