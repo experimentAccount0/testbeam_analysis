@@ -78,7 +78,7 @@ def get_line_intersections_with_plane(line_origins, line_directions, position_pl
     if np.any(normal_dot_directions == 0):
         logging.warning('Some line plane intersection could not be calculated')
 
-    # Apply dot product on all line entries simultaniously, avoid division by 0
+    # Calculate t scalar for each line simultaniously, avoid division by 0
     t[normal_dot_directions != 0] = normal_dot_offsets[normal_dot_directions != 0] / normal_dot_directions[normal_dot_directions != 0]
 
     # Calculate the intersections for each line with the plane
@@ -271,12 +271,15 @@ def translation_matrix(x, y, z):
 
 
 def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
-    ''' Calculates the transformation matrix that applies a translation by x, y, z
-    to the local coordinate system and then a rotation in the local coordinate system.
+    ''' Calculates the transformation matrix that applies a translation by T=(-x, -y, -z)
+    to the local coordinate system followed by a rotation = R(alpha, beta, gamma).T
+    in the local coordinate system.
+
+    This function is the inverse of local_to_global_transformation_matrix()
 
     Remember:
         - The resulting transformation matrix is 4 x 4
-        - Translation and Rotation operations do not commutative
+        - Translation and Rotation operations are not commutative
 
     Paramter:
     --------
@@ -301,12 +304,12 @@ def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
 
     # Extend rotation matrix R by one dimension
     R = np.eye(4, 4, 0)
-    R[:3, :3] = rotation_matrix(alpha, beta, gamma)
+    R[:3, :3] = rotation_matrix(alpha, beta, gamma).T  # Inverse of a rotation matrix is also the transformed matrix, since Det = 1
 
     # Get translation matrix T
-    T = translation_matrix(x, y, z)
+    T = translation_matrix(-x, -y, -z)
 
-    return np.dot(T, R)
+    return np.dot(R, T)
 
 
 def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
@@ -340,12 +343,12 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
 
     # Extend inverse rotation matrix R by one dimension
     R = np.eye(4, 4, 0)
-    R[:3, :3] = rotation_matrix(alpha, beta, gamma).T  # Inverse of a rotation matrix is also the transformed matrix, since Det = 1
+    R[:3, :3] = rotation_matrix(alpha, beta, gamma)
 
     # Get inverse translation matrix T
-    T = translation_matrix(-x, -y, -z)
+    T = translation_matrix(x, y, z)
 
-    return np.dot(R, T)
+    return np.dot(T, R)
 
 
 def apply_transformation_matrix(x, y, z, transformation_matrix):
