@@ -281,6 +281,7 @@ class SimulateData(object):
         self.digitization_charge_sharing = True
         self.digitization_shuffle_hits = True  # Shuffle hit per event to challange track finding
         self.digitization_sigma_cc = 1.35  # Correction factor for charge cloud sigma(z) to take into account also repulsion; for further info see NIMA 606 (2009) 508-516
+        self.digitization_pixel_discretization = True  # Translate hit position on DUT plane to channel indices (column / row)
 
         # Internals
         self._hit_dtype = np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)])
@@ -398,14 +399,17 @@ class SimulateData(object):
 
             # Deduce geometry in global coordinates of actual DUT from DUT position and rotation
             dut_position = np.array([self.offsets[dut_index][0], self.offsets[dut_index][1], z_position])  # Actual DUT position in global coordinates
-            # Plane direction vectors in global coordinate system, taking into account DUT rotations around x/y axis
+            # Calculate plane x/y direction vectors in global coordinate system, taking into account DUT rotations around x/y axis
             # z-axis rotations do not influence the intersection with a plane not expanding in z
             rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])
-            direction_plane_x_global = rotation_matrix.dot(np.array([1, 0, 0]))
-            direction_plane_y_global = rotation_matrix.dot(np.array([0, 1, 0]))
+            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+            direction_plane_x_global = basis_global[0]
+            direction_plane_y_global = basis_global[1]
             # Normal vector of the actual DUT plane in the global coordinate system, needed for line intersection
             normal_plane = geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
-            if dut_index == 0:  # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to this plane
+
+            # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to first plane
+            if dut_index == 0:
                 track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
                                                                                           theta=actual_track_angles_theta,
                                                                                           r=1.)))  # r does not define a direction in spherical coordinates, any r > 0 can be used
@@ -447,7 +451,7 @@ class SimulateData(object):
 #         import matplotlib.pyplot as plt
 #         plt.hist(intersections[0][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[0][:, 1], bins=100, alpha=0.2)
-# #         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
+# plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 1], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 2], bins=100, alpha=0.2)
@@ -462,6 +466,7 @@ class SimulateData(object):
 #             plt.plot(z, y, '.-', label='y')
 #             plt.legend()
 #             plt.show()
+
         return intersections
 
     def _digitize_hits(self, event_number, hits):
@@ -470,7 +475,17 @@ class SimulateData(object):
         digitized_hits = []
         event_numbers = []  # The event number index can be different for each DUT due to noisy pixel and charge sharing hits
 
+#         import matplotlib.pyplot as plt
+#         plt.plot(hits[0][:, 0], hits[1][:, 0], '.', label='x')
+#         plt.plot(hits[0][:, 1], hits[1][:, 1], '.', label='y')
+
+
         for dut_index, dut_hits in enumerate(hits):  # Loop over DUTs
+#             import matplotlib.pyplot as plt
+#             plt.hist(dut_hits[:, 0], bins=100, label='global')  # , range=(-2000, 2000))
+
+            actual_event_number = event_number.copy()  # Since actual_event_number is changed depending on the DUT this is needed
+            # print dut_index, 'global', dut_hits[0, 0], dut_hits[0, 1], dut_hits[0, 2]
             # Transform hits from global coordinate system into local coordinate system of actual DUT
             transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=self.offsets[dut_index][0],  # Get the transformation matrix
                                                                                          y=self.offsets[dut_index][1],
@@ -482,35 +497,43 @@ class SimulateData(object):
                                                                                                         y=dut_hits[:, 1],
                                                                                                         z=dut_hits[:, 2],
                                                                                                         transformation_matrix=transformation_matrix)
-
-            # Calculate discretized pixel hit position in x,y = column/row (digit)
+#             plt.hist(dut_hits[:, 0], bins=100, label='local')  # , range=(-2000, 2000))
+#             plt.legend(loc=0)
+#             plt.show()
+            # Output hit digits, with x/y information and charge
             dut_hits_digits = np.zeros(shape=(dut_hits.shape[0], 3))  # Create new array with additional charge column
-            dut_hits_digits[:, :2] = dut_hits[:, :2] / np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
-            dut_hits_digits[:, :2] = np.around(dut_hits_digits[:, :2] - 0.5) + 1  # Pixel discretization, column/row index start from 1
             dut_hits_digits[:, 2] = self._get_charge_deposited(dut_index, n_entries=dut_hits.shape[0])  # Fill charge column
 
-            actual_event_number = event_number
+            # Calculate discretized pixel hit position in x,y = column/row (digit)
+            if self.digitization_pixel_discretization:
+                dut_hits_digits[:, :2] = dut_hits[:, :2] / np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
+                dut_hits_digits[:, :2] = np.around(dut_hits_digits[:, :2] - 0.5) + 1  # Pixel discretization, column/row index start from 1
 
-            # Create cluster from seed hits dut to charge sharing
-            if self.digitization_charge_sharing:
-                relative_position = dut_hits[:, :2] - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
-                dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position.T,  # This function takes 75 % of the time
-                                                                             hits_digits=dut_hits_digits,
-                                                                             max_column=self.dut_n_pixel[dut_index][0],
-                                                                             max_row=self.dut_n_pixel[dut_index][1],
-                                                                             thickness=self.dut_thickness[dut_index],
-                                                                             pixel_size_x=self.dut_pixel_size[dut_index][0],
-                                                                             pixel_size_y=self.dut_pixel_size[dut_index][1],
-                                                                             temperature=self.temperature,
-                                                                             bias=self.dut_bias[dut_index])
-                actual_event_number = np.repeat(actual_event_number, n_hits_per_event)
+                # Create cluster from seed hits dut to charge sharing
+                if self.digitization_charge_sharing:
+                    relative_position = dut_hits[:, :2] - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
+                    dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position.T,  # This function takes 75 % of the time
+                                                                                 hits_digits=dut_hits_digits,
+                                                                                 max_column=self.dut_n_pixel[dut_index][0],
+                                                                                 max_row=self.dut_n_pixel[dut_index][1],
+                                                                                 thickness=self.dut_thickness[dut_index],
+                                                                                 pixel_size_x=self.dut_pixel_size[dut_index][0],
+                                                                                 pixel_size_y=self.dut_pixel_size[dut_index][1],
+                                                                                 temperature=self.temperature,
+                                                                                 bias=self.dut_bias[dut_index])
+                    actual_event_number = np.repeat(actual_event_number, n_hits_per_event)
 
-            # Delete hits outside of the DUT
-            selection_x = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[0] <= self.dut_n_pixel[dut_index][0])  # Hits that are inside the x dimension of the DUT
-            selection_y = np.logical_and(dut_hits_digits.T[1] > 0, dut_hits_digits.T[1] <= self.dut_n_pixel[dut_index][1])  # Hits that are inside the y dimension of the DUT
-            selection = np.logical_and(selection_x, selection_y)
-            dut_hits_digits = dut_hits_digits[selection]  # reduce hits to valid hits
-            actual_event_number = actual_event_number[selection]  # Reducce event number to event number with valid hits
+                # Delete hits outside of the DUT
+                selection_x = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[0] <= self.dut_n_pixel[dut_index][0])  # Hits that are inside the x dimension of the DUT
+                selection_y = np.logical_and(dut_hits_digits.T[1] > 0, dut_hits_digits.T[1] <= self.dut_n_pixel[dut_index][1])  # Hits that are inside the y dimension of the DUT
+                selection = np.logical_and(selection_x, selection_y)
+                dut_hits_digits = dut_hits_digits[selection]  # reduce hits to valid hits
+                actual_event_number = actual_event_number[selection]  # Reducce event number to event number with valid hits
+            else:  # No position digitization
+                dut_hits_digits[:, :2] = dut_hits[:, :2]
+                selection = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[1] > 0)   # Hits can only have a positive position
+                dut_hits_digits = dut_hits_digits[selection]  # reduce hits to valid hits
+                actual_event_number = actual_event_number[selection]  # Reducce event number to event number with valid hits
 
             # Mask hits due to inefficiency
             selection = np.ones_like(actual_event_number, dtype=np.bool)
@@ -534,6 +557,11 @@ class SimulateData(object):
             # Append results
             digitized_hits.append(dut_hits_digits)
             event_numbers.append(actual_event_number)
+            
+#         plt.plot(digitized_hits[0][:100, 0], digitized_hits[1][:100, 0], '.', label='column')
+#         plt.plot(digitized_hits[0][:100, 1], digitized_hits[1][:100, 1], '.', label='row')
+#         plt.legend()
+#         plt.show()
 
         return (event_numbers, digitized_hits)
 
@@ -604,6 +632,7 @@ if __name__ == '__main__':
     simulate_data.rotations[1] = (-np.pi / 6., 0., 0.)
     simulate_data.beam_angle_sigma = 100
     simulate_data.beam_position_sigma = (0, 0)
+    simulate_data.digitization_pixel_discretization = False
     simulate_data.create_data_and_store('simulated_data', n_events=1000000)
 
 
