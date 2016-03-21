@@ -62,6 +62,23 @@ class TestTrackAnalysis(unittest.TestCase):
                     self.assertAlmostEqual(np.linalg.det(rotation_matrix), 1)
                     self.assertTrue(np.allclose(rotation_matrix.T, np.linalg.inv(rotation_matrix)))
 
+    def test_apply_transformation_matrix(self):
+        # Test 1: Transformation matrix that is a translation by (1, 2, 3) without rotation
+        transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=1,
+                                                                                     y=2,
+                                                                                     z=3,
+                                                                                     alpha=0.0,
+                                                                                     beta=0.0,
+                                                                                     gamma=0.0)
+        x_new, y_new, z_new = geometry_utils.apply_transformation_matrix(x=np.arange(10),
+                                                                         y=np.arange(10),
+                                                                         z=np.arange(10),
+                                                                         transformation_matrix=transformation_matrix)
+
+        self.assertTrue(np.all(x_new == np.arange(10) - 1))
+        self.assertTrue(np.all(y_new == np.arange(10) - 2))
+        self.assertTrue(np.all(z_new == np.arange(10) - 3))
+
 if __name__ == '__main__':
     tests_data_folder = r'test_track_analysis/'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestTrackAnalysis)
