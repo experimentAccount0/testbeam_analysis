@@ -1,6 +1,5 @@
 ''' Script to check the correctness of the geometry utils functions (rotation, translation matrices)
 '''
-import os
 import numpy as np
 
 import unittest
@@ -14,10 +13,6 @@ class TestTrackAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        pass
-
-    @classmethod
-    def tearDownClass(cls):  # remove created files
         pass
 
     def test_transformations(self):  # Transforms from global to local system and back and checks for equality
