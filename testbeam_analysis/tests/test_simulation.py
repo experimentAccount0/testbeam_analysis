@@ -293,8 +293,8 @@ class TestHitAnalysis(unittest.TestCase):
         for alpha in [0, np.pi / 8., np.pi / 6., np.pi / 4., np.pi / 3.]:
             for beta in [0, np.pi / 8., np.pi / 6., np.pi / 4., np.pi / 3.]:
                 for gamma in [0, np.pi / 8., np.pi / 6., np.pi / 4., np.pi / 3.]:
-                    for offset_x in range(-1000, 100, 1001):
-                        for offset_y in range(-1000, 100, 1001):
+                    for offset_x in range(-1000, 1001, 500):
+                        for offset_y in range(-1000, 1001, 500):
                             self.simulate_data.rotations[1] = (alpha, beta, gamma)
                             self.simulate_data.offsets[1] = (self.simulate_data.offsets[0][0] + offset_x, self.simulate_data.offsets[0][1] + offset_y)  # Set x/y shift with respect to DUT 0
                             self.simulate_data.create_data_and_store('simulated_data', n_events=1000)
