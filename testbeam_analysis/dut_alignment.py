@@ -10,30 +10,31 @@ import os.path
 import matplotlib.pyplot as plt
 import tables as tb
 import numpy as np
-from scipy.optimize import curve_fit, minimize_scalar, leastsq, OptimizeWarning
+from scipy.optimize import curve_fit, minimize_scalar, leastsq, basinhopping, OptimizeWarning
 from matplotlib.backends.backend_pdf import PdfPages
 
 from multiprocessing import Pool, cpu_count
 from math import sqrt
 from math import asin
-from math import acos
 
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
 from testbeam_analysis import geometry_utils
+from testbeam_analysis import track_analysis
 
 
 warnings.simplefilter("ignore", OptimizeWarning)  # Fit errors are handled internally, turn of warnings
 
 
-def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, output_pdf_file=None, chunk_size=4999999):
-    '''Histograms the hit column (row) of two different devices on an event basis. If the hits are correlated a line should be seen.
-    Permutations are not considered (not all hits of the first device are correlated with all hits of the second device).
+def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pixel_size, dut_names=None, output_pdf_file=None, chunk_size=4999999):
+    '''Histograms the cluster mean column (row) of two different devices on an event basis. If the cluster means are correlated a line should be seen.
+    The cluster means are round to 1 um precision to increase the histogramming speed.
+    All permutations are considered (all cluster of the first device are correlated with all cluster of the second device).
 
     Parameters
     ----------
-    input_hits_files : pytables file
-        Input file with hit data.
+    input_cluster_files : iterable of pytables file
+        Input files with cluster data. One file per DUT.
     output_correlation_file : pytables file
         Output file with the correlation histograms.
     n_pixel : iterable of tuples
@@ -50,32 +51,40 @@ def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_si
         Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
     '''
 
-    logging.info('=== Correlate the position of %d DUTs ===', len(input_hits_files))
+    logging.info('=== Correlate the position of %d DUTs ===', len(input_cluster_files))
     with tb.open_file(output_correlation_file, mode="w") as out_file_h5:
-        n_duts = len(input_hits_files)
+        n_duts = len(input_cluster_files)
 
         # Result arrays to be filled
         column_correlations = [None] * (n_duts - 1)
         row_correlations = [None] * (n_duts - 1)
 
-        with tb.open_file(input_hits_files[0], mode='r') as in_file_h5:  # Open DUT0 hit file
-            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Hits.shape[0], term_width=80)
+        with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
+            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
             progress_bar.start()
             start_indices = [0] * (n_duts - 1)  # Store the loop indices for speed up
-            for hits_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Hits, chunk_size=chunk_size):  # Loop over the hits of DUT0 in chunks
-                actual_event_numbers = hits_dut_0[:]['event_number']
-                # Calculate the common event number of each device with the reference device and correlate the hits of this events
-                for dut_index, hit_file in enumerate(input_hits_files[1:], start=1):  # Loop over the other hit files
-                    with tb.open_file(hit_file, mode='r') as actual_in_file_h5:  # Open other DUT hit file
-                        for actual_dut_hits, start_indices[dut_index - 1] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Hits, start=start_indices[dut_index - 1], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the hits in the actual hit file in chunks
-                            dut_0_hits, actual_dut_hits = analysis_utils.merge_on_event_number(hits_dut_0, actual_dut_hits)
+            for cluster_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+                actual_event_numbers = cluster_dut_0[:]['event_number']
+                # Calculate the common event number of each device with the reference device and correlate the cluster of this events
+                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
+                    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
+                        for actual_dut_cluster, start_indices[dut_index - 1] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index - 1], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+                            dut_0_cluster, actual_dut_cluster = analysis_utils.merge_on_event_number(cluster_dut_0, actual_dut_cluster)
+
+                            # Convert to integer to allow fast histogramming
+                            dut0_mean_cluster = (dut_0_cluster['mean_column'] - 1.).astype(np.int)
+                            dut0_mean_row = (dut_0_cluster['mean_row'] - 1.).astype(np.int)
+                            actual_dut_mean_cluster = (actual_dut_cluster['mean_column'] - 1.).astype(np.int)
+                            actual_dut_mean_row = (actual_dut_cluster['mean_row'] - 1.).astype(np.int)
+                            shape_column = (n_pixels[dut_index][0], n_pixels[0][0])
+                            shape_row = (n_pixels[dut_index][1], n_pixels[0][1])
 
                             if not np.any(column_correlations[dut_index - 1]):
-                                column_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits['column'] - 1, dut_0_hits['column'] - 1, shape=(n_pixels[dut_index][0], n_pixels[0][0]))
-                                row_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_hits['row'] - 1, dut_0_hits['row'] - 1, shape=(n_pixels[dut_index][1], n_pixels[0][1]))
+                                column_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_mean_cluster, dut0_mean_cluster, shape=shape_column)
+                                row_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_mean_row, dut0_mean_row, shape=shape_row)
                             else:
-                                column_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits['column'] - 1, dut_0_hits['column'] - 1, shape=(n_pixels[dut_index][0], n_pixels[0][0]))
-                                row_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_hits['row'] - 1, dut_0_hits['row'] - 1, shape=(n_pixels[dut_index][1], n_pixels[0][1]))
+                                column_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_mean_cluster, dut0_mean_cluster, shape=shape_column)
+                                row_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_mean_row, dut0_mean_row, shape=shape_row)
 
                 progress_bar.update(index)
 
@@ -83,8 +92,8 @@ def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_si
             for dut_index in range(n_duts - 1):
                 out_col = out_file_h5.createCArray(out_file_h5.root, name='CorrelationColumn_%d_0' % (dut_index + 1), title='Column Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(column_correlations[dut_index].dtype), shape=column_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_row = out_file_h5.createCArray(out_file_h5.root, name='CorrelationRow_%d_0' % (dut_index + 1), title='Row Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(row_correlations[dut_index].dtype), shape=row_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_col.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[dut_index])]
-                out_row.attrs.filenames = [str(input_hits_files[0]), str(input_hits_files[dut_index])]
+                out_col.attrs.filenames = [str(input_cluster_files[0]), str(input_cluster_files[dut_index])]
+                out_row.attrs.filenames = [str(input_cluster_files[0]), str(input_cluster_files[dut_index])]
                 out_col[:] = column_correlations[dut_index]
                 out_row[:] = row_correlations[dut_index]
             progress_bar.finish()
@@ -92,43 +101,19 @@ def correlate_hits(input_hits_files, output_correlation_file, n_pixels, pixel_si
     plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
 
 
-def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names=None, output_pdf_file=None, non_interactive=False, iterations=3):
-    '''Takes the correlation histograms, fits the correlations and stores the correlation parameters.
-    The user can define cuts on the fit error and straight line offset in an interactive way.
-
-    This is a coarse alignment that uses the hit correlation and corrects for translations between the planes and beam divergences.
-    The alignment of the plane rotation needs the the fine alignment function.
-
-    Parameters
-    ----------
-    input_correlation_file : pytbales file
-        The input file with the correlation histograms.
-    output_alignment_file : pytables file
-        The output file for correlation data.
-    pixel_size: iterable
-        List of tuples with column and row pixel size. In um.
-    dut_names: iterable
-        List of names of the DUTs.
-    output_pdf_file : string
-        File name for the output plots.
-    non_interactive : boolean
-        Deactivate user interaction and apply cuts automatically
-    iterations : number
-        Only used in non interactive mode. Sets how often automatic cuts are applied.
+def _pre_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names, output_pdf_file, non_interactive, iterations):
+    '''Deduce a prealignment from the correlations, by fitting the correlations with a straight line (gives offset, slope).
+       The user can define cuts on the fit error and straight line offset in an interactive way.
     '''
-    logging.info('=== Coarse aligning the DUTs ===')
+    logging.info('Step 1: Prealigning DUTs from cluster correlations')
 
     def gauss_offset(x, *p):
         A, mu, sigma, offset, slope = p
         return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0)) + offset + x * slope
 
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(output_alignment_file)[0] + '.pdf'
-
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
             n_nodes = len(in_file_h5.list_nodes("/"))
-            n_duts = int(n_nodes / 2) + 1
             result = np.zeros(shape=(n_nodes,), dtype=[('dut_x', np.uint8), ('dut_y', np.uint8), ('c0', np.float), ('c0_error', np.float), ('c1', np.float), ('c1_error', np.float), ('sigma', np.float), ('sigma_error', np.float)])
             for node in in_file_h5.root:
                 indices = re.findall(r'\d+', node.name)
@@ -142,7 +127,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 result[node_index]['dut_y'] = ref_idx
                 dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
                 ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
-                logging.info('Aligning %s', node.name)
+                logging.info('Prealigning with %s data', node.name)
 
                 if "column" in node.name.lower():
                     pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][0], pixel_size[ref_idx][0]
@@ -176,13 +161,13 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 mean_error_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Error of the fit of the peak
                 sigma_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Sigma of the Gaussfit
                 chi2 = np.array([-1.0 for _ in range(data.shape[0])])  # Chi2 of the fit
-                n_hits = np.array([-1.0 for _ in range(data.shape[0])])  # Number of hits per bin
+                n_cluster = np.array([-1.0 for _ in range(data.shape[0])])  # Number of cluster per bin
 
                 # Loop over all row/row or column/column slices and fit a double gaussian or gaussian + offset to the profile
                 # Get values with highest correlation for alignment fit; do this with channel indices, later convert to um
-                # Origin pixel cluster mean is 1.5 / 1.5, since hits start from 1, 1 not 0, 0
+                # Origin pixel cluster mean is 1. / 1., since cluster start from 1, 1 not 0, 0
 
-                x_hist_fit = np.arange(1.5, data.shape[1] + 1.5)  # x bin positions
+                x_hist_fit = np.arange(1.0, data.shape[1] + 1.0)  # x bin positions
                 ref_beam_center = np.argmax(np.sum(data, axis=1))  # Get the beam spot for plotting
 
                 for index in np.arange(data.shape[0]):  # Loop over x dimension of correlation hitogram
@@ -196,7 +181,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                         mean_fitted[index] = plsq[0][3]
                         mean_error_fitted[index] = np.sqrt(np.abs(np.diag(plsq[1])))[3]
                         sigma_fitted[index] = np.abs(plsq[0][5])
-                        n_hits[index] = data[index, :].sum()
+                        n_cluster[index] = data[index, :].sum()
                         fit_type = 1
                     except RuntimeError:
                         try:
@@ -206,12 +191,11 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                             mean_fitted[index] = coeff[1]
                             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
                             sigma_fitted[index] = np.abs(coeff[2])
-                            n_hits[index] = data[index, :].sum()
+                            n_cluster[index] = data[index, :].sum()
                             fit_type = 2
                         except RuntimeError:
                             pass
-                    finally:
-                        # Create plot in the center of the mean data
+                    finally:  # Create plot in the center of the mean data
                         if index == int(ref_beam_center):
                             plot_utils.plot_correlation_fit(x=x_hist_fit,
                                                             y=data[index, :],
@@ -230,17 +214,17 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 mean_fitted *= pixel_length_ref
                 mean_error_fitted = pixel_length_ref * mean_error_fitted
 
-                # Show the correlation fit/fit errors and offsets from straigt line
+                # Show the straigt line correlation fit including fit errors and offsets from the fit
                 # Let the user change the cuts (error limit, offset limit) and refit until result looks good
                 refit = True
                 selected_data = np.ones_like(mean_fitted, dtype=np.bool)
-                x = np.arange(1.5, mean_fitted.shape[0] + 1.5) * pixel_length_dut
+                x = np.arange(1.0, mean_fitted.shape[0] + 1.0) * pixel_length_dut
                 actual_iteration = 0  # Refit counter for non interactive mode
                 while(refit):
                     selected_data, fit, refit = plot_utils.plot_alignments(x=x,
                                                                            mean_fitted=mean_fitted,
                                                                            mean_error_fitted=mean_error_fitted,
-                                                                           n_hits=n_hits,
+                                                                           n_cluster=n_cluster,
                                                                            ref_name=ref_name,
                                                                            dut_name=dut_name,
                                                                            title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name),
@@ -250,20 +234,20 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                     mean_error_fitted = mean_error_fitted[selected_data]
                     sigma_fitted = sigma_fitted[selected_data]
                     chi2 = chi2[selected_data]
-                    n_hits = n_hits[selected_data]
+                    n_cluster = n_cluster[selected_data]
                     # Stop in non interactive mode if the number of refits (iterations) is reached
                     if non_interactive:
                         actual_iteration += 1
                         if actual_iteration > iterations:
                             break
 
-                # Linear fit, usually describes correlation very well
-                # With low energy beam and / or beam with diverse agular distribution, the correlation will not be straight
+                # Linear fit, usually describes correlation very well, slope is close to 1.
+                # With low energy beam and / or beam with diverse agular distribution, the correlation will not be perfectly straight
 
                 def line(x, c0, c1):
                     return c0 + c1 * x
 
-                # Use results from straight line fit as start values for final fit
+                # Use results from straight line fit as start values for this final fit
                 re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
 
                 # Write fit results to array
@@ -271,7 +255,7 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 result[node_index]['c1'], result[node_index]['c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
 
                 # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
-                # This error is needed for track finding
+                # This error is needed for track finding and track quality determination
                 mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted))
                 mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)) / np.sqrt(np.array(sigma_fitted).shape[0])
 
@@ -281,33 +265,549 @@ def coarse_alignment(input_correlation_file, output_alignment_file, pixel_size, 
                 fit_fn = np.poly1d(re_fit[::-1])
                 plot_utils.plot_alignment_fit(x=x, mean_fitted=mean_fitted, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
 
+            logging.info('Store prealignment data in %s', output_alignment_file)
             with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
                 try:
-                    result_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', description=result.dtype, title='Correlation data', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    result_table = out_file_h5.create_table(out_file_h5.root, name='Prealignment', description=result.dtype, title='Prealignment from correlation', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     result_table.append(result)
                 except tb.exceptions.NodeError:
-                    logging.warning('Correlation table exists already. Do not create new.')
+                    logging.warning('Prealignment table exists already. Do not create new.')
 
-                # Create transilation / rotation table that can be can be overwritten later in the fine alignment step; initial values define no translation and no rotation
-                description = [('DUT', np.int)]
-                for index in range(3):  # Translation has 3 dimensions
-                    description.append(('translation_%d' % index, np.float))
-                for i in range(3):  # Rotation matrix of the DUT
-                    for j in range(3):
-                        description.append(('rotation_%d_%d' % (i, j), np.float))
 
-                trans_rot_parameters = np.zeros((n_duts,), dtype=description)
+def coarse_alignment(input_cluster_files, input_correlation_file, output_alignment_file, z_positions, pixel_size, errors=None, angles=None, dut_names=None, output_pdf_file=None, non_interactive=False, iterations=3, chunk_size=1000000):
+    ''' This function does a coarse alignment of the DUTs relative to the reference DUT and sets translation and rotation values for all DUTs.
+    The reference DUT defines the global coordinate system and should be well in the beam and not heavily rotated.
 
-                # Rotation matrix without effect has 1s in the diagonal
-                trans_rot_parameters[:]['rotation_0_0'] = np.ones((n_duts,))
-                trans_rot_parameters[:]['rotation_1_1'] = np.ones((n_duts,))
-                trans_rot_parameters[:]['rotation_2_2'] = np.ones((n_duts,))
+    To solve the chicken-and-egg problem that a good dut alignment needs hits belonging to one track, but good track finding needs a good dut alignment an
+    iterative approach is used involving the following steps:
 
-                try:
-                    geometry_table = out_file_h5.create_table(out_file_h5.root, name='Geometry', title='File containing the fine alignment geometry parameters', description=np.zeros((1,), dtype=trans_rot_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    geometry_table.append(trans_rot_parameters)
-                except tb.exceptions.NodeError:
-                    logging.warning('Correlation table exists already. Do not create new.')
+    1. Prealignment : deduce a prealignment from the correlations, by fitting the correlations with a straight line (gives offset, slope).
+       The user can define cuts on the fit error and straight line offset in an interactive way if needed.
+    2. Correct the hit position with the prealignment data
+    3. Find tracks
+    4. Take the found tracks and revert the prealignment
+    5. Take the track hits belonging to one track and find the best rotation to the reference DUT. Use the prealignment for starting values and range cuts.
+    6. Apply the rotations to the hits to deduce the translations
+    7. Check the coarse alignment and calculate sigma correlation needed for track quality assignment
+    8. Store the coarse alginment data (rotation / translation data for each DUT)
+    9. Delete temporary files
+
+    Parameters
+    ----------
+    input_cluster_files : iterable of pytables files
+        Input file with cluster data
+    input_correlation_file : pytbales file
+        The input file with the correlation histograms.
+    output_alignment_file : pytables file
+        The output file for correlation data.
+    z_position : iterable
+        The positions of the devices in z in um
+    pixel_size: iterable
+        Iterable of tuples with column and row pixel size in um
+    errors : iterable, None
+        Maximum error for the angles of DUT 1. Sets the limit of the possible reconstructed rotation angles and should be choosen
+        carefully. E.g.: (np.pi, np.pi, np.pi)
+        If None +- 5 degree maximum error from the starting values x0 is assumed
+    angles : iterable, None
+        Rotation angles of the DUTs to be used as starting values in the coarse alignment rotation reconstruction.
+        If None the starting values for rotation angles alpha, beta are deduced from the correlations and gamma is assumed to be 0.
+    dut_names: iterable
+        List of names of the DUTs.
+    output_pdf_file : string
+        File name for the output plots.
+    non_interactive : boolean
+        Deactivate user interaction and apply cuts automatically
+    iterations : number
+        Only used in non interactive mode. Sets how often automatic cuts are applied.
+    chunk_size: int
+        Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
+    '''
+    logging.info('=== Coarse aligning the DUTs ===')
+
+    # Helper functions
+    def get_scalar(column_0, row_0, column_1, row_1):
+        ''' Calculate one scalar to judge the quality of the correlation in column and row direction.
+            The smaller the scalar the better the correlation.
+            The scalar is calculated as the sum of the quadratic offset of the correlation in
+            column (row) fitted with a straight line. The line has a fixed slope of 1.
+            The correct alpha/beta angles reduce the scalar since the slope is more close
+            to 1 and the correct theta angle reduces the scalar due to lower spread around this
+            line.
+        '''
+        def line(x, c0):  # Correlation line fit
+            return x + c0
+        coeff_column, _ = curve_fit(line, column_1, column_0, p0=[0])
+        coeff_row, _ = curve_fit(line, row_1, row_0, p0=[0])
+        scalar = np.sqrt(np.square(np.std(column_0 - line(column_1, *coeff_column))) + np.square(np.std(row_0 - line(row_1, *coeff_row))))
+
+        return scalar
+
+    def correlation_error(rotation, column_0, row_0, column_1, row_1):
+        ''' Applies a rotation (alpha, beta, gamma) to the hits and returns the goodness of the
+        correltation with these rotation angles. This function can be minimized for different rotations to
+        reconstruct the real rotation '''
+        rotation_matrix = geometry_utils.rotation_matrix(*rotation)
+        actual_column_1, actual_row_1, _ = np.dot(rotation_matrix, np.column_stack((column_1, row_1, np.zeros_like(column_1))).T)
+        return get_scalar(column_0, row_0, actual_column_1, actual_row_1)
+
+    def reconstruct_rotation(column_0, row_0, column_1, row_1, x0, errors=None):
+        ''' Reconstructs the real rotation by changing the rotation angles until the correlation
+        in column/row can be described best by a straight line with the slope of 1.
+
+        Parameters:
+        ----------
+        column_0, row_0, column_1, row_1 : np.array
+            The column/row positions of DUT0 and other DUT
+        x0 : iterable
+            Start parameters from pre alignment or measurement (alpha_0, beta_0, gamma_0, alpha_1, beta_1, gamma_1, ...).
+            E.g. for 2 DUTs: x0 = (0., 0., 0., pi, 0.01, 0.)
+        errors : iterable of iterable
+            Maximum error for the angles of DUT 1. Sets the limit of the possible reconstructed rotation angles and should be choosen
+            carefully. E.g.: ((-np.pi, np.pi), (-np.pi, np.pi), (-np.pi, np.pi))
+            If None +- 5 degree maximum error from the starting values x0 is assumed
+
+        Returns:
+        -------
+
+        Tuple with (alha, beta, gamma) rotation angles
+        '''
+
+        if errors is None:
+            errors = (np.ones(3) * 5. / 180. * np.pi)
+
+        bounds = []
+        for i in range(3):  # Loop over angles
+            bounds.append((x0[i] - errors[i], x0[i] + errors[i]))
+
+        niter = 1  # Iterations of basinhopping, so far did never really change the result
+
+        progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=niter, term_width=80)
+        progress_bar.start()
+
+        def callback(x, f, accept):  # Callback called after each basinhopping step, used to show a progressbar
+            progress_bar.update(progress_bar.currval + 1)
+
+        result = basinhopping(func=correlation_error,
+                              T=0.5,
+                              niter=niter,
+                              x0=x0,
+                              callback=callback,
+                              minimizer_kwargs={'args': (column_0, row_0, column_1, row_1),
+                                                'method': 'SLSQP',
+                                                'bounds': bounds
+                                                })
+
+        progress_bar.finish()
+
+#         result = minimize(fun=correlation_error,
+#                           x0=x0,
+#                           args=(column_0, row_0, column_1, row_1),
+#                           bounds=bounds,
+#                           method='SLSQP')
+        return result.x
+
+    def reconstruct_translation(column_0, row_0, column_1, row_1):
+        ''' Calculated the median of the column / row difference.
+        These values are the translation in x/y.
+        '''
+        return np.median(column_0 - column_1), np.median(row_0 - row_1)
+    
+    def get_percentile_for_distribution(data, percentile=68.2):
+        ''' FIXME: Overly complex function to return the +- range from the mean of the data where the defined
+        percentile amount of values are within.
+        E.g.: normal distribution with sigma = 1 with percentile 68.2 returns 1.
+        '''
+        median, std = np.median(data), np.std(data)
+        hist, bin_edges = np.histogram(data, bins=1000, range=(median - 5. * std, median + 5. * std))
+    
+        bin_width = bin_edges[1] - bin_edges[0]
+        mean_index = np.where(np.logical_and(bin_edges >= median - bin_width, bin_edges <= median + bin_width))[0]
+    
+        if mean_index.shape[0] > 1:
+            mean_index = mean_index[0]
+    
+        sum_total = np.sum(hist)
+        for i in range(hist.shape[0]):
+            actual_sum = hist[mean_index - i:mean_index + i].sum()
+            if actual_sum > sum_total * percentile / 100.:
+                break
+    
+        return bin_edges[mean_index + i + 1] - median
+
+    # Step 1: Simply prealign data by utilizing the correlation information
+    _pre_alignment(input_correlation_file, output_alignment_file, pixel_size, dut_names, output_alignment_file[:-3] + '_Prealignment.pdf', non_interactive, iterations)
+
+    # The coarse alignment works best on cluster belonging to one track. Thus create temporary track candidates from cluster for the coarse alignment.
+
+    # Step 2: Correct all DUT cluster using alignment information and merge the cluster tables to one tracklets table aligned at the event number
+    logging.info('Coarse alignment step 2: Merge cluster')
+    merge_cluster_data(input_cluster_files=input_cluster_files,
+                       input_alignment_file=output_alignment_file,
+                       output_tracklets_file=output_alignment_file[:-3] + '_Tracklets_tmp.h5',
+                       pixel_size=pixel_size)
+
+    # Step 3: Find tracks from the tracklets and store them with quality indicator into track candidates table
+    logging.info('Coarse alignment step 3: Find tracks')
+    track_analysis.find_tracks(input_tracklets_file=output_alignment_file[:-3] + '_Tracklets_tmp.h5',
+                               input_alignment_file=output_alignment_file,
+                               output_track_candidates_file=output_alignment_file[:-3] + '_TrackCandidates_tmp.h5')
+
+    with tb.open_file(output_alignment_file, mode='r+') as io_file_alignment_h5:
+        prealignment = io_file_alignment_h5.root.Prealignment[:]
+
+        # Step 4: Take the track cluster and revert the prealignment
+        with tb.open_file(output_alignment_file[:-3] + '_TrackCandidates_tmp.h5', mode='r+') as io_file_h5:
+            n_duts = sum(['column' in col for col in io_file_h5.root.TrackCandidates.dtype.names])
+            track_candidates = io_file_h5.create_table(io_file_h5.root, name='TrackCandidates_noalign', description=io_file_h5.root.TrackCandidates.dtype, title='Track candidates withput alignment', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+            n_chunks = 0
+            logging.info('Step 4: Revert prealignment for coarse alignment')
+            for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(io_file_h5.root.TrackCandidates, chunk_size=chunk_size):
+                # Revert prealignment
+                for dut_index in range(1, n_duts):
+                    selection = track_candidates_chunk['column_dut_%d' % dut_index] != 0  # Do not change vitual cluster
+                    c0 = prealignment[prealignment['dut_x'] == dut_index]['c0']
+                    c1 = prealignment[prealignment['dut_x'] == dut_index]['c1']
+                    track_candidates_chunk['column_dut_%d' % dut_index][selection] = (track_candidates_chunk['column_dut_%d' % dut_index][selection] - c0[0]) / c1[0]
+                    track_candidates_chunk['row_dut_%d' % dut_index][selection] = (track_candidates_chunk['row_dut_%d' % dut_index][selection] - c0[1]) / c1[1]
+                track_candidates.append(track_candidates_chunk)
+                n_chunks += 1
+
+        # Step 5: Take the track cluster without prealignment and find the best rotation to the reference DUT. Use the prealignment for starting values and range cuts.
+        with tb.open_file(output_alignment_file[:-3] + '_TrackCandidates_tmp.h5', mode='r') as in_file_h5:
+            logging.info('Step 5: Select cluster for coarse alignment')
+            track_cluster = []  # Track hits used for coarse correlation per DUT
+            for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates_noalign, chunk_size=chunk_size):
+                for dut_index in range(1, n_duts):
+                    real_hits_selection = np.logical_and(track_candidates_chunk['column_dut_%d' % dut_index] != 0, track_candidates_chunk['column_dut_0'] != 0)  # Do not select vitual hits
+
+                    dut_selection = 1  # DUTs to be used in the fit, DUT 0 is always included
+                    dut_selection |= (1 << dut_index)  # Add actual DUT
+                    track_quality = 2  # Take hits from tracklets whre hits are within 2 sigma of the correlation; TODO: check if this biases the alignment result
+                    good_tracklets_selection = (track_candidates_chunk['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
+
+                    selection = np.logical_and(real_hits_selection, good_tracklets_selection)
+
+                    actual_tracklets = np.column_stack((track_candidates_chunk['column_dut_0'][selection],
+                                                        track_candidates_chunk['row_dut_0'][selection],
+                                                        track_candidates_chunk['column_dut_%d' % dut_index][selection],
+                                                        track_candidates_chunk['row_dut_%d' % dut_index][selection]))
+
+                    # Select ~ 100000 random hits per DUT only to increase speed; this selection seems to be a good trade off between speed and accuracy, TODO: check
+                    actual_tracklets_indices = np.arange(actual_tracklets.shape[0])  # Indices of hits
+                    actual_tracklets = actual_tracklets[actual_tracklets_indices][:100000 / n_chunks]
+
+                    try:
+                        track_cluster[dut_index - 1] = np.append(track_cluster[dut_index - 1], actual_tracklets, axis=0)
+                    except IndexError:
+                        track_cluster.append(actual_tracklets)
+
+            # Transilation / rotation table from coarse alignment
+            # Is overwritten later in the fine alignment step; initial values for the reference DUT define no translation and no rotation
+            description = [('DUT', np.int)]
+            description.append(('translation_x', np.float))
+            description.append(('translation_y', np.float))
+            description.append(('translation_z', np.float))
+            description.append(('alpha', np.float))
+            description.append(('beta', np.float))
+            description.append(('gamma', np.float))
+            description.append(('correlation_x', np.float))
+            description.append(('correlation_y', np.float))
+
+            alignment_parameters = np.zeros((n_duts,), dtype=description)
+
+            logging.info('Reconstruct rotation angles')
+            for dut_index, dut_track_cluster in enumerate(track_cluster, start=1):  # Loop over DUTs
+                logging.info('Deduce rotation of DUT %s', dut_index)
+                alignment_parameters['DUT'][dut_index] = dut_index
+                column_0, row_0, column_1, row_1 = dut_track_cluster[:, 0], dut_track_cluster[:, 1], dut_track_cluster[:, 2], dut_track_cluster[:, 3]
+
+                if angles is None:  # Get slope from prealignment to set alpha, beta starting angle
+                    slope = prealignment[prealignment['dut_x'] == dut_index]['c1']
+
+                    if slope[0] < 0. or slope[1] < 0.:
+                        raise RuntimeWarning('Inverted DUTs are not tested yet. Reconstruction might not work!')
+
+                    if slope[0] < 1.:
+                        beta = np.arccos(slope[0])
+                    else:
+                        beta = np.arccos(1. - slope[0])
+                    if slope[0] > 1.1:
+                        raise RuntimeWarning('The reference DUT seems to be tilted. This is not tested yet. Reconstruction might not work!')
+                    if slope[1] < 1.:
+                        alpha = np.arccos(slope[1])
+                    else:
+                        alpha = np.arccos(1. - slope[1])
+                    if slope[1] > 1.1:
+                        raise RuntimeWarning('The reference DUT seems to be tilted. This is not tested yet. Reconstruction might not work!')
+                    gamma = 0.  # Assume gamma = 0, otherwise alpha/beta angles cannot be deduced from correlations
+                else:  # Take angles given to this funciton from measurement
+                    alpha, beta, gamma = angles
+
+                alpha, beta, gamma = reconstruct_rotation(column_0=column_0,
+                                                          row_0=row_0,
+                                                          column_1=column_1,
+                                                          row_1=row_1,
+                                                          x0=(alpha, beta, gamma),
+                                                          errors=errors)
+
+                # Step 6: Apply the rotations to the hits to deduce the translations
+                actual_column_1, actual_row_1, _ = geometry_utils.apply_rotation_matrix(x=column_1,
+                                                                                        y=row_1,
+                                                                                        z=np.zeros_like(column_1),
+                                                                                        rotation_matrix=geometry_utils.rotation_matrix(alpha, beta, gamma))
+                # Reconstruct translation (position) of the plane
+                translation_x, translation_y = reconstruct_translation(column_0, row_0, actual_column_1, actual_row_1)
+                translation_z = z_positions[dut_index] - z_positions[0]
+
+                # Save results for actual DUT
+                alignment_parameters['translation_x'][dut_index] = translation_x
+                alignment_parameters['translation_y'][dut_index] = translation_y
+                alignment_parameters['translation_z'][dut_index] = translation_z
+                alignment_parameters['alpha'][dut_index] = alpha
+                alignment_parameters['beta'][dut_index] = beta
+                alignment_parameters['gamma'][dut_index] = gamma
+
+        # Step 7: Check the coarse alignment and calculate sigma correlation needed for track quality assignment
+        logging.info('Step 7:  Check the coarse alignment and calculate sigma correlation needed for track quality assignment')
+        if not output_pdf_file:
+            output_pdf_file = os.path.splitext(output_alignment_file)[0] + '.pdf'
+
+        with PdfPages(output_pdf_file) as output_pdf:
+            logging.info('Select cluster for coarse alignment check')
+            with tb.open_file(output_alignment_file[:-3] + '_TrackCandidates_tmp.h5', mode='r') as in_file_h5:
+                track_cluster = []  # Track hits used to check coarse correlation per DUT
+                for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates_noalign, chunk_size=chunk_size):
+                    for dut_index in range(1, n_duts):
+                        selection = np.logical_and(track_candidates_chunk['column_dut_%d' % dut_index] != 0, track_candidates_chunk['column_dut_0'] != 0)  # Do not select vitual hits
+
+                        actual_tracklets = np.column_stack((track_candidates_chunk['column_dut_0'][selection],
+                                                            track_candidates_chunk['row_dut_0'][selection],
+                                                            track_candidates_chunk['column_dut_%d' % dut_index][selection],
+                                                            track_candidates_chunk['row_dut_%d' % dut_index][selection]))
+
+                        # Select ~ 100000 random hits per DUT only to increase speed; this selection seems to be a good trade off between speed and accuracy, TODO: check
+                        actual_tracklets_indices = np.arange(actual_tracklets.shape[0])  # Indices of hits
+                        actual_tracklets = actual_tracklets[actual_tracklets_indices][:100000 / n_chunks]
+
+                        try:
+                            track_cluster[dut_index - 1] = np.append(track_cluster[dut_index - 1], actual_tracklets, axis=0)
+                        except IndexError:
+                            track_cluster.append(actual_tracklets)
+
+                for dut_index, dut_track_cluster in enumerate(track_cluster, start=1):  # Loop over DUTs
+                    logging.info('Check of DUT %s', dut_index)
+                    alignment_parameters['DUT'][dut_index] = dut_index
+                    column_0, row_0, column_1, row_1 = dut_track_cluster[:, 0], dut_track_cluster[:, 1], dut_track_cluster[:, 2], dut_track_cluster[:, 3]
+
+                    transformation_matrix = geometry_utils.local_to_global_transformation_matrix(x=alignment_parameters['translation_x'][dut_index],
+                                                                                                 y=alignment_parameters['translation_y'][dut_index],
+                                                                                                 z=alignment_parameters['translation_z'][dut_index],
+                                                                                                 alpha=alignment_parameters['alpha'][dut_index],
+                                                                                                 beta=alignment_parameters['beta'][dut_index],
+                                                                                                 gamma=alignment_parameters['gamma'][dut_index])
+
+                    column_1, row_1, _ = geometry_utils.apply_transformation_matrix(x=column_1,
+                                                                                    y=row_1,
+                                                                                    z=np.zeros_like(column_1),
+                                                                                    transformation_matrix=transformation_matrix)
+
+                    # Warn for large offsets (> 10% of pixel pitch)
+                    if np.median(column_1 - column_0) > 0.1 * pixel_size[dut_index][0]:
+                        logging.warning('The difference between the column position of the DUT %d and the reference is large: %1.2f um!', dut_index, np.median(column_1 - column_0))
+                    if np.median(row_1 - row_0) > 0.1 * pixel_size[dut_index][1]:
+                        logging.warning('The difference between the row position of the DUT %d and the reference is large: %1.2f um!', dut_index, np.median(row_1 - row_0))
+
+                    alignment_parameters['correlation_x'][dut_index] = get_percentile_for_distribution(column_1 - column_0)
+                    alignment_parameters['correlation_y'][dut_index] = get_percentile_for_distribution(row_1 - row_0)
+
+                    print '!!', alignment_parameters['correlation_x'][dut_index]
+                    print '!!!', alignment_parameters['correlation_y'][dut_index]
+
+                    plot_utils.plot_coarse_alignment_check(column_0, column_1, row_0, row_1, alignment_parameters['correlation_x'][dut_index], alignment_parameters['correlation_y'][dut_index], dut_index, output_pdf)
+
+        # Step 8: Store the coarse alginment data (rotation / translation data for each DUT)
+        logging.info('Coarse alignment step 8: Store the coarse alginment data (rotation / translation data for each DUT)')
+        try:
+            geometry_table = io_file_alignment_h5.create_table(io_file_alignment_h5.root, name='Alignment', title='File containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            geometry_table.append(alignment_parameters)
+        except tb.exceptions.NodeError:
+            logging.warning('Alignment data exists already. Do not create new.')
+
+    logging.info('Coarse alignment step 9: Store the coarse alginment data (rotation / translation data for each DUT)')
+
+
+def merge_cluster_data(input_cluster_files, input_alignment_file, output_tracklets_file, pixel_size, chunk_size=4999999):
+    '''Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.
+    Empty entries are signaled with column = row = charge = 0. 
+
+    Alignment information from the alignment file is used to correct the column/row positions. If coarse alignment is
+    available it is used (translation/rotations for each plane), otherwise prealignment data (offset, slope of correlation) 
+    is used.
+
+    Parameters
+    ----------
+    input_cluster_files : list of pytables files
+        File name of the input cluster files with correlation data.
+    input_alignment_file : pytables file
+        File name of the input aligment data.
+    output_tracklets_file : pytables file
+        File name of the output tracklet file.
+    limit_events : int
+        Limit events to givien number. Only events with hits are counted. If None or 0, all events will be taken.
+    chunk_size: int
+        Defines the amount of in RAM data. The higher the more RAM is used and the faster this function works.
+    '''
+    logging.info('=== Merge cluster from %d DUTSs to tracklets ===', len(input_cluster_files))
+
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        coarse_alignment = True
+        try:
+            alignment = in_file_h5.root.Alignment[:]
+        except tb.exceptions.NodeError:
+            coarse_alignment = False
+            alignment = in_file_h5.root.Prealignment[:]
+
+    # Create result array description, depends on the number of DUTs
+    description = [('event_number', np.int64)]
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('column_dut_%d' % index, np.float))
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('row_dut_%d' % index, np.float))
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('charge_dut_%d' % index, np.float))
+    description.extend([('track_quality', np.uint32), ('n_tracks', np.uint8)])
+
+    start_indices = [0] * len(input_cluster_files)  # Store the loop indices for speed up
+    start_indices_2 = [0] * len(input_cluster_files)  # Additional indices for second loop
+
+    # Merge the cluster data from different DUTs into one table
+    with tb.open_file(output_tracklets_file, mode='w') as out_file_h5:
+        tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracklets', description=np.zeros((1,), dtype=description).dtype, title='Tracklets', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+        with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
+            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
+            progress_bar.start()
+            actual_start_event_number = 0  # Defines the first event number of the actual chunk for speed up. Cannot be deduced from DUT0, since this DUT could have missing event numbers.
+            for cluster_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+                actual_event_numbers = cluster_dut_0[:]['event_number']
+
+                # First loop: calculate the minimum event number indices needed to merge all cluster from all files to this event number index
+                common_event_numbers = actual_event_numbers
+                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
+                    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
+                        for actual_cluster, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+                            common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
+                tracklets_array = np.zeros((common_event_numbers.shape[0],), dtype=description)  # Result array to be filled. For no hit: column = row = 0
+
+                # Fill result array with DUT 0 data
+                tracklets_array['event_number'] = common_event_numbers[:]
+                actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
+                selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
+
+                if not coarse_alignment:  # No coarse alignment info available, use prealignmet
+                    tracklets_array['column_dut_0'][selection] = pixel_size[0][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
+                    tracklets_array['row_dut_0'][selection] = pixel_size[0][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
+                    tracklets_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
+                else:
+                    alpha, beta, gamma = alignment[0]['alpha'], alignment[0]['beta'], alignment[0]['gamma']
+                    dx, dy, dz = alignment[0]['translation_x'], alignment[0]['translation_y'], alignment[0]['translation_z']
+                    transformation_matrix = geometry_utils.global_to_local_transformation_matrix(dx, dy, dz, alpha, beta, gamma)
+
+                    tracklets_array['column_dut_0'][selection], tracklets_array['row_dut_0'][selection], _ = geometry_utils.apply_transformation_matrix(x=tracklets_array['column_dut_0'][selection],
+                                                                                                                                                        y=tracklets_array['row_dut_0'][selection],
+                                                                                                                                                        z=np.ones_like(tracklets_array['column_dut_0'][selection]) * alignment[0]['translation_z'],
+                                                                                                                                                        transformation_matrix=transformation_matrix)
+
+                # Fill result array with other DUT data
+                # Second loop: get the cluster from all files and merge them to the common event number
+                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
+                    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
+                        for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+                            actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
+                            selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
+                            actual_mean_column = pixel_size[dut_index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
+                            actual_mean_row = pixel_size[dut_index][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
+
+                            if not coarse_alignment:  # No coarse alignment info available, use prealignmet
+                                c0 = alignment[alignment['dut_x'] == (dut_index)]['c0']
+                                c1 = alignment[alignment['dut_x'] == (dut_index)]['c1']
+                                tracklets_array['column_dut_%d' % (dut_index)][selection] = (c1[0] * actual_mean_column + c0[0])
+                                tracklets_array['row_dut_%d' % (dut_index)][selection] = (c1[1] * actual_mean_row + c0[1])
+                            else:  # Apply transformation from coarse alignment information
+                                # Build translation matrix
+                                alpha, beta, gamma = alignment[dut_index]['alpha'], alignment[dut_index]['beta'], alignment[dut_index]['gamma']
+                                dx, dy, dz = alignment[dut_index]['translation_x'], alignment[dut_index]['translation_y'], 0
+                                transformation_matrix = geometry_utils.global_to_local_transformation_matrix(dx, dy, dz, alpha, beta, gamma)
+                                # Apply translation matrix
+                                actual_mean_column, actual_mean_row, _ = geometry_utils.apply_transformation_matrix(x=actual_mean_column,
+                                                                                                                    y=actual_mean_row,
+                                                                                                                    z=np.ones_like(actual_mean_column) * alignment[dut_index]['translation_z'],
+                                                                                                                    transformation_matrix=transformation_matrix)
+                                tracklets_array['column_dut_%d' % (dut_index)][selection] = actual_mean_column
+                                tracklets_array['row_dut_%d' % (dut_index)][selection] = actual_mean_row
+
+                            tracklets_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
+
+                np.nan_to_num(tracklets_array)
+                tracklets_table.append(tracklets_array)
+                actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read
+                progress_bar.update(index)
+            progress_bar.finish()
+
+
+def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=100000, correlated_only=False):
+    '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
+    for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
+    (with the event number).
+
+    Parameters
+    ----------
+    input_tracklets_file : string
+        Input file name with merged cluster hit table from all DUTs
+    output_pdf_file : pdf file name object
+    combine_n_hits : int
+        The number of events to combine for the hit position check
+    correlated_only : bool
+        Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
+    '''
+    logging.info('=== Check hit alignment ===')
+    with tb.open_file(input_tracklets_file, mode="r") as in_file_h5:
+        with PdfPages(output_pdf_file) as output_fig:
+            for table_column in in_file_h5.root.Tracklets.dtype.names:
+                if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
+                    median, mean, std, alignment, correlation = [], [], [], [], []
+                    ref_dut_column = table_column[:-1] + '0'
+                    logging.info('Check alignment for % s', table_column)
+                    progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Tracklets.shape[0], term_width=80)
+                    progress_bar.start()
+                    for index in range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits):
+                        particles = in_file_h5.root.Tracklets[index:index + combine_n_hits]
+                        particles = particles[np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)]  # only select events with hits in both DUTs
+                        if correlated_only is True:
+                            particles = particles[particles['track_quality'] & (1 << (24 + int(table_column[-1]))) == (1 << (24 + int(table_column[-1])))]
+                        if particles.shape[0] == 0:
+                            logging.warning('No correlation for dut %s and tracks %d - %d', table_column, index, index + combine_n_hits)
+                            median.append(-1)
+                            mean.append(-1)
+                            std.append(-1)
+                            alignment.append(0)
+                            correlation.append(0)
+                            continue
+                        difference = particles[:][ref_dut_column] - particles[:][table_column]
+
+                        # Calculate median, mean and RMS
+                        actual_median, actual_mean, actual_rms = np.median(difference), np.mean(difference), np.std(difference)
+                        alignment.append(np.median(np.abs(difference)))
+                        correlation.append(difference.shape[0] * 100. / combine_n_hits)
+
+                        median.append(actual_median)
+                        mean.append(actual_mean)
+                        std.append(actual_rms)
+
+                        plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=64)
+                        progress_bar.update(index)
+                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig)
+                    progress_bar.finish()
 
 
 def _fit_tracks_loop(track_hits):
@@ -331,7 +831,8 @@ def _fit_tracks_loop(track_hits):
 
     return offset, slope, chi2
 
-def fit_plot_tracks_slopes (slopes, actual_dut, output_fig):
+
+def fit_plot_tracks_slopes(slopes, actual_dut, output_fig):
     def gauss(x, *p):
         A, mu, sigma = p
         return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
@@ -361,7 +862,7 @@ def fit_tracks_align(track_candidates_file, z_positions, fit_dut, geometry, igno
     tracks_file : string
         file name of the created track file having the track table
     z_position : iterable
-        the positions of the devices in z in cm
+        the positions of the devices in z in um
     geometry: dictrionary for geometry parameters
     fit_dut : integer
         the dut to fit tracks for.
@@ -536,10 +1037,10 @@ def align_by_residuals(track_candidates_file, geometry, z_positions, fit_duts, i
 #         hits[:, 0] = tmpc
 #         hits[:, 1] = tmpr
         '''Global residuals '''
-        tmppc = intersection[:, 0] - translations[actual_dut, 0]
-        tmppr = intersection[:, 1] - translations[actual_dut, 1]
-        tmpc = tmppc * rotations[actual_dut, 0, 0] + tmppr * rotations[actual_dut, 1, 0]
-        tmpr = tmppc * rotations[actual_dut, 0, 1] + tmppr * rotations[actual_dut, 1, 1]
+        tmppc = intersection[:, 0] - translations[actual_dut, 0]  # x
+        tmppr = intersection[:, 1] - translations[actual_dut, 1]  # y
+        tmpc = tmppc * rotations[actual_dut, 0, 0] + tmppr * rotations[actual_dut, 1, 0]  # Column
+        tmpr = tmppc * rotations[actual_dut, 0, 1] + tmppr * rotations[actual_dut, 1, 1]  # Row
         intersection[:, 0] = tmpc
         intersection[:, 1] = tmpr
 
@@ -642,7 +1143,7 @@ def fine_alignment(input_track_candidates_file, alignment_file, z_positions, out
 
         refit = True
         selected_data = np.ones_like(mean_fitted, dtype=np.bool)
-#        x = np.arange(1.5, mean_fitted.shape[0] + 1.5)
+#        x = np.arange(1.0, mean_fitted.shape[0] + 1.0)
         x = edges1
         while(refit):
             # print mean_fitted
@@ -670,7 +1171,7 @@ def fine_alignment(input_track_candidates_file, alignment_file, z_positions, out
 
         logging.info('Calculate residuals for DUT %d', actual_dut)
 
-        fits = np.zeros((2, 2, 2))
+        fits = np.zeros((2, 2, 2))  # Fit results (offset/slope) for actual DUT for all correlations (col/col, col/row, row/col, row/row)
 
         intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
         tmpc = hits[:, 0] * rotations[actual_dut, 0, 0] + hits[:, 1] * rotations[actual_dut, 0, 1] + translations[actual_dut, 0]
@@ -681,7 +1182,7 @@ def fine_alignment(input_track_candidates_file, alignment_file, z_positions, out
         difference = hits - intersection
 
         for i in range(2):  # col / row
-            for j in range(2):
+            for j in range(2):  # col / row
                 mean, rms = np.mean(difference[:, j]), np.std(difference[:, j])
                 _, xedges, yedges = np.histogram2d(hits[:, i], difference[:, j], bins=[100, 1000], range=[[np.amin(hits[:, i]), np.amax(hits[:, i])], [mean - 3 * rms, mean + 3 * rms]])
                 #_, xedges, yedges = np.histogram2d(hits[:, i], difference[:, j], bins=[100, 150], range=[[np.amin(hits[:, i]), np.amax(hits[:, i])], [-150,150]])
@@ -785,90 +1286,6 @@ def fine_alignment(input_track_candidates_file, alignment_file, z_positions, out
                 calculate_residuals_correlations_all(dut_hits, offsets, slopes, fit_dut, z_positions, geometry, output_fig1, doFit=False)
 
     align_by_residuals(input_track_candidates_file, geometry, z_positions, fit_duts, include_duts, output_pdf1_res)
-
-
-def merge_cluster_data(input_cluster_files, input_alignment_file, output_tracklets_file, pixel_size, chunk_size=4999999):
-    '''Takes the cluster from all cluster files and merges them into one big table onto the event number.
-    Empty entries are signaled with charge = 0. The position is referenced from the correlation data to the first plane.
-    Function uses easily several GB of RAM. If memory errors occur buy a better PC or chunk this function.
-
-    Parameters
-    ----------
-    input_cluster_files : list of pytables files
-        File name of the input cluster files with correlation data.
-    input_alignment_file : pytables file
-        File name of the input aligment data.
-    output_tracklets_file : pytables file
-        File name of the output tracklet file.
-    limit_events : int
-        Limit events to givien number. Only events with hits are counted. If None or 0, all events will be taken.
-    chunk_size: int
-        Defines the amount of in RAM data. The higher the more RAM is used and the faster this function works.
-    '''
-    logging.info('=== Merge cluster from %d DUTSs to tracklets ===', len(input_cluster_files))
-
-    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        alignment = in_file_h5.root.Alignment[:]
-
-    # Create result array description, depends on the number of DUTs
-    description = [('event_number', np.int64)]
-    for index, _ in enumerate(input_cluster_files):
-        description.append(('column_dut_%d' % index, np.float))
-    for index, _ in enumerate(input_cluster_files):
-        description.append(('row_dut_%d' % index, np.float))
-    for index, _ in enumerate(input_cluster_files):
-        description.append(('charge_dut_%d' % index, np.float))
-    description.extend([('track_quality', np.uint32), ('n_tracks', np.uint8)])
-
-    start_indices = [0] * len(input_cluster_files)  # Store the loop indices for speed up
-    start_indices_2 = [0] * len(input_cluster_files)  # Additional indices for second loop
-
-    # Merge the cluster data from different DUTs into one table
-    with tb.open_file(output_tracklets_file, mode='w') as out_file_h5:
-        tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracklets', description=np.zeros((1,), dtype=description).dtype, title='Tracklets', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-        with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
-            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
-            progress_bar.start()
-            actual_start_event_number = 0  # Defines the first event number of the actual chunk for speed up. Cannot be deduced from DUT0, since this DUT could have missing event numbers.
-            for cluster_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
-                actual_event_numbers = cluster_dut_0[:]['event_number']
-
-                # First loop: calculate the minimum event number indices needed to merge all cluster from all files to this event number index
-                common_event_numbers = actual_event_numbers
-                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
-                    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
-                        for actual_cluster, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
-                            common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
-                tracklets_array = np.zeros((common_event_numbers.shape[0],), dtype=description)  # Result array to be filled. For no hit: column = row = 0
-                # Fill result array with DUT 0 data
-                tracklets_array['event_number'] = common_event_numbers[:]
-                actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
-                selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
-                tracklets_array['column_dut_0'][selection] = pixel_size[0][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
-                tracklets_array['row_dut_0'][selection] = pixel_size[0][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
-                tracklets_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
-
-                # Fill result array with other DUT data
-                # Second loop: get the cluster from all files and merge them to the common event number
-                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
-                    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-                        for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
-                            actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
-                            selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
-                            actual_mean_column = pixel_size[dut_index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
-                            actual_mean_row = pixel_size[dut_index][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
-                            # Apply alignment information
-                            c0 = alignment[alignment['dut_x'] == (dut_index)]['c0']
-                            c1 = alignment[alignment['dut_x'] == (dut_index)]['c1']
-                            tracklets_array['column_dut_%d' % (dut_index)][selection] = (c1[0] * actual_mean_column + c0[0])
-                            tracklets_array['row_dut_%d' % (dut_index)][selection] = (c1[1] * actual_mean_row + c0[1])
-                            tracklets_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
-
-                np.nan_to_num(tracklets_array)
-                tracklets_table.append(tracklets_array)
-                actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read
-                progress_bar.update(index)
-            progress_bar.finish()
 
 
 def fix_event_alignment(input_tracklets_file, tracklets_corr_file, input_alignment_file, error=3., n_bad_events=100, n_good_events=10, correlation_search_range=20000, good_events_search_range=100):
@@ -992,61 +1409,6 @@ def optimize_hit_alignment(input_tracklets_file, input_alignment_file, fraction=
         in_file_h5.removeNode(in_file_h5.root, 'Tracklets')
         corrected_tracklets_table = in_file_h5.create_table(in_file_h5.root, name='Tracklets', description=particles.dtype, title='Tracklets', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         corrected_tracklets_table.append(particles)
-
-
-def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=100000, correlated_only=False):
-    '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
-    for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
-    (with the event number).
-
-    Parameters
-    ----------
-    input_tracklets_file : string
-        Input file name with merged cluster hit table from all DUTs
-    output_pdf_file : pdf file name object
-    combine_n_hits : int
-        The number of events to combine for the hit position check
-    correlated_only : bool
-        Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
-    '''
-    logging.info('=== Check hit alignment ===')
-    with tb.open_file(input_tracklets_file, mode="r") as in_file_h5:
-        with PdfPages(output_pdf_file) as output_fig:
-            for table_column in in_file_h5.root.Tracklets.dtype.names:
-                if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
-                    median, mean, std, alignment, correlation = [], [], [], [], []
-                    ref_dut_column = table_column[:-1] + '0'
-                    logging.info('Check alignment for % s', table_column)
-                    progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Tracklets.shape[0], term_width=80)
-                    progress_bar.start()
-                    for index in range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits):
-                        particles = in_file_h5.root.Tracklets[index:index + combine_n_hits]
-                        particles = particles[np.logical_and(particles[ref_dut_column] > 0, particles[table_column] > 0)]  # only select events with hits in both DUTs
-                        if correlated_only is True:
-                            particles = particles[particles['track_quality'] & (1 << (24 + int(table_column[-1]))) == (1 << (24 + int(table_column[-1])))]
-                        if particles.shape[0] == 0:
-                            logging.warning('No correlation for dut %s and tracks %d - %d', table_column, index, index + combine_n_hits)
-                            median.append(-1)
-                            mean.append(-1)
-                            std.append(-1)
-                            alignment.append(0)
-                            correlation.append(0)
-                            continue
-                        difference = particles[:][ref_dut_column] - particles[:][table_column]
-
-                        # Calculate median, mean and RMS
-                        actual_median, actual_mean, actual_rms = np.median(difference), np.mean(difference), np.std(difference)
-                        alignment.append(np.median(np.abs(difference)))
-                        correlation.append(difference.shape[0] * 100. / combine_n_hits)
-
-                        median.append(actual_median)
-                        mean.append(actual_mean)
-                        std.append(actual_rms)
-
-                        plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=64)
-                        progress_bar.update(index)
-                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig)
-                    progress_bar.finish()
 
 
 def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_positions=None, track_quality=1, max_tracks=3, warn_at=0.5):
