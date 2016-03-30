@@ -403,10 +403,8 @@ class SimulateData(object):
             # z-axis rotations do not influence the intersection with a plane not expanding in z
             rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])
             basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
-            direction_plane_x_global = basis_global[0]
-            direction_plane_y_global = basis_global[1]
             # Normal vector of the actual DUT plane in the global coordinate system, needed for line intersection
-            normal_plane = geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
+            normal_plane = basis_global[2]  # geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
 
             # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to first plane
             if dut_index == 0:
@@ -451,7 +449,7 @@ class SimulateData(object):
 #         import matplotlib.pyplot as plt
 #         plt.hist(intersections[0][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[0][:, 1], bins=100, alpha=0.2)
-# plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
+# #         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 1], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 2], bins=100, alpha=0.2)
@@ -466,7 +464,6 @@ class SimulateData(object):
 #             plt.plot(z, y, '.-', label='y')
 #             plt.legend()
 #             plt.show()
-
         return intersections
 
     def _digitize_hits(self, event_number, hits):
@@ -475,17 +472,8 @@ class SimulateData(object):
         digitized_hits = []
         event_numbers = []  # The event number index can be different for each DUT due to noisy pixel and charge sharing hits
 
-#         import matplotlib.pyplot as plt
-#         plt.plot(hits[0][:, 0], hits[1][:, 0], '.', label='x')
-#         plt.plot(hits[0][:, 1], hits[1][:, 1], '.', label='y')
-
-
         for dut_index, dut_hits in enumerate(hits):  # Loop over DUTs
-#             import matplotlib.pyplot as plt
-#             plt.hist(dut_hits[:, 0], bins=100, label='global')  # , range=(-2000, 2000))
-
             actual_event_number = event_number.copy()  # Since actual_event_number is changed depending on the DUT this is needed
-            # print dut_index, 'global', dut_hits[0, 0], dut_hits[0, 1], dut_hits[0, 2]
             # Transform hits from global coordinate system into local coordinate system of actual DUT
             transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=self.offsets[dut_index][0],  # Get the transformation matrix
                                                                                          y=self.offsets[dut_index][1],
@@ -497,9 +485,7 @@ class SimulateData(object):
                                                                                                         y=dut_hits[:, 1],
                                                                                                         z=dut_hits[:, 2],
                                                                                                         transformation_matrix=transformation_matrix)
-#             plt.hist(dut_hits[:, 0], bins=100, label='local')  # , range=(-2000, 2000))
-#             plt.legend(loc=0)
-#             plt.show()
+
             # Output hit digits, with x/y information and charge
             dut_hits_digits = np.zeros(shape=(dut_hits.shape[0], 3))  # Create new array with additional charge column
             dut_hits_digits[:, 2] = self._get_charge_deposited(dut_index, n_entries=dut_hits.shape[0])  # Fill charge column
@@ -557,11 +543,6 @@ class SimulateData(object):
             # Append results
             digitized_hits.append(dut_hits_digits)
             event_numbers.append(actual_event_number)
-            
-#         plt.plot(digitized_hits[0][:100, 0], digitized_hits[1][:100, 0], '.', label='column')
-#         plt.plot(digitized_hits[0][:100, 1], digitized_hits[1][:100, 1], '.', label='row')
-#         plt.legend()
-#         plt.show()
 
         return (event_numbers, digitized_hits)
 
@@ -632,7 +613,6 @@ if __name__ == '__main__':
     simulate_data.rotations[1] = (-np.pi / 6., 0., 0.)
     simulate_data.beam_angle_sigma = 100
     simulate_data.beam_position_sigma = (0, 0)
-    simulate_data.digitization_pixel_discretization = False
     simulate_data.create_data_and_store('simulated_data', n_events=1000000)
 
 
