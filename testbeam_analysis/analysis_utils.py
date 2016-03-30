@@ -275,7 +275,6 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
 
 
-# @profile
 def data_aligned_at_events(table, start_event_number=None, stop_event_number=None, start=None, stop=None, try_speedup=False, chunk_size=10000000):
     '''Takes the table with a event_number column and returns chunks with the size up to chunk_size. The chunks are chosen in a way that the events are not splitted. Additional
     parameters can be set to increase the readout speed. If only events between a certain event range are used one can specify this. Also the start and the
