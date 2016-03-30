@@ -125,18 +125,51 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
 
 
 def plot_correlation_fit(x, y, y_fit, fit_type, xlabel, title, output_pdf):
-    plt.clf()  # FIXME: plotting should be in plot_utils
+    plt.clf()
     if fit_type == 1:
         plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Gauss')
     elif fit_type == 2:
         plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Offset')
 
-    plt.plot(x, y, 'r.-', label='Real Data')
+    plt.plot(x, y, 'r.-', label='Data')
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('#')
     plt.grid()
     plt.legend()
+    output_pdf.savefig()
+
+
+def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y, dut_index, output_pdf):
+    # Plot column check
+    plt.clf()
+    plt.title('Coarse alignment check, column of DUT%d against reference DUT' % dut_index)
+    median = np.median(column_1 - column_0)
+    std = np.std(column_1 - column_0)
+    y, _, _ = plt.hist(column_1 - column_0, bins=100, range=(-2 * std, 2 * std), label='Data')
+    plt.plot([median, median], [0, y.max()], label='Median %1.2f um' % median)
+    plt.plot([median - corr_x, median - corr_x], [0, y.max()], '--', color='red', label='68 % of the data')
+    plt.plot([median + corr_x, median + corr_x], [0, y.max()], '--', color='red')
+    plt.grid()
+    plt.xlabel('Difference [um]')
+    plt.ylabel('#')
+    plt.yscale('log')
+    plt.legend(loc=0)
+    output_pdf.savefig()
+    # Plot row check
+    plt.clf()
+    plt.title('Coarse alignment check, row of DUT%d against reference DUT' % dut_index)
+    median = np.median(row_1 - row_0) 
+    std = np.std(row_1 - row_0)
+    y, _, _ = plt.hist(row_1 - row_0, bins=100, range=(-2 * std, 2 * std), label='Data')
+    plt.plot([median, median], [0, y.max()], label='Median %1.2f um' % median)
+    plt.plot([median - corr_x, median - corr_x], [0, y.max()], '--', color='red', label='68 % of the data')
+    plt.plot([median + corr_x, median + corr_x], [0, y.max()], '--', color='red')
+    plt.grid()
+    plt.xlabel('Difference [um]')
+    plt.ylabel('#')
+    plt.yscale('log')
+    plt.legend(loc=0)
     output_pdf.savefig()
 
 
