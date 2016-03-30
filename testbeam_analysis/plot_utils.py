@@ -124,25 +124,23 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
             output_pdf.savefig()
 
 
-def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
-    def gauss(x, *p):
-        A, mu, sigma, offset = p
-        return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2)) + offset
-    plt.clf()
-    gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm% .1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-    plt.bar(x - 0.5, y, label='data', width=1)  # substract .5 to get edges of bins correct, since x parameter is center of bins
-    x_fit = np.arange(np.amin(x), np.amax(x), 0.1)
-    y_fit = gauss(x_fit, *coeff)
-    plt.plot(x_fit, y_fit, '-', label=gauss_fit_legend_entry)
-    plt.legend(loc=0)
+def plot_correlation_fit(x, y, y_fit, fit_type, xlabel, title, output_pdf):
+    plt.clf()  # FIXME: plotting should be in plot_utils
+    if fit_type == 1:
+        plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Gauss')
+    elif fit_type == 2:
+        plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Offset')
+
+    plt.plot(x, y, 'r.-', label='Real Data')
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('#')
     plt.grid()
-    output_fig.savefig()
+    plt.legend()
+    output_pdf.savefig()
 
 
-def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_name, title, non_interactive=False):
+def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, title, non_interactive=False):
     '''PLots the correlation and lets the user cut on the data in an interactive way.
 
     Parameters
@@ -151,7 +149,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
         The fitted peaks of one column / row correlation
     mean_error_fitted : array like
          The error of the fitted peaks of one column / row correlation
-    n_hits : array like
+    n_cluster : array like
         The number of hits per column / row
     ref_name : string
         Reference name
@@ -239,8 +237,8 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
         global left_limit
         global right_limit
 
-        n_hit_cut = np.percentile(n_hits, n_hit_percentile)  # Cut of low/high 5 % of the hits
-        n_hit_cut_index = np.where(n_hits < n_hit_cut)[0]
+        n_hit_cut = np.percentile(n_cluster, n_hit_percentile)  # Cut of low/high 5 % of the hits
+        n_hit_cut_index = np.where(n_cluster < n_hit_cut)[0]
 
         if np.any(n_hit_cut_index):  # If data is rather constant n_hit_cut_index is empty
             def consecutive(data, stepsize=1):  # Returns group of consecutive increasing values
@@ -253,14 +251,14 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
             max_cut = cons[-1][0] if len(np.atleast_1d(cons[-1][0])) == 1 else cons[-1][0][0]
 
             # Validity check, needed e.g. if there are areas without data
-            n_hits_max = np.where(n_hits == np.amax(n_hits))[0]
-            n_hits_max_min_index = n_hits_max if len(np.atleast_1d(n_hits_max)) == 1 else n_hits_max[0]  # Cut down to first index with maximum entries
-            n_hits_max_max_index = n_hits_max if len(np.atleast_1d(n_hits_max)) == 1 else n_hits_max[-1]  # Cut down to first index with maximum entries
+            n_cluster_max = np.where(n_cluster == np.amax(n_cluster))[0]
+            n_cluster_max_min_index = n_cluster_max if len(np.atleast_1d(n_cluster_max)) == 1 else n_cluster_max[0]  # Cut down to first index with maximum entries
+            n_cluster_max_max_index = n_cluster_max if len(np.atleast_1d(n_cluster_max)) == 1 else n_cluster_max[-1]  # Cut down to first index with maximum entries
 
-            if min_cut > max_cut or min_cut > n_hits_max_min_index:
+            if min_cut > max_cut or min_cut > n_cluster_max_min_index:
                 min_cut = 0
-            if max_cut < min_cut or max_cut < n_hits_max_max_index:
-                max_cut = n_hits.shape[0] - 1
+            if max_cut < min_cut or max_cut < n_cluster_max_max_index:
+                max_cut = n_cluster.shape[0] - 1
 
             if min_cut:
                 left_limit = x[min_cut]
@@ -309,7 +307,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
     error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit * 1000., error_limit * 1000.], 'r--', linewidth=2)  # Plot error cut as a line
     left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-', linewidth=2)  # Plot left cut as a vertical line
     right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-', linewidth=2)  # Plot right cut as a vertical line
-    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
+    plt.bar(x, n_cluster / np.amax(n_cluster).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
 
     plt.ylim(ymin=0.0)
     ax.set_title(title)
@@ -433,8 +431,8 @@ def plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, xlabel, titl
     if coord is not None and res is not None and xedges is not None and yedges is not None:
         ax = fig.add_subplot(2, 1, 2)
     else:
-        ax = fig.add_subplot(1, 1, 1)        
-    #f = lambda x, c0, c1, c2: c0 + c1 * x + c2 *x**2  # Fit function: straight line
+        ax = fig.add_subplot(1, 1, 1)
+    # f = lambda x, c0, c1, c2: c0 + c1 * x + c2 *x**2  # Fit function: straight line
     f = lambda x, c0, c1: c0 + c1 * x  # Fit function: straight line
     fit, _ = curve_fit(f, x, mean_fitted)  # Fit stragiht line
     fit_fn = np.poly1d(fit[::-1])
@@ -455,12 +453,12 @@ def plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, xlabel, titl
     left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-')  # Plot left cut as a vertical line
     right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-')  # Plot right cut as a vertical line
     plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
-    
+
     if coord is not None and res is not None and xedges is not None and yedges is not None:
         acr = fig.add_subplot(2, 1, 1)
         acr.hist2d(coord, res, [xedges, yedges])
 
-    #plt.ylim(ymin=0.0)
+    # plt.ylim(ymin=0.0)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel('DUT0')
@@ -499,9 +497,8 @@ def plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, xlabel, titl
 
     plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
     plt.show()
-    
-    return selected_data, fit, do_refit  # Return cut data for further processing
 
+    return selected_data, fit, do_refit  # Return cut data for further processing
 
 
 def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
@@ -782,7 +779,7 @@ def plot_track_slope(i, actual_dut, edges, hist, fit_ok, coeff, gauss, slopes, v
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.6f\pm %.6f$\nsigma=$%.6f\pm %.6f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
             plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
-            
+
         if output_fig is not None:
             output_fig.savefig()
         else:
