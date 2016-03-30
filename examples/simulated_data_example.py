@@ -92,7 +92,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file='TrackCandidates.h5',
                               output_tracks_file='Tracks.h5',
-                              output_pdf='Tracks.pdf',
+                              output_pdf_file='Tracks.pdf',
                               z_positions=simulate_data.z_positions,
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
@@ -109,15 +109,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                         output_pdf='Residuals.pdf',
                                         z_positions=simulate_data.z_positions)
 
-    # Calculate the efficiency and mean hit/track hit distance
-    # When needed, set included column and row range for each DUT as list of tuples
-    result_analysis.calculate_efficiency(input_tracks_file='Tracks.h5',
-                                         output_pdf='Efficiency.pdf',
-                                         z_positions=simulate_data.z_positions,
-                                         bin_size=(50, 50),
-                                         minimum_track_density=2,
-                                         use_duts=None,
-                                         cut_distance=None,
-                                         max_distance=500,
-                                         col_range=None,
-                                         row_range=None)
+# FIXME: no data to use
+#     # Calculate the efficiency and mean hit/track hit distance
+#     # When needed, set included column and row range for each DUT as list of tuples
+#     result_analysis.calculate_efficiency(input_tracks_file='Tracks.h5',
+#                                          output_pdf='Efficiency.pdf',
+#                                          z_positions=simulate_data.z_positions,
+#                                          bin_size=(50, 50),
+#                                          minimum_track_density=0,
+#                                          use_duts=None,
+#                                          cut_distance=None,
+#                                          max_distance=None,
+#                                          col_range=None,
+#                                          row_range=None)
