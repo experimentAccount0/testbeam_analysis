@@ -31,7 +31,7 @@ def get_plane_normal(direction_vector_1, direction_vector_2):
 
 
 def get_line_intersections_with_plane(line_origins, line_directions, position_plane, normal_plane):
-    ''' Calculates the intersection of n lines with a plane (n >= 1).
+    ''' Calculates the intersection of n lines with one plane (n >= 1).
     If there is not a intersection point (line is parallel to plane or the line is in the plane)
     the intersection point is set to NaN.
 
@@ -213,7 +213,7 @@ def rotation_matrix(alpha, beta, gamma):
     Usage:
     ------
         A rotation by (alpha, beta, gamma) of the vector (x, y, z) in the local coordinate system can be done by:
-          np.dot(rotation_matrix(dx, dy, dz), np.array([x, y, z]))
+          np.dot(rotation_matrix(alpha, beta, gamma), np.array([x, y, z]))
 
 
     Paramter:
@@ -304,6 +304,7 @@ def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
 
     # Extend rotation matrix R by one dimension
     R = np.eye(4, 4, 0)
+    # Inverse of rotation Matrix Rtot = R(alpha) * R(beta) * R(gamma) = R(gamma).T * R(beta).T * R(alpha).T = (R(alpha) * R(beta) * R(gamma)).T = Rtot.T
     R[:3, :3] = rotation_matrix(alpha, beta, gamma).T  # Inverse of a rotation matrix is also the transformed matrix, since Det = 1
 
     # Get translation matrix T
@@ -352,7 +353,7 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
 
 
 def apply_transformation_matrix(x, y, z, transformation_matrix):
-    ''' Takes array in x, y, z and applies a transformation matrix
+    ''' Takes array in x, y, z and applies a transformation matrix (4 x 4).
 
     Paramter:
     --------
@@ -371,6 +372,30 @@ def apply_transformation_matrix(x, y, z, transformation_matrix):
 
     positions = np.column_stack((x, y, z, np.ones_like(x))).T  # Add extra 4th dimension
     positions_transformed = np.dot(transformation_matrix, positions).T[:, :-1]  # Transform and delete extra dimension
+
+    return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
+
+
+def apply_rotation_matrix(x, y, z, rotation_matrix):
+    ''' Takes array in x, y, z and applies a rotation matrix (3 x 3).
+
+    Paramter:
+    --------
+
+    x : number
+        Position in x
+    y : number
+        Position in y
+    z : number
+        Position in z
+
+    Returns:
+    --------
+    np.array with shape 3, 3
+    '''
+
+    positions = np.column_stack((x, y, z)).T  # Add extra 4th dimension
+    positions_transformed = np.dot(rotation_matrix, positions).T
 
     return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
 
