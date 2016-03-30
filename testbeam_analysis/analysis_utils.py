@@ -38,6 +38,7 @@ def merge_on_event_number(data_1, data_2):
     result_array_size = 0
     event_index_data_2 = 0
 
+    # Loop to determine the needed result array size
     for index_data_1 in range(data_1.shape[0]):
 
         while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:
