@@ -12,7 +12,7 @@ from testbeam_analysis import analysis_functions
 from testbeam_analysis.cpp import data_struct
 
 
-@njit()
+@njit
 def merge_on_event_number(data_1, data_2):
     """
     Merges the data_2 with data_1 on an event basis with all permutations
