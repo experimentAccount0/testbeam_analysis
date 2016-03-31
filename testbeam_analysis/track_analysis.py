@@ -28,8 +28,8 @@ def gauss(x, *p):
 
 def find_tracks(input_tracklets_file, input_alignment_file, output_track_candidates_file, event_range=None, chunk_size=1000000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
-    The output is the same array with resorted hits into tracks. A track quality is given to
-    be able to cut on good tracks.
+    The output is the same array with resorted hits into tracks. A track quality is set to
+    be able to cut on good (less scattered) tracks.
     This function is uses numba to increase the speed on the inner loop (_find_tracks_loop()).
 
     This function can also be called on TrackCandidates arrays. That is usefull if an additional alignment step
@@ -51,53 +51,60 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
     with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
         try:
             correlations = in_file_h5.root.Alignment[:]
+            n_duts = correlations.shape[0]
+            logging.info('Taking correlation cut values from alignment')
+            column_sigma = correlations['correlation_x']
+            row_sigma = correlations['correlation_y']
         except tb.exceptions.NoSuchNodeError:
-            logging.info('Taking data from prealignment')
+            logging.info('Taking correlation cut values from prealignment')
             correlations = in_file_h5.root.Prealignment[:]
-        column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
-        row_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
-        column_sigma[0], row_sigma[0] = 0, 0  # DUT0 has no correlation error
-        for index in range(1, correlations.shape[0] // 2 + 1):
-            column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
-            row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
+            n_duts = int(correlations.shape[0] / 2 + 1)
+            column_sigma = np.zeros(shape=n_duts)
+            row_sigma = np.zeros(shape=n_duts)
+            column_sigma[0], row_sigma[0] = 0., 0.  # DUT0 has no correlation error
+            for index in range(1, n_duts):
+                column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
+                row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
 
     with tb.open_file(input_tracklets_file, mode='r') as in_file_h5:
         try:  # First try:  normal tracklets assumed
             tracklets_node = in_file_h5.root.Tracklets
         except tb.exceptions.NoSuchNodeError:
-            try:  # Second try:  normal track candidates assumed
+            try:  # Second try: normal track candidates assumed
                 tracklets_node = in_file_h5.root.TrackCandidates
                 output_track_candidates_file = os.path.splitext(output_track_candidates_file)[0] + '_2.h5'
                 logging.info('Additional find track run on track candidates file %s', input_tracklets_file)
                 logging.info('Output file with new track candidates file %s', output_track_candidates_file)
-            except tb.exceptions.NoSuchNodeError:  # Last try:  prealigned tracklets from coarse alignment assumed
+            except tb.exceptions.NoSuchNodeError:  # Last try: prealigned tracklets from coarse alignment assumed
                 tracklets_node = in_file_h5.root.Tracklets_prealignment
         with tb.open_file(output_track_candidates_file, mode='w') as out_file_h5:
             track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=tracklets_node.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            n_duts = sum(['column' in col for col in tracklets_node.dtype.names])
 
             for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(tracklets_node, chunk_size=chunk_size):
                 tracklets_data_chunk = tracklets_data_chunk.view(np.recarray)
 
-                # Prepare data for track finding, create arrays for column, row and charge data
-                tr_column = tracklets_data_chunk['column_dut_0']
-                tr_row = tracklets_data_chunk['row_dut_0']
+                # Prepare data for track finding, create arrays for x, y position and charge data
+                tr_x = tracklets_data_chunk['x_dut_0']
+                tr_y = tracklets_data_chunk['y_dut_0']
+                tr_z = tracklets_data_chunk['z_dut_0']
                 tr_charge = tracklets_data_chunk['charge_dut_0']
                 for dut_index in range(n_duts - 1):
-                    tr_column = np.vstack((tr_column, tracklets_data_chunk['column_dut_%d' % (dut_index + 1)]))
-                    tr_row = np.vstack((tr_row, tracklets_data_chunk['row_dut_%d' % (dut_index + 1)]))
+                    tr_x = np.vstack((tr_x, tracklets_data_chunk['x_dut_%d' % (dut_index + 1)]))
+                    tr_y = np.vstack((tr_y, tracklets_data_chunk['y_dut_%d' % (dut_index + 1)]))
+                    tr_z = np.vstack((tr_z, tracklets_data_chunk['z_dut_%d' % (dut_index + 1)]))
                     tr_charge = np.vstack((tr_charge, tracklets_data_chunk['charge_dut_%d' % (dut_index + 1)]))
-                tr_column = np.transpose(tr_column)
-                tr_row = np.transpose(tr_row)
+                tr_x = np.transpose(tr_x)
+                tr_y = np.transpose(tr_y)
+                tr_z = np.transpose(tr_z)
                 tr_charge = np.transpose(tr_charge)
 
                 tracklets_data_chunk.track_quality = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
                 # Perform the track finding with jitted loop
-                tracklets_data_chunk, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
+                tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma)
 
                 # Merge result data from arrays into one recarray
-                combined = np.column_stack((tracklets_data_chunk.event_number, tr_column, tr_row, tr_charge, tracklets_data_chunk.track_quality, tracklets_data_chunk.n_tracks))
+                combined = np.column_stack((tracklets_data_chunk.event_number, tr_x, tr_y, tr_z, tr_charge, tracklets_data_chunk.track_quality, tracklets_data_chunk.n_tracks))
                 combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
 
                 track_candidates.append(combined)
@@ -269,7 +276,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -279,8 +286,6 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
         file name with the track candidates table
     output_tracks_file : string
         file name of the created track file having the track table
-    z_position : iterable
-        the positions of the devices in z in cm
     fit_duts : iterable
         the duts to fit tracks for. If None all duts are used
     ignore_duts : iterable
@@ -292,8 +297,8 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
         only events with tracks <= max tracks are taken
     track_quality : int
         0: All tracks with hits in DUT and references are taken
-        1: The track hits in DUT and reference are within 5-sigma of the correlation
-        2: The track hits in DUT and reference are within 2-sigma of the correlation
+        1: The track hits in DUT and reference are within 2-sigma of the correlation
+        2: The track hits in DUT and reference are within 1-sigma of the correlation
         Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each 'quality stage', one digit per DUT.
         E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     pixel_size : iterable, (x dimensions, y dimension)
@@ -310,9 +315,11 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
         # Define description
         description = [('event_number', np.int64)]
         for index in range(n_duts):
-            description.append(('column_dut_%d' % index, np.float))
+            description.append(('x_dut_%d' % index, np.float))
         for index in range(n_duts):
-            description.append(('row_dut_%d' % index, np.float))
+            description.append(('y_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('z_dut_%d' % index, np.float))
         for index in range(n_duts):
             description.append(('charge_dut_%d' % index, np.float))
         for dimension in range(3):
@@ -327,8 +334,9 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
         tracks_array['track_quality'] = good_track_candidates['track_quality']
         tracks_array['n_tracks'] = good_track_candidates['n_tracks']
         for index in range(n_duts):
-            tracks_array['column_dut_%d' % index] = good_track_candidates['column_dut_%d' % index]
-            tracks_array['row_dut_%d' % index] = good_track_candidates['row_dut_%d' % index]
+            tracks_array['x_dut_%d' % index] = good_track_candidates['x_dut_%d' % index]
+            tracks_array['y_dut_%d' % index] = good_track_candidates['y_dut_%d' % index]
+            tracks_array['z_dut_%d' % index] = good_track_candidates['z_dut_%d' % index]
             tracks_array['charge_dut_%d' % index] = good_track_candidates['charge_dut_%d' % index]
         for dimension in range(3):
             tracks_array['offset_%d' % dimension] = offsets[:, dimension]
@@ -340,7 +348,7 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
     with PdfPages(output_pdf_file) as output_fig:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
-                n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
+                n_duts = sum(['charge' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
                 fit_duts = fit_duts if fit_duts else range(n_duts)
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT %d', fit_dut)
@@ -383,7 +391,7 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, z_positions, fit
                         track_hits = np.zeros((n_tracks, n_fit_duts, 3))
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
                             if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
-                                xyz = np.column_stack((good_track_candidates['column_dut_%s' % dut_index], good_track_candidates['row_dut_%s' % dut_index], np.repeat(z_positions[dut_index], n_tracks)))
+                                xyz = np.column_stack((good_track_candidates['x_dut_%s' % dut_index], good_track_candidates['y_dut_%s' % dut_index], good_track_candidates['z_dut_%s' % dut_index]))
                                 track_hits[:, index, :] = xyz
                                 index += 1
 
@@ -664,9 +672,9 @@ def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_tra
     if row != 0:  # row = 0 is no hit
         actual_track.track_quality |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # High quality track hits
+        if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
             actual_track.track_quality |= (65793 << dut_index)
-        elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # Low quality track hits
+        elif column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # Low quality track hits
             actual_track.track_quality |= (257 << dut_index)
     else:
         actual_track.track_quality &= (~(65793 << dut_index))  # Unset track quality
@@ -686,9 +694,9 @@ def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_inde
     if row != 0:  # row = 0 is no hit
         actual_track.track_quality |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # High quality track hits
+        if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
             actual_track.track_quality |= (65793 << dut_index)
-        elif column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # Low quality track hits
+        elif column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # Low quality track hits
             actual_track.track_quality |= (257 << dut_index)
 
 
@@ -703,15 +711,15 @@ def _get_first_dut_index(tr_column, index):
 
 
 @njit
-def _swap_hits(tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge):
+def _swap_hits(tr_column, tr_row, tr_z, tr_charge, track_index, dut_index, hit_index, column, row, z, charge):
     #     print 'Swap hits', tr_column[track_index][dut_index], tr_column[hit_index][dut_index]
-    tmp_column, tmp_row, tmp_charge = tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_charge[track_index][dut_index]
-    tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_charge[track_index][dut_index] = column, row, charge
-    tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index] = tmp_column, tmp_row, tmp_charge
+    tmp_column, tmp_row, tmp_z, tmp_charge = tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_z[track_index][dut_index], tr_charge[track_index][dut_index]
+    tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_z[track_index][dut_index], tr_charge[track_index][dut_index] = column, row, z, charge
+    tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index] = tmp_column, tmp_row, tmp_z, tmp_charge
 
 
 @njit
-def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma):
+def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigma, row_sigma):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Not ment to be called stand alone.
     Optimizations included to make it compile with numba. Can be called from
@@ -757,10 +765,14 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                 for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # Loop over all not sorted hits of actual DUT
                     if tracklets[hit_index].event_number != actual_event_number:  # Abort condition
                         break
-                    column, row, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_charge[hit_index][dut_index]
+                    column, row, z, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index]
                     if row != 0:  # Check for hit (row != 0)
+                        # Calculate the hit distance of the actual DUT hit towards the actual reference hit
                         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
                         hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
+                        # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
+                        current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
+                        current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
                         if shortest_hit_distance < 0 or hit_distance < shortest_hit_distance:  # Check if the hit is closer to reference hit
 #                             print 'FOUND MATCHING HIT', column, row
                             if track_index != hit_index:  # Check if hit swapping is needed
@@ -770,11 +782,14 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
                                     # Calculate hit distance to reference hit of other track
                                     column_distance_old, row_distance_old = abs(column - tr_column[hit_index][first_dut_index]), abs(row - tr_row[hit_index][first_dut_index])
                                     hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
+                                    if current_hit_distance < hit_distance:
+#                                         print 'CURRENT ASSIGNED HIT FITS BETTER, DO NOT SWAP', hit_index
+                                        continue
                                     if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track; otherwise leave it with other track
 #                                         print 'IT FIT BETTER WITH OLD TRACK, DO NOT SWAP', hit_index
                                         continue
 #                                 print 'SWAP HIT'
-                                _swap_hits(tr_column, tr_row, tr_charge, track_index, dut_index, hit_index, column, row, charge)
+                                _swap_hits(tr_column, tr_row, tr_z, tr_charge, track_index, dut_index, hit_index, column, row, z, charge)
                                 if track_index > hit_index:  # Check if hit is already assigned to other track
 #                                     print 'RESET DUT TRACK QUALITY'
                                     _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, hit_index, actual_column_sigma, actual_row_sigma)
@@ -788,13 +803,13 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row
 
 #         print 'TRACK', track_index
 #         for dut_index in range(n_duts):
-#             print tr_column[track_index][dut_index], tr_row[track_index][dut_index],
+#             print tr_row[track_index][dut_index],
 #         print
         # Set number of tracks of last event
         for i in range(n_actual_tracks):
             tracklets[track_index - i].n_tracks = n_actual_tracks
 
-    return tracklets, tr_column, tr_row, tr_charge
+    return tracklets, tr_column, tr_row, tr_z, tr_charge
 
 
 def _fit_tracks_loop(track_hits):
