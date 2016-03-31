@@ -652,13 +652,12 @@ def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, 
     output_fig.savefig()
 
 
-def plot_events(input_tracks_file, z_positions, event_range, dut=None, max_chi2=None, output_pdf=None):
+def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_pdf=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
     ----------
     input_tracks_file : pytables file with tracks
-    z_positions : iterable
     event_range : iterable:
         (start event number, stop event number(
     dut : int
@@ -678,7 +677,7 @@ def plot_events(input_tracks_file, z_positions, event_range, dut=None, max_chi2=
             table = in_file_h5.getNode(in_file_h5.root, name='Tracks_DUT_%d' % dut)
             fitted_tracks = True
 
-        n_duts = sum(['column' in col for col in table.dtype.names])
+        n_duts = sum(['charge' in col for col in table.dtype.names])
         array = table[:]
         tracks = analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
         if max_chi2:
@@ -689,10 +688,10 @@ def plot_events(input_tracks_file, z_positions, event_range, dut=None, max_chi2=
         for track in tracks:
             x, y, z = [], [], []
             for dut_index in range(0, n_duts):
-                if track['row_dut_%d' % dut_index] != 0:  # No hit has row = 0
-                    x.append(track['column_dut_%d' % dut_index] * 1.e-3)  # in mm
-                    y.append(track['row_dut_%d' % dut_index] * 1.e-3)  # in mm
-                    z.append(z_positions[dut_index] * 1.e-3)  # in mm
+                if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
+                    x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
+                    y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
+                    z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
             if fitted_tracks:
                 offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
                 slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
@@ -710,7 +709,7 @@ def plot_events(input_tracks_file, z_positions, event_range, dut=None, max_chi2=
 
 #         ax.set_xlim(0, 20)
 #         ax.set_ylim(0, 20)
-        ax.set_zlim(z_positions[0] * 1.e-3, z_positions[-1] * 1.e-3)
+        ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
         ax.set_xlabel('x [mm]')
         ax.set_ylabel('y [mm]')
         ax.set_zlabel('z [mm]')
