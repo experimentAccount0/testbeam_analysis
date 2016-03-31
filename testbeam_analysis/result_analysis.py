@@ -104,14 +104,12 @@ def calculate_residuals_kalman(input_tracks_file, z_positions, use_duts=None, ma
     return residuals
 
 
-def calculate_residuals(input_tracks_file, z_positions, use_duts=None, max_chi2=None, output_pdf=None):
+def calculate_residuals(input_tracks_file, use_duts=None, max_chi2=None, output_pdf=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
     input_tracks_file : string
         File name with the tracks table
-    z_position : iterable
-        The positions of the devices in z in cm
     use_duts : iterable
         The duts to calculate residuals for. If None all duts in the input_tracks_file are used
     max_chi2 : int
@@ -140,13 +138,14 @@ def calculate_residuals(input_tracks_file, z_positions, use_duts=None, max_chi2=
                 continue
             logging.info('Calculate residuals for DUT %d', actual_dut)
 
+            # FIXME: has to be chunked
             track_array = node[:]
 
             if max_chi2:
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
-            track_array = track_array[np.logical_and(track_array['column_dut_%d' % actual_dut] != 0., track_array['row_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
-            hits, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-            intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+            track_array = track_array[np.logical_and(track_array['x_dut_%d' % actual_dut] != 0., track_array['y_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
+            hits, offset, slope = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut])), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
+            intersection = offset + slope / slope[:, 2, np.newaxis] * (hits[:, 2, np.newaxis] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
             difference = intersection - hits
 
             for i in range(2):  # col / row
@@ -218,15 +217,13 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     return mean_fitted, selected_data, fit, pcov
 
 
-def calculate_efficiency(input_tracks_file, output_pdf, z_positions, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
+def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
     input_tracks_file : string
         file name with the tracks table
     output_pdf : pdf file name object
-    z_positions : iterable
-        z_positions of all devices relative to DUT0
     bin_size : iterable
         sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
     minimum_track_density : int
@@ -260,7 +257,7 @@ def calculate_efficiency(input_tracks_file, output_pdf, z_positions, bin_size, m
                 # Allow different sensor sizes for every plane
                 # TODO: confusing code
                 if not sensor_size:
-                    dimensions = (np.amax(track_array['column_dut_%d' % actual_dut]), np.amax(track_array['row_dut_%d' % actual_dut]))
+                    dimensions = (np.amax(track_array['x_dut_%d' % actual_dut]), np.amax(track_array['y_dut_%d' % actual_dut]))
                 else:
                     dimensions = [sensor_size, ] if not isinstance(sensor_size, list) else sensor_size
                     if len(dimensions) == 1:
@@ -286,8 +283,8 @@ def calculate_efficiency(input_tracks_file, output_pdf, z_positions, bin_size, m
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
 
                 # Take hits of actual DUT and track projection on actual DUT plane
-                hits, offset, slope = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], np.repeat(z_positions[actual_dut], track_array.shape[0]))), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-                intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+                hits, offset, slope = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut])), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
+                intersection = offset + slope / slope[:, 2, np.newaxis] * (hits[:, 2, np.newaxis] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
 
                 # Select hits from column row range (e.g. to supress edge pixels)
                 # TODO: confusing code
@@ -343,7 +340,6 @@ def calculate_efficiency(input_tracks_file, output_pdf, z_positions, bin_size, m
                         out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                         out_efficiency_mask = out_file_h5.createCArray(actual_dut_folder, name='Efficiency_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.mask.dtype), shape=efficiency.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                         # Store parameters used for efficiency calculation
-                        out_efficiency.attrs.z_positions = z_positions
                         out_efficiency.attrs.bin_size = bin_size
                         out_efficiency.attrs.minimum_track_density = minimum_track_density
                         out_efficiency.attrs.sensor_size = sensor_size
