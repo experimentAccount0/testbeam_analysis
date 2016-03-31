@@ -523,10 +523,11 @@ class SimulateData(object):
 
             # Mask hits due to inefficiency
             selection = np.ones_like(actual_event_number, dtype=np.bool)
-            hit_indices = np.arange(actual_event_number.shape[0])  # Indices of hits
-            np.random.shuffle(hit_indices)  # shuffle hit indeces
-            n_inefficient_hit = int(hit_indices.shape[0] * (1. - self.dut_efficiencies[dut_index]))
-            selection[hit_indices[:n_inefficient_hit]] = False
+            if self.dut_efficiencies[dut_index] < 1.:
+                hit_indices = np.arange(actual_event_number.shape[0])  # Indices of hits
+                np.random.shuffle(hit_indices)  # shuffle hit indeces
+                n_inefficient_hit = int(hit_indices.shape[0] * (1. - self.dut_efficiencies[dut_index]))
+                selection[hit_indices[:n_inefficient_hit]] = False
 
             dut_hits_digits = dut_hits_digits[selection]
             actual_event_number = actual_event_number[selection]
