@@ -24,6 +24,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     simulate_data.n_duts = 6  # Number of DUTs in the simulation
     simulate_data.z_positions = [i * 10000 for i in range(simulate_data.n_duts)]  # in um; std: every 10 cm
     simulate_data.offsets = [(-2500, -2500)] * simulate_data.n_duts  # in x, y in mu
+    simulate_data.rotations = [(0, 0, 0)] * simulate_data.n_duts  # in rotation around x, y, z axis in Rad
     simulate_data.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
     # Beam related settings
     simulate_data.beam_position = (0, 0)  # Average beam position in x, y at z = 0 in mu
@@ -43,6 +44,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     simulate_data.dut_material_budget = [simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(simulate_data.n_duts)]  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering; std. setting is the sensor thickness made of silicon as material budget
     # Digitization settings
     simulate_data.digitization_charge_sharing = True
+    simulate_data.digitization_shuffle_hits = True  # Shuffle hit per event to challange track finding
+    simulate_data.digitization_pixel_discretization = True  # Translate hit position on DUT plane to channel indices (column / row)
 
     # Create the data
     simulate_data.create_data_and_store('simulated_data', n_events=100000)
@@ -58,7 +61,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'max_x_distance': 2,
         'max_y_distance': 1,
         'max_time_distance': 2,
-        'max_cluster_hits':1000,
+        'max_hit_charge': 2 ** 16,
         "dut_name": data_files[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
@@ -67,14 +70,17 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.join()
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(input_hits_files=data_files,
-                                 output_correlation_file='Correlation.h5',
-                                 n_pixels=simulate_data.dut_n_pixel)
+    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+                                    output_correlation_file='Correlation.h5',
+                                    n_pixels=simulate_data.dut_n_pixel,
+                                    pixel_size=simulate_data.dut_pixel_size)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.coarse_alignment(input_correlation_file='Correlation.h5',
+    dut_alignment.coarse_alignment(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+                                   input_correlation_file='Correlation.h5',
                                    output_alignment_file='Alignment.h5',
+                                   z_positions=simulate_data.z_positions,
                                    pixel_size=simulate_data.dut_pixel_size,
                                    non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
@@ -93,25 +99,22 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file='TrackCandidates.h5',
                               output_tracks_file='Tracks.h5',
                               output_pdf_file='Tracks.pdf',
-                              z_positions=simulate_data.z_positions,
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file='Tracks.h5',
                            output_pdf='Event.pdf',
-                           z_positions=simulate_data.z_positions,
                            event_range=(0, 10),
                            dut=1)
 
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file='Tracks.h5',
-                                        output_pdf='Residuals.pdf',
-                                        z_positions=simulate_data.z_positions)
+                                        output_pdf='Residuals.pdf')
 
 # FIXME: no data to use
-#     # Calculate the efficiency and mean hit/track hit distance
-#     # When needed, set included column and row range for each DUT as list of tuples
+# Calculate the efficiency and mean hit/track hit distance
+# When needed, set included column and row range for each DUT as list of tuples
 #     result_analysis.calculate_efficiency(input_tracks_file='Tracks.h5',
 #                                          output_pdf='Efficiency.pdf',
 #                                          z_positions=simulate_data.z_positions,

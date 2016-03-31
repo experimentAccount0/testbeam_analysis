@@ -14,6 +14,7 @@ import os
 import logging
 from multiprocessing import Pool
 
+import testbeam_analysis
 from testbeam_analysis import hit_analysis
 from testbeam_analysis import dut_alignment
 from testbeam_analysis import track_analysis
@@ -23,8 +24,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 
 if __name__ == '__main__':  # main entry point is needed for multiprocessing under windows
+    # Get the absolute example path
+    tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(os.path.dirname(testbeam_analysis.__file__))) + r'/examples/data'))
     # The location of the data files, one file per DUT
-    data_files = [('data/TestBeamData_Mimosa26_DUT' + str(i) + '.h5') for i in range(6)]  # The first device is the reference for the coordinate system
+    data_files = [(os.path.join(tests_data_folder, r'TestBeamData_Mimosa26_DUT%d' % i + '.h5')) for i in range(6)]  # The first device is the reference for the coordinate system
 
     # Pixel dimesions and matrix size of the DUTs
     pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
@@ -45,44 +48,45 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'pixel_size': pixel_size[i],
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
-    multiple_results = [pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwarg) for kwarg in kwargs]
-    noisy_pixels_files = [res.get() for res in multiple_results]
+    for kwarg in kwargs:
+        pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwarg)
+    pool.close()
+    pool.join()
 
     # Cluster hits off all DUTs
     kwargs = [{
-        'input_hits_file': noisy_pixels_files[i],
+        'input_hits_file': data_files[i][:-3] + '_noisy_pixels.h5',
         'max_x_distance': 3,
         'max_y_distance': 3,
         'max_time_distance': 2,
         'max_cluster_hits': 1000000,
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
-    multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg) for kwarg in kwargs]
-    # free resources
+    pool = Pool()
+    for kwarg in kwargs:
+        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
     pool.close()
     pool.join()
-    noisy_pixels_cluster_files = [res.get() for res in multiple_results]
-
-    noisy_pixels_files = [os.path.splitext(data_files[i])[0] + '_noisy_pixels.h5' for i in range(len(data_files))]
-    noisy_pixels_cluster_files = [os.path.splitext(data_files[i])[0] + '_noisy_pixels_cluster.h5' for i in range(len(data_files))]
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(input_hits_files=noisy_pixels_files,
-                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                                 n_pixels=n_pixels,
-                                 pixel_size=pixel_size,
-                                 dut_names=dut_names)
+    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+                                    output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                    n_pixels=n_pixels,
+                                    pixel_size=pixel_size,
+                                    dut_names=dut_names)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                   input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                    output_pdf_file=os.path.join(output_folder, 'Alignment.pdf'),
+                                   z_positions=z_positions,
                                    pixel_size=pixel_size,
-                                   non_interactive=True,  # Tries to find cuts automatically; deactivate to do this manualy
-                                   fix_slope=True)
+                                   dut_names=dut_names,
+                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=noisy_pixels_cluster_files,
+    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
                                      input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                      output_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
                                      pixel_size=pixel_size)
@@ -96,7 +100,6 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
-                              z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
                               include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
@@ -105,10 +108,9 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         output_pdf=os.path.join(output_folder, 'Residuals.pdf'),
-                                        z_positions=z_positions,
                                         use_duts=None,
                                         max_chi2=None)
-
+# FIXME: make it work again
     # Do a fine alignment utilizing tracks and residuals minimization
     dut_alignment.fine_alignment(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                                  alignment_file=geo_file,
@@ -117,7 +119,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                  fit_duts=range(6),
                                  include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5],
                                  create_new_geometry=True)
-
+ 
     # Fit the tracks using a straight line fit
     track_analysis.fit_tracks_kalman(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                                      output_tracks_file=os.path.join(output_folder, 'Tracks_interpolation.h5'),
@@ -133,7 +135,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                      method="Interpolation",
                                      pixel_size=pixel_size,
                                      chunk_size=10000)
-
+ 
     # Fit the tracks using a kalman filter
     track_analysis.fit_tracks_kalman(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                                      output_tracks_file=os.path.join(output_folder, 'Tracks_kalman.h5'),

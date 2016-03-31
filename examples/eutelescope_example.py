@@ -46,6 +46,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'input_hits_file': data_files[i],
         'n_pixel': n_pixels[i],
         'pixel_size': pixel_size[i],
+        'threshold': 5,
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
@@ -68,16 +69,19 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.join()
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(input_hits_files=[data_file[:-3] + '_noisy_pixels.h5' for data_file in data_files],
-                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                                 n_pixels=n_pixels,
-                                 pixel_size=pixel_size,
-                                 dut_names=dut_names)
+    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+                                    output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                    n_pixels=n_pixels,
+                                    pixel_size=pixel_size,
+                                    dut_names=dut_names)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                   input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                   output_pdf_file=os.path.join(output_folder, 'Alignment.pdf'),
+                                   z_positions=z_positions,
                                    pixel_size=pixel_size,
                                    dut_names=dut_names,
                                    non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
@@ -97,7 +101,6 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
-                              z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
                               include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
@@ -106,6 +109,5 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         output_pdf=os.path.join(output_folder, 'Residuals.pdf'),
-                                        z_positions=z_positions,
                                         use_duts=None,
                                         max_chi2=None)
