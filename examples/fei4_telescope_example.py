@@ -47,16 +47,18 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     pool.join()
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(input_hits_files=data_files,
-                                 output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                                 n_pixels=n_pixels,
-                                 pixel_size=pixel_size,
-                                 dut_names=dut_names
-                                 )
+    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+                                    output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                                    n_pixels=n_pixels,
+                                    pixel_size=pixel_size,
+                                    dut_names=dut_names
+                                    )
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
-    dut_alignment.coarse_alignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+    dut_alignment.coarse_alignment(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+                                   input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                   z_positions=z_positions,
                                    pixel_size=pixel_size,
                                    dut_names=dut_names,
                                    non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
@@ -80,48 +82,29 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
-                              z_positions=z_positions,
                               fit_duts=[0, 1, 2, 3],
                               include_duts=[-3, -2, -1, 1, 2, 3],
-                              track_quality=1)
+                              track_quality=2)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                            output_pdf=os.path.join(output_folder, 'Event.pdf'),
-                           z_positions=z_positions,
                            event_range=(0, 10),
                            dut=1)
 
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         output_pdf=os.path.join(output_folder, 'Residuals.pdf'),
-                                        z_positions=z_positions,
                                         max_chi2=10000)
-
-    # Plot the track density on selected DUT planes
-    plot_utils.plot_track_density(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                                  output_pdf=os.path.join(output_folder, 'TrackDensity.pdf'),
-                                  z_positions=z_positions,
-                                  dim_x=80,
-                                  dim_y=336,
-                                  pixel_size=pixel_size,
-                                  use_duts=None)
-
-    plot_utils.plot_charge_distribution(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
-                                        output_pdf=os.path.join(output_folder, 'ChargeDistribution.pdf'),
-                                        dim_x=(80, 80, 80, 80),
-                                        dim_y=(336, 336, 336, 336),
-                                        pixel_size=pixel_size)
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                          output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
-                                         z_positions=z_positions,
                                          bin_size=(250, 50),
                                          minimum_track_density=2,
                                          use_duts=None,
                                          cut_distance=500,
                                          max_distance=500,
-                                         col_range=(1250, 17500),
-                                         row_range=(1000, 16000))
+                                         col_range=None,
+                                         row_range=None)
