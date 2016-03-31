@@ -81,7 +81,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
 
                 hit_table_out.append(hits)
 
-            logging.info('Reducing data by a factor of %.2f in %s', hit_table_out.nrows / input_file_h5.root.Hits.nrows, out_file_h5.filename)
+            logging.info('Reducing data by %.2f in %s', hit_table_out.nrows / input_file_h5.root.Hits.nrows, out_file_h5.filename)
 
             # creating occupancy table without masking noisy pixels
             occupancy_array_table = out_file_h5.createCArray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -121,7 +121,7 @@ def cluster_hits_wrapper(args):
     return cluster_hits(**args)
 
 
-def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, max_y_distance=3, max_time_distance=2, dut_name=None, plot=True, max_cluster_hits=1000, chunk_size=1000000):
+def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, max_y_distance=3, max_time_distance=2, dut_name=None, plot=True, max_cluster_hits=1000, max_hit_charge=13, chunk_size=1000000):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
@@ -141,6 +141,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, ma
             clusterizer = HitClusterizer()
             clusterizer.set_max_hits(chunk_size)
             clusterizer.set_max_cluster_hits(max_cluster_hits)
+            clusterizer.set_max_hit_charge(max_hit_charge)
 
             # Set clusterzier settings
             clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
