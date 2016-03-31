@@ -27,12 +27,13 @@ class TestTrackAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(os.path.join(cls.output_folder + 'TrackCandidates.h5'))
-        os.remove(os.path.join(cls.output_folder + 'TrackCandidates_2.h5'))
-        os.remove(os.path.join(cls.output_folder + 'Tracks.h5'))
-        os.remove(os.path.join(cls.output_folder + 'Tracks.pdf'))
-        os.remove(os.path.join(cls.output_folder + 'Tracks_2.h5'))
-        os.remove(os.path.join(cls.output_folder + 'Tracks_2.pdf'))
+        pass
+#         os.remove(os.path.join(cls.output_folder + 'TrackCandidates.h5'))
+#         os.remove(os.path.join(cls.output_folder + 'TrackCandidates_2.h5'))
+#         os.remove(os.path.join(cls.output_folder + 'Tracks.h5'))
+#         os.remove(os.path.join(cls.output_folder + 'Tracks.pdf'))
+#         os.remove(os.path.join(cls.output_folder + 'Tracks_2.h5'))
+#         os.remove(os.path.join(cls.output_folder + 'Tracks_2.pdf'))
 
     def test_track_finding(self):
         track_analysis.find_tracks(input_tracklets_file=os.path.join(tests_data_folder + 'Tracklets_small.h5'),
@@ -46,7 +47,7 @@ class TestTrackAnalysis(unittest.TestCase):
                                    chunk_size=293)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder + 'TrackCandidates_result.h5'), os.path.join(self.output_folder + 'TrackCandidates_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
-
+    @unittest.SkipTest
     def test_track_fitting(self):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder + 'TrackCandidates_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder + 'Tracks.h5'),
