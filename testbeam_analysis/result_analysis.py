@@ -144,8 +144,8 @@ def calculate_residuals(input_tracks_file, use_duts=None, max_chi2=None, output_
             if max_chi2:
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
             track_array = track_array[np.logical_and(track_array['x_dut_%d' % actual_dut] != 0., track_array['y_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
-            hits, offset, slope = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut])), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-            intersection = offset + slope / slope[:, 2, np.newaxis] * (hits[:, 2, np.newaxis] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+            hits = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut]))
+            intersection = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2']))  # Intersection of track with DUT plane is the offset of the track definition (by convention)
             difference = intersection - hits
 
             for i in range(2):  # col / row
@@ -255,7 +255,6 @@ def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_
 
                 # Get pixel and bin sizes for calculations and plotting
                 # Allow different sensor sizes for every plane
-                # TODO: confusing code
                 if not sensor_size:
                     dimensions = (np.amax(track_array['x_dut_%d' % actual_dut]), np.amax(track_array['y_dut_%d' % actual_dut]))
                 else:
@@ -266,7 +265,6 @@ def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_
                         dimensions = dimensions[index]
 
                 # Allow different bin_sizes for every plane
-                # TODO: confusing code
                 bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
                 if len(bin_size) != 1:
                     actual_bin_size_x = bin_size[index][0]
@@ -283,11 +281,10 @@ def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
 
                 # Take hits of actual DUT and track projection on actual DUT plane
-                hits, offset, slope = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut])), np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-                intersection = offset + slope / slope[:, 2, np.newaxis] * (hits[:, 2, np.newaxis] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
+                hits = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut]))
+                intersection = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2']))  # Intersection of track with DUT plane is the offset of the track definition (by convention)
 
                 # Select hits from column row range (e.g. to supress edge pixels)
-                # TODO: confusing code
                 col_range = [col_range, ] if not isinstance(col_range, list) else col_range
                 row_range = [row_range, ] if not isinstance(row_range, list) else row_range
                 if len(col_range) == 1:
