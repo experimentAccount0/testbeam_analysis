@@ -276,7 +276,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -284,6 +284,8 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, fit_duts=None, i
     ----------
     input_track_candidates_file : string
         file name with the track candidates table
+    input_alignment_file : pytables file
+        File name of the input aligment data
     output_tracks_file : string
         file name of the created track file having the track table
     fit_duts : iterable
@@ -310,6 +312,9 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, fit_duts=None, i
     '''
 
     logging.info('=== Fit tracks ===')
+
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        alignment = in_file_h5.root.Alignment[:]
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
         # Define description
@@ -352,6 +357,14 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, fit_duts=None, i
                 fit_duts = fit_duts if fit_duts else range(n_duts)
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT %d', fit_dut)
+
+                    dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
+                    rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
+                                                                     beta=alignment[fit_dut]['beta'],
+                                                                     gamma=alignment[fit_dut]['gamma'])
+                    basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+                    dut_plane_normal = basis_global[2]
+
                     tracklets_table = None
                     for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
 
@@ -406,9 +419,15 @@ def fit_tracks(input_track_candidates_file, output_tracks_file, fit_duts=None, i
                         del track_hits
 
                         # Store results
-                        offsets = np.concatenate([i[0] for i in results])  # merge offsets from all cores in results
-                        slopes = np.concatenate([i[1] for i in results])  # merge slopes from all cores in results
-                        chi2s = np.concatenate([i[2] for i in results])  # merge chi2 from all cores in results
+                        offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
+                        slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
+                        chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
+
+                        # Set the offset to the track intersection with the tilded plane
+                        offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                                                line_directions=slopes,
+                                                                                                position_plane=dut_position,
+                                                                                                normal_plane=dut_plane_normal)
 
                         tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts)
 
@@ -791,7 +810,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
 #                                 print 'SWAP HIT'
                                 _swap_hits(tr_column, tr_row, tr_z, tr_charge, track_index, dut_index, hit_index, column, row, z, charge)
                                 if track_index > hit_index:  # Check if hit is already assigned to other track
-#                                     print 'RESET DUT TRACK QUALITY'
+                                    #                                     print 'RESET DUT TRACK QUALITY'
                                     _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, hit_index, actual_column_sigma, actual_row_sigma)
                             shortest_hit_distance = hit_distance
                             n_track_hits += 1
