@@ -207,12 +207,14 @@ def _add_charge_sharing_hits(relative_position, hits_digits, max_column, max_row
 
 
 @njit()
-def shuffle_event_hits(event_number, n_tracks_per_event, hits):
+def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
     ''' Takes the hits of all DUTs and shuffles them for each event
     '''
 
     index = 0
     indeces = np.arange(hits.shape[0])  # Hack to allow np.shuffle on a multidimesnional array, http://numba.pydata.org/numba-doc/dev/reference/numpysupported.html#simple-random-data
+
+    np.random.seed(seed)
 
     while index < hits.shape[0]:  # Loop over actual DUT hits
         if n_tracks_per_event[index] == 1:  # One cannot shuffle one hit
@@ -573,7 +575,7 @@ class SimulateData(object):
         # Suffle event hits to simulate unordered hit data per trigger
         if self.digitization_shuffle_hits:
             for index, actual_dut_hits in enumerate(hits):
-                hits[index] = shuffle_event_hits(event_number, n_tracks_per_event, actual_dut_hits)
+                hits[index] = shuffle_event_hits(event_number, n_tracks_per_event, actual_dut_hits, self.random_seed + index)  # + Index is a trick to shuffle different for each device 
 
         # Create detector response: digitized hits
         hits_digitized = self._digitize_hits(event_number, hits)
