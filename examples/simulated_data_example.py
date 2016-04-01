@@ -21,25 +21,25 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # All simulator std. settings are listed here and can be changed
     # General setup
-    simulate_data.n_duts = 4  # Number of DUTs in the simulation
-    simulate_data.z_positions = [i * 50000 for i in range(simulate_data.n_duts)]  # in um; std: every 10 cm
-    simulate_data.offsets = [(-10000, -10000), (-10000, -10000), (-11731, -9013), (-12341, -13163)]  # in x, y in mu
-    # simulate_data.rotations = [(0.002, -0.001, 0.001), (0.004, -0.003, 0.006), (-0.004, 0, 0), (0, 0.004, 0)] # in rotation around x, y, z axis in Rad
+    simulate_data.n_duts = 6  # Number of DUTs in the simulation
+    simulate_data.z_positions = [i * 10000 for i in range(simulate_data.n_duts)]  # in um; std: every 10 cm
+    simulate_data.offsets = [(-2500, -2500)] * simulate_data.n_duts  # in x, y in mu
+    simulate_data.rotations = [(0, 0, 0)] * simulate_data.n_duts  # in rotation around x, y, z axis in Rad
     simulate_data.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
     # Beam related settings
     simulate_data.beam_position = (0, 0)  # Average beam position in x, y at z = 0 in mu
     simulate_data.beam_position_sigma = (2000, 2000)  # in x, y at z = 0 in mu
     simulate_data.beam_angle = 0  # Average beam angle in theta at z = 0 in mRad
     simulate_data.beam_angle_sigma = 1  # Deviation from e average beam angle in theta at z = 0 in mRad
-    simulate_data.tracks_per_event = 2  # Average number of tracks per event
+    simulate_data.tracks_per_event = 1  # Average number of tracks per event
     simulate_data.tracks_per_event_sigma = 1  # Deviation from the average number of tracks, makes no track pe event possible!
     # Device specific settings
-    simulate_data.dut_bias = [20] * simulate_data.n_duts  # Sensor bias voltage for each device in volt
-    simulate_data.dut_thickness = [400] * simulate_data.n_duts  # Sensor thickness for each device in um
-    simulate_data.dut_threshold = [2000] * simulate_data.n_duts  # Detection threshold for each device in electrons, influences efficiency!
-    simulate_data.dut_noise = [150] * simulate_data.n_duts  # Noise for each device in electrons
-    simulate_data.dut_pixel_size = [(250, 50)] * simulate_data.n_duts  # Pixel size for each device in x / y in um
-    simulate_data.dut_n_pixel = [(80, 400)] * simulate_data.n_duts  # Number of pixel for each device in x / y
+    simulate_data.dut_bias = [50] * simulate_data.n_duts  # Sensor bias voltage for each device in volt
+    simulate_data.dut_thickness = [100] * simulate_data.n_duts  # Sensor thickness for each device in um
+    simulate_data.dut_threshold = [0] * simulate_data.n_duts  # Detection threshold for each device in electrons, influences efficiency!
+    simulate_data.dut_noise = [50] * simulate_data.n_duts  # Noise for each device in electrons
+    simulate_data.dut_pixel_size = [(50, 50)] * simulate_data.n_duts  # Pixel size for each device in x / y in um
+    simulate_data.dut_n_pixel = [(1000, 1000)] * simulate_data.n_duts  # Number of pixel for each device in x / y
     simulate_data.dut_efficiencies = [1.] * simulate_data.n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
     simulate_data.dut_material_budget = [simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(simulate_data.n_duts)]  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering; std. setting is the sensor thickness made of silicon as material budget
     # Digitization settings
