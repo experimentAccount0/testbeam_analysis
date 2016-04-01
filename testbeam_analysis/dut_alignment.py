@@ -309,8 +309,8 @@ def coarse_alignment(input_cluster_files, input_correlation_file, output_alignme
         carefully. E.g.: (np.pi, np.pi, np.pi)
         If None +- 5 degree maximum error from the starting values x0 is assumed
     angles : iterable, None
-        Rotation angles of the DUTs to be used as starting values in the coarse alignment rotation reconstruction.
-        If None the starting values for rotation angles alpha, beta are deduced from the correlations and gamma is assumed to be 0.
+        Measured rotation angles of the DUTs to be used as starting values in the coarse alignment rotation reconstruction.
+        If None no rotation for all DUTs is assumed, alpha = beta = gamma = 0
     dut_names: iterable
         List of names of the DUTs.
     output_pdf_file : string
@@ -513,33 +513,35 @@ def coarse_alignment(input_cluster_files, input_correlation_file, output_alignme
 
             alignment_parameters = np.zeros((n_duts,), dtype=description)
 
+            # FIXME: the reference rotations have to be changed too
             logging.info('Reconstruct rotation angles')
             for dut_index, dut_track_cluster in enumerate(track_cluster, start=1):  # Loop over DUTs
                 logging.info('Deduce rotation of DUT %s', dut_index)
                 alignment_parameters[dut_index]['DUT'] = dut_index
                 column_0, row_0, column_1, row_1 = dut_track_cluster[:, 0], dut_track_cluster[:, 1], dut_track_cluster[:, 2], dut_track_cluster[:, 3]
 
-                if angles is None:  # Get slope from prealignment to set alpha, beta starting angle
-                    slope = prealignment[prealignment['dut_x'] == dut_index]['c1']
+                if angles is None:
+                    alpha, beta, gamma = 0., 0., 0.
+                else:
+                    alpha, beta, gamma = angles[dut_index]
 
-                    if slope[0] < 0. or slope[1] < 0.:
-                        raise RuntimeWarning('Inverted DUTs are not tested yet. Reconstruction might not work!')
+                # Get slope from prealignment to set alpha, beta starting angle
+                slope = prealignment[prealignment['dut_x'] == dut_index]['c1']
 
-                    if slope[0] < 1.:
-                        beta = np.arccos(slope[0])
-                    else:
-                        beta = np.arccos(1. - slope[0])
-                    if slope[0] > 1.1:
-                        raise RuntimeWarning('The reference DUT seems to be tilted. This is not tested yet. Reconstruction might not work!')
-                    if slope[1] < 1.:
-                        alpha = np.arccos(slope[1])
-                    else:
-                        alpha = np.arccos(1. - slope[1])
-                    if slope[1] > 1.1:
-                        raise RuntimeWarning('The reference DUT seems to be tilted. This is not tested yet. Reconstruction might not work!')
-                    gamma = 0.  # Assume gamma = 0, otherwise alpha/beta angles cannot be deduced from correlations
-                else:  # Take angles given to this funciton from measurement
-                    alpha, beta, gamma = angles
+                if slope[0] < 0. or slope[1] < 0.:
+                    raise RuntimeWarning('Inverted DUTs are not tested yet. Reconstruction might not work!')
+                if slope[0] < 1.:
+                    beta = np.arccos(slope[0])
+                else:
+                    beta = np.arccos(1. - slope[0])
+                if slope[0] > 1.1:
+                    raise RuntimeWarning('The reference DUT seems to be tilted. This is not tested yet. Reconstruction might not work!')
+                if slope[1] < 1.:
+                    alpha = np.arccos(slope[1])
+                else:
+                    alpha = np.arccos(1. - slope[1])
+                if slope[1] > 1.1:
+                    raise RuntimeWarning('The reference DUT seems to be tilted. This is not tested yet. Reconstruction might not work!')
 
                 alpha, beta, gamma = reconstruct_rotation(column_0=column_0,
                                                           row_0=row_0,
