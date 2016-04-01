@@ -80,6 +80,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
+                              input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
                               fit_duts=[0, 1, 2, 3],
@@ -94,12 +95,14 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                                        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                         output_pdf=os.path.join(output_folder, 'Residuals.pdf'),
                                         max_chi2=10000)
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                          output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
                                          bin_size=(250, 50),
                                          minimum_track_density=2,
