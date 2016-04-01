@@ -104,12 +104,14 @@ def calculate_residuals_kalman(input_tracks_file, z_positions, use_duts=None, ma
     return residuals
 
 
-def calculate_residuals(input_tracks_file, use_duts=None, max_chi2=None, output_pdf=None):
+def calculate_residuals(input_tracks_file, input_alignment_file, use_duts=None, max_chi2=None, output_pdf=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
     input_tracks_file : string
         File name with the tracks table
+    input_alignment_file : pytables file
+        File name of the input aligment data
     use_duts : iterable
         The duts to calculate residuals for. If None all duts in the input_tracks_file are used
     max_chi2 : int
@@ -122,6 +124,9 @@ def calculate_residuals(input_tracks_file, use_duts=None, max_chi2=None, output_
     A list of residuals in column row. e.g.: [Col residual DUT 0, Row residual DUT 0, Col residual DUT 1, Row residual DUT 1, ...]
     '''
     logging.info('=== Calculate residuals ===')
+
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        alignment = in_file_h5.root.Alignment[:]
 
     def gauss(x, *p):
         A, mu, sigma = p
@@ -144,9 +149,28 @@ def calculate_residuals(input_tracks_file, use_duts=None, max_chi2=None, output_
             if max_chi2:
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
             track_array = track_array[np.logical_and(track_array['x_dut_%d' % actual_dut] != 0., track_array['y_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
-            hits = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut]))
-            intersection = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2']))  # Intersection of track with DUT plane is the offset of the track definition (by convention)
-            difference = intersection - hits
+
+            transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
+                                                                                         y=alignment[actual_dut]['translation_y'],
+                                                                                         z=alignment[actual_dut]['translation_z'],
+                                                                                         alpha=alignment[actual_dut]['alpha'],
+                                                                                         beta=alignment[actual_dut]['beta'],
+                                                                                         gamma=alignment[actual_dut]['gamma'])
+
+            hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut],
+                                                                             y=track_array['y_dut_%d' % actual_dut],
+                                                                             z=track_array['z_dut_%d' % actual_dut],
+                                                                             transformation_matrix=transformation_matrix)
+
+            intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'],
+                                                                                                        y=track_array['offset_1'],
+                                                                                                        z=track_array['offset_2'],
+                                                                                                        transformation_matrix=transformation_matrix)
+
+            if not np.allclose(hit_z, 0) or not np.allclose(intersection_z, 0):
+                raise RuntimeError('The transformation to the local coordinate system did not give all z = 0.')
+
+            difference = np.column_stack((intersection_x, intersection_y, intersection_z)) - np.column_stack((hit_x, hit_y, hit_z))
 
             for i in range(2):  # col / row
                 mean, rms = np.mean(difference[:, i]), np.std(difference[:, i])
@@ -217,12 +241,14 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     return mean_fitted, selected_data, fit, pcov
 
 
-def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
     input_tracks_file : string
         file name with the tracks table
+    input_alignment_file : pytables file
+        File name of the input aligment data
     output_pdf : pdf file name object
     bin_size : iterable
         sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
@@ -242,6 +268,9 @@ def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_
         column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation)
     '''
     logging.info('=== Calculate efficiency ===')
+
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        alignment = in_file_h5.root.Alignment[:]
 
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
@@ -280,9 +309,29 @@ def calculate_efficiency(input_tracks_file, output_pdf, bin_size, minimum_track_
                 if max_chi2:
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
 
-                # Take hits of actual DUT and track projection on actual DUT plane
-                hits = np.column_stack((track_array['x_dut_%d' % actual_dut], track_array['y_dut_%d' % actual_dut], track_array['z_dut_%d' % actual_dut]))
-                intersection = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2']))  # Intersection of track with DUT plane is the offset of the track definition (by convention)
+                transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
+                                                                                             y=alignment[actual_dut]['translation_y'],
+                                                                                             z=alignment[actual_dut]['translation_z'],
+                                                                                             alpha=alignment[actual_dut]['alpha'],
+                                                                                             beta=alignment[actual_dut]['beta'],
+                                                                                             gamma=alignment[actual_dut]['gamma'])
+
+                selection = np.logical_and(track_array['x_dut_%d' % actual_dut] != 0., track_array['y_dut_%d' % actual_dut] != 0.)  # Only transform real hits
+                hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut][selection],
+                                                                                 y=track_array['y_dut_%d' % actual_dut][selection],
+                                                                                 z=track_array['z_dut_%d' % actual_dut][selection],
+                                                                                 transformation_matrix=transformation_matrix)
+
+                intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'],
+                                                                                                            y=track_array['offset_1'],
+                                                                                                            z=track_array['offset_2'],
+                                                                                                            transformation_matrix=transformation_matrix)
+                if not np.allclose(hit_z, 0) or not np.allclose(intersection_z, 0):
+                    raise RuntimeError('The transformation to the local coordinate system did not give all z = 0.')
+
+                intersection = np.column_stack((intersection_x, intersection_y, intersection_z))
+                hits = np.zeros_like(intersection)
+                hits[selection] = np.column_stack((hit_x, hit_y, hit_z))
 
                 # Select hits from column row range (e.g. to supress edge pixels)
                 col_range = [col_range, ] if not isinstance(col_range, list) else col_range
