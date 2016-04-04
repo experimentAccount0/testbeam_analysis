@@ -680,6 +680,9 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
         n_duts = sum(['charge' in col for col in table.dtype.names])
         array = table[:]
         tracks = analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+        if tracks.shape[0] == 0:
+            logging.warning('No tracks in event selection, cannot plot events!')
+            return
         if max_chi2:
             tracks = tracks[tracks['track_chi2'] <= max_chi2]
         mpl.rcParams['legend.fontsize'] = 10
