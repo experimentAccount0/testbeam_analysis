@@ -35,10 +35,10 @@ class TestExamples(unittest.TestCase):
                                        cls.output_folder + r'\TestBeamData_FEI4_DUT1.h5',
                                        cls.output_folder + r'\TestBeamData_FEI4_DUT4.h5',
                                        cls.output_folder + r'\TestBeamData_FEI4_DUT5.h5']
-        data_selection.reduce_hit_files(cls.examples_fei4_hit_files, fraction=1000)
+        data_selection.reduce_hit_files(cls.examples_fei4_hit_files, fraction=100)
 
         cls.examples_mimosa_hit_files = [cls.output_folder + r'\TestBeamData_Mimosa26_DUT%d.h5' % i for i in range(6)]
-        data_selection.reduce_hit_files(cls.examples_mimosa_hit_files, fraction=1000)
+        data_selection.reduce_hit_files(cls.examples_mimosa_hit_files, fraction=100)
 
         # Remove old files and rename reduced files
         for file_name in cls.examples_fei4_hit_files:
