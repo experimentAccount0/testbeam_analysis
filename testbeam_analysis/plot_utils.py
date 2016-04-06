@@ -1107,7 +1107,10 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=np.amin(efficiency), z_max=100.)
+    z_min = np.min(efficiency)
+    if z_min == 100.:
+        z_min = 90.
+    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
     fig.tight_layout()
     output_fig.savefig(fig)
 
