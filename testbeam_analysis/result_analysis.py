@@ -316,24 +316,25 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                                                                                              beta=alignment[actual_dut]['beta'],
                                                                                              gamma=alignment[actual_dut]['gamma'])
 
-                selection = np.logical_and(track_array['x_dut_%d' % actual_dut] != 0., track_array['y_dut_%d' % actual_dut] != 0.)  # Only transform real hits
-                hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut][selection],
-                                                                                 y=track_array['y_dut_%d' % actual_dut][selection],
-                                                                                 z=track_array['z_dut_%d' % actual_dut][selection],
+                hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut],
+                                                                                 y=track_array['y_dut_%d' % actual_dut],
+                                                                                 z=track_array['z_dut_%d' % actual_dut],
                                                                                  transformation_matrix=transformation_matrix)
 
-                intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'][selection],
-                                                                                                            y=track_array['offset_1'][selection],
-                                                                                                            z=track_array['offset_2'][selection],
+                intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'],
+                                                                                                            y=track_array['offset_1'],
+                                                                                                            z=track_array['offset_2'],
                                                                                                             transformation_matrix=transformation_matrix)
-                if not np.allclose(hit_z, 0) or not np.allclose(intersection_z, 0):
-                    raise RuntimeError('The transformation to the local coordinate system did not give all z = 0.')
 
                 intersection = np.column_stack((intersection_x, intersection_y, intersection_z))
                 hits = np.column_stack((hit_x, hit_y, hit_z))
 
-                event_number = track_array['event_number'][selection]
+                selection = np.logical_or(track_array['x_dut_%d' % actual_dut] == 0., track_array['y_dut_%d' % actual_dut] == 0.)  # Only transform real hits
+                hits[selection, 0] = 0.
+                hits[selection, 1] = 0.
 
+                if not np.allclose(hit_z[~selection], 0) or not np.allclose(intersection_z, 0):
+                    raise RuntimeError('The transformation to the local coordinate system did not give all z = 0.')
 
                 # Select hits from column row range (e.g. to supress edge pixels)
                 col_range = [col_range, ] if not isinstance(col_range, list) else col_range
@@ -369,13 +370,18 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 if cut_distance:  # Select intersections where hit is in given distance around track intersection
                     intersection_valid_hit = intersection[np.logical_and(np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0), distance < cut_distance)]
                 else:
-                    sel = np.where(np.logical_or(hits[:, 0] == 0, hits[:, 1] == 0))
                     intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
 
                 track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
                 track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
+
+                if np.all(track_density == 0):
+                    logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
+                    continue
+
                 efficiency = np.zeros_like(track_density_with_DUT_hit)
                 efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
+
                 efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
 
                 plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
