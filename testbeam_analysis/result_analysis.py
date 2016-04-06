@@ -241,7 +241,7 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     return mean_fitted, selected_data, fit, pcov
 
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, minimum_track_density, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=500, max_distance=500, col_range=None, row_range=None, output_file=None):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, minimum_track_density, max_distance=500, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=None, col_range=None, row_range=None, output_file=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -322,16 +322,18 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                                                                                  z=track_array['z_dut_%d' % actual_dut][selection],
                                                                                  transformation_matrix=transformation_matrix)
 
-                intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'],
-                                                                                                            y=track_array['offset_1'],
-                                                                                                            z=track_array['offset_2'],
+                intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'][selection],
+                                                                                                            y=track_array['offset_1'][selection],
+                                                                                                            z=track_array['offset_2'][selection],
                                                                                                             transformation_matrix=transformation_matrix)
                 if not np.allclose(hit_z, 0) or not np.allclose(intersection_z, 0):
                     raise RuntimeError('The transformation to the local coordinate system did not give all z = 0.')
 
                 intersection = np.column_stack((intersection_x, intersection_y, intersection_z))
-                hits = np.zeros_like(intersection)
-                hits[selection] = np.column_stack((hit_x, hit_y, hit_z))
+                hits = np.column_stack((hit_x, hit_y, hit_z))
+
+                event_number = track_array['event_number'][selection]
+
 
                 # Select hits from column row range (e.g. to supress edge pixels)
                 col_range = [col_range, ] if not isinstance(col_range, list) else col_range
@@ -367,6 +369,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 if cut_distance:  # Select intersections where hit is in given distance around track intersection
                     intersection_valid_hit = intersection[np.logical_and(np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0), distance < cut_distance)]
                 else:
+                    sel = np.where(np.logical_or(hits[:, 0] == 0, hits[:, 1] == 0))
                     intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
 
                 track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
