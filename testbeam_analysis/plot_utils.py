@@ -1104,22 +1104,25 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     fig.tight_layout()
     output_fig.savefig(fig)
 
-    fig = Figure()
-    fig.patch.set_facecolor('white')
-    ax = fig.add_subplot(111)
-    z_min = np.min(efficiency)
-    if z_min == 100.:
-        z_min = 90.
-    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
-    fig.tight_layout()
-    output_fig.savefig(fig)
+    if np.any(~efficiency.mask):
+        fig = Figure()
+        fig.patch.set_facecolor('white')
+        ax = fig.add_subplot(111)
+        z_min = np.ma.min(efficiency)
+        if z_min == 100.:  # One cannot plot with 0 z axis range
+            z_min = 90.
+        plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
+        fig.tight_layout()
+        output_fig.savefig(fig)
 
-    plt.clf()
-    plt.grid()
-    plt.title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
-    plt.xlabel('Efficiency [%]')
-    plt.ylabel('#')
-    plt.yscale('log')
-    plt.xlim([-0.5, 101.5])
-    plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
-    output_fig.savefig()
+        plt.clf()
+        plt.grid()
+        plt.title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
+        plt.xlabel('Efficiency [%]')
+        plt.ylabel('#')
+        plt.yscale('log')
+        plt.xlim([-0.5, 101.5])
+        plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
+        output_fig.savefig()
+    else:
+        logging.warning('Cannot create efficiency plots, since all pixels are masked')
