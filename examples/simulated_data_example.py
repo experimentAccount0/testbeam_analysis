@@ -23,7 +23,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # General setup
     simulate_data.n_duts = 6  # Number of DUTs in the simulation
     simulate_data.z_positions = [i * 10000 for i in range(simulate_data.n_duts)]  # in um; std: every 10 cm
-    simulate_data.offsets = [(-2500, -2500)] * simulate_data.n_duts  # in x, y in mu
+    simulate_data.offsets = [(-10000, -10000)] * simulate_data.n_duts  # in x, y in mu
     simulate_data.rotations = [(0, 0, 0)] * simulate_data.n_duts  # in rotation around x, y, z axis in Rad
     simulate_data.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
     # Beam related settings
@@ -39,16 +39,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     simulate_data.dut_threshold = [0] * simulate_data.n_duts  # Detection threshold for each device in electrons, influences efficiency!
     simulate_data.dut_noise = [50] * simulate_data.n_duts  # Noise for each device in electrons
     simulate_data.dut_pixel_size = [(50, 50)] * simulate_data.n_duts  # Pixel size for each device in x / y in um
-    simulate_data.dut_n_pixel = [(1000, 1000)] * simulate_data.n_duts  # Number of pixel for each device in x / y
+    simulate_data.dut_n_pixel = [(400, 400)] * simulate_data.n_duts  # Number of pixel for each device in x / y
     simulate_data.dut_efficiencies = [1.] * simulate_data.n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
     simulate_data.dut_material_budget = [simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(simulate_data.n_duts)]  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering; std. setting is the sensor thickness made of silicon as material budget
     # Digitization settings
     simulate_data.digitization_charge_sharing = True
-    simulate_data.digitization_shuffle_hits = True  # Shuffle hit per event to challange track finding
+    simulate_data.digitization_shuffle_hits = False  # Shuffle hit per event to challange track finding
     simulate_data.digitization_pixel_discretization = True  # Translate hit position on DUT plane to channel indices (column / row)
 
     # Create the data
-    simulate_data.create_data_and_store('simulated_data', n_events=1000000)
+    simulate_data.create_data_and_store('simulated_data', n_events=100000)
 
     # The simulated data files, one file per DUT
     data_files = [r'simulated_data_DUT%d.h5' % i for i in range(simulate_data.n_duts)]
@@ -77,18 +77,20 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.coarse_alignment(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
-                                   input_correlation_file='Correlation.h5',
-                                   output_alignment_file='Alignment.h5',
-                                   z_positions=simulate_data.z_positions,
-                                   pixel_size=simulate_data.dut_pixel_size,
-                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
+    dut_alignment.prealignment(input_correlation_file='Correlation.h5',
+                               output_alignment_file='Alignment.h5',
+                               z_positions=simulate_data.z_positions,
+                               pixel_size=simulate_data.dut_pixel_size,
+                               non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
-                                     input_alignment_file='Alignment.h5',
-                                     output_tracklets_file='Tracklets.h5',
+                                     output_merged_file='Merged.h5',
                                      pixel_size=simulate_data.dut_pixel_size)
+
+    dut_alignment.apply_alignment(input_hit_file='Merged.h5',
+                                  input_alignment_file='Alignment.h5',
+                                  output_hit_aligned_file='Tracklets.h5')
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
     track_analysis.find_tracks(input_tracklets_file='Tracklets.h5',
@@ -111,13 +113,15 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Calculate the residuals to check the alignment
     result_analysis.calculate_residuals(input_tracks_file='Tracks.h5',
+                                        input_alignment_file='Alignment.h5',
                                         output_pdf='Residuals.pdf')
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     sensor_size = [(simulate_data.dut_pixel_size[i][0] * simulate_data.dut_n_pixel[i][0], simulate_data.dut_pixel_size[i][1] * simulate_data.dut_n_pixel[i][1]) for i in range(simulate_data.n_duts)]
     result_analysis.calculate_efficiency(input_tracks_file='Tracks.h5',
+                                         input_alignment_file='Alignment.h5',
                                          output_pdf='Efficiency.pdf',
                                          bin_size=simulate_data.dut_pixel_size,
-                                         minimum_track_density=10,
+                                         minimum_track_density=1,
                                          sensor_size=sensor_size)

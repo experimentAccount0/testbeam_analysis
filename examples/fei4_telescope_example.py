@@ -55,23 +55,21 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                     )
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
-    dut_alignment.coarse_alignment(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
-                                   input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
-                                   output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                   z_positions=z_positions,
-                                   pixel_size=pixel_size,
-                                   dut_names=dut_names,
-                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
+    dut_alignment.prealignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                               output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                               z_positions=z_positions,
+                               pixel_size=pixel_size,
+                               dut_names=dut_names,
+                               non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
-                                     input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                     output_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
+                                     output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=pixel_size)
 
-    dut_alignment.check_hit_alignment(input_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
-                                      output_pdf_file=os.path.join(output_folder, 'Alignment_Check.pdf'),
-                                      combine_n_hits=1000000)
+    dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
+                                  input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                  output_hit_aligned_file=os.path.join(output_folder, 'Tracklets.h5'))
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
     track_analysis.find_tracks(input_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
@@ -89,8 +87,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                           output_pdf=os.path.join(output_folder, 'Event.pdf'),
-                           event_range=(0, 10),
+                           output_pdf=None,  # os.path.join(output_folder, 'Event.pdf'),
+                           event_range=(0, 40),
                            dut=1)
 
     # Calculate the residuals to check the alignment
