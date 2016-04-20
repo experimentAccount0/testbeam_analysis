@@ -32,9 +32,10 @@ class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(os.path.join(cls.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5'))
-        os.remove(os.path.join(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
-        os.remove(os.path.join(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.pdf'))
+        pass
+#         os.remove(os.path.join(cls.output_folder + 'TestBeamData_FEI4_DUT0_small_cluster.h5'))
+#         os.remove(os.path.join(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
+#         os.remove(os.path.join(cls.output_folder + 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.pdf'))
 
     def test_noisy_pixel_remover(self):
         hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=1.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4))

@@ -100,7 +100,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
                 try:
                     expected_data = first_h5_file.get_node(first_h5_file.root, node.name)[:]
                     data = second_h5_file.get_node(second_h5_file.root, node.name)[:]
-                    if exact:  # exact comparison if exact is set and on recarray data (np.allclose does not work on recarray)
+                    if exact:
                         if not np.array_equal(expected_data, data):  # compare the arrays for each element
                             checks_passed = False
                             error_msg += node.name
