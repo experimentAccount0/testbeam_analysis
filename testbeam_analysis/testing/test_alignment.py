@@ -41,8 +41,8 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder, 'Correlation.pdf'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
 #         os.remove(os.path.join(cls.output_folder, 'Tracklets_2.h5'))
-        os.remove(cls.output_folder, 'Alignment.h5')
-        os.remove(cls.output_folder, 'Alignment.pdf')
+        os.remove(os.path.join(cls.output_folder, 'Alignment.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Alignment.pdf'))
 
     def test_cluster_correlation(self):  # check the hit correlation function
         dut_alignment.correlate_cluster(input_cluster_files=self.data_files,
