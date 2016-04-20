@@ -327,10 +327,10 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     fit, _ = curve_fit(f, x, mean_fitted)  # Fit stragiht line
     fit_fn = np.poly1d(fit[::-1])
     offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
-    offset_limit = np.amax(offset)  # Calculate starting offset cut
-    error_limit = np.amax(mean_error_fitted)  # Calculate starting fit error cut
-    left_limit = np.amin(x) - 1  # Calculate starting left cut
-    right_limit = np.amax(x) + 1  # Calculate starting right cut
+    offset_limit = np.max(np.abs(offset))  # Calculate starting offset cut
+    error_limit = np.max(mean_error_fitted)  # Calculate starting fit error cut
+    left_limit = np.min(x) - 1  # Calculate starting left cut
+    right_limit = np.max(x) + 1  # Calculate starting right cut
 
     mean_plot, = ax.plot(x, mean_fitted, 'o-', label='Data prefit')  # Plot correlatioin
     ax.plot(x, fit_fn(x), '-', label='Line fit')  # Plot line fit
@@ -695,6 +695,7 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
                     x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
                     y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
                     z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
+
             if fitted_tracks:
                 offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
                 slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
