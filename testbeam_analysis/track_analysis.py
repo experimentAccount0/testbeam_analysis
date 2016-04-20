@@ -18,7 +18,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis import plot_utils
 from testbeam_analysis import analysis_utils
-from testbeam_analysis import geometry_utils
+from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.dut_alignment import prealignment
 
 
