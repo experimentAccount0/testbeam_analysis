@@ -10,7 +10,11 @@ import numpy as np
 from testbeam_analysis.cpp import data_struct
 from testbeam_analysis import analysis_utils
 
-tests_data_folder = r'tests/test_analysis_utils/'
+# Get package path
+testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
+
+# Set the converter script path
+tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/test_analysis_utils//'))
 
 
 class TestAnalysisUtils(unittest.TestCase):
@@ -93,7 +97,7 @@ class TestAnalysisUtils(unittest.TestCase):
         self.assertTrue(exception_ok & np.all(array == array_fast))
 
     def test_3d_index_histograming(self):  # check compiled hist_3D_index function
-        with tb.open_file(os.path.join(tests_data_folder + 'hist_data.h5'), mode="r") as in_file_h5:
+        with tb.open_file(os.path.join(tests_data_folder, 'hist_data.h5'), mode="r") as in_file_h5:
             xyz = in_file_h5.root.HistDataXYZ[:]
             x, y, z = xyz[0], xyz[1], xyz[2]
             shape = (100, 100, 100)
@@ -110,6 +114,5 @@ class TestAnalysisUtils(unittest.TestCase):
             self.assertTrue(exception_ok & np.all(array == array_fast))
 
 if __name__ == '__main__':
-    tests_data_folder = r'test_analysis_utils/'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestAnalysisUtils)
     unittest.TextTestRunner(verbosity=2).run(suite)

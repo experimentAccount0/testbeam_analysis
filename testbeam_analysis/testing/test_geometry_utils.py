@@ -4,9 +4,7 @@ import numpy as np
 
 import unittest
 
-from testbeam_analysis import geometry_utils
-
-tests_data_folder = r'tests/test_track_analysis/'
+from testbeam_analysis.tools import geometry_utils
 
 
 class TestTrackAnalysis(unittest.TestCase):
@@ -75,6 +73,5 @@ class TestTrackAnalysis(unittest.TestCase):
         self.assertTrue(np.all(z_new == np.arange(10) - 3))
 
 if __name__ == '__main__':
-    tests_data_folder = r'test_track_analysis/'
     suite = unittest.TestLoader().loadTestsFromTestCase(TestTrackAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)

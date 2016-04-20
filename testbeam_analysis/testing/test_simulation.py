@@ -10,7 +10,7 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 from testbeam_analysis.tools import simulate_data
-from testbeam_analysis import geometry_utils
+from testbeam_analysis.tools import geometry_utils
 
 from testbeam_analysis import analysis_utils
 from testbeam_analysis import plot_utils
