@@ -104,7 +104,7 @@ def calculate_residuals_kalman(input_tracks_file, z_positions, use_duts=None, ma
     return residuals
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, use_duts=None, max_chi2=None, output_pdf=None):
+def calculate_residuals(input_tracks_file, input_alignment_file, use_duts=None, max_chi2=None, force_prealignment=False, output_pdf=None):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
@@ -116,6 +116,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, use_duts=None, 
         The duts to calculate residuals for. If None all duts in the input_tracks_file are used
     max_chi2 : int
         Use only converged fits (cut on chi2)
+    force_prealignment : boolean
+        Take the prealignment, although if a coarse alignment is availale
     output_pdf : pdf file name
         If None plots are printed to screen.
         If False no plots are created.
@@ -125,8 +127,17 @@ def calculate_residuals(input_tracks_file, input_alignment_file, use_duts=None, 
     '''
     logging.info('=== Calculate residuals ===')
 
+    use_prealignment = True if force_prealignment else False
+
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        alignment = in_file_h5.root.Alignment[:]
+        prealignment = in_file_h5.root.PreAlignment[:]
+        if not use_prealignment:
+            try:
+                alignment = in_file_h5.root.Alignment[:]
+                logging.info('Use alignment data')
+            except tb.exceptions.NodeError:
+                use_prealignment = True
+                logging.info('Use prealignment data')
 
     def gauss(x, *p):
         A, mu, sigma = p
@@ -150,12 +161,21 @@ def calculate_residuals(input_tracks_file, input_alignment_file, use_duts=None, 
                 track_array = track_array[track_array['track_chi2'] <= max_chi2]
             track_array = track_array[np.logical_and(track_array['x_dut_%d' % actual_dut] != 0., track_array['y_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
 
-            transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
-                                                                                         y=alignment[actual_dut]['translation_y'],
-                                                                                         z=alignment[actual_dut]['translation_z'],
-                                                                                         alpha=alignment[actual_dut]['alpha'],
-                                                                                         beta=alignment[actual_dut]['beta'],
-                                                                                         gamma=alignment[actual_dut]['gamma'])
+            # Transform the hits and track intersections into the local coordinate system (otherwise they are quite meaningless)
+            if not use_prealignment:  # Use alignment with rotations
+                transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
+                                                                                             y=alignment[actual_dut]['translation_y'],
+                                                                                             z=alignment[actual_dut]['translation_z'],
+                                                                                             alpha=alignment[actual_dut]['alpha'],
+                                                                                             beta=alignment[actual_dut]['beta'],
+                                                                                             gamma=alignment[actual_dut]['gamma'])
+            else:  # Prealignment only gives offsets and no rotations, thus apply the known offsets
+                transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=prealignment[actual_dut]['column_c0'],
+                                                                                             y=prealignment[actual_dut]['row_c0'],
+                                                                                             z=prealignment[actual_dut]['z'],
+                                                                                             alpha=0,
+                                                                                             beta=0,
+                                                                                             gamma=0)
 
             hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut],
                                                                              y=track_array['y_dut_%d' % actual_dut],
@@ -241,7 +261,7 @@ def calculate_correlation_fromplot(data1, data2, edges1, edges2, dofit=True):
     return mean_fitted, selected_data, fit, pcov
 
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, minimum_track_density, max_distance=500, sensor_size=None, use_duts=None, max_chi2=None, cut_distance=None, col_range=None, row_range=None, output_file=None):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, minimum_track_density, max_distance=500, sensor_size=None, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, output_file=None):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -260,6 +280,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
         the DUTs to calculate efficiency for. If None all duts are used
     max_chi2 : int
         only use track with a chi2 <= max_chi2
+    force_prealignment : boolean
+        Take the prealignment, although if a coarse alignment is availale
     cut_distance : int
         use only distances (between DUT hit and track hit) smaller than cut_distance
     max_distance : int
@@ -269,8 +291,17 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
     '''
     logging.info('=== Calculate efficiency ===')
 
+    use_prealignment = True if force_prealignment else False
+
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        alignment = in_file_h5.root.Alignment[:]
+        prealignment = in_file_h5.root.PreAlignment[:]
+        if not use_prealignment:
+            try:
+                alignment = in_file_h5.root.Alignment[:]
+                logging.info('Use alignment data')
+            except tb.exceptions.NodeError:
+                use_prealignment = True
+                logging.info('Use prealignment data')
 
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
@@ -309,12 +340,21 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 if max_chi2:
                     track_array = track_array[track_array['track_chi2'] <= max_chi2]
 
-                transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
-                                                                                             y=alignment[actual_dut]['translation_y'],
-                                                                                             z=alignment[actual_dut]['translation_z'],
-                                                                                             alpha=alignment[actual_dut]['alpha'],
-                                                                                             beta=alignment[actual_dut]['beta'],
-                                                                                             gamma=alignment[actual_dut]['gamma'])
+                # Transform the hits and track intersections into the local coordinate system (otherwise they are quite meaningless)
+                if not use_prealignment:  # Use alignment with rotations
+                    transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
+                                                                                                 y=alignment[actual_dut]['translation_y'],
+                                                                                                 z=alignment[actual_dut]['translation_z'],
+                                                                                                 alpha=alignment[actual_dut]['alpha'],
+                                                                                                 beta=alignment[actual_dut]['beta'],
+                                                                                                 gamma=alignment[actual_dut]['gamma'])
+                else:  # Prealignment only gives offsets and no rotations, thus apply the known offsets
+                    transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=prealignment[actual_dut]['column_c0'],
+                                                                                                 y=prealignment[actual_dut]['row_c0'],
+                                                                                                 z=prealignment[actual_dut]['z'],
+                                                                                                 alpha=0,
+                                                                                                 beta=0,
+                                                                                                 gamma=0)
 
                 hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut],
                                                                                  y=track_array['y_dut_%d' % actual_dut],
