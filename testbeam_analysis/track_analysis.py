@@ -17,9 +17,8 @@ from numba import njit
 from matplotlib.backends.backend_pdf import PdfPages
 
 from testbeam_analysis import plot_utils
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools import geometry_utils
-from testbeam_analysis.dut_alignment import prealignment
 
 
 def gauss(x, *p):
@@ -781,6 +780,12 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
         for dut_index in range(n_duts):  # loop over all DUTs in the actual track
             actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
 
+            # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
+            current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
+            current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
+            if tr_column[track_index][dut_index] == 0:  # No hit at the actual position
+                current_hit_distance = -1  # Signal no hit
+
 #             print '== ACTUAL DUT  ==', dut_index
 
             if not reference_hit_set and tr_row[track_index][dut_index] != 0:  # Search for first DUT that registered a hit (row != 0)
@@ -799,9 +804,6 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
                         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
                         hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
-                        # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
-                        current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
-                        current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
                         if shortest_hit_distance < 0 or hit_distance < shortest_hit_distance:  # Check if the hit is closer to reference hit
                             #                             print 'FOUND MATCHING HIT', column, row
                             if track_index != hit_index:  # Check if hit swapping is needed
@@ -811,7 +813,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                                     # Calculate hit distance to reference hit of other track
                                     column_distance_old, row_distance_old = abs(column - tr_column[hit_index][first_dut_index]), abs(row - tr_row[hit_index][first_dut_index])
                                     hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
-                                    if current_hit_distance < hit_distance:
+                                    if current_hit_distance > 0 and current_hit_distance < hit_distance:  # Check if actual assigned hit is better
                                         #                                         print 'CURRENT ASSIGNED HIT FITS BETTER, DO NOT SWAP', hit_index
                                         continue
                                     if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track; otherwise leave it with other track
