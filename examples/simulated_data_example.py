@@ -2,6 +2,7 @@
 '''
 
 import logging
+import os
 from multiprocessing import Pool
 
 from testbeam_analysis import hit_analysis
@@ -48,10 +49,13 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     simulate_data.digitization_pixel_discretization = True  # Translate hit position on DUT plane to channel indices (column / row)
 
     # Create the data
-    simulate_data.create_data_and_store('simulated_data', n_events=100000)
+    output_folder = 'simulation'  # define a folder where all output data and plots are stored
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    simulate_data.create_data_and_store(os.path.join(output_folder, 'simulated_data'), n_events=100000)
 
     # The simulated data files, one file per DUT
-    data_files = [r'simulated_data_DUT%d.h5' % i for i in range(simulate_data.n_duts)]
+    data_files = [os.path.join(output_folder, r'simulated_data_DUT%d.h5' % i) for i in range(simulate_data.n_duts)]
 
     # The following shows a complete test beam analysis by calling the separate function in correct order
 
@@ -71,57 +75,57 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
-                                    output_correlation_file='Correlation.h5',
+                                    output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                     n_pixels=simulate_data.dut_n_pixel,
                                     pixel_size=simulate_data.dut_pixel_size)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
-    dut_alignment.prealignment(input_correlation_file='Correlation.h5',
-                               output_alignment_file='Alignment.h5',
+    dut_alignment.prealignment(input_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
+                               output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                z_positions=simulate_data.z_positions,
                                pixel_size=simulate_data.dut_pixel_size,
                                non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
-                                     output_merged_file='Merged.h5',
+                                     output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=simulate_data.dut_pixel_size)
 
-    dut_alignment.apply_alignment(input_hit_file='Merged.h5',
-                                  input_alignment_file='Alignment.h5',
-                                  output_hit_aligned_file='Tracklets.h5')
+    dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
+                                  input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                  output_hit_aligned_file=os.path.join(output_folder, 'Tracklets.h5'))
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
-    track_analysis.find_tracks(input_tracklets_file='Tracklets.h5',
-                               input_alignment_file='Alignment.h5',
-                               output_track_candidates_file='TrackCandidates.h5')
+    track_analysis.find_tracks(input_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
+                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                               output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
     # Fit the track candidates and create new track table
-    track_analysis.fit_tracks(input_track_candidates_file='TrackCandidates.h5',
-                              input_alignment_file='Alignment.h5',
-                              output_tracks_file='Tracks.h5',
-                              output_pdf_file='Tracks.pdf',
+    track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
+                              input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                              output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                              output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
                               include_duts=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
-    plot_utils.plot_events(input_tracks_file='Tracks.h5',
-                           output_pdf='Event.pdf',
+    plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                           output_pdf=os.path.join(output_folder, 'Event.pdf'),
                            event_range=(0, 10),
                            dut=1)
 
     # Calculate the residuals to check the alignment
-    result_analysis.calculate_residuals(input_tracks_file='Tracks.h5',
-                                        input_alignment_file='Alignment.h5',
-                                        output_pdf='Residuals.pdf')
+    result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                                        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                        output_pdf=os.path.join(output_folder, 'Residuals.pdf'))
 
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     sensor_size = [(simulate_data.dut_pixel_size[i][0] * simulate_data.dut_n_pixel[i][0], simulate_data.dut_pixel_size[i][1] * simulate_data.dut_n_pixel[i][1]) for i in range(simulate_data.n_duts)]
-    result_analysis.calculate_efficiency(input_tracks_file='Tracks.h5',
-                                         input_alignment_file='Alignment.h5',
-                                         output_pdf='Efficiency.pdf',
+    result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                         output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
                                          bin_size=simulate_data.dut_pixel_size,
                                          minimum_track_density=1,
                                          sensor_size=sensor_size)
