@@ -8,7 +8,7 @@ import tables as tb
 import numpy as np
 
 from testbeam_analysis.cpp import data_struct
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 
 # Get package path
 testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation

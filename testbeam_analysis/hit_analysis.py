@@ -9,7 +9,7 @@ import numpy as np
 from scipy.ndimage import median_filter
 
 from pixel_clusterizer.clusterizer import HitClusterizer
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.plot_utils import plot_noisy_pixels, plot_cluster_size
 
 

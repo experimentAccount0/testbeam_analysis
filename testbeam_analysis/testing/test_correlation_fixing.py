@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis import analysis_functions
 
 

@@ -3,7 +3,7 @@ import numpy as np
 import tables as tb
 from numba import njit
 
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 
 
 def combine_hit_files(hit_files, combined_file, event_number_offsets=None, chunk_size=10000000):

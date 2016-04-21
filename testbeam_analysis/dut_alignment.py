@@ -17,7 +17,7 @@ from multiprocessing import Pool, cpu_count
 from math import sqrt
 from math import asin
 
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis import plot_utils
 from testbeam_analysis.tools import geometry_utils
 #from testbeam_analysis import track_analysis
@@ -1194,49 +1194,27 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
     return z_positions_rec_abs if z_positions is not None else z_positions_rec
 
 
-def fine_alignment_new(input_cluster_files, input_correlation_file, output_alignment_file, z_positions, pixel_size, errors=None, angles=None, dut_names=None, output_pdf_file=None, non_interactive=False, iterations=3, chunk_size=1000000):
-    ''' This function does a coarse alignment of the DUTs relative to the reference DUT and sets translation and rotation values for all DUTs.
-    The reference DUT defines the global coordinate system and should be well in the beam and not heavily rotated.
+def alignment(input_track_candidates_file, input_alignment_file, non_interactive=False, iterations=3, chunk_size=1000000):
+    ''' This function does an alignment of the DUTs and sets translation and rotation values for all DUTs.
+    The reference DUT defines the global coordinate system position at 0, 0, 0 and should be well in the beam and not heavily rotated.
 
-    To solve the chicken-and-egg problem that a good dut alignment needs hits belonging to one track, but good track finding needs a good dut alignment an
-    iterative approach is used involving the following steps:
+    To solve the chicken-and-egg problem that a good dut alignment needs hits belonging to one track, but good track finding needs a good dut alignment this
+    function work only on already prealigned hits belonging to one track. Thus this function can be called only after track finding.
 
-    1. Prealignment : deduce a prealignment from the correlations, by fitting the correlations with a straight line (gives offset, slope).
-       The user can define cuts on the fit error and straight line offset in an interactive way if needed.
-    2. Correct the hit position with the prealignment data
-    3. Find tracks
-    4. Take the found tracks and revert the prealignment
-    5. Take the track hits belonging to one track and find the best rotation to the reference DUT. Use the prealignment for starting values and range cuts.
-    6. Apply the rotations to the hits to deduce the translations
-    7. Check the coarse alignment and calculate sigma correlation needed for track quality assignment
-    8. Store the coarse alginment data (rotation / translation data for each DUT)
-    9. Delete temporary files
+    These steps are done
+    1. Take the found tracks and revert the prealignment
+    2. Take the track hits belonging to one track and fit tracks for all DUTs
+    3. Calculate the residuals for each DUT
+    4. Deduce rotations from the residuals and apply them to the hits
+    5. Deduce the translation of each plane
+    6. Store the alignment information
 
     Parameters
     ----------
-    input_cluster_files : iterable of pytables files
-        Input file with cluster data
-    input_correlation_file : pytbales file
-        The input file with the correlation histograms.
-    output_alignment_file : pytables file
-        The output file for correlation data.
-    z_position : iterable
-        The positions of the devices in z in um
-    pixel_size: iterable
-        Iterable of tuples with column and row pixel size in um
-    errors : iterable, None
-        Maximum error for the angles of DUT 1. Sets the limit of the possible reconstructed rotation angles and should be choosen
-        carefully. E.g.: (np.pi, np.pi, np.pi)
-        If None +- 5 degree maximum error from the starting values x0 is assumed
-    angles : iterable, None
-        Measured rotation angles of the DUTs to be used as starting values in the coarse alignment rotation reconstruction.
-        If None no rotation for all DUTs is assumed, alpha = beta = gamma = 0
-    dut_names: iterable
-        List of names of the DUTs.
-    output_pdf_file : string
-        File name for the output plots.
-    non_interactive : boolean
-        Deactivate user interaction and apply cuts automatically
+    input_track_candidates_file : string
+        file name with the track candidates table
+    input_alignment_file : pytables file
+        File name of the input aligment data
     iterations : number
         Only used in non interactive mode. Sets how often automatic cuts are applied.
     chunk_size: int
@@ -1244,7 +1222,7 @@ def fine_alignment_new(input_cluster_files, input_correlation_file, output_align
     '''
 
     n_duts = len(z_positions)
-    logging.info('=== Coarse aligning %d DUTs ===', n_duts)
+    logging.info('=== Aligning %d DUTs ===', n_duts)
 
     # Helper functions
     def get_scalar(column_0, row_0, column_1, row_1):

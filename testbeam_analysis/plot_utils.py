@@ -18,7 +18,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.widgets import Slider, Button
 from scipy.optimize import curve_fit
 
-from testbeam_analysis import analysis_utils
+from testbeam_analysis.tools import analysis_utils
 
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")  # Plot backend error not important
 
