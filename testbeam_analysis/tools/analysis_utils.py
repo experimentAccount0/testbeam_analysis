@@ -376,3 +376,8 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_cha
     charge = np.ascontiguousarray(charge, dtype=np.uint16)
     n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
     return correlated, n_fixes
+
+
+def gauss(x, *p):
+    A, mu, sigma = p
+    return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
