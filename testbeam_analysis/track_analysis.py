@@ -16,7 +16,7 @@ from scipy.optimize import curve_fit
 from numba import njit
 from matplotlib.backends.backend_pdf import PdfPages
 
-from testbeam_analysis import plot_utils
+from testbeam_analysis.tools import plot_utils
 from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools import geometry_utils
 
@@ -107,65 +107,6 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
 
                 track_candidates.append(combined)
-
-
-# def find_tracks_corr(input_tracklets_file, input_alignment_file, output_track_candidates_file, pixel_size):
-#     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
-#     Works on corrected Tracklets file, is identical to the find_tracks function.
-#     The output is the same array with resorted hits into tracks. A track quality is given to
-#     be able to cut on good tracks.
-#     This function is slow since the main loop happens in Python (< 1e5 tracks / second)
-#     but does the track finding loop on all cores in parallel (_find_tracks_loop()).
-#     Does the same as find_tracks function but works on a corrected TrackCandidates file (optimize_track_aligment)
-#
-#     Parameters
-#     ----------
-#     input_tracklets_file : string
-#         Input file name with merged cluster hit table from all DUTs
-#     input_alignment_file : string
-#         File containing the alignment information
-#     output_track_candidates_file : string
-#         Output file name for track candidate array
-#     '''
-#     logging.info('=== Build tracks from TrackCandidates ===')
-#
-# Get alignment errors from file
-#     with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
-#         correlations = in_file_h5.root.Alignment[:]
-#         column_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
-#         row_sigma = np.zeros(shape=(correlations.shape[0] / 2) + 1)
-# column_sigma[0], row_sigma[0] = 0, 0  # DUT0 has no correlation error
-#         for index in range(1, correlations.shape[0] // 2 + 1):
-#             column_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][0]]
-#             row_sigma[index] = correlations['sigma'][np.where(correlations['dut_x'] == index)[0][1]]
-#
-#     with tb.open_file(input_tracklets_file, mode='r') as in_file_h5:
-#         tracklets = in_file_h5.root.TrackCandidates
-#         n_duts = sum(['column' in col for col in tracklets.dtype.names])
-#
-# prepare data for track finding, create arrays for column, row and charge data
-#         tracklets = tracklets[:].view(np.recarray)
-#         tr_column = tracklets['column_dut_0']
-#         tr_row = tracklets['row_dut_0']
-#         tr_charge = tracklets['charge_dut_0']
-#         for dut_index in range(n_duts - 1):
-#             tr_column = np.vstack((tr_column, tracklets['column_dut_%d' % (dut_index + 1)]))
-#             tr_row = np.vstack((tr_row, tracklets['row_dut_%d' % (dut_index + 1)]))
-#             tr_charge = np.vstack((tr_charge, tracklets['charge_dut_%d' % (dut_index + 1)]))
-#         tr_column = np.transpose(tr_column)
-#         tr_row = np.transpose(tr_row)
-#         tr_charge = np.transpose(tr_charge)
-#
-# Perform the track finding with jitted loop
-#         tracklets, tr_column, tr_row, tr_charge = _find_tracks_loop(tracklets, tr_column, tr_row, tr_charge, column_sigma, row_sigma)
-#
-# Merge result data from arrays into one recarray
-#         combined = np.column_stack((tracklets['event_number'], tr_column, tr_row, tr_charge, tracklets.track_quality, tracklets.n_tracks))
-#         combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets.dtype)
-#
-#         with tb.open_file(output_track_candidates_file, mode='w') as out_file_h5:
-#             track_candidates2 = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=in_file_h5.root.TrackCandidates.description, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-#             track_candidates2.append(combined)
 
 
 def optimize_track_alignment(input_track_candidates_file, input_alignment_file, fraction=1, correlated_only=False):
@@ -275,7 +216,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                     progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, force_prealignment=False, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -310,15 +251,22 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
     logging.info('=== Fit tracks ===')
 
+    use_prealignment = True if force_prealignment else False
+
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        try:
-            alignment = in_file_h5.root.Alignment[:]
-            logging.info('Use alignment data')
-            use_prealignment = False
-        except tb.NoSuchNodeError:
-            z_positions = in_file_h5.root.PreAlignment[:]['z']
-            use_prealignment = True
-            logging.info('Use prealignment data')
+        z_positions = in_file_h5.root.PreAlignment[:]['z']
+        if not use_prealignment:
+            try:
+                alignment = in_file_h5.root.Alignment[:]
+                use_prealignment = False
+            except tb.exceptions.NodeError:
+                z_positions = in_file_h5.root.PreAlignment[:]['z']
+                use_prealignment = True
+
+    if use_prealignment:
+        logging.info('Use prealignment data')
+    else:
+        logging.info('Use alignment data')
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
         # Define description
@@ -424,12 +372,17 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         results = pool.map(_fit_tracks_loop, slices)
                         pool.close()
                         pool.join()
+                        print 'track_hits', track_hits[0]
                         del track_hits
 
                         # Store results
                         offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
                         slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
                         chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
+                        
+#                         print '!! event number', good_track_candidates['event_number'][0]
+#                         print '!! slopes', slopes[0]
+#                         raise
 
                         # Set the offset to the track intersection with the tilded plane
                         offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
