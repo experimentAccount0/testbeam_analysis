@@ -233,8 +233,9 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     ignore_duts : iterable
         the duts that are not taken in a fit. Needed to exclude bad planes from track fit. Also included Duts are ignored!
     include_duts : iterable
-        the relative dut positions of dut to use in the track fit. The position is relative to the actual dut the tracks are fitted for
+        The relative dut positions of DUTs to use in the track fit. The position is relative to the actual dut the tracks are fitted for
         e.g. actual track fit dut = 2, include_duts = [-3, -2, -1, 1] means that duts 0, 1, 3 are used for the track fit
+        If include_duts is None all available DUTs are used, besides the ignore_duts
     max_tracks : int, None
         only events with tracks <= max tracks are taken
     track_quality : int
@@ -302,44 +303,83 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
         return tracks_array
 
+    def store_track_data(fit_dut):  # Set the offset to the track intersection with the tilded plane and store the data
+        if not use_prealignment:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
+            dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
+            rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
+                                                             beta=alignment[fit_dut]['beta'],
+                                                             gamma=alignment[fit_dut]['gamma'])
+            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+            dut_plane_normal = basis_global[2]
+        else:  # Prealignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+            dut_position = np.array([0., 0., z_positions[fit_dut]])
+            dut_plane_normal = np.array([0., 0., 1.])
+
+        # Set the offset to the track intersection with the tilded plane
+        actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                          line_directions=slopes,
+                                                                          position_plane=dut_position,
+                                                                          normal_plane=dut_plane_normal)
+
+        tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts)
+
+        try:  # Check if table exists already, than append data
+            tracklets_table = out_file_h5.get_node('/Tracks_DUT_%d' % fit_dut)
+        except tb.NoSuchNodeError:  # Table does not exist, thus create new
+            tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+        tracklets_table.append(tracks_array)
+
+        # Plot chi2 distribution
+        plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
+
     with PdfPages(output_tracks_file[:-3] + '.pdf') as output_fig:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
-            with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
+            try:  # If file exists already delete it first
+                os.remove(output_tracks_file)
+            except OSError:
+                pass
+            with tb.open_file(output_tracks_file, mode='a') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
                 n_duts = sum(['charge' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
-                fit_duts = fit_duts if fit_duts else range(n_duts)
+                fit_duts = fit_duts if fit_duts else range(n_duts)  # Std. setting: fit tracks for all DUTs
+                if not include_duts:  # If include_dut is None use all DUTs in the  fit
+                    all_duts = True
+                else:
+                    all_duts = False
+
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
-                    logging.info('Fit tracks for DUT %d', fit_dut)
+                    if not all_duts:
+                        logging.info('Fit tracks for DUT %d', fit_dut)
+                    else:  # Special case: use all DUTs in the fit, looping over fit_dut not needed
+                        logging.info('Fit tracks for all DUTs')
 
-                    if not use_prealignment:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
-                        dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
-                        rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
-                                                                         beta=alignment[fit_dut]['beta'],
-                                                                         gamma=alignment[fit_dut]['gamma'])
-                        basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
-                        dut_plane_normal = basis_global[2]
-                    else:  # Prealignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
-                        dut_position = np.array([0., 0., z_positions[fit_dut]])
-                        dut_plane_normal = np.array([0., 0., 1.])
-
-                    tracklets_table = None
                     for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
 
                         # Select track candidates
                         dut_selection = 0  # DUTs to be used in the fit
                         quality_mask = 0  # Masks DUTs to check track quality for
-                        for include_dut in include_duts:  # Calculate mask to select DUT hits for fitting
-                            if fit_dut + include_dut < 0 or ((ignore_duts and fit_dut + include_dut in ignore_duts) or fit_dut + include_dut >= n_duts):
-                                continue
-                            if include_dut >= 0:
-                                dut_selection |= ((1 << fit_dut) << include_dut)
-                            else:
-                                dut_selection |= ((1 << fit_dut) >> abs(include_dut))
+                        if not all_duts:
+                            for include_dut in include_duts:  # Calculate relative mask to select DUT hits for fitting
+                                if fit_dut + include_dut < 0 or ((ignore_duts and fit_dut + include_dut in ignore_duts) or fit_dut + include_dut >= n_duts):
+                                    continue
+                                if include_dut >= 0:
+                                    dut_selection |= ((1 << fit_dut) << include_dut)
+                                else:
+                                    dut_selection |= ((1 << fit_dut) >> abs(include_dut))
 
-                            quality_mask = dut_selection | (1 << fit_dut)  # Include the DUT where the track is fitted for in quality check
+                                quality_mask = dut_selection | (1 << fit_dut)  # Include the DUT where the track is fitted for in quality check
+                        else:  # Special case, use all DUTs
+                            for i in range(n_duts):
+                                if ignore_duts and i in ignore_duts:
+                                    continue
+                                dut_selection |= (1 << i)
+                                quality_mask |= (1 << i)
 
                         if bin(dut_selection).count("1") < 2:
                             logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
                             continue
+
+                        logging.info("Use %d DUTs in the fit", bin(dut_selection).count("1"))
 
                         # Select tracks based on given track_quality
                         good_track_selection = (track_candidates_chunk['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
@@ -372,33 +412,21 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         results = pool.map(_fit_tracks_loop, slices)
                         pool.close()
                         pool.join()
-                        print 'track_hits', track_hits[0]
                         del track_hits
 
                         # Store results
                         offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
                         slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
                         chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
-                        
-#                         print '!! event number', good_track_candidates['event_number'][0]
-#                         print '!! slopes', slopes[0]
-#                         raise
 
-                        # Set the offset to the track intersection with the tilded plane
-                        offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                                   line_directions=slopes,
-                                                                                   position_plane=dut_position,
-                                                                                   normal_plane=dut_plane_normal)
-
-                        tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts)
-
-                        if tracklets_table is None:
-                            tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-
-                        tracklets_table.append(tracks_array)
-
-                        # Plot chi2 distribution
-                        plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
+                        # Store the data
+                        if not all_duts:  # Check if all DUTs were fitted at one
+                            store_track_data(fit_dut)
+                        else:
+                            for fit_dut in range(n_duts):
+                                store_track_data(fit_dut)
+                    if all_duts:  # Stop fit Dut loop since all DUTs were fitted at once
+                        break
 
 
 def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_file, z_positions, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, output_pdf=None, use_correlated=False, method="Interpolation", pixel_size=[], chunk_size=1000000):
