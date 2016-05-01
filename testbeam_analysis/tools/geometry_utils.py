@@ -398,3 +398,70 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     positions_transformed = np.dot(rotation_matrix, positions).T
 
     return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
+
+
+def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', force_absolute_translation=False):
+    ''' Stores the alignment parameters (rotations, translations) into the alignment file.
+    Absolute (overwriting) and relative mode (add angles, translations) is supported.
+
+    Paramter:
+    --------
+
+    alignment_file : pytables file
+        The pytables file with the alignment
+    alignment_parameters : numpy recarray
+        An array with the alignment values
+    mode : string
+        'relative' and 'absolute' supported.
+    '''
+
+    if 'absolute' not in mode and 'relative' not in mode:
+        raise RuntimeError('Mode %s is unknown', str(mode))
+    with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
+        alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from prealignment
+        try:
+            alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            alignment_table.append(alignment_parameters)
+        except tb.NodeError:
+            if mode == 'absolute':
+                logging.warning('Overwrite existing alignment!')
+                out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
+                alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                alignment_table.append(alignment_parameters)
+            else:
+                logging.info('Merge new alignment with old alignment')
+                old_alignment = out_file_h5.root.Alignment[:]
+                out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
+                alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                new_alignment = old_alignment
+                if not force_absolute_translation:
+                    new_alignment['translation_x'] += alignment_parameters['translation_x']
+                    new_alignment['translation_y'] += alignment_parameters['translation_y']
+                    #new_alignment['translation_z'] += alignment_parameters['translation_z']  #FIXME: has to be off right now
+                else:
+                    new_alignment['translation_x'] = alignment_parameters['translation_x']
+                    new_alignment['translation_y'] = alignment_parameters['translation_y']
+
+                new_alignment['alpha'] += alignment_parameters['alpha']
+                new_alignment['beta'] += alignment_parameters['beta']
+                new_alignment['gamma'] += alignment_parameters['gamma']
+
+                # All alignments are relative, thus center them around 0 by substracting the mean (exception z position)
+                new_alignment['alpha'] -= np.mean(new_alignment['alpha'])
+                new_alignment['beta'] -= np.mean(new_alignment['beta'])
+                new_alignment['gamma'] -= np.mean(new_alignment['gamma'])
+                new_alignment['translation_x'] -= np.mean(new_alignment['translation_x'])
+                new_alignment['translation_y'] -= np.mean(new_alignment['translation_y'])
+
+                logging.info('Change translation to:')
+                string = '\n\n'
+                for dut_values in new_alignment:
+                    string += 'DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um\n' % (dut_values['DUT'], 
+                                                                                                 dut_values['alpha'], 
+                                                                                                 dut_values['beta'], 
+                                                                                                 dut_values['gamma'], 
+                                                                                                 dut_values['translation_x'], 
+                                                                                                 dut_values['translation_y'], 
+                                                                                                 dut_values['translation_z'])
+                logging.info(string)
+                alignment_table.append(new_alignment)
