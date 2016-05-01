@@ -381,3 +381,15 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_cha
 def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+
+
+def get_mean_from_histogram(counts, bin_positions):
+    return np.dot(counts, np.array(bin_positions)) / np.sum(counts).astype('f4')
+
+
+def get_rms_from_histogram(counts, bin_positions):
+    values = []
+    for index, one_bin in enumerate(counts):
+        for _ in range(one_bin):
+            values.append(bin_positions[index])
+    return np.std(values)
