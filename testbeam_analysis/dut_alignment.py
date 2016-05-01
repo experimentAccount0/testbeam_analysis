@@ -398,7 +398,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
 
-def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, inverse=False, force_prealignment=False, reset_z=False, no_z=False, use_duts=None, chunk_size=1000000):
+def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
     ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT. The alignment data is used. If this is not
     available a fallback to the prealignment is done.
 
@@ -414,8 +414,6 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
         Apply the inverse alignment
     force_prealignment : boolean
         Take the prealignment, although if a coarse alignment is availale
-    reset_z : boolean
-        Set z = 0 before applying alignment
     no_z : boolean
         Do not change the z alignment. Needed since the z position is special for x / y based plane measurements.
     use_duts : iterable
@@ -466,9 +464,6 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
                             continue
                         selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change vitual hits
 
-                        if reset_z:
-                            hits_chunk['z_dut_%d' % dut_index][selection] = 0
-
                         if use_prealignment:
                             c0_column = alignment[dut_index]['column_c0']
                             c1_column = alignment[dut_index]['column_c1']
@@ -479,13 +474,13 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
                             if inverse:
                                 hits_chunk['x_dut_%d' % dut_index][selection] = (hits_chunk['x_dut_%d' % dut_index][selection] - c0_column) / c1_column
                                 hits_chunk['y_dut_%d' % dut_index][selection] = (hits_chunk['y_dut_%d' % dut_index][selection] - c0_row) / c1_row
-                                if not no_z:
-                                    hits_chunk['z_dut_%d' % dut_index][selection] -= z
+#                                 if not no_z:
+                                hits_chunk['z_dut_%d' % dut_index][selection] -= z
                             else:
                                 hits_chunk['x_dut_%d' % dut_index][selection] = (c1_column * hits_chunk['x_dut_%d' % dut_index][selection] + c0_column)
                                 hits_chunk['y_dut_%d' % dut_index][selection] = (c1_row * hits_chunk['y_dut_%d' % dut_index][selection] + c0_row)
-                                if not no_z:
-                                    hits_chunk['z_dut_%d' % dut_index][selection] += z
+#                                 if not no_z:
+                                hits_chunk['z_dut_%d' % dut_index][selection] += z
                         else:  # Apply transformation from fine alignment information
                             if inverse:
                                 transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[dut_index]['translation_x'],
@@ -506,8 +501,8 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
                                                                                                                                                                          y=hits_chunk['y_dut_%d' % dut_index][selection],
                                                                                                                                                                          z=hits_chunk['z_dut_%d' % dut_index][selection],
                                                                                                                                                                          transformation_matrix=transformation_matrix)
-                            if not no_z:
-                                hits_chunk['z_dut_%d' % dut_index][selection] = z
+#                             if not no_z:
+                            hits_chunk['z_dut_%d' % dut_index][selection] = z
 
                     hits_aligned_table.append(hits_chunk)
 
@@ -561,10 +556,16 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
     logging.info('=== Aligning DUTs ===')
 
-    def calculate_translation_alignment(track_candidates_file, iteration, output_pdf, total_residual, plot_title_praefix='', include_duts=None, keep_angles=False, do_apply_alignment=True, force_absolute_translation=False):
+    def calculate_translation_alignment(track_candidates_file, iteration, output_pdf, total_residual, plot_title_praefix='', include_duts=None):
         ''' Main function that fits tracks, calculates the residuals, deduces rotation and translation values from the residuals
         and applies the new alignment to the track hits. The alignment result is scored as a combined
         residual value of all planes in x and y. '''
+
+        apply_alignment(input_hit_file=track_candidates_file[:-3] + '_no_align_tmp.h5',  # Always apply alignment to starting file
+                        input_alignment=input_alignment_file,
+                        output_hit_aligned_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
+                        chunk_size=chunk_size)
+
         # Step 2: Fit tracks for all DUTs
         logging.info('= Alignment step 2 / iteration %d: Fit tracks for all DUTs =', iteration)
         fit_tracks(input_track_candidates_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
@@ -572,8 +573,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                    output_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
                    track_quality=1,
                    include_duts=include_duts,
-                   ignore_duts=ignore_duts,
-                   force_prealignment=True if iteration == 0 else False)  # In the first iteration there is no alignment
+                   ignore_duts=ignore_duts)  # In the first iteration there is no alignment
 
         # Step 3: Calculate the residuals for each DUT
         logging.info('= Alignment step 3 / iteration %d: Calculate the residuals for each DUT =', iteration)
@@ -582,7 +582,6 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                             output_residuals_file=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
                             n_pixels=n_pixels,
                             pixel_size=pixel_size,
-                            force_prealignment=True if iteration == 0 else False,  # In the first iteration there is no alignment
                             output_pdf=False,
                             chunk_size=chunk_size)
 
@@ -592,11 +591,6 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                       output_pdf,
                                                                       n_duts,
                                                                       plot_title_praefix=plot_title_praefix)
-
-        if keep_angles:  # If only translations are changed
-            alignment_parameters['alpha'] = np.zeros_like(alignment_parameters['alpha'])
-            alignment_parameters['beta'] = np.zeros_like(alignment_parameters['beta'])
-            alignment_parameters['gamma'] = np.zeros_like(alignment_parameters['gamma'])
 
         if total_residual and new_total_residual > total_residual:
             logging.info('Best alignment found')
@@ -608,23 +602,20 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         logging.info('= Alignment step 5/ iteration %d: Set rotation information in alignment file =', iteration)
         geometry_utils.store_alignment_parameters(input_alignment_file,
                                                   alignment_parameters,
-                                                  mode='absolute' if iteration == 0 else 'relative',
-                                                  force_absolute_translation=force_absolute_translation)
-
-        if do_apply_alignment:
-            apply_alignment(input_hit_file=track_candidates_file[:-3] + '_no_align_0_tmp.h5',  # Always apply alignment to starting file
-                            input_alignment=input_alignment_file,
-                            output_hit_aligned_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % (iteration + 1),
-                            reset_z=True,
-                            chunk_size=chunk_size)
+                                                  mode='relative')
 
         return total_residual
 
-    # Open the prealignment and reset z offset, because z has to be set to std. sttings for track fitting and not to be 0
+    # Open the prealignment and create the alignment info (at the beginning only the z position is set)
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        alignment = in_file_h5.root.PreAlignment[:]
-        alignment['z'] = 0.
-        n_duts = alignment.shape[0]
+        prealignment = in_file_h5.root.PreAlignment[:]
+        n_duts = prealignment.shape[0]
+        alignment_parameters = _create_alignment_array(n_duts)
+        alignment_parameters['translation_z'] = prealignment['z']
+
+    geometry_utils.store_alignment_parameters(input_alignment_file,
+                                              alignment_parameters,
+                                              mode='absolute')
 
     # Step 0: Reduce the number of tracks to increase the calculation time
     logging.info('= Alignment step 0: Reduce number of tracks to %d =', use_n_tracks)
@@ -644,8 +635,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     # Step 1: Take the found tracks and revert the slope of the prealignment but keep the offset to ease track fitting
     logging.info('= Alignment step 1: Revert prealignment =')
     apply_alignment(input_hit_file=reduced_track_candidates_file,
-                    input_alignment=alignment,  # Revert prealignent (= revert the slope, offsets ore kept since they do not interfere with rotation estimation)
-                    output_hit_aligned_file=reduced_track_candidates_file[:-3] + '_no_align_0_tmp.h5',
+                    input_alignment=input_alignment_file,  # Revert prealignent (= revert the slope, offsets ore kept since they do not interfere with rotation estimation)
+                    output_hit_aligned_file=reduced_track_candidates_file[:-3] + '_no_align_tmp.h5',
                     inverse=True,
                     force_prealignment=True,
                     chunk_size=chunk_size)
@@ -679,7 +670,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             apply_alignment(input_hit_file=input_track_candidates_file[:-3] + '_no_prealignment_tmp.h5',
                             input_alignment=input_alignment_file,
                             output_hit_aligned_file=input_track_candidates_file[:-3] + '_final_tmp.h5',
-                            reset_z=True,
+                            # reset_z=True,
                             chunk_size=chunk_size)
             fit_tracks(input_track_candidates_file=input_track_candidates_file[:-3] + '_final_tmp.h5',
                        input_alignment_file=input_alignment_file,
@@ -731,8 +722,7 @@ def _get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy):
     return alpha, beta, gamma
 
 
-def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix=''):
-    ''' Take the residual plots and deduce rotation and translation angles from them '''
+def _create_alignment_array(n_duts):
     # Result Translation / rotation table
     description = [('DUT', np.int)]
     description.append(('translation_x', np.float))
@@ -743,7 +733,12 @@ def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix
     description.append(('gamma', np.float))
     description.append(('correlation_x', np.float))
     description.append(('correlation_y', np.float))
-    alignment_parameters = np.zeros((n_duts,), dtype=description)
+    return np.zeros((n_duts,), dtype=description)
+
+
+def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix=''):
+    ''' Take the residual plots and deduce rotation and translation angles from them '''
+    alignment_parameters = _create_alignment_array(n_duts)
 
     total_residual = 0  # Sum of all residuals to judge the overall alignment
 
@@ -756,10 +751,11 @@ def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix
             x = edges_x + np.diff(edges_x)[0]  # Center bins
             x = x[:-1]  # Get rid of extra bin
             y = hist_node[:]
-            mu = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
+            mu_x = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
             std = analysis_utils.get_rms_from_histogram(y, edges_x[:-1])
-            coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu, std])
-            total_residual = np.sqrt(np.square(total_residual) + np.square(coeff_x[2]))
+            coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu_x, std])
+
+            total_residual = np.sqrt(np.square(total_residual) + np.square(std))  # Maybe better to use sigma from gauss fit?
 
             alignment_parameters[dut_index]['correlation_x'] = std
 
@@ -777,11 +773,11 @@ def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix
             x = edges_x + np.diff(x)[0]  # Center bins
             x = x[:-1]  # Get rid of extra bin
             y = hist_node[:]
-            mu = analysis_utils.get_mean_from_histogram(y, x)
+            mu_y = analysis_utils.get_mean_from_histogram(y, x)
             std = analysis_utils.get_rms_from_histogram(y, x)
-            coeff_y, var_matrix = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu, std])
+            coeff_y, var_matrix = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_y, std])
 
-            total_residual = np.sqrt(np.square(total_residual) + np.square(coeff_y[2]))
+            total_residual = np.sqrt(np.square(total_residual) + np.square(std))  # Maybe better to use sigma from gauss fit?
 
             alignment_parameters[dut_index]['correlation_y'] = std
 
@@ -870,7 +866,15 @@ def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix
             alignment_parameters[dut_index]['beta'] = beta
             alignment_parameters[dut_index]['gamma'] = gamma
 
-            alignment_parameters[dut_index]['translation_x'] = -coeff_x[1]
-            alignment_parameters[dut_index]['translation_y'] = -coeff_y[1]
+            alignment_parameters[dut_index]['translation_x'] = -mu_x
+            alignment_parameters[dut_index]['translation_y'] = -mu_y
 
     return alignment_parameters, total_residual
+
+
+def align_z(input_track_candidates, input_alignment):
+        # Load the alignment
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        alignment = in_file_h5.root.PreAlignment[:]
+        alignment['z'] = 0.
+        n_duts = alignment.shape[0]
