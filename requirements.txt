@@ -9,3 +9,4 @@ pixel_clusterizer>=2.3  # to cluster pixel hits
 pykalman  # for track fitting
 pylandau  # for charge deposition simulation
 progressbar-latest  # to show a progress bar
+numexpr  # for fast c compiled loops on numpy arrays
