@@ -400,7 +400,7 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
 
 
-def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', force_absolute_translation=False):
+def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute'):
     ''' Stores the alignment parameters (rotations, translations) into the alignment file.
     Absolute (overwriting) and relative mode (add angles, translations) is supported.
 
@@ -434,19 +434,15 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
                 out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
                 alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 new_alignment = old_alignment
-                if not force_absolute_translation:
-                    new_alignment['translation_x'] += alignment_parameters['translation_x']
-                    new_alignment['translation_y'] += alignment_parameters['translation_y']
-                    #new_alignment['translation_z'] += alignment_parameters['translation_z']  #FIXME: has to be off right now
-                else:
-                    new_alignment['translation_x'] = alignment_parameters['translation_x']
-                    new_alignment['translation_y'] = alignment_parameters['translation_y']
+                new_alignment['translation_x'] += alignment_parameters['translation_x']
+                new_alignment['translation_y'] += alignment_parameters['translation_y']
+                new_alignment['translation_z'] += alignment_parameters['translation_z']  # FIXME: has to be off right now
 
                 new_alignment['alpha'] += alignment_parameters['alpha']
                 new_alignment['beta'] += alignment_parameters['beta']
                 new_alignment['gamma'] += alignment_parameters['gamma']
 
-                # All alignments are relative, thus center them around 0 by substracting the mean (exception z position)
+                # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
                 new_alignment['alpha'] -= np.mean(new_alignment['alpha'])
                 new_alignment['beta'] -= np.mean(new_alignment['beta'])
                 new_alignment['gamma'] -= np.mean(new_alignment['gamma'])
