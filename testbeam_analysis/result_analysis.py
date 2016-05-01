@@ -71,7 +71,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
-                logging.info('Calculate residuals for DUT %d', actual_dut)
+                logging.debug('Calculate residuals for DUT %d', actual_dut)
 
                 mean_column, std_column = None, None  # column residual mean and RMS needed for histogramming range determination
                 mean_row, std_row = None, None  # row residual mean and RMS needed for histogramming range determination
@@ -231,7 +231,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     residuals.append(std_column)
                     residuals.append(std_row)
 
-                logging.info('Store residual histograms')
+                logging.debug('Store residual histograms')
 
                 # Global residuals
                 out_res_x = out_file_h5.createCArray(out_file_h5.root,
@@ -354,7 +354,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 # Create plots
                 if output_fig:
                     # Global residuals
-                    logging.info('Create residual plots')
+                    logging.debug('Create residual plots')
                     coeff, var_matrix = None, None
                     try:
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x[1][:-1], hist_residual_x[0], p0=[np.amax(hist_residual_x[0]), mean_x, std_x])
