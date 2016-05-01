@@ -94,22 +94,6 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     if plot:
         plot_noisy_pixels(input_hits_file=output_hits_file, pixel_size=pixel_size, dut_name=dut_name)
 
-# testing output file
-#     occupancy = None
-#     with tb.open_file(data_file[:-3] + '_hot_pixel.h5', 'r') as input_file_h5:
-#         for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
-#             col, row = hits['column'], hits['row']
-#             chunk_occ = analysis_utils.hist_2d_index(col - 1, row - 1, shape=n_pixel)
-#             if occupancy is None:
-#                 occupancy = chunk_occ
-#             else:
-#                 occupancy = occupancy + chunk_occ
-#
-#     occupancy = np.ma.masked_where(occupancy == 0, occupancy)
-#     plt.figure()
-#     plt.imshow(occupancy, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, np.percentile(occupancy, 99)))
-#     plt.show()
-
     return output_hits_file
 
 
