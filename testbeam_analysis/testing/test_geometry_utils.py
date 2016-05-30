@@ -56,6 +56,7 @@ class TestTrackAnalysis(unittest.TestCase):
                     self.assertTrue(np.allclose(rotation_matrix.T, np.linalg.inv(rotation_matrix)))
 
     def test_apply_transformation_matrix(self):
+        x, y, z = np.arange(10), np.arange(1, 11), np.arange(2, 12)
         # Test 1: Transformation matrix that is a translation by (1, 2, 3) without rotation
         transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=1,
                                                                                      y=2,
@@ -63,14 +64,40 @@ class TestTrackAnalysis(unittest.TestCase):
                                                                                      alpha=0.0,
                                                                                      beta=0.0,
                                                                                      gamma=0.0)
-        x_new, y_new, z_new = geometry_utils.apply_transformation_matrix(x=np.arange(10),
-                                                                         y=np.arange(10),
-                                                                         z=np.arange(10),
+        x_new, y_new, z_new = geometry_utils.apply_transformation_matrix(x=x,
+                                                                         y=y,
+                                                                         z=z,
                                                                          transformation_matrix=transformation_matrix)
+        self.assertTrue(np.all(x_new == x - 1))
+        self.assertTrue(np.all(y_new == y - 2))
+        self.assertTrue(np.all(z_new == z - 3))
 
-        self.assertTrue(np.all(x_new == np.arange(10) - 1))
-        self.assertTrue(np.all(y_new == np.arange(10) - 2))
-        self.assertTrue(np.all(z_new == np.arange(10) - 3))
+        # Test 2: Test application of transformation matrix that is a translation and rotation, by checking T*T-1 state = state
+        for alpha in [-np.pi / 4., -np.pi / 3., -np.pi / 2., -3 * np.pi / 4., -np.pi, -4. * np.pi / 3., 0, np.pi / 4., np.pi / 3., np.pi / 2., 3 * np.pi / 4., np.pi, 4. * np.pi / 3.]:  # Loop x rotation values
+            for beta in [-np.pi / 4., -np.pi / 3., -np.pi / 2., -3 * np.pi / 4., -np.pi, -4. * np.pi / 3., 0, np.pi / 4., np.pi / 3., np.pi / 2., 3 * np.pi / 4., np.pi, 4. * np.pi / 3.]:  # Loop y rotation values
+                for gamma in [-np.pi / 4., -np.pi / 3., -np.pi / 2., -3 * np.pi / 4., -np.pi, -4. * np.pi / 3., 0, np.pi / 4., np.pi / 3., np.pi / 2., 3 * np.pi / 4., np.pi, 4. * np.pi / 3.]:  # Loop z rotation values
+                    x_new, y_new, z_new = geometry_utils.apply_transformation_matrix(x=x,
+                                                                                     y=y,
+                                                                                     z=z,
+                                                                                     transformation_matrix=geometry_utils.global_to_local_transformation_matrix(x=1000,
+                                                                                                                                                                y=20000,
+                                                                                                                                                                z=3000,
+                                                                                                                                                                alpha=alpha,
+                                                                                                                                                                beta=beta,
+                                                                                                                                                                gamma=gamma))
+                    x_old, y_old, z_old = geometry_utils.apply_transformation_matrix(x=x_new,
+                                                                                     y=y_new,
+                                                                                     z=z_new,
+                                                                                     transformation_matrix=geometry_utils.local_to_global_transformation_matrix(x=1000,
+                                                                                                                                                                y=20000,
+                                                                                                                                                                z=3000,
+                                                                                                                                                                alpha=alpha,
+                                                                                                                                                                beta=beta,
+                                                                                                                                                                gamma=gamma))
+
+                    self.assertTrue(np.allclose(x_old, x))
+                    self.assertTrue(np.allclose(y_old, y))
+                    self.assertTrue(np.allclose(z_old, z))
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestTrackAnalysis)
