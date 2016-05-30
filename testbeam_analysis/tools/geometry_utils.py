@@ -84,7 +84,7 @@ def get_line_intersections_with_plane(line_origins, line_directions, position_pl
     # Calculate the intersections for each line with the plane
     intersections = line_origins + line_directions * t[:, np.newaxis]
 
-    return np.squeeze(intersections)  # Reduce extra dimensions for the n = 1 case
+    return intersections
 
 
 def cartesian_to_spherical(x, y, z):
