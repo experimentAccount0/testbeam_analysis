@@ -17,7 +17,7 @@ from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools import geometry_utils
 
 
-def find_tracks(input_tracklets_file, input_alignment_file, output_track_candidates_file, event_range=None, chunk_size=1000000):
+def find_tracks(input_tracklets_file, input_alignment_file, output_track_candidates_file, min_cluster_distance=False, chunk_size=1000000):
     '''Takes first DUT track hit and tries to find matching hits in subsequent DUTs.
     The output is the same array with resorted hits into tracks. A track quality is set to
     be able to cut on good (less scattered) tracks.
@@ -35,13 +35,20 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         File containing the alignment information
     output_track_candidates_file : string
         Output file name for track candidate array
+    min_cluster_distance : iterable, boolean
+        A minimum distance all track cluster have to be apart, otherwise the complete event is flagged to have merged tracks (n_tracks = -1).
+        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is not implemented and error prone.
+        If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
+        e.g.: For two devices: min_cluster_distance = (50, 250)
+        If false the cluster distance is not considered.
+        The events where any plane does have hits < min_cluster_distance is flagged with n_tracks = -1
     '''
     logging.info('=== Find tracks ===')
 
     # Get alignment errors from file
     with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
         try:
-            raise tb.exceptions.NoSuchNodeError # FIXME: sigma is to small after alignment, track finding with tracks instead of correlation needed
+            raise tb.exceptions.NoSuchNodeError  # FIXME: sigma is to small after alignment, track finding with tracks instead of correlation needed
             correlations = in_file_h5.root.Alignment[:]
             n_duts = correlations.shape[0]
             logging.info('Taking correlation cut values from alignment')
@@ -51,6 +58,12 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             logging.info('Taking correlation cut values from prealignment')
             correlations = in_file_h5.root.PreAlignment[:]
             n_duts = correlations.shape[0]
+            if min_cluster_distance is True:
+                min_cluster_distance = np.array([(200.)] * n_duts)
+            elif min_cluster_distance is False:
+                min_cluster_distance = np.zeros(n_duts)
+            else:
+                min_cluster_distance = np.array(min_cluster_distance)
             column_sigma = np.zeros(shape=n_duts)
             row_sigma = np.zeros(shape=n_duts)
             column_sigma[0], row_sigma[0] = 0., 0.  # DUT0 has no correlation error
@@ -92,7 +105,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 tracklets_data_chunk['track_quality'] = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
                 # Perform the track finding with jitted loop
-                tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma)
+                tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance)
 
                 # Merge result data from arrays into one recarray
                 combined = np.column_stack((tracklets_data_chunk['event_number'], tr_x, tr_y, tr_z, tr_charge, tracklets_data_chunk['track_quality'], tracklets_data_chunk['n_tracks']))
@@ -101,7 +114,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 track_candidates.append(combined)
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, force_prealignment=False, output_pdf_file=None, use_correlated=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, force_prealignment=False, output_pdf_file=None, use_correlated=False, min_track_distance=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -133,6 +146,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         the size in um of the pixels, needed for chi2 calculation
     correlated_only : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
+    min_track_distance : iterable, boolean
+        A minimum distance all track intersection at the DUT have to be apart, otherwise these tracks are deleted.
+        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is not implemented and error prone.
+        If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
+        e.g.: For two devices: min_track_distance = (50, 250)
+        If false the track distance is not considered.
     '''
 
     logging.info('=== Fit tracks ===')
@@ -169,7 +188,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             description.append(('offset_%d' % dimension, np.float))
         for dimension in range(3):
             description.append(('slope_%d' % dimension, np.float))
-        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.uint8)])
+        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.int8)])
 
         # Define structure of track_array
         tracks_array = np.zeros((n_tracks,), dtype=description)
@@ -188,7 +207,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
         return tracks_array
 
-    def store_track_data(fit_dut):  # Set the offset to the track intersection with the tilded plane and store the data
+    def store_track_data(fit_dut, min_track_distance):  # Set the offset to the track intersection with the tilded plane and store the data
         if not use_prealignment:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
             dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
             rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
@@ -213,6 +232,15 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         except tb.NoSuchNodeError:  # Table does not exist, thus create new
             tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
+        # Remove tracks that are too close when extrapolated to the actual DUT
+        # All but one merged track are signaled by n_tracks = -1
+        actual_min_track_distance = min_track_distance[fit_dut]
+        if actual_min_track_distance > 0:
+            _find_merged_tracks(tracks_array, actual_min_track_distance)
+            selection = tracks_array['n_tracks'] > 0
+            logging.info('Removed %d merged tracks', np.count_nonzero(~selection))
+            tracks_array = tracks_array[selection]
+
         tracklets_table.append(tracks_array)
 
         # Plot chi2 distribution
@@ -231,6 +259,13 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     all_duts = True
                 else:
                     all_duts = False
+
+                if min_track_distance is True:
+                    min_track_distance = np.array([(200.)] * n_duts)
+                elif min_track_distance is False:
+                    min_track_distance = np.zeros(n_duts)
+                else:
+                    min_track_distance = np.array(min_track_distance)
 
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
                     if not all_duts:
@@ -268,14 +303,32 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Select tracks based on given track_quality
                         good_track_selection = (track_candidates_chunk['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
+
+                        n_track_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection)
+
+                        good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] > 0)  # n_tracks < 0 means merged tracks, omit these to allow valid efficiency calculation
+
+                        n_merged_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection) - n_track_cut
+
                         if max_tracks:  # Option to neglect events with too many hits
                             good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] <= max_tracks)
-
-                        logging.info('Lost %d tracks candidates due to track quality cuts, %d percent ', good_track_selection.shape[0] - np.count_nonzero(good_track_selection), (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
+                            n_tracks_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection) - n_track_cut - n_merged_cut
+                            logging.info('Removed %d tracks candidates due to cuts (%d quality, %d merged cluster, %d # tracks), %d percent ',
+                                         good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
+                                         n_track_cut,
+                                         n_merged_cut,
+                                         n_tracks_cut,
+                                         (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
+                        else:
+                            logging.info('Removed %d tracks candidates due to cuts (%d quality, %d merged cluster), %d percent ',
+                                         good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
+                                         n_track_cut,
+                                         n_merged_cut,
+                                         (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
 
                         if use_correlated:  # Reduce track selection to correlated DUTs only
                             good_track_selection &= (track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24))
-                            logging.info('Lost due to correlated cuts %d', good_track_selection.shape[0] - np.sum(track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24)))
+                            logging.info('Removed %d tracks candidates due to correlated cuts', good_track_selection.shape[0] - np.sum(track_candidates_chunk['track_quality'] & (quality_mask << 24) == (quality_mask << 24)))
 
                         good_track_candidates = track_candidates_chunk[good_track_selection]
 
@@ -305,11 +358,11 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
 
                         # Store the data
-                        if not all_duts:  # Check if all DUTs were fitted at one
-                            store_track_data(fit_dut)
+                        if not all_duts:  # Check if all DUTs were fitted at once
+                            store_track_data(fit_dut, min_track_distance)
                         else:
                             for fit_dut in range(n_duts):
-                                store_track_data(fit_dut)
+                                store_track_data(fit_dut, min_track_distance)
                     if all_duts:  # Stop fit Dut loop since all DUTs were fitted at once
                         break
 
@@ -369,7 +422,30 @@ def _swap_hits(tr_column, tr_row, tr_z, tr_charge, track_index, dut_index, hit_i
 
 
 @njit
-def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigma, row_sigma):
+def _set_n_tracks(start_index, stop_index, tracklets, n_actual_tracks, tr_column, tr_row, min_cluster_distance, n_duts):
+    if start_index < 0:
+        start_index = 0
+
+    if n_actual_tracks > 1:  # Only if the event has more than one track check the min_cluster_distance
+        for dut_index in range(n_duts):
+            if min_cluster_distance[dut_index] != 0:  # Check if minimum track distance evaluation is set, 0 is no mimimum track distance cut
+                for i in range(start_index, stop_index):  # Loop over all event hits
+                    actual_column, actual_row = tr_column[i][dut_index], tr_row[i][dut_index]
+                    if actual_column == 0:  # Omit virtual hit
+                        continue
+                    for j in range(i + 1, stop_index):  # Loop over other event hits
+                        if sqrt((actual_column - tr_column[j][dut_index]) * (actual_column - tr_column[j][dut_index]) + (actual_row - tr_row[j][dut_index]) * (actual_row - tr_row[j][dut_index])) < min_cluster_distance[dut_index]:
+                            for i in range(start_index, stop_index):  # Set number of tracks of this event to -1 to signal merged hits, thus merged tracks
+                                tracklets[i]['n_tracks'] = -1
+                            return
+
+    # Called if no merged track is found
+    for i in range(start_index, stop_index):  # Set number of tracks of previous event
+        tracklets[i]['n_tracks'] = n_actual_tracks
+
+
+@njit
+def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Each hit is put to the best fitting track. Tracks are assued to have
     no big angle, otherwise this approach does not work.
@@ -391,8 +467,17 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
         # Set variables for new event
         if actual_track['event_number'] != actual_event_number:  # Detect new event
             actual_event_number = actual_track['event_number']
-            for i in range(n_actual_tracks):  # Set number of tracks of previous event
-                tracklets[track_index - 1 - i]['n_tracks'] = n_actual_tracks
+# for i in range(n_actual_tracks):  # Set number of tracks of previous event
+#                 print 'old', track_index - 1 - i
+# print 'track_index', track_index
+#             tracklets[track_index - 1 - i]['n_tracks'] = n_actual_tracks
+            _set_n_tracks(start_index=track_index - n_actual_tracks,
+                          stop_index=track_index, tracklets=tracklets,
+                          n_actual_tracks=n_actual_tracks,
+                          tr_column=tr_column,
+                          tr_row=tr_row,
+                          min_cluster_distance=min_cluster_distance,
+                          n_duts=n_duts)
             n_actual_tracks = 0
             actual_hit_track_index = track_index
 
@@ -460,10 +545,39 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
 #             print tr_row[track_index][dut_index],
 #         print
         # Set number of tracks of last event
-        for i in range(n_actual_tracks):
-            tracklets[track_index - i]['n_tracks'] = n_actual_tracks
+        _set_n_tracks(start_index=track_index - n_actual_tracks + 1,
+                      stop_index=track_index + 1, tracklets=tracklets,
+                      n_actual_tracks=n_actual_tracks,
+                      tr_column=tr_column,
+                      tr_row=tr_row,
+                      min_cluster_distance=min_cluster_distance,
+                      n_duts=n_duts)
 
     return tracklets, tr_column, tr_row, tr_z, tr_charge
+
+@njit
+def _find_merged_tracks(tracks_array, min_track_distance):
+    i = 0
+    for _ in range(0, tracks_array.shape[0]):
+        track_index = i
+        if track_index >= tracks_array.shape[0]:
+            break
+        actual_event = tracks_array[track_index]['event_number']
+        for _ in range(track_index, tracks_array.shape[0]):  # Loop over event hits
+            if tracks_array[i]['event_number'] != actual_event:  # Next event reached, break loop
+                break
+            if tracks_array[i]['n_tracks'] < 2:  # Only if the event has more than one track check the min_track_distance
+                i += 1
+                break
+            offset_x, offset_y = tracks_array[i]['offset_0'], tracks_array[i]['offset_1']
+            for j in range(i + 1, tracks_array.shape[0]):  # Loop over other event hits
+                if tracks_array[j]['event_number'] != actual_event:  # Next event reached, break loop
+                    break
+                if sqrt((offset_x - tracks_array[j]['offset_0']) * (offset_x - tracks_array[j]['offset_0']) + (offset_y - tracks_array[j]['offset_1']) * (offset_y - tracks_array[j]['offset_1'])) < min_track_distance:
+                    tracks_array[j]['n_tracks'] = -1
+            i += 1
+
+    return tracks_array
 
 
 def _fit_tracks_loop(track_hits):
@@ -490,6 +604,3 @@ def _fit_tracks_loop(track_hits):
 
 def _function_wrapper_find_tracks_loop(args):  # Needed for multiprocessing call with arguments
     return _find_tracks_loop(*args)
-
-
-
