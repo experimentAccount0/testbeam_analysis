@@ -40,6 +40,8 @@ class TestTrackAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder, 'Tracks_All.pdf'))
         os.remove(os.path.join(cls.output_folder, 'Tracks_All_Iter.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracks_All_Iter.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Tracks_merged.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Tracks_merged.pdf'))
 
     def test_track_finding(self):
         track_analysis.find_tracks(input_tracklets_file=os.path.join(tests_data_folder, 'Tracklets_small.h5'),
@@ -66,7 +68,7 @@ class TestTrackAnalysis(unittest.TestCase):
                                   use_correlated=False)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_result.h5'), os.path.join(self.output_folder, 'Tracks.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
-         
+
         # Test 2: As test 1 but chunked data analysis, should result in the same tracks
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
@@ -99,6 +101,20 @@ class TestTrackAnalysis(unittest.TestCase):
                                   track_quality=1,
                                   use_correlated=False)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_All.h5'), os.path.join(self.output_folder, 'Tracks_All_Iter.h5'), exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
+
+        # Fit tracks and eliminate merged tracks
+        track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
+                                  input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
+                                  output_tracks_file=os.path.join(self.output_folder, 'Tracks_merged.h5'),
+                                  fit_duts=None,
+                                  include_duts=[-3, -2, -1, 1, 2, 3],
+                                  ignore_duts=None,
+                                  track_quality=1,
+                                  use_correlated=False,
+                                  min_track_distance=True  # Activate track merge cut
+                                  )
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_merged_result.h5'), os.path.join(self.output_folder, 'Tracks_merged.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
