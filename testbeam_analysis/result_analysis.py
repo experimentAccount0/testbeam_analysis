@@ -39,7 +39,11 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
     force_prealignment : boolean
         Take the prealignment, although if a coarse alignment is availale
     output_pdf : boolean
-        Set to true to create plots.
+        Set to True to create pdf plots with a file name output_residuals_file.pdf
+        Set to None to show plots.
+        Set to False to not create plots, saves a lot of time.
+    chunk_size : integer
+        The size of data in RAM
     Returns
     -------
     A list of residuals in column row. e.g.: [Col residual DUT 0, Row residual DUT 0, Col residual DUT 1, Row residual DUT 1, ...]
@@ -61,7 +65,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
     else:
         logging.info('Use alignment data')
 
-    output_fig = PdfPages(output_residuals_file[:-3] + '.pdf') if output_pdf is not False else False
+    if output_pdf:
+        output_fig = PdfPages(output_residuals_file[:-3] + '.pdf') if output_pdf is not False else False
+    elif output_pdf is None:
+        output_fig = None
+    else:
+        output_fig = False
 
     residuals = []
 
@@ -73,45 +82,38 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     continue
                 logging.debug('Calculate residuals for DUT %d', actual_dut)
 
-                mean_column, std_column = None, None  # column residual mean and RMS needed for histogramming range determination
-                mean_row, std_row = None, None  # row residual mean and RMS needed for histogramming range determination
+                mean_column, std_column = None, None  # Column residual mean and RMS needed for histogramming range determination
+                mean_row, std_row = None, None  # Row residual mean and RMS needed for histogramming range determination
 
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
 
                     if max_chi2:
                         tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
-                    tracks_chunk = tracks_chunk[np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] != 0., tracks_chunk['y_dut_%d' % actual_dut] != 0.)]  # take only tracks where actual dut has a hit, otherwise residual wrong
-
-                    # Transform the hits and track intersections into the local coordinate system
-                    if not use_prealignment:  # Use alignment with rotations
-                        transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
-                                                                                                     y=alignment[actual_dut]['translation_y'],
-                                                                                                     z=alignment[actual_dut]['translation_z'],
-                                                                                                     alpha=alignment[actual_dut]['alpha'],
-                                                                                                     beta=alignment[actual_dut]['beta'],
-                                                                                                     gamma=alignment[actual_dut]['gamma'])
-                    else:  # Prealignment only gives offsets and no rotations, thus apply the known offsets
-                        transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=prealignment[actual_dut]['column_c0'],
-                                                                                                     y=prealignment[actual_dut]['row_c0'],
-                                                                                                     z=prealignment[actual_dut]['z'],
-                                                                                                     alpha=0,
-                                                                                                     beta=0,
-                                                                                                     gamma=0)
+                    tracks_chunk = tracks_chunk[np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] != 0., tracks_chunk['y_dut_%d' % actual_dut] != 0.)]  # Take only tracks where actual dut has a hit, otherwise residual wrong
 
                     # Coordinates in global coordinate system (x, y, z)
                     hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
                     intersection_x, intersection_y, intersection_z = tracks_chunk['offset_0'], tracks_chunk['offset_1'], tracks_chunk['offset_2']
 
-                    # Coordinates in local coordinate system (x, y, z) -> (col, row, 0)
-                    hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_transformation_matrix(x=hit_x,
-                                                                                                       y=hit_y,
-                                                                                                       z=hit_z,
-                                                                                                       transformation_matrix=transformation_matrix)
-
-                    intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_transformation_matrix(x=intersection_x,
-                                                                                                                                  y=intersection_y,
-                                                                                                                                  z=intersection_z,
-                                                                                                                                  transformation_matrix=transformation_matrix)
+                    # Transform to local coordinate system
+                    if use_prealignment:
+                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                               dut_index=actual_dut,
+                                                                                               prealignment=prealignment,
+                                                                                               inverse=True)
+                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                          dut_index=actual_dut,
+                                                                                                                          prealignment=prealignment,
+                                                                                                                          inverse=True)
+                    else:  # Apply transformation from fine alignment information
+                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                               dut_index=actual_dut,
+                                                                                               alignment=alignment,
+                                                                                               inverse=True)
+                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                          dut_index=actual_dut,
+                                                                                                                          alignment=alignment,
+                                                                                                                          inverse=True)
 
                     if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
                         logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
@@ -121,7 +123,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     difference_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local)) - np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
 
                     # Histogram residuals in different ways
-                    if not mean_column:
+                    if not mean_column:  # Only true at the first run, create hists here
                         mean_x, std_x = np.mean(difference[:, 0]), np.std(difference[:, 0])
                         mean_y, std_y = np.mean(difference[:, 1]), np.std(difference[:, 1])
                         mean_column, std_column = np.mean(difference_local[:, 0]), np.std(difference_local[:, 0])
@@ -179,7 +181,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                                difference_local[:, 0],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_column - 1 * std_column, mean_column + 1 * std_column)))
-                    else:
+                    else:  # Add data to existing hists
                         # X residual agains x position
                         hist_x_residual_x += np.histogram2d(intersection_x,
                                                             difference[:, 0],
@@ -352,9 +354,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 out_row_res_col[:] = hist_row_residual_col[0]
 
                 # Create plots
-                if output_fig:
+                if output_fig is not False:
                     # Global residuals
-                    logging.debug('Create residual plots')
+                    logging.info('Create residual plots')
                     coeff, var_matrix = None, None
                     try:
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x[1][:-1], hist_residual_x[0], p0=[np.amax(hist_residual_x[0]), mean_x, std_x])
@@ -501,7 +503,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
     return residuals
 
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, minimum_track_density, max_distance=500, sensor_size=None, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, output_file=None):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, sensor_size, minimum_track_density, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, chunk_size=1000000):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -512,10 +514,11 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
     output_pdf : pdf file name object
     bin_size : iterable
         sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
+    sensor_size : Tuple or list of tuples
+        Describes the sensor size for each DUT. If one tuple is given it is (size x, size y)
+        If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...]
     minimum_track_density : int
         minimum track density required to consider bin for efficiency calculation
-    sensor_size : iterable
-        size of the used sensor in um. Give one tuple (x, y) for every plane or list of tuples for different planes
     use_duts : iterable
         the DUTs to calculate efficiency for. If None all duts are used
     max_chi2 : int
@@ -528,6 +531,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
         defines binnig of distance values
     col_range, row_range : iterable
         column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation)
+    chunk_size : integer
+        The size of data in RAM
     '''
     logging.info('=== Calculate efficiency ===')
 
@@ -551,20 +556,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.info('Calculate efficiency for DUT %d', actual_dut)
-                track_array = node[:]
 
-                # Get pixel and bin sizes for calculations and plotting
-                # Allow different sensor sizes for every plane
-                if not sensor_size:
-                    dimensions = (np.amax(track_array['x_dut_%d' % actual_dut]), np.amax(track_array['y_dut_%d' % actual_dut]))
-                else:
-                    dimensions = [sensor_size, ] if not isinstance(sensor_size, list) else sensor_size
-                    if len(dimensions) == 1:
-                        dimensions = dimensions[0]
-                    else:
-                        dimensions = dimensions[index]
-
-                # Allow different bin_sizes for every plane
+                # Calculate histogram properties (bins size and number of bins)
                 bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
                 if len(bin_size) != 1:
                     actual_bin_size_x = bin_size[index][0]
@@ -572,111 +565,134 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 else:
                     actual_bin_size_x = bin_size[0][0]
                     actual_bin_size_y = bin_size[0][1]
-
+                dimensions = [sensor_size, ] if not isinstance(sensor_size, list) else sensor_size  # Sensor dimensions for each DUT
+                if len(dimensions) == 1:
+                    dimensions = dimensions[0]
+                else:
+                    dimensions = dimensions[index]
                 n_bin_x = dimensions[0] / actual_bin_size_x
                 n_bin_y = dimensions[1] / actual_bin_size_y
 
-                # Cut in Chi 2 of the track fit
-                if max_chi2:
-                    track_array = track_array[track_array['track_chi2'] <= max_chi2]
+                # Define result histograms, these are filled for each hit chunk
+                total_distance_array = np.zeros(shape=(n_bin_x, n_bin_y, max_distance))
+                total_hit_hist = np.zeros(shape=(n_bin_x, n_bin_y))
+                total_track_density = np.zeros(shape=(n_bin_x, n_bin_y))
+                total_track_density_with_DUT_hit = np.zeros(shape=(n_bin_x, n_bin_y))
 
-                # Transform the hits and track intersections into the local coordinate system (otherwise they are quite meaningless)
-                if not use_prealignment:  # Use alignment with rotations
-                    transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
-                                                                                                 y=alignment[actual_dut]['translation_y'],
-                                                                                                 z=alignment[actual_dut]['translation_z'],
-                                                                                                 alpha=alignment[actual_dut]['alpha'],
-                                                                                                 beta=alignment[actual_dut]['beta'],
-                                                                                                 gamma=alignment[actual_dut]['gamma'])
-                else:  # Prealignment only gives offsets and no rotations, thus apply the known offsets -> col/row/z position is x/y/z offset
-                    transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=prealignment[actual_dut]['column_c0'],
-                                                                                                 y=prealignment[actual_dut]['row_c0'],
-                                                                                                 z=prealignment[actual_dut]['z'],
-                                                                                                 alpha=0,
-                                                                                                 beta=0,
-                                                                                                 gamma=0)
+                for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
+                    # Cut in Chi 2 of the track fit
+                    if max_chi2:
+                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
 
-                hit_x, hit_y, hit_z = geometry_utils.apply_transformation_matrix(x=track_array['x_dut_%d' % actual_dut],
-                                                                                 y=track_array['y_dut_%d' % actual_dut],
-                                                                                 z=track_array['z_dut_%d' % actual_dut],
-                                                                                 transformation_matrix=transformation_matrix)
+                    # Transform the hits and track intersections into the local coordinate system
+                    # Coordinates in global coordinate system (x, y, z)
+                    hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
+                    intersection_x, intersection_y, intersection_z = tracks_chunk['offset_0'], tracks_chunk['offset_1'], tracks_chunk['offset_2']
 
-                intersection_x, intersection_y, intersection_z = geometry_utils.apply_transformation_matrix(x=track_array['offset_0'],
-                                                                                                            y=track_array['offset_1'],
-                                                                                                            z=track_array['offset_2'],
-                                                                                                            transformation_matrix=transformation_matrix)
+                    # Transform to local coordinate system
+                    if use_prealignment:
+                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                               dut_index=actual_dut,
+                                                                                               prealignment=prealignment,
+                                                                                               inverse=True)
+                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                          dut_index=actual_dut,
+                                                                                                                          prealignment=prealignment,
+                                                                                                                          inverse=True)
+                    else:  # Apply transformation from fine alignment information
+                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                               dut_index=actual_dut,
+                                                                                               alignment=alignment,
+                                                                                               inverse=True)
+                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                          dut_index=actual_dut,
+                                                                                                                          alignment=alignment,
+                                                                                                                          inverse=True)
 
-                intersection = np.column_stack((intersection_x, intersection_y, intersection_z))
-                hits = np.column_stack((hit_x, hit_y, hit_z))
+                    intersections_local = np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
+                    hits_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local))
 
-                selection = np.logical_or(track_array['x_dut_%d' % actual_dut] == 0., track_array['y_dut_%d' % actual_dut] == 0.)  # Only transform real hits
-                hits[selection, 0] = 0.
-                hits[selection, 1] = 0.
+                    # Only transform real hits, thus reset them to x/y/z = 0/0/0
+                    selection = np.logical_or(tracks_chunk['x_dut_%d' % actual_dut] == 0., tracks_chunk['y_dut_%d' % actual_dut] == 0.)
+                    hits_local[selection, :] = 0.
 
-                if not np.allclose(hit_z[~selection], 0) or not np.allclose(intersection_z, 0):
-                    raise RuntimeError('The transformation to the local coordinate system did not give all z = 0.')
+                    if not np.allclose(hits_local[0][2], 0.) or not np.allclose(intersection_z_local, 0.):
+                        tracks_chunk['event_number'][hits_local[0][2] != 0] 
+                        raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
-                # Select hits from column row range (e.g. to supress edge pixels)
-                col_range = [col_range, ] if not isinstance(col_range, list) else col_range
-                row_range = [row_range, ] if not isinstance(row_range, list) else row_range
-                if len(col_range) == 1:
-                    index = 0
-                if len(row_range) == 1:
-                    index = 0
-                if col_range[index] is not None:
-                    selection = np.logical_and(intersection[:, 0] >= col_range[index][0], intersection[:, 0] <= col_range[index][1])  # Select real hits
-                    hits, intersection = hits[selection], intersection[selection]
-                if row_range[index] is not None:
-                    selection = np.logical_and(intersection[:, 1] >= row_range[index][0], intersection[:, 1] <= row_range[index][1])  # Select real hits
-                    hits, intersection = hits[selection], intersection[selection]
+                    # Usefull for debugging, print some inefficient events that can be cross checked
+                    if show_inefficient_events:
+                        logging.info('These events are inefficient: %s', str(tracks_chunk['event_number'][selection]))
 
-                events = track_array['event_number'][selection]
-                print events
+                    # Select hits from column, row range (e.g. to supress edge pixels)
+                    col_range = [col_range, ] if not isinstance(col_range, list) else col_range
+                    row_range = [row_range, ] if not isinstance(row_range, list) else row_range
+                    if len(col_range) == 1:
+                        index = 0
+                    if len(row_range) == 1:
+                        index = 0
+                    if col_range[index] is not None:
+                        selection = np.logical_and(intersections_local[:, 0] >= col_range[index][0], intersections_local[:, 0] <= col_range[index][1])  # Select real hits
+                        hits_local, intersections_local = hits_local[selection], intersections_local[selection]
+                    if row_range[index] is not None:
+                        selection = np.logical_and(intersections_local[:, 1] >= row_range[index][0], intersections_local[:, 1] <= row_range[index][1])  # Select real hits
+                        hits_local, intersections_local = hits_local[selection], intersections_local[selection]
 
-                # Calculate distance between track hit and DUT hit
-                scale = np.square(np.array((1, 1, 0)))  # regard pixel size for calculating distances
-                distance = np.sqrt(np.dot(np.square(intersection - hits), scale))  # array with distances between DUT hit and track hit for each event. Values in um
+                    # Calculate distance between track hit and DUT hit
+                    scale = np.square(np.array((1, 1, 0)))  # Regard pixel size for calculating distances
+                    distance = np.sqrt(np.dot(np.square(intersections_local - hits_local), scale))  # Array with distances between DUT hit and track hit for each event. Values in um
 
-                col_row_distance = np.column_stack((hits[:, 0], hits[:, 1], distance))
-                distance_array = np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[0, dimensions[0]], [0, dimensions[1]], [0, max_distance]])[0]
-                hit_hist, _, _ = np.histogram2d(hits[:, 0], hits[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
+                    col_row_distance = np.column_stack((hits_local[:, 0], hits_local[:, 1], distance))
+
+                    total_distance_array += np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[0, dimensions[0]], [0, dimensions[1]], [0, max_distance]])[0]
+                    total_hit_hist += np.histogram2d(hits_local[:, 0], hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
+
+                    # Calculate efficiency
+                    if cut_distance:  # Select intersections where hit is in given distance around track intersection
+                        intersection_valid_hit = intersections_local[np.logical_and(np.logical_and(hits_local[:, 0] != 0, hits_local[:, 1] != 0), distance < cut_distance)]
+                    else:
+                        intersection_valid_hit = intersections_local[np.logical_and(hits_local[:, 0] != 0, hits_local[:, 1] != 0)]
+
+                    total_track_density += np.histogram2d(intersections_local[:, 0], intersections_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
+                    total_track_density_with_DUT_hit += np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
+
+                    if np.all(total_track_density == 0):
+                        logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
+                        continue
+
+                efficiency = np.zeros_like(total_track_density_with_DUT_hit)
+                efficiency[total_track_density != 0] = total_track_density_with_DUT_hit[total_track_density != 0].astype(np.float) / total_track_density[total_track_density != 0].astype(np.float) * 100.
+
+                efficiency = np.ma.array(efficiency, mask=total_track_density < minimum_track_density)
+
+                if not np.any(efficiency):
+                    raise RuntimeError('All efficiencies for DUT%d are zero, consider changing cut values!', actual_dut)
 
                 # Calculate distances between hit and intersection
-                distance_mean_array = np.average(distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
+                distance_mean_array = np.average(total_distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
-                distance_max_array = np.amax(distance_array, axis=2) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
-                distance_min_array = np.amin(distance_array, axis=2) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
+                distance_max_array = np.amax(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+                distance_min_array = np.amin(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
                 distance_max_array = np.ma.masked_invalid(distance_max_array)
                 distance_min_array = np.ma.masked_invalid(distance_min_array)
 
-                # Calculate efficiency
-                if cut_distance:  # Select intersections where hit is in given distance around track intersection
-                    intersection_valid_hit = intersection[np.logical_and(np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0), distance < cut_distance)]
-                else:
-                    intersection_valid_hit = intersection[np.logical_and(hits[:, 0] != 0, hits[:, 1] != 0)]
-
-                track_density, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
-                track_density_with_DUT_hit, _, _ = np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])
-
-                if np.all(track_density == 0):
-                    logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
-                    continue
-
-                efficiency = np.zeros_like(track_density_with_DUT_hit)
-                efficiency[track_density != 0] = track_density_with_DUT_hit[track_density != 0].astype(np.float) / track_density[track_density != 0].astype(np.float) * 100.
-
-                efficiency = np.ma.array(efficiency, mask=track_density < minimum_track_density)
-
-                plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
+                plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, total_hit_hist, total_track_density, total_track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
 
                 logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
 
                 if output_file:
                     with tb.open_file(output_file, 'a') as out_file_h5:
-                        actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+                        try:
+                            actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+                        except tb.NodeError:
+                            logging.warning('Data for DUT%d exists already and will be overwritten', actual_dut)
+                            out_file_h5.remove_node('/DUT_%d' % actual_dut, recursive=True)
+                            actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+
                         out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                         out_efficiency_mask = out_file_h5.createCArray(actual_dut_folder, name='Efficiency_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.mask.dtype), shape=efficiency.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
                         # Store parameters used for efficiency calculation
                         out_efficiency.attrs.bin_size = bin_size
                         out_efficiency.attrs.minimum_track_density = minimum_track_density
