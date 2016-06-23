@@ -32,7 +32,7 @@ def get_plane_normal(direction_vector_1, direction_vector_2):
 
 def get_line_intersections_with_plane(line_origins, line_directions, position_plane, normal_plane):
     ''' Calculates the intersection of n lines with one plane (n >= 1).
-    If there is not a intersection point (line is parallel to plane or the line is in the plane)
+    If there is not an intersection point (line is parallel to plane or the line is in the plane)
     the intersection point is set to NaN.
 
     Link: http://stackoverflow.com/questions/4938332/line-plane-intersection-based-on-points
@@ -53,24 +53,16 @@ def get_line_intersections_with_plane(line_origins, line_directions, position_pl
     Returns:
     --------
 
-    array like with n, 3 dimension with the intersection point. If n = 1
+    array like with n, 3 dimension with the intersection point
     '''
 
     offsets = position_plane[np.newaxis, :] - line_origins  # Calculate offsets and extend in missing dimension
 
-#     print 'offsets', offsets
-#     print 'offsets.shape', offsets.shape
-#     print 'normal_plane', normal_plane.shape
-#     print 'normal_plane dot offsets', np.dot(normal_plane, offsets.T)
-#     print 'direction', line_directions
-#     print 'direction.shape', line_directions.shape
-#     print 'normal_plane.dot direction', np.dot(normal_plane, line_directions.T)
-
     # Precalculate to be able to avoid division by 0 (line is parallel to the plane or in the plane)
     normal_dot_offsets = np.dot(normal_plane, offsets.T)
-    normal_dot_directions = np.atleast_1d(np.dot(normal_plane, line_directions.T))  # Dot product is transformed to be at least 1D for n = 1
+    normal_dot_directions = np.atleast_1d(np.dot(normal_plane, line_directions.T))  # Dot product is transformed to be at least 1D for special n = 1
 
-    # Initialize to nan
+    # Initialize result to nan
     t = np.empty_like(normal_dot_offsets)
     t[:] = np.NAN
 
@@ -304,7 +296,7 @@ def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
 
     # Extend rotation matrix R by one dimension
     R = np.eye(4, 4, 0)
-    # Inverse of rotation Matrix Rtot = R(alpha) * R(beta) * R(gamma) = R(gamma).T * R(beta).T * R(alpha).T = (R(alpha) * R(beta) * R(gamma)).T = Rtot.T
+    # Inverse of rotation Matrix Rtot_inv = R(alpha) * R(beta) * R(gamma) = R(gamma).T * R(beta).T * R(alpha).T = (R(alpha) * R(beta) * R(gamma)).T = Rtot.T
     R[:3, :3] = rotation_matrix(alpha, beta, gamma).T  # Inverse of a rotation matrix is also the transformed matrix, since Det = 1
 
     # Get translation matrix T
@@ -400,6 +392,79 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
 
 
+def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignment=None, inverse=False):
+    ''' Helper function that takes hits and applies a transformation according to the alignment data given.
+    If alignment data with rotations and translations are given the hits are transformed according to the
+    rotations and translations.
+    If prealignment data with offsets and slopes are given the hits are transformed according to the
+    slopes and offsets.
+    If both are given alignment data is taken.
+    The transformation can be inverted.
+
+    Paramter:
+    --------
+
+    hits_i : numpy arrays with hit position infos
+    dut_index : integer
+        Needed to select the corrct alignment info
+    alignment : nunmpy array
+        Alignment information with rotations and translations
+    prealignment : numpy array
+        Prealignment information with offsets and slopes
+    inverse : boolean
+        Apply inverse transformation if true
+
+    Returns:
+    --------
+    hit_x, hit_y, hit_z: numpy arrays
+    '''
+
+    if alignment is None and prealignment is None:
+        raise RuntimeError('Either prealignment or alignment data has to be given.')
+
+    if alignment is not None:
+        if inverse:
+            logging.debug('Transform hit position into the local coordinate system using alignment data')
+            transformation_matrix = global_to_local_transformation_matrix(x=alignment[dut_index]['translation_x'],
+                                                                          y=alignment[dut_index]['translation_y'],
+                                                                          z=alignment[dut_index]['translation_z'],
+                                                                          alpha=alignment[dut_index]['alpha'],
+                                                                          beta=alignment[dut_index]['beta'],
+                                                                          gamma=alignment[dut_index]['gamma'])
+        else:
+            logging.debug('Transform hit position into the global coordinate system using alignment data')
+            transformation_matrix = local_to_global_transformation_matrix(x=alignment[dut_index]['translation_x'],
+                                                                          y=alignment[dut_index]['translation_y'],
+                                                                          z=alignment[dut_index]['translation_z'],
+                                                                          alpha=alignment[dut_index]['alpha'],
+                                                                          beta=alignment[dut_index]['beta'],
+                                                                          gamma=alignment[dut_index]['gamma'])
+
+        hits_x, hits_y, hits_z = apply_transformation_matrix(x=hits_x,
+                                                             y=hits_y,
+                                                             z=hits_z,
+                                                             transformation_matrix=transformation_matrix)
+    else:
+        c0_column = prealignment[dut_index]['column_c0']
+        c1_column = prealignment[dut_index]['column_c1']
+        c0_row = prealignment[dut_index]['row_c0']
+        c1_row = prealignment[dut_index]['row_c1']
+        z = prealignment[dut_index]['z']
+
+        if inverse:
+            logging.debug('Transform hit position into the local coordinate system using prealignment data')
+            hits_x = (hits_x - c0_column) / c1_column
+            hits_y = (hits_y - c0_row) / c1_row
+            hits_z -= z
+        else:
+            logging.debug('Transform hit position into the global coordinate system using prealignment data')
+            hits_x = (c1_column * hits_x + c0_column)
+            hits_y = (c1_row * hits_y + c0_row)
+            hits_z += z
+
+    return hits_x, hits_y, hits_z
+
+
 def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute'):
     ''' Stores the alignment parameters (rotations, translations) into the alignment file.
     Absolute (overwriting) and relative mode (add angles, translations) is supported.
@@ -452,12 +517,12 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
                 logging.info('Change translation to:')
                 string = '\n\n'
                 for dut_values in new_alignment:
-                    string += 'DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um\n' % (dut_values['DUT'], 
-                                                                                                 dut_values['alpha'], 
-                                                                                                 dut_values['beta'], 
-                                                                                                 dut_values['gamma'], 
-                                                                                                 dut_values['translation_x'], 
-                                                                                                 dut_values['translation_y'], 
-                                                                                                 dut_values['translation_z'])
+                    string += 'DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um\n' % (dut_values['DUT'],
+                                                                                                        dut_values['alpha'],
+                                                                                                        dut_values['beta'],
+                                                                                                        dut_values['gamma'],
+                                                                                                        dut_values['translation_x'],
+                                                                                                        dut_values['translation_y'],
+                                                                                                        dut_values['translation_z'])
                 logging.info(string)
                 alignment_table.append(new_alignment)
