@@ -92,6 +92,7 @@ def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, du
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
 
         output_pdf.savefig()
+        plt.close()
 
 
 def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
@@ -625,13 +626,16 @@ def plot_residuals(histogram, fit, fit_errors, x_label, title, output_fig=None):
             plt.show()
 
 
-def plot_position_residuals(hist, x, y, x_label, y_label, title=None, output_fig=None, fit=None):  # Plot the residuals as a function of the position
+def plot_position_residuals(hist, x, y, x_label, y_label, title=None, yerr=None, output_fig=None, fit=None):  # Plot the residuals as a function of the position
     plt.clf()
 
     plt.plot(x, y, 'go', linewidth=2, label='Median residual')
     if fit:
         line = lambda x, c0, c1: c0 + c1 * x
-        plt.plot(x, line(x, *fit[0]), 'r-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
+        if np.any(yerr):
+            plt.errorbar(x=x, y=line(x, *fit[0]), yerr=yerr, fmt='r-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
+        else:
+            plt.plot(x, line(x, *fit[0]), 'r-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
 
     plt.plot()
     plt.grid()
