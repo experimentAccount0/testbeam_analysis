@@ -97,7 +97,6 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, tra
         with tb.open_file(hit_file[:-3] + '_reduced.h5', mode="w") as out_file_h5:
             for node in in_file_h5.root:
                 total_hits = node.shape[0]
-                hit_fraction = max_hits / float(total_hits)  # Fraction of hits to add per chunk
                 hit_table_out = out_file_h5.createTable(out_file_h5.root, name=node.name, description=node.dtype, title=node.title, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 for hits, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                     n_hits = hits.shape[0]
@@ -115,6 +114,7 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, tra
 
                     if max_hits:  # Reduce the number of added hits of this chunk to not exeed max_hits
                         # Calculate number of hits to add for this chunk
+                        hit_fraction = max_hits / float(total_hits)  # Fraction of hits to add per chunk
                         selection = np.ceil(np.linspace(0, hits.shape[0], int(hit_fraction * n_hits), endpoint=False)).astype(np.int)
                         selection = selection[selection < hits.shape[0]]
                         hits = hits[selection]
