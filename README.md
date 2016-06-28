@@ -1,5 +1,5 @@
 # Testbeam_Analysis [![BuildStatus](https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=development)](https://travis-ci.org/SiLab-Bonn/testbeam_analysis) [![Build Status](https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis)](https://ci.appveyor.com/project/DavidLP/testbeam-analysis) [![Coverage Status](https://coveralls.io/repos/SiLab-Bonn/testbeam_analysis/badge.svg?branch=development&service=github)](https://coveralls.io/github/SiLab-Bonn/testbeam_analysis?branch=development)
-A simple analysis of pixel-sensors data in particle beams. All steps of a complete analysis are implemented with a few independent python functions. If you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope dara reconstruction this code might help. 
+A simple analysis of pixel-sensor data in particle beams. All steps of a complete analysis are implemented with a few independent python functions. If you want to understand the basics of telescope data reconstruction this code might help. 
 If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. _EUTelescope_. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code.
 For a quick first impression check the example plots in the wiki.
 
