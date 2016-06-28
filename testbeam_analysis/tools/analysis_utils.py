@@ -93,7 +93,7 @@ def get_max_events_in_both_arrays(events_one, events_two):
     """
     events_one = np.ascontiguousarray(events_one)  # change memory alignement for c++ library
     events_two = np.ascontiguousarray(events_two)  # change memory alignement for c++ library
-    event_result = np.empty(shape=(events_one.shape[0] + events_two.shape[0], ), dtype=events_one.dtype)
+    event_result = np.empty(shape=(events_one.shape[0] + events_two.shape[0],), dtype=events_one.dtype)
     count = analysis_functions.get_max_events_in_both_arrays(events_one, events_two, event_result)
     return event_result[:count]
 
@@ -124,7 +124,7 @@ def map_cluster(events, cluster):
     """
     cluster = np.ascontiguousarray(cluster)
     events = np.ascontiguousarray(events)
-    mapped_cluster = np.zeros((events.shape[0], ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
+    mapped_cluster = np.zeros((events.shape[0],), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
     mapped_cluster = np.ascontiguousarray(mapped_cluster)
     analysis_functions.map_cluster(events, cluster, mapped_cluster)
     return mapped_cluster
@@ -393,3 +393,93 @@ def get_rms_from_histogram(counts, bin_positions):
         for _ in range(one_bin):
             values.append(bin_positions[index])
     return np.std(values)
+
+def get_mean_efficiency(array_pass, array_total, method=0):
+    ''' Function to calculate the mean and the error of the efficiency using different approaches.
+    No good approach was found.
+
+    Parameters
+    ---------
+    array_pass : numpy array
+        Array with tracks that were seen by the DUT. Can be a masked array.
+    array_total : numpy array
+        Array with total tracks in the DUT. Can be a masked array.
+    method: number
+        Select the method to calculate the efficiency:
+          1: Take mean and RMS of the efficiency per bin. Each bin is weightd by the number of total tracks.
+             Results in symmetric unphysical error bars that cover also efficiencies > 100%
+          2: Takes a correct binomial distribution and calculate the correct confidence interval after combining all pixels.
+             Gives correct mean and correct statistical error bars. Systematic efficiency variations are not taken into account, thus
+             the error bar is very small. Further info: https://root.cern.ch/doc/master/classTEfficiency.html
+          3: As 2. but for each efficiency bin separately. Then the distribution is fitted by a constant using the
+             asymmetric error bars. Gives too high efficiencies and small,  asymmetric error bars.
+          4: Use a special Binomial efficiency fit. Gives best mean efficiency but unphysical symmetric error
+             bars. Further info: https://root.cern.ch/doc/master/classTBinomialEfficiencyFitter.html
+    '''
+    
+    n_bins = np.ma.count(array_pass)
+    logging.info('Calculate the mean efficiency from %d pixels', n_bins)
+    
+    if method == 0:
+        def weighted_avg_and_std(values, weights):  # http://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
+            average = np.average(values, weights=weights)
+            variance = np.average((values - average) ** 2, weights=weights)  # Fast and numerically precise
+            return (average, np.sqrt(variance))
+
+        efficiency = np.ma.compressed(array_pass) / np.ma.compressed(array_total)
+        return weighted_avg_and_std(efficiency, np.ma.compressed(array_total))
+    else:  # Use CERN ROOT
+        try:
+            from ROOT import TH1D, TEfficiency, TF1, TBinomialEfficiencyFitter
+        except ImportError:
+            raise RuntimeError('To use these method you have to install CERN ROOT with python bindings.')
+    
+        # Convert not masked numpy array values to 1D ROOT double histogram
+        def fill_1d_root_hist(array, name):
+            length = np.ma.count(array_pass)
+            root_hist = TH1D(name, "hist", length, 0, length)
+            for index, value in enumerate(np.ma.compressed(array).ravel()):
+                root_hist.SetBinContent(index, value)
+            return root_hist
+        
+        if method == 1:
+            # The following combines all pixel and gives correct
+            # statistical errors but does not take the systematic
+            # variations of within the  efficiency histogram parts into account
+            # Thus gives very small error bars
+            hist_pass = TH1D("hist_pass", "hist", 1, 0, 1)
+            hist_total = TH1D("hist_total", "hist", 1, 0, 1)
+            hist_pass.SetBinContent(0, np.ma.sum(array_pass))
+            hist_total.SetBinContent(0, np.ma.sum(array_total))
+            efficiency = TEfficiency(hist_pass, hist_total)
+            return efficiency.GetEfficiency(0), efficiency.GetEfficiencyErrorLow(0), efficiency.GetEfficiencyErrorUp(0)
+        elif method == 2:
+            # The following fits the efficiency with a constant but
+            # it gives symmetric error bars, thus unphysical results
+            # This is not understood yet and thus not used
+            
+            # Convert numpy array to ROOT hists
+            hist_pass = fill_1d_root_hist(array_pass, 'h_pass')
+            hist_total = fill_1d_root_hist(array_total, 'h_total')
+            f1 = TF1("f1", "pol0(0)", 0, n_bins)
+            fitter = TBinomialEfficiencyFitter(hist_pass, hist_total)
+            r = fitter.Fit(f1, "SE")
+            eff_err_low = r.LowerError(0)
+            eff_err_up = r.UpperError(0)
+            efficiency = r.GetParams()[0]
+            return efficiency, eff_err_low, eff_err_up
+        elif method == 3:
+            # Fit point of each efficiency bin using asymmetric error bars
+            # Parameters described here: https://root.cern.ch/doc/master/classTGraph.html#a61269bcd47a57296f0f1d57ceff8feeb
+            # This gives too high efficiency and too small error
+            
+            # Convert numpy array to ROOT hists
+            hist_pass = fill_1d_root_hist(array_pass, 'h_pass')
+            hist_total = fill_1d_root_hist(array_total, 'h_total')
+            efficiency = TEfficiency(hist_pass, hist_total)
+            f1 = TF1("f1", "pol0(0)", 0, n_bins)
+            fit_result = efficiency.CreateGraph().Fit(f1, "SFEM")
+            eff_mean = fit_result.GetParams()[0]
+            eff_err_low = fit_result.LowerError(0)
+            eff_err_up = fit_result.UpperError(0)
+            return eff_mean, eff_err_low, eff_err_up
