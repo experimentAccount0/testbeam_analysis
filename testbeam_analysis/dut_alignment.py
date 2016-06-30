@@ -59,11 +59,12 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
         # Result arrays to be filled
         column_correlations = [None] * (n_duts - 1)
         row_correlations = [None] * (n_duts - 1)
+        start_indices = [0] * (n_duts - 1)  # Store the loop indices for speed up
 
         with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
             progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
             progress_bar.start()
-            start_indices = [0] * (n_duts - 1)  # Store the loop indices for speed up
+
             for cluster_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
                 actual_event_numbers = cluster_dut_0[:]['event_number']
                 # Calculate the common event number of each device with the reference device and correlate the cluster of this events
@@ -174,7 +175,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
                 # Second loop: get the cluster from all files and merge them to the common event number
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-                        for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+                        for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
                             selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
                             actual_mean_column = pixel_size[dut_index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
