@@ -44,6 +44,21 @@ class TestAnalysisUtils(unittest.TestCase):
         event_numbers_2 = np.array([0, 3, 3, 4], dtype=np.int64)
         result = analysis_utils.get_max_events_in_both_arrays(event_numbers, event_numbers_2)
         self.assertListEqual([0, 1, 1, 2, 3, 3, 4, 5, 6, 7], result.tolist())
+        # Test 3
+        event_numbers = np.array([1, 1, 2, 4, 5, 6, 7], dtype=np.int64)
+        event_numbers_2 = np.array([6, 7, 9, 10], dtype=np.int64)
+        result = analysis_utils.get_max_events_in_both_arrays(event_numbers, event_numbers_2)
+        self.assertListEqual([1, 1, 2, 4, 5, 6, 7, 9, 10], result.tolist())
+        # Test 4
+        event_numbers = np.array([1, 1, 2, 4, 5, 6, 7, 10, 10], dtype=np.int64)
+        event_numbers_2 = np.array([1, 6, 7, 9, 10], dtype=np.int64)
+        result = analysis_utils.get_max_events_in_both_arrays(event_numbers, event_numbers_2)
+        self.assertListEqual([1, 1, 2, 4, 5, 6, 7, 9, 10, 10], result.tolist())
+        # Test 5
+        event_numbers = np.array([1, 1, 2, 4, 5, 6, 7, 10, 10], dtype=np.int64)
+        event_numbers_2 = np.array([1, 1, 1, 6, 7, 9, 10], dtype=np.int64)
+        result = analysis_utils.get_max_events_in_both_arrays(event_numbers, event_numbers_2)
+        self.assertListEqual([1, 1, 1, 2, 4, 5, 6, 7, 9, 10, 10], result.tolist())
 
     def test_map_cluster(self):  # check the compiled function against result
         clusters = np.zeros((20, ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
