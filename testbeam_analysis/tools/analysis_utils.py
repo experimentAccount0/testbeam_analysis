@@ -260,17 +260,21 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         if event_start is None:
             min_index_data = 0
         else:
-            min_index_data = np.argmin(event_number < event_start)
+            if event_number[0] > event_start:
+                min_index_data = 0
+            else:
+                min_index_data = np.argmin(event_number < event_start)
 
         if event_stop is None:
             max_index_data = event_number.shape[0]
         else:
-            max_index_data = np.argmax(event_number >= event_stop)
+            if event_number[-1] < event_stop:
+                max_index_data = event_number.shape[0]
+            else: 
+                max_index_data = np.argmax(event_number >= event_stop)
 
         if min_index_data < 0:
             min_index_data = 0
-        if max_index_data == 0 or max_index_data > event_number.shape[0]:
-            max_index_data = event_number.shape[0]
         return array[min_index_data:max_index_data]
     else:
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
@@ -332,18 +336,18 @@ def data_aligned_at_events(table, start_event_number=None, stop_event_number=Non
                 stop_index = stop_indeces[0]
                 stop_index_known = True
 
-    if (start_index_known and stop_index_known) and (start_index + chunk_size >= stop_index):  # special case, one read is enough, data not bigger than one chunk and the indices are known
+    if (start_index_known and stop_index_known) and (start_index + chunk_size >= stop_index):  # Special case, one read is enough, data not bigger than one chunk and the indices are known
         yield table.read(start=start_index, stop=stop_index), stop_index
-    else:  # read data in chunks, chunks do not divide events, abort if stop_event_number is reached
+    else:  # Read data in chunks, chunks do not divide events, abort if stop_event_number is reached
         while(start_index < stop_index):
-            src_array = table.read(start=start_index, stop=start_index + chunk_size + 1)  # stop index is exclusive, so add 1
+            src_array = table.read(start=start_index, stop=start_index + chunk_size + 1)  # Stop index is exclusive, so add 1
             first_event = src_array["event_number"][0]
             last_event = src_array["event_number"][-1]
             if (start_event_number is not None and last_event < start_event_number):
-                start_index = start_index + src_array.shape[0]  # events fully read, increase start index and continue reading
+                start_index = start_index + src_array.shape[0]  # Events fully read, increase start index and continue reading
                 continue
 
-            last_event_start_index = np.argmax(src_array["event_number"] == last_event)  # get first index of last event
+            last_event_start_index = np.argmax(src_array["event_number"] == last_event)  # Get first index of last event
             if last_event_start_index == 0:
                 nrows = src_array.shape[0]
                 if nrows != 1:
