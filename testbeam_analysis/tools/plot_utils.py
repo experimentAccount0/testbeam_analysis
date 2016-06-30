@@ -104,7 +104,7 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
-            cluster_n_hits = input_file_h5.root.Cluster[:]['n_hits']
+            cluster_n_hits = input_file_h5.root.Cluster[:1000000]['n_hits']
             # Save cluster size histogram
             max_cluster_size = np.amax(cluster_n_hits) + 1
             plt.clf()
@@ -219,7 +219,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         global right_limit
         offset_limit = offset_limit_new
         offset_limit_plot.set_ydata([offset_limit * 10., offset_limit * 10.])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
         selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
         update_plot(selected_data)
 
@@ -231,7 +231,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         global right_limit
         error_limit = error_limit_new
         error_limit_plot.set_ydata([error_limit * 1000., error_limit * 1000.])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
         selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
         update_plot(selected_data)
 
@@ -243,7 +243,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         global right_limit
         left_limit = left_limit_new
         left_limit_plot.set_xdata([left_limit, left_limit])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
         selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
         update_plot(selected_data)
 
@@ -255,7 +255,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         global right_limit
         right_limit = right_limit_new
         right_limit_plot.set_xdata([right_limit, right_limit])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
+        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
         selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
         update_plot(selected_data)
 
