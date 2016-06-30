@@ -40,9 +40,9 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder, 'Correlation.h5'))
         os.remove(os.path.join(cls.output_folder, 'Correlation.pdf'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
-#         os.remove(os.path.join(cls.output_folder, 'Tracklets_2.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Tracklets_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Alignment.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Alignment.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Prealignment.pdf'))
 
     def test_cluster_correlation(self):  # check the hit correlation function
         dut_alignment.correlate_cluster(input_cluster_files=self.data_files,
@@ -52,16 +52,16 @@ class TestHitAnalysis(unittest.TestCase):
                                         )
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Correlation_result.h5'), os.path.join(self.output_folder, 'Correlation.h5'), exact=True)
         self.assertTrue(data_equal, msg=error_msg)
-# FIXME: chunking does not work
-#         # Retest with tiny chunk size to force chunked correlation
-#         dut_alignment.correlate_cluster(input_cluster_files=self.data_files,
-#                                         output_correlation_file=os.path.join(self.output_folder, 'Correlation_2.h5'),
-#                                         n_pixels=self.n_pixels,
-#                                         pixel_size=self.pixel_size,
-#                                         chunk_size=293
-#                                         )
-#         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Correlation_result.h5'), os.path.join(self.output_folder, 'Correlation_2.h5'), exact=True)
-#         self.assertTrue(data_equal, msg=error_msg)
+
+        # Retest with tiny chunk size to force chunked correlation
+        dut_alignment.correlate_cluster(input_cluster_files=self.data_files,
+                                        output_correlation_file=os.path.join(self.output_folder, 'Correlation_2.h5'),
+                                        n_pixels=self.n_pixels,
+                                        pixel_size=self.pixel_size,
+                                        chunk_size=293
+                                        )
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Correlation_result.h5'), os.path.join(self.output_folder, 'Correlation_2.h5'), exact=True)
+        self.assertTrue(data_equal, msg=error_msg)
 
     def test_prealignment(self):  # Check the hit alignment function
         dut_alignment.prealignment(input_correlation_file=os.path.join(tests_data_folder, 'Correlation_result.h5'),
@@ -69,7 +69,7 @@ class TestHitAnalysis(unittest.TestCase):
                                    z_positions=self.z_positions,
                                    pixel_size=self.pixel_size,
                                    non_interactive=True,
-                                   iterations=5)  # Due to too little test data the alignment result is only stable for more iterations
+                                   iterations=5)  # Due to too little test data the alignment result is only rather stable for more iterations
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Alignment_result.h5'),
                                                             os.path.join(self.output_folder, 'Alignment.h5'),
                                                             exact=False,
@@ -84,15 +84,15 @@ class TestHitAnalysis(unittest.TestCase):
                                          pixel_size=self.pixel_size)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets.h5'))
         self.assertTrue(data_equal, msg=error_msg)
-# FIXME: chunking does not work
-#         # Retest with tiny chunk size to force chunked merging
-#         dut_alignment.merge_cluster_data(cluster_files,
-#                                          output_merged_file=os.path.join(self.output_folder, Tracklets_2.h5'),
-#                                          pixel_size=self.pixel_size,
-#                                          chunk_size=293)
-# 
-#         data_equal, error_msg = test_tools.compare_h5_files(tests_data_folder + 'Tracklets_result.h5', self.output_folder, 'Tracklets_2.h5')
-#         self.assertTrue(data_equal, msg=error_msg)
+
+        # Retest with tiny chunk size to force chunked merging
+        dut_alignment.merge_cluster_data(cluster_files,
+                                         output_merged_file=os.path.join(self.output_folder, 'Tracklets_2.h5'),
+                                         pixel_size=self.pixel_size,
+                                         chunk_size=293)
+ 
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
+        self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
