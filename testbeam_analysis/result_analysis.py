@@ -3,7 +3,6 @@ from __future__ import division
 
 import logging
 import re
-from collections import Iterable
 
 import tables as tb
 import numpy as np
@@ -550,6 +549,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
 
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
+        pass_tracks = []
+        total_tracks = []
         with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
             for index, node in enumerate(in_file_h5.root):
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
@@ -617,7 +618,6 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                     hits_local[selection, :] = 0.
 
                     if not np.allclose(hits_local[0][2], 0.) or not np.allclose(intersection_z_local, 0.):
-                        tracks_chunk['event_number'][hits_local[0][2] != 0] 
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
                     # Usefull for debugging, print some inefficient events that can be cross checked
@@ -693,6 +693,14 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                         out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                         out_efficiency_mask = out_file_h5.createCArray(actual_dut_folder, name='Efficiency_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.mask.dtype), shape=efficiency.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
+                        # For correct statistical error calculation the number of detected tracks over total tracks is needed
+                        out_pass = out_file_h5.createCArray(actual_dut_folder, name='Passing_tracks', title='Passing events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density_with_DUT_hit.dtype), shape=total_track_density_with_DUT_hit.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                        out_total = out_file_h5.createCArray(actual_dut_folder, name='Total_tracks', title='Total events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density.dtype), shape=total_track_density.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+                        pass_tracks.append(total_track_density_with_DUT_hit.sum())
+                        total_tracks.append(total_track_density.sum())
+                        logging.info('Passing / total tracks: %d / %d', total_track_density_with_DUT_hit.sum(), total_track_density.sum())
+
                         # Store parameters used for efficiency calculation
                         out_efficiency.attrs.bin_size = bin_size
                         out_efficiency.attrs.minimum_track_density = minimum_track_density
@@ -705,4 +713,6 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                         out_efficiency.attrs.row_range = row_range
                         out_efficiency[:] = efficiency.T
                         out_efficiency_mask[:] = efficiency.mask.T
-    return efficiencies
+                        out_pass[:] = total_track_density_with_DUT_hit.T
+                        out_total[:] = total_track_density.T
+    return efficiencies, pass_tracks, total_tracks
