@@ -44,11 +44,13 @@ class TestTrackAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder, 'Tracks_merged.pdf'))
 
     def test_track_finding(self):
+        # Test 1:
         track_analysis.find_tracks(input_tracklets_file=os.path.join(tests_data_folder, 'Tracklets_small.h5'),
                                    input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                    output_track_candidates_file=os.path.join(self.output_folder, 'TrackCandidates.h5'))
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'TrackCandidates_result.h5'), os.path.join(self.output_folder, 'TrackCandidates.h5'))
         self.assertTrue(data_equal, msg=error_msg)
+        # Test 2: chunked
         track_analysis.find_tracks(input_tracklets_file=os.path.join(tests_data_folder, 'Tracklets_small.h5'),
                                    input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                    output_track_candidates_file=os.path.join(self.output_folder, 'TrackCandidates_2.h5'),
