@@ -31,12 +31,11 @@ def get_array_differences(first_array, second_array):
                 continue
             if (first_column.dtype != second_column.dtype):
                 return_str += 'Column ' + column_name + ' has different data type. '
-            try:
-                if not (first_column == second_column).all():  # check if the data of the column is equal
-                    return_str += 'Column ' + column_name + ' not equal. '
-            except AttributeError:
-                if not (first_column == second_column):
-                    return_str += 'Column ' + column_name + ' not equal. '
+            if (first_column.shape != second_column.shape):
+                return_str += 'The array length is different: %s != %s' % (str(first_column.shape), str(second_column.shape))
+                return ': ' + return_str
+            if not np.all(first_column == second_column):  # check if the data of the column is equal
+                return_str += 'Column ' + column_name + ' not equal. '
         for column_name in second_array.dtype.names:
             try:
                 first_array[column_name]
