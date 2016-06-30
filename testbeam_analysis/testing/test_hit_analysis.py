@@ -41,12 +41,22 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.pdf'))
 
     def test_noisy_pixel_remover(self):
+        # Test 1:
         hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=1.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4))
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'HotPixel_result.h5'), os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
+        self.assertTrue(data_equal, msg=error_msg)
+        # Test 2: smaller chunks
+        hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=1.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4), chunk_size=4999)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'HotPixel_result.h5'), os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_hit_clustering(self):
+        # Test 1:
         hit_analysis.cluster_hits(self.data_files[0], max_x_distance=1, max_y_distance=2)
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Cluster_result.h5'), os.path.join(self.output_folder, 'TestBeamData_FEI4_DUT0_small_cluster.h5'), exact=False)
+        self.assertTrue(data_equal, msg=error_msg)
+        # Test 2: smaller chunks
+        hit_analysis.cluster_hits(self.data_files[0], max_x_distance=1, max_y_distance=2, chunk_size=4999)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Cluster_result.h5'), os.path.join(self.output_folder, 'TestBeamData_FEI4_DUT0_small_cluster.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
