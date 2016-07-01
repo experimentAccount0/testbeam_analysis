@@ -60,7 +60,7 @@ def merge_on_event_number(data_1, data_2):
 
     for index_data_1 in range(data_1.shape[0]):
 
-        while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:
+        while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:  # Catch up with outer loop
             event_index_data_2 += 1
 
         for index_data_2 in range(event_index_data_2, data_2.shape[0]):
@@ -73,6 +73,52 @@ def merge_on_event_number(data_1, data_2):
                 break
 
     return result_1, result_2
+
+@njit
+def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr_hist):
+    """
+    Merges the data_2 cluster positions with data_1 cluster positions on an event basis with all permutations
+    That means: merge all hits of every event in data_2 on all hits of the same event in data_1.
+    Then the hits are used to fill a correlation histogram. The correlation histogram has a precision of 1 um.
+
+    Does the same than the merge of the pandas package:
+        df = data_1.merge(data_2, how='left', on='event_number')
+        df.dropna(inplace=True)
+        correlation_column = np.hist2d(df[column_mean_dut_0], df[column_mean_dut_x])
+        correlation_row = np.hist2d(df[row_mean_dut_0], df[row_mean_dut_x])
+    But results in > 10 x faster code.
+
+    Parameter
+    --------
+
+    data_1, data_2: np.recarray with event_number column
+    column_corr_hist, row_corr_hist: np.arrays to be filled with correlation data
+
+    """
+    event_index_data_2 = 0
+    result_array_size = 0
+
+    # Loop to determine the needed result array size
+    for index_data_1 in range(data_1.shape[0]):
+
+        while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:  # Catch up with outer loop
+            event_index_data_2 += 1
+
+        for index_data_2 in range(event_index_data_2, data_2.shape[0]):
+            if data_1[index_data_1]['event_number'] == data_2[index_data_2]['event_number']:
+                # Bin cluster positions with 1 um precision
+                column_index_dut_1 = int(data_1[index_data_1]['mean_column'] - 1.)
+                row_index_dut_1 = int(data_1[index_data_1]['mean_row'] - 1.)
+                column_index_dut_2 = int(data_2[index_data_2]['mean_column'] - 1.)
+                row_index_dut_2 = int(data_2[index_data_2]['mean_row'] - 1.)
+
+                # Add correlation to histogram
+                column_corr_hist[column_index_dut_2, column_index_dut_1] += 1
+                row_corr_hist[row_index_dut_2, row_index_dut_1] += 1
+
+                result_array_size += 1
+            else:
+                break
 
 
 def in1d_events(ar1, ar2):
