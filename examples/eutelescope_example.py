@@ -108,7 +108,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     # The following two steps are for demonstration only. They show track fitting and residual calculation on
     # prealigned hits. Usually you are not interessted in this and will use the aligned hits directly.
 
-    # Fit the track candidates and create new track table (using the prealignment!)
+    # Step 1.: Fit the track candidates and create new track table (using the prealignment!)
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealignment.h5'),
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
@@ -119,7 +119,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                               force_prealignment=True,  # This is just for demonstration purpose, you usually fully aligned hits
                               track_quality=1)
 
-    # Calculate the residuals to check the alignment (using the prealignment!)
+    # Step 2.:  Calculate the residuals to check the alignment (using the prealignment!)
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                         output_residuals_file=os.path.join(output_folder, 'Residuals_prealigned.h5'),
@@ -150,10 +150,11 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
-                              include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
+                              include_duts=None,  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
                               track_quality=0)  # Take all tracks
 
+    # Create unconstrained residuals
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                         output_residuals_file=os.path.join(output_folder, 'Residuals.h5'),
