@@ -424,6 +424,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
         The input file with the correlation histograms.
     output_pdf_file : pdf file name
     '''
+
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_correlation_file)[0] + '.pdf'
 
@@ -441,6 +442,11 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 except AttributeError:
                     continue
                 data = node[:]
+
+                if np.all(data <= 0):
+                    logging.warning('All correlation entries for %s are zero, do not create plots', str(node.name))
+                    continue
+
                 plt.clf()
                 cmap = cm.get_cmap('viridis')
 #                 cmap.set_bad('w')
