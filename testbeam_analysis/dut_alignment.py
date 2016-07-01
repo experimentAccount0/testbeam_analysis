@@ -57,8 +57,14 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
         n_duts = len(input_cluster_files)
 
         # Result arrays to be filled
-        column_correlations = [None] * (n_duts - 1)
-        row_correlations = [None] * (n_duts - 1)
+        column_correlations = []
+        row_correlations = []
+        for dut_index in range(1, n_duts):
+            shape_column = (n_pixels[dut_index][0], n_pixels[0][0])
+            shape_row = (n_pixels[dut_index][1], n_pixels[0][1])
+            column_correlations.append(np.zeros(shape_column, dtype=np.int))
+            row_correlations.append(np.zeros(shape_row, dtype=np.int))
+
         start_indices = [0] * (n_duts - 1)  # Store the loop indices for speed up
 
         with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
@@ -71,22 +77,11 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
                         for actual_dut_cluster, start_indices[dut_index - 1] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index - 1], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
-                            dut_0_cluster, actual_dut_cluster = analysis_utils.merge_on_event_number(cluster_dut_0, actual_dut_cluster)
 
-                            # Convert to integer to allow fast histogramming
-                            dut0_mean_cluster = (dut_0_cluster['mean_column'] - 1.).astype(np.int)
-                            dut0_mean_row = (dut_0_cluster['mean_row'] - 1.).astype(np.int)
-                            actual_dut_mean_cluster = (actual_dut_cluster['mean_column'] - 1.).astype(np.int)
-                            actual_dut_mean_row = (actual_dut_cluster['mean_row'] - 1.).astype(np.int)
-                            shape_column = (n_pixels[dut_index][0], n_pixels[0][0])
-                            shape_row = (n_pixels[dut_index][1], n_pixels[0][1])
-
-                            if not np.any(column_correlations[dut_index - 1]):
-                                column_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_mean_cluster, dut0_mean_cluster, shape=shape_column)
-                                row_correlations[dut_index - 1] = analysis_utils.hist_2d_index(actual_dut_mean_row, dut0_mean_row, shape=shape_row)
-                            else:
-                                column_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_mean_cluster, dut0_mean_cluster, shape=shape_column)
-                                row_correlations[dut_index - 1] += analysis_utils.hist_2d_index(actual_dut_mean_row, dut0_mean_row, shape=shape_row)
+                            analysis_utils.correlate_cluster_on_event_number(data_1=cluster_dut_0,
+                                                                             data_2=actual_dut_cluster,
+                                                                             column_corr_hist=column_correlations[dut_index - 1],
+                                                                             row_corr_hist=row_correlations[dut_index - 1])
 
                 progress_bar.update(index)
 
