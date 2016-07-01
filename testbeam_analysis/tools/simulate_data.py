@@ -16,7 +16,7 @@ import logging
 import progressbar
 from numba import njit
 import math
-from pyLandau import landau
+import pylandau
 
 from testbeam_analysis.tools import geometry_utils
 
@@ -587,8 +587,8 @@ class SimulateData(object):
 
         '''
         x = np.arange(0, 10, 0.1)
-        y = landau.landau(x, mu=1. - 0.22278298, eta=eta)  # MPV is at mu + 0.22278298; eta is different according to the device thickness; this is neglected here
-        p = y / np.sum(y)  # Propability
+        y = pylandau.landau(x, mpv=1., eta=eta)  # eta is different according to the device thickness; this is neglected here
+        p = y / np.sum(y)  # Propability by normalization to integral
         mpv = 77 * self.dut_thickness[dut_index]
         charge = x * mpv
 

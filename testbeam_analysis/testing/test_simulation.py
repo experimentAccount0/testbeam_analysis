@@ -4,7 +4,7 @@ import os
 import tables as tb
 import numpy as np
 import unittest
-from pyLandau import landau
+import pylandau
 from scipy.optimize import curve_fit
 
 import matplotlib.pyplot as plt
@@ -13,7 +13,6 @@ from testbeam_analysis.tools import simulate_data
 from testbeam_analysis.tools import geometry_utils
 
 from testbeam_analysis.tools import analysis_utils
-from testbeam_analysis import plot_utils
 
 
 class TestHitAnalysis(unittest.TestCase):
@@ -79,9 +78,9 @@ class TestHitAnalysis(unittest.TestCase):
                 mpv_charge = 77 * self.simulate_data.dut_thickness[dut_index]  # 77 electrons per um in silicon
                 x = np.arange(0, 10, 0.1) * mpv_charge
                 if self.simulate_data.dut_noise[dut_index]:
-                    y = landau.langau(x, mu=mpv_charge, eta=0.2 * mpv_charge, sigma=self.simulate_data.dut_noise[dut_index])
+                    y = pylandau.langau(x, mpv=mpv_charge, eta=0.2 * mpv_charge, sigma=self.simulate_data.dut_noise[dut_index])
                 else:
-                    y = landau.landau(x, mu=mpv_charge, eta=0.2 * mpv_charge)
+                    y = pylandau.landau(x, mpv=mpv_charge, eta=0.2 * mpv_charge)
                 with tb.open_file('simulated_data_DUT%d.h5' % dut_index, 'r') as in_file_h5:
                     charge = in_file_h5.root.Hits[:]['charge'] * 10.  # 1 LSB corresponds to 10 electrons
                     charge_hist, edges = np.histogram(charge, bins=100, range=(x[0], x[-1]))
