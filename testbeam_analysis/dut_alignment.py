@@ -53,6 +53,7 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
     '''
 
     logging.info('=== Correlate the position of %d DUTs ===', len(input_cluster_files))
+
     with tb.open_file(output_correlation_file, mode="w") as out_file_h5:
         n_duts = len(input_cluster_files)
 
@@ -71,19 +72,33 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
             progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
             progress_bar.start()
 
+            pool = Pool()  # Provide worker pool
             for cluster_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
                 actual_event_numbers = cluster_dut_0[:]['event_number']
-                # Calculate the common event number of each device with the reference device and correlate the cluster of this events
-                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
-                    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-                        for actual_dut_cluster, start_indices[dut_index - 1] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index - 1], start_event_number=actual_event_numbers[0], stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
 
-                            analysis_utils.correlate_cluster_on_event_number(data_1=cluster_dut_0,
-                                                                             data_2=actual_dut_cluster,
-                                                                             column_corr_hist=column_correlations[dut_index - 1],
-                                                                             row_corr_hist=row_correlations[dut_index - 1])
+                # Create correlation histograms to the reference device for all other devices
+                # Do this in parallel to safe time
+
+                dut_results = []
+                for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
+                    dut_results.append(pool.apply_async(_correlate_cluster, kwds={'cluster_dut_0': cluster_dut_0,
+                                                               'cluster_file':cluster_file,
+                                                                'start_index':start_indices[dut_index - 1],
+                                                                'start_event_number':actual_event_numbers[0],
+                                                                'stop_event_number':actual_event_numbers[-1] + 1,
+                                                                'column_correlation':column_correlations[dut_index - 1],
+                                                                'row_correlation':row_correlations[dut_index - 1],
+                                                                'chunk_size':chunk_size
+                                                            }
+                                     ))
+                # Collect results when available
+                for dut_index, dut_result in enumerate(dut_results, start=1):
+                    (start_indices[dut_index - 1], column_correlations[dut_index - 1], row_correlations[dut_index - 1]) = dut_result.get()
 
                 progress_bar.update(index)
+
+            pool.close()
+            pool.join()
 
             # Store the correlation histograms
             for dut_index in range(n_duts - 1):
@@ -864,6 +879,18 @@ def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix
             alignment_parameters[dut_index]['translation_y'] = -mu_y
 
     return alignment_parameters, total_residual
+
+
+def _correlate_cluster(cluster_dut_0, cluster_file, start_index, start_event_number, stop_event_number, column_correlation, row_correlation, chunk_size):
+        with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
+            for actual_dut_cluster, start_index in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_index, start_event_number=start_event_number, stop_event_number=stop_event_number, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+
+                analysis_utils.correlate_cluster_on_event_number(data_1=cluster_dut_0,
+                                                                 data_2=actual_dut_cluster,
+                                                                 column_corr_hist=column_correlation,
+                                                                 row_corr_hist=row_correlation)
+
+        return start_index, column_correlation, row_correlation
 
 
 def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=100000, ignore_duts=None, chunk_size=10000000):
