@@ -42,6 +42,7 @@ class TestHitAnalysis(unittest.TestCase):
         os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Alignment.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Alignment_difficult.h5'))
         os.remove(os.path.join(cls.output_folder, 'Prealignment.pdf'))
 
     def test_cluster_correlation(self):  # check the hit correlation function
@@ -69,9 +70,24 @@ class TestHitAnalysis(unittest.TestCase):
                                    z_positions=self.z_positions,
                                    pixel_size=self.pixel_size,
                                    non_interactive=True,
-                                   iterations=5)  # Due to too little test data the alignment result is only rather stable for more iterations
+                                   fit_background=False,
+                                   iterations=3)  # Due to too little test data the alignment result is only rather stable for more iterations
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Alignment_result.h5'),
                                                             os.path.join(self.output_folder, 'Alignment.h5'),
+                                                            exact=False,
+                                                            rtol=0.05,  # 5 % error allowed
+                                                            atol=5)  # 5 um absolute tolerance allowed
+        self.assertTrue(data_equal, msg=error_msg)
+
+        dut_alignment.prealignment(input_correlation_file=os.path.join(tests_data_folder, 'Correlation_difficult.h5'),
+                                   output_alignment_file=os.path.join(self.output_folder, 'Alignment_difficult.h5'),
+                                   z_positions=self.z_positions,
+                                   pixel_size=self.pixel_size,
+                                   non_interactive=True,
+                                   fit_background=True,
+                                   iterations=2)  # Due to too little test data the alignment result is only rather stable for more iterations
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Alignment_difficult_result.h5'),
+                                                            os.path.join(self.output_folder, 'Alignment_difficult.h5'),
                                                             exact=False,
                                                             rtol=0.05,  # 5 % error allowed
                                                             atol=5)  # 5 um absolute tolerance allowed
@@ -90,7 +106,7 @@ class TestHitAnalysis(unittest.TestCase):
                                          output_merged_file=os.path.join(self.output_folder, 'Tracklets_2.h5'),
                                          pixel_size=self.pixel_size,
                                          chunk_size=293)
- 
+
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
