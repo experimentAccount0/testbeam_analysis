@@ -125,20 +125,20 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
             output_pdf.savefig()
 
 
-def plot_correlation_fit(x, y, y_fit, fit_type, xlabel, title, output_pdf):
+def plot_correlation_fit(x, y, y_fit, xlabel, title, output_pdf):
     plt.clf()
-    if fit_type == 1:
-        plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Gauss')
-    elif fit_type == 2:
-        plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Offset')
+    plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Gauss-Offset')
 
     plt.plot(x, y, 'r.-', label='Data')
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('#')
     plt.grid()
-    plt.legend()
-    output_pdf.savefig()
+    plt.legend(loc=0)
+    if output_pdf:
+        output_pdf.savefig()
+    else:
+        plt.show()
 
 
 def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y, dut_index, output_pdf):
@@ -321,7 +321,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
                 logging.info('Cuts are too tight. Not enough data to fit')
 
     # Calculate and plot selected data + fit + fit offset and gauss fit error
-    selected_data = (mean_error_fitted > 1e-3)  # Require the gaussian fit arror to be reasonable
+    selected_data = (mean_error_fitted > 1e-10)  # Require the gaussian fit arror to be reasonable
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
