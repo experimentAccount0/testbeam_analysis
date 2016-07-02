@@ -86,7 +86,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                z_positions=z_positions,
                                pixel_size=pixel_size,
                                dut_names=dut_names,
-                               fix_slope=True,
+                               fit_background=True,  # This data has several tracks per event and noisy pixel, thus fit existing background
                                non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Merge the cluster tables to one merged table aligned at the event number
