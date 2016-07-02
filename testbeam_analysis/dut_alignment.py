@@ -82,15 +82,15 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
                 dut_results = []
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     dut_results.append(pool.apply_async(_correlate_cluster, kwds={'cluster_dut_0': cluster_dut_0,
-                                                               'cluster_file':cluster_file,
-                                                                'start_index':start_indices[dut_index - 1],
-                                                                'start_event_number':actual_event_numbers[0],
-                                                                'stop_event_number':actual_event_numbers[-1] + 1,
-                                                                'column_correlation':column_correlations[dut_index - 1],
-                                                                'row_correlation':row_correlations[dut_index - 1],
-                                                                'chunk_size':chunk_size
-                                                            }
-                                     ))
+                                                                                  'cluster_file': cluster_file,
+                                                                                  'start_index': start_indices[dut_index - 1],
+                                                                                  'start_event_number': actual_event_numbers[0],
+                                                                                  'stop_event_number': actual_event_numbers[-1] + 1,
+                                                                                  'column_correlation': column_correlations[dut_index - 1],
+                                                                                  'row_correlation': row_correlations[dut_index - 1],
+                                                                                  'chunk_size': chunk_size
+                                                                                  }
+                                                        ))
                 # Collect results when available
                 for dut_index, dut_result in enumerate(dut_results, start=1):
                     (start_indices[dut_index - 1], column_correlations[dut_index - 1], row_correlations[dut_index - 1]) = dut_result.get()
@@ -204,7 +204,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
             progress_bar.finish()
 
 
-def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, dut_names=None, non_interactive=True, iterations=3, fix_slope=False):
+def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, dut_names=None, non_interactive=True, iterations=3):
     '''Deduce a prealignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
@@ -216,6 +216,14 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         The output file for correlation data.
     z_positions : iterable
         The positions of the devices in z in um
+    s_n : number
+        The signal to noise ratio for peak signal over background peak. This should be specified when the background is fitted with a gaussian.
+        Usually data with a lot if tracks per event have a gaussian background. The S/N can be guesses by looking at the correlation plot. The std.
+        value is usually fine.
+    fit_background : boolean
+        Data with a lot if tracks per event have a gaussian background from the beam profile. Also try to fit this background to determine the correlation
+        peak correctly. If you see a clear 2D gaussian in the correlation plot this shoud be activated. If you have 1-2 tracks per event and large pixels
+        this option should be off, because otherwise overfitting is possible.
     pixel_size: iterable
         Iterable of tuples with column and row pixel size in um
     dut_names: iterable
@@ -228,9 +236,166 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
     logging.info('=== Prealignment ===')
 
+    def gauss(x, *p):
+        A, mu, sigma = p
+        return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
+
     def gauss_offset(x, *p):
         A, mu, sigma, offset, slope = p
-        return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0)) + offset + x * slope
+        return gauss(x, A, mu, sigma) + offset + x * slope
+
+    def double_gauss(x, *p):
+        A_1, mu_1, sigma_1, A_2, mu_2, sigma_2 = p
+        return gauss(x, A_1, mu_1, sigma_1) + gauss(x, A_2, mu_2, sigma_2)
+
+    def double_gauss_offset(x, *p):
+        A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset = p
+        return gauss(x, A_1, mu_1, sigma_1) + gauss(x, A_2, mu_2, sigma_2) + offset
+
+    def get_chi2(y_data, y_fit):
+        return np.square(y_data - y_fit).sum()
+
+    def signal_sanity_check(coeff, s_n, A_peak):
+        ''' Sanity check if signal was deducted correctly from background. 3 Conditions:
+            1. The given signal to noise value has to be fullfilled: S/N > Amplitude Signal / ( Amplidude background + Offset)
+            2. The signal + background has to be large enough: Amplidute 1 + Amplitude 2 + Offset > Data maximum / 2
+            3. The Signal Sigma has to be smaller than the background sigma, otherwise beam would be larger than one pixel pitch
+        '''
+        if coeff[0] < (coeff[3] + coeff[6]) * s_n or coeff[0] + coeff[3] + coeff[6] < A_peak / 2. or coeff[2] > coeff[5] / 2.:
+            return False
+        return True
+
+    def calc_limits_from_fit(coeff):
+        ''' Calculates the fit limits from the last successfull fit.'''
+        return [[0.01 * coeff[0], 0., 0.1 * coeff[2], 0.01 * coeff[3], 0., 0.1 * coeff[5], 0.1 * coeff[6]],
+                [1000 * coeff[0], np.inf, 10 * coeff[2], 1000 * coeff[3], np.inf, 10 * coeff[5], 10 * coeff[6]]]
+
+    def fit_data(data):
+
+        def refit_advanced(x_data, y_data, y_fit, p0):
+            ''' Substract the fit from the data, thus only the small signal peak should be left.
+            Fit this peak, and refit everything with start values'''
+            y_peak = y_data - y_fit  # Fit most likely only describes background, thus substract it
+            peak_A = np.max(y_peak)  # Determine start value for amplitude
+            peak_mu = np.argmax(y_peak)  # Determine start value for mu
+            fwhm_1, fwhm_2 = analysis_utils.fwhm(x_data, y_peak)
+            peak_sigma = (fwhm_2 - fwhm_1) / 2.35  # Determine start value for sigma
+
+            # Fit a Gauss + Offset to the background substracted data
+            coeff_peak, _ = curve_fit(gauss_offset, x_data, y_peak, p0=[peak_A, peak_mu, peak_sigma, 0., 0.], bounds=([0., 0., 0., -10000, -10], [1.1 * peak_A, np.inf, np.inf, 10000, 10]))
+
+            # Refit orignial double Gauss function with proper start values for the small signal peak
+            coeff, var_matrix = curve_fit(double_gauss_offset, x_data, y_data, p0=[coeff_peak[0], coeff_peak[1], coeff_peak[2], p0[3], p0[4], p0[5], p0[6]], bounds=[0, np.inf])
+
+            return coeff, var_matrix
+
+        x_hist_fit = np.arange(1.0, data.shape[1] + 1.0)  # x bin positions
+        ref_beam_center = np.argmax(np.sum(data, axis=1))  # Get the beam spot for plotting
+
+        # Start values for fitting
+        # Peak Gauss of correlation
+        mu_peak = np.argmax(data, axis=1) + 1  # +1 because col/row start at 1
+        A_peak = np.max(data, axis=1)
+        # Background gauss of uncorrelated data
+        n_entries = np.sum(data, axis=1)
+        A_background = np.mean(data, axis=1)
+        mu_background = np.zeros_like(n_entries)
+        mu_background[n_entries > 0] = np.average(data, axis=1, weights=range(0, data.shape[1]))[n_entries > 0] * sum(range(0, data.shape[1])) / n_entries[n_entries > 0]
+
+        n_cluster_last = 0  # The number of entries of the last converged correlation fit
+        coeff = None
+        fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
+
+        for index in np.arange(data.shape[0]):  # Loop over x dimension of correlation histogram
+
+            # Absolutely no correlation is expected at sensor edges, thus omit these
+            if not np.any(data[index, :]):
+                continue
+
+            # If correlation data is < 1 % of last data omit it.
+            # This can be the case for random noisy pixels that are not in the beam
+            if fit_converged and data[index, :].sum() < n_cluster_last * 0.01:
+                logging.warning('Very few correlation entries for index %d. Omit correlation fit.', index)
+                continue
+
+            try:
+                # Set start values and fit limits
+                if fit_converged:  # Set start values from last successfull fit, no large difference expected
+                    p0 = coeff  # Set start values from last successfull fit
+                    bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
+                else:  # No successfull fit so far, try to dedeuce reasonable start values
+                    signal = A_peak[index]
+                    noise = A_background[index]
+                    p0 = [signal, mu_peak[index], A_peak.shape[0] / 30., noise, mu_background[index], A_peak.shape[0] / 3., 0.]
+                    bounds = [[0, 0, 0, 0, 0, 0, 0], [10 * signal, 2 * data.shape[1], data.shape[1], 10 * signal, 2 * data.shape[1], data.shape[1], data.shape[1]]]
+
+                # Fit correlation
+                if fit_background:  # Describe background with addidional gauss + offset
+                    coeff, var_matrix = curve_fit(double_gauss_offset, x_hist_fit, data[index, :], p0=p0, bounds=bounds)
+
+                    if not signal_sanity_check(coeff, s_n, A_peak[index]):
+                        logging.debug('No signal peak found. Try refit.')
+                        # Refit with wrong converged result as starting value
+                        y_fit = double_gauss_offset(x_hist_fit, *coeff)
+                        coeff, var_matrix = refit_advanced(x_data=x_hist_fit, y_data=data[index, :], y_fit=y_fit, p0=coeff)
+
+                    fit_converged = True
+                    # Check result again:
+                    if not signal_sanity_check(coeff, s_n, A_peak[index]):
+                        logging.debug('No signal peak found in refit!')
+                        fit_converged = False
+
+                else:    # Describe background with offset only.
+                    # Do not use the second gauss, thus fix values by redifining fit funtion
+                    # http://stackoverflow.com/questions/12208634/fitting-only-one-paramter-of-a-function-with-many-parameters-in-python
+                    # Change  start parameters and boundaries
+                    p0 = [v for i, v in enumerate(p0) if i not in (3, 4, 5)]
+                    bounds[0] = [v for i, v in enumerate(bounds[0]) if i not in (3, 4, 5)]
+                    bounds[1] = [v for i, v in enumerate(bounds[1]) if i not in (3, 4, 5)]
+
+                    p0[0] = A_peak[index]
+                    p0[1] = mu_peak[index]
+
+                    # Sanity check if a bad fit still converged
+                    if bounds[0][0] > p0[0]:
+                        bounds[0][0] = 0
+                    if bounds[0][1] > mu_peak[index]:
+                        bounds[0][1] = 0
+
+                    coeff, var_matrix = curve_fit(lambda x, A_1, mu_1, sigma_1, offset: double_gauss_offset(x, A_1, mu_1, sigma_1, 0., 1., 1., offset), x_hist_fit, data[index, :], p0=p0, bounds=bounds)
+
+                    fit_converged = True
+                    # Change back start parameters and boundaries
+                    coeff = np.insert(coeff, 3, 0.)
+                    coeff = np.insert(coeff, 4, 1.)
+                    coeff = np.insert(coeff, 5, 1.)
+                    p0.insert(3, 0.)
+                    p0.insert(4, 1.)
+                    p0.insert(5, 1.)
+
+                n_cluster[index] = data[index, :].sum()
+
+                # Set fit results if fit converged
+                if fit_converged:
+                    n_cluster_last = n_cluster[index].sum()
+                    mean_fitted[index] = coeff[1]
+                    mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
+                    sigma_fitted[index] = np.abs(coeff[2])
+                    chi2[index] = get_chi2(y_data=data[index, :], y_fit=double_gauss_offset(x_hist_fit, *coeff))
+
+            except RuntimeError:  # Can happen, nothing to worry about
+                fit_converged = False
+
+            # Select correlation fit of beam center to plot
+            if index == int(ref_beam_center):
+                y_fit = double_gauss_offset(x_hist_fit, *coeff)
+                plot_utils.plot_correlation_fit(x=x_hist_fit,
+                                                y=data[index, :],
+                                                y_fit=y_fit,
+                                                xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
+                                                title="Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows",
+                                                                                                 ref_name, dut_name, "column" if "column" in node.name.lower() else "row", index),
+                                                output_pdf=output_pdf)
 
     with PdfPages(os.path.join(os.path.dirname(os.path.abspath(output_alignment_file)), 'Prealignment.pdf')) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
@@ -258,26 +423,6 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 data = node[:]
 
-                # Start values for fitting
-                mu_start = np.argmax(data, axis=1)
-                A_start = np.max(data, axis=1)
-                A_mean = np.mean(data, axis=1)
-
-                # Get mu start values for the Gauss fits
-                n_entries = np.sum(data, axis=1)
-                mu_mean = np.zeros_like(n_entries)
-                mu_mean[n_entries > 0] = np.average(data, axis=1, weights=range(0, data.shape[1]))[n_entries > 0] * sum(range(0, data.shape[1])) / n_entries[n_entries > 0]
-
-                def gauss2(x, *p):
-                    A, mu, sigma = p
-                    return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
-
-                def res(p, y, x):
-                    a_mean, a, mean, peak, sigma1, sigma2 = p
-                    y_fit = gauss2(x, *(a_mean, mean, sigma1)) + gauss2(x, *(a, peak, sigma2))
-                    err = y - y_fit
-                    return err
-
                 # Fit result arrays have -1.0 for a bad fit
                 mean_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Peak of the Gaussfit
                 mean_error_fitted = np.array([-1.0 for _ in range(data.shape[0])])  # Error of the fit of the peak
@@ -285,48 +430,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 chi2 = np.array([-1.0 for _ in range(data.shape[0])])  # Chi2 of the fit
                 n_cluster = np.array([-1.0 for _ in range(data.shape[0])])  # Number of cluster per bin
 
-                # Loop over all row/row or column/column slices and fit a double gaussian or gaussian + offset to the profile
-                # Get values with highest correlation for alignment fit; do this with channel indices, later convert to um
-                # Origin pixel cluster mean is 1. / 1., since cluster start from 1, 1 not 0, 0
-
-                x_hist_fit = np.arange(1.0, data.shape[1] + 1.0)  # x bin positions
-                ref_beam_center = np.argmax(np.sum(data, axis=1))  # Get the beam spot for plotting
-
-                for index in np.arange(data.shape[0]):  # Loop over x dimension of correlation hitogram
-                    fit = None
-                    try:
-                        p = [A_mean[index], A_start[index], mu_mean[index], mu_start[index], 500.0, 5.0]  # FIXME: hard coded starting values
-                        plsq = leastsq(res, p, args=(data[index, :], x_hist_fit), full_output=True)
-                        y_fit = gauss2(x_hist_fit, plsq[0][0], plsq[0][2], plsq[0][4]) + gauss2(x_hist_fit, plsq[0][1], plsq[0][3], plsq[0][5])
-                        if plsq[1] is None:
-                            raise RuntimeError
-                        mean_fitted[index] = plsq[0][3]
-                        mean_error_fitted[index] = np.sqrt(np.abs(np.diag(plsq[1])))[3]
-                        sigma_fitted[index] = np.abs(plsq[0][5])
-                        n_cluster[index] = data[index, :].sum()
-                        fit_type = 1
-                    except RuntimeError:
-                        try:
-                            p0 = [A_start[index], mu_start[index], 5.0, A_mean[index], 0.0]  # FIXME: hard coded start value
-                            coeff, var_matrix = curve_fit(gauss_offset, x_hist_fit, data[index, :], p0=p0)
-                            y_fit = gauss_offset(x_hist_fit, *coeff)
-                            mean_fitted[index] = coeff[1]
-                            mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
-                            sigma_fitted[index] = np.abs(coeff[2])
-                            n_cluster[index] = data[index, :].sum()
-                            fit_type = 2
-                        except RuntimeError:
-                            pass
-                    finally:  # Create plot in the center of the mean data
-                        if index == int(ref_beam_center):
-                            plot_utils.plot_correlation_fit(x=x_hist_fit,
-                                                            y=data[index, :],
-                                                            y_fit=y_fit,
-                                                            fit_type=fit_type,
-                                                            xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
-                                                            title="Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows",
-                                                                                                             ref_name, dut_name, "column" if "column" in node.name.lower() else "row", index),
-                                                            output_pdf=output_pdf)
+                fit_data(data)
 
                 # Unset invalid data
                 mean_fitted[~np.isfinite(mean_fitted)] = -1
@@ -368,28 +472,16 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 praefix = 'column' if 'column' in node.name.lower() else 'row'
 
-                if fix_slope:
-                    def line(x, c0):
-                        return c0 + 1. * x
+                def line(x, c0, c1):
+                    return c0 + c1 * x
 
-                    # Use results from straight line fit as start values for this final fit
-                    re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0]])
+                # Use results from straight line fit as start values for this final fit
+                re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
 
-                    # Write fit results to array
-                    result[dut_idx]['%s_c0' % praefix], result[dut_idx]['%s_c0_error' % praefix] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
-                    result[dut_idx]['%s_c1' % praefix], result[dut_idx]['%s_c1_error' % praefix] = 1., 0.
-                    result[dut_idx]['z'] = z_positions[dut_idx]
-                else:
-                    def line(x, c0, c1):
-                        return c0 + c1 * x
-
-                    # Use results from straight line fit as start values for this final fit
-                    re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
-
-                    # Write fit results to array
-                    result[dut_idx]['%s_c0' % praefix], result[dut_idx]['%s_c0_error' % praefix] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
-                    result[dut_idx]['%s_c1' % praefix], result[dut_idx]['%s_c1_error' % praefix] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
-                    result[dut_idx]['z'] = z_positions[dut_idx]
+                # Write fit results to array
+                result[dut_idx]['%s_c0' % praefix], result[dut_idx]['%s_c0_error' % praefix] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
+                result[dut_idx]['%s_c1' % praefix], result[dut_idx]['%s_c1_error' % praefix] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
+                result[dut_idx]['z'] = z_positions[dut_idx]
 
                 # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
                 # This error is needed for track finding and track quality determination
@@ -882,15 +974,15 @@ def _analyze_residuals(residuals_file_h5, output_fig, n_duts, plot_title_praefix
 
 
 def _correlate_cluster(cluster_dut_0, cluster_file, start_index, start_event_number, stop_event_number, column_correlation, row_correlation, chunk_size):
-        with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-            for actual_dut_cluster, start_index in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_index, start_event_number=start_event_number, stop_event_number=stop_event_number, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+    with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
+        for actual_dut_cluster, start_index in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_index, start_event_number=start_event_number, stop_event_number=stop_event_number, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
 
-                analysis_utils.correlate_cluster_on_event_number(data_1=cluster_dut_0,
-                                                                 data_2=actual_dut_cluster,
-                                                                 column_corr_hist=column_correlation,
-                                                                 row_corr_hist=row_correlation)
+            analysis_utils.correlate_cluster_on_event_number(data_1=cluster_dut_0,
+                                                             data_2=actual_dut_cluster,
+                                                             column_corr_hist=column_correlation,
+                                                             row_corr_hist=row_correlation)
 
-        return start_index, column_correlation, row_correlation
+    return start_index, column_correlation, row_correlation
 
 
 def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=100000, ignore_duts=None, chunk_size=10000000):
@@ -922,7 +1014,7 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
                 xyz = np.column_stack((track_candidates['x_dut_%s' % dut_index], track_candidates['y_dut_%s' % dut_index], track_candidates['z_dut_%s' % dut_index])) + z_corrections[dut_index]
                 track_hits[:, index, :] = xyz
                 index += 1
-    
+
         # Split data and fit on all available cores
         n_slices = cpu_count()
         slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
@@ -931,12 +1023,12 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
         results = pool.map(track_analysis._fit_tracks_loop, slices)
         pool.close()
         pool.join()
-    
+
         offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
         slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
 
         return track_hits, offsets, slopes
-    
+
     def _minimize_me(z_correction, actual_dut):
         dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z'] + z_correction])
         rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
@@ -944,12 +1036,12 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
                                                          gamma=alignment[actual_dut]['gamma'])
         basis_global = rotation_matrix.T.dot(np.eye(3))
         dut_plane_normal = basis_global[2]
-         
+
         intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                          line_directions=slopes,
-                                                                          position_plane=dut_position,
-                                                                          normal_plane=dut_plane_normal)
-         
+                                                                         line_directions=slopes,
+                                                                         position_plane=dut_position,
+                                                                         normal_plane=dut_plane_normal)
+
         return np.sqrt(np.square(np.std(track_hits[:, actual_dut, 0] - intersections[:, 0])) + np.square(np.std(track_hits[:, actual_dut, 1] - intersections[:, 1])))
 
     dut_selection = 0
@@ -961,15 +1053,13 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
     dut_selection = (1 << (n_duts - 1) | 1)
     z_corrections = np.zeros(n_duts)
     track_candidates = _reduce_data(input_track_candidates_file, dut_selection, use_n_tracks=use_n_tracks)
-    
+
     residuals = np.zeros(n_duts)
-    
+
     _, offsets, slopes = _fit_tracks(track_candidates, dut_selection, z_corrections=z_corrections)
 
-
-
     for actual_dut in range(n_duts):
-        residuals_plt =[]
+        residuals_plt = []
         #_, offsets, slopes = _fit_tracks(track_candidates, dut_selection | (1 << actual_dut), z_corrections=z_corrections)
         for z_correction in range(-1000000, 1000000, 10000):
             dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z'] + z_correction])
@@ -978,31 +1068,31 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
                                                              gamma=0)
             basis_global = rotation_matrix.T.dot(np.eye(3))
             dut_plane_normal = basis_global[2]
-                
+
             intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                              line_directions=slopes,
-                                                                              position_plane=dut_position,
-                                                                              normal_plane=dut_plane_normal)
-                
+                                                                             line_directions=slopes,
+                                                                             position_plane=dut_position,
+                                                                             normal_plane=dut_plane_normal)
+
             residual = np.sqrt(np.square(np.std(track_candidates['x_dut_%s' % actual_dut] - intersections[:, 0])) + np.square(np.std(track_candidates['y_dut_%s' % actual_dut] - intersections[:, 1])))
-                
+
             residuals_plt.append(residual)
-                
+
         plt.title('DUT%d' % actual_dut)
         plt.plot(range(-1000000, 1000000, 10000), residuals_plt)
         plt.show()
-    
-    
+
+
 #     for actual_dut in range(n_duts):
 #         for i in range(100):
 #             track_hits, offsets, slopes = _fit_tracks(track_candidates, dut_selection, z_corrections=z_corrections)
-# #             res = minimize_scalar(_minimize_me, bounds=(-50000, 50000), args=(actual_dut), method='bounded')
-# #             z_corrections[actual_dut] = -res.x
-# #             residuals[actual_dut] = res.fun
-# #             print 'z_corrections', z_corrections 
-# #             print 'residuals', residuals
-# #             print i, residuals.sum()
-#         
+# res = minimize_scalar(_minimize_me, bounds=(-50000, 50000), args=(actual_dut), method='bounded')
+# z_corrections[actual_dut] = -res.x
+# residuals[actual_dut] = res.fun
+# print 'z_corrections', z_corrections
+# print 'residuals', residuals
+# print i, residuals.sum()
+#
 #             for actual_dut in range(n_duts):
 #                 residuals_plt =[]
 #                 for z_correction in range(-10000, 10000, 100):
@@ -1012,26 +1102,24 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
 #                                                                      gamma=alignment[actual_dut]['gamma'])
 #                     basis_global = rotation_matrix.T.dot(np.eye(3))
 #                     dut_plane_normal = basis_global[2]
-#                         
+#
 #                     intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
 #                                                                                       line_directions=slopes,
 #                                                                                       position_plane=dut_position,
 #                                                                                       normal_plane=dut_plane_normal)
-#                         
+#
 #                     residual = np.sqrt(np.square(np.std(track_hits[:, actual_dut, 0] - intersections[:, 0])) + np.square(np.std(track_hits[:, actual_dut, 1] - intersections[:, 1])))
-#                         
+#
 #                     residuals_plt.append(residual)
-#                         
+#
 #                 plt.title('DUT%d' % actual_dut)
 #                 plt.plot(range(-10000, 10000, 100), residuals_plt)
 #                 plt.show()
-# #             
-        
-            
+# #
 
     def total_residuals(z_corrections, track_hits, offsets, slopes):
         residual_sum = 0
-    
+
         # Step 2: Calcualte residual
         for actual_dut in range(n_duts):
             dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z']]) + z_corrections[actual_dut]
@@ -1040,19 +1128,19 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
                                                              gamma=alignment[actual_dut]['gamma'])
             basis_global = rotation_matrix.T.dot(np.eye(3))
             dut_plane_normal = basis_global[2]
-            
+
             intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                              line_directions=slopes,
-                                                                              position_plane=dut_position,
-                                                                              normal_plane=dut_plane_normal)
-            
+                                                                             line_directions=slopes,
+                                                                             position_plane=dut_position,
+                                                                             normal_plane=dut_plane_normal)
+
             residual = np.sqrt(np.square(np.std(track_hits[:, actual_dut, 0] - intersections[:, 0])) + np.square(np.std(track_hits[:, actual_dut, 1] - intersections[:, 1])))
             residual_sum += residual
-          
+
         track_hits[:, :, 2] -= z_corrections[np.newaxis, :]  # Reverse change for next call
         print 'residual_sum', residual_sum
         return residual_sum
-    
+
     def reconstruct_z(track_hits):
         ''' Reconstructs the real rotation by changing the rotation angles until the correlation
         in column/row can be described best by a straight line with the slope of 1.
@@ -1075,24 +1163,24 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
         Tuple with (alha, beta, gamma) rotation angles
         '''
 #         bounds = []
-#         for i in range(3):  # Loop over angles
+# for i in range(3):  # Loop over angles
 #             bounds.append((x0[i] - errors[i], x0[i] + errors[i]))
-#         
-#         
-#         
+#
+#
+#
         n_duts = track_hits.shape[1]
         bounds = [(-5000, 5000)] * n_duts
-# 
-#         niter = 10  # Iterations of basinhopping, so far did never really change the result
-# 
+#
+# niter = 10  # Iterations of basinhopping, so far did never really change the result
+#
 #         progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=niter, term_width=80)
 #         progress_bar.start()
-# 
-#         def callback(x, f, accept):  # Callback called after each basinhopping step, used to show a progressbar
+#
+# def callback(x, f, accept):  # Callback called after each basinhopping step, used to show a progressbar
 #             progress_bar.update(progress_bar.currval + 1)
-# 
+#
 #         result = basinhopping(func=total_residuals,
-#                               #T=0.5,
+# T=0.5,
 #                               niter=niter,
 #                               x0=np.zeros(n_duts),
 #                               callback=callback,
@@ -1100,35 +1188,35 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
 #                                                 'method': 'SLSQP',
 #                                                 'bounds': bounds
 #                                                 })
-# 
+#
 #         progress_bar.finish()
-        
+
 #         result = minimize(fun=total_residuals,
 #                 x0=np.zeros(n_duts),
 #                 args=(track_hits),
 #                 bounds=bounds,
-#                 #method='SLSQP',
+# method='SLSQP',
 #                 options={'eps':1000})
-# 
+#
 #         return result.x
-# 
+#
 #     minimm = 1000000
-#     
+#
 #     reconstruct_z(track_hits)
 
 #     a = np.zeros(n_duts)
-# 
+#
 #     for i in range(-10000, 10000, 1000):
 #         a[0] = i
 #         print i, total_residuals(a, track_hits)
-    
 
-#     #print total_residuals(track_hits, z_corrections=np.zeros_like(z_positions))
+
+# print total_residuals(track_hits, z_corrections=np.zeros_like(z_positions))
 #     print total_residuals(track_hits, z_corrections=np.ones_like((z_positions)) * 100. )
 #     print total_residuals(track_hits, z_corrections=np.zeros_like(z_positions))
 
 #         y, edges_x = np.histogram(difference[:, 0], bins=1000)
-#         
+#
 #         mu_x = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
 #         std = analysis_utils.get_rms_from_histogram(y, edges_x[:-1])
 #         coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu_x, std])
@@ -1137,9 +1225,9 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
 #         plt.plot(x, analysis_utils.gauss(x, *coeff_x))
 #         print 'sigma_x', std
 #         plt.show()
-#         
+#
 #         y, edges_x = np.histogram(difference[:, 1], bins=1000)
-#         
+#
 #         mu_x = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
 #         std = analysis_utils.get_rms_from_histogram(y, edges_x[:-1])
 #         coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu_x, std])
@@ -1148,38 +1236,38 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
 #         plt.plot(x, analysis_utils.gauss(x, *coeff_x))
 #         print 'sigma_y', std
 #         plt.show()
-        
+
 #         dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z']])
 #         rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
 #                                                          beta=alignment[fit_dut]['beta'],
 #                                                          gamma=alignment[fit_dut]['gamma'])
-#         basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+# basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
 #         dut_plane_normal = basis_global[2]
-#         
+#
 #          actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
 #                                                                           line_directions=slopes,
 #                                                                           position_plane=dut_position,
 #                                                                           normal_plane=dut_plane_normal)
-#         
+#
 #         transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
 #                                                                                      y=alignment[actual_dut]['translation_y'],
 #                                                                                      z=alignment[actual_dut]['translation_z'],
 #                                                                                      alpha=alignment[actual_dut]['alpha'],
 #                                                                                      beta=alignment[actual_dut]['beta'],
 #                                                                                      gamma=alignment[actual_dut]['gamma'])
-# 
+#
 #         hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_transformation_matrix(x=track_hits[:, actual_dut, :][0],
 #                                                                                            y=track_hits[:, actual_dut, :][1],
 #                                                                                            z=track_hits[:, actual_dut, :][2],
 #                                                                                            transformation_matrix=transformation_matrix)
-# 
-# 
-# 
+#
+#
+#
 #         intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_transformation_matrix(x=results[1][0],
 #                                                                                                                       y=results[1][1],
 #                                                                                                                       z=results[1][2],
 #                                                                                                                       transformation_matrix=transformation_matrix)
-# 
+#
 #         if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
 #             logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
 #             raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
