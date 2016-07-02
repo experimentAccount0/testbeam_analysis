@@ -7,6 +7,7 @@ import numpy as np
 import numexpr as ne
 import tables as tb
 from numba import njit
+from scipy.interpolate import splrep, sproot
 
 from testbeam_analysis import analysis_functions
 from testbeam_analysis.cpp import data_struct
@@ -533,3 +534,21 @@ def get_mean_efficiency(array_pass, array_total, method=0):
             eff_err_low = fit_result.LowerError(0)
             eff_err_up = fit_result.UpperError(0)
             return eff_mean, eff_err_low, eff_err_up
+
+
+def fwhm(x, y, k=10):  # http://stackoverflow.com/questions/10582795/finding-the-full-width-half-maximum-of-a-peak
+    """
+    Determine full-with-half-maximum of a peaked set of points, x and y.
+
+    Assumes that there is only one peak present in the datasset.  The function
+    uses a spline interpolation of order k.
+    """
+
+    half_max = np.amax(y) / 2.0
+    s = splrep(x, y - half_max)
+    roots = sproot(s)
+
+    if len(roots) > 2 or len(roots) < 2:
+        raise RuntimeError("Cannot determine FWHM")
+    else:
+        return roots[0], roots[1]
