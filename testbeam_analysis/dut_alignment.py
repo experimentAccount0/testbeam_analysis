@@ -553,9 +553,32 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
 
     n_duts = alignment.shape[0]
 
+    def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
+        selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change vitual hits
+
+        if use_prealignment:
+            hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
+                                                                                                                                                 hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
+                                                                                                                                                 hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
+                                                                                                                                                 dut_index=dut_index,
+                                                                                                                                                 prealignment=alignment,
+                                                                                                                                                 inverse=inverse)
+            if not no_z:
+                hits_chunk['z_dut_%d' % dut_index][selection] = hit_z
+        else:  # Apply transformation from fine alignment information
+            hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
+                                                                                                                                                 hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
+                                                                                                                                                 hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
+                                                                                                                                                 dut_index=dut_index,
+                                                                                                                                                 alignment=alignment,
+                                                                                                                                                 inverse=inverse)
+            if not no_z:
+                hits_chunk['z_dut_%d' % dut_index][selection] = hit_z
+
+    # Looper over the hits of all DUTs of all hit tables in chunks and apply the alignment
     with tb.open_file(input_hit_file, mode='r') as in_file_h5:
         with tb.open_file(output_hit_aligned_file, mode='w') as out_file_h5:
-            for node in in_file_h5.root:
+            for node in in_file_h5.root:  # Loop over potential hit tables in data file
                 hits = node
                 new_node_name = hits.name
 
@@ -564,32 +587,19 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
 
                 hits_aligned_table = out_file_h5.create_table(out_file_h5.root, name=new_node_name, description=np.zeros((1,), dtype=hits.dtype).dtype, title=hits.title, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
-                for hits_chunk, _ in analysis_utils.data_aligned_at_events(hits, chunk_size=chunk_size):
-                    for dut_index in range(0, n_duts):
+                progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=hits.shape[0], term_width=80)
+                progress_bar.start()
+
+                for hits_chunk, index in analysis_utils.data_aligned_at_events(hits, chunk_size=chunk_size):  # Loop over the hits
+                    for dut_index in range(0, n_duts):  # Loop over the DUTs in the hit table
                         if use_duts is not None and dut_index not in use_duts:  # omit DUT
                             continue
-                        selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change vitual hits
 
-                        if use_prealignment:
-                            hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
-                                                                                                                                                                 hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
-                                                                                                                                                                 hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
-                                                                                                                                                                 dut_index=dut_index,
-                                                                                                                                                                 prealignment=alignment,
-                                                                                                                                                                 inverse=inverse)
-                            if not no_z:
-                                hits_chunk['z_dut_%d' % dut_index][selection] = hit_z
-                        else:  # Apply transformation from fine alignment information
-                            hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
-                                                                                                                                                                 hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
-                                                                                                                                                                 hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
-                                                                                                                                                                 dut_index=dut_index,
-                                                                                                                                                                 alignment=alignment,
-                                                                                                                                                                 inverse=inverse)
-                            if not no_z:
-                                hits_chunk['z_dut_%d' % dut_index][selection] = hit_z
+                        apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z)
 
                     hits_aligned_table.append(hits_chunk)
+                    progress_bar.update(index)
+                progress_bar.finish()
 
     logging.debug('File with newly aligned hits %s', output_hit_aligned_file)
 
