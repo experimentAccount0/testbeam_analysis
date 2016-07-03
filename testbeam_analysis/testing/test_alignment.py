@@ -39,6 +39,8 @@ class TestHitAnalysis(unittest.TestCase):
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder, 'Correlation.h5'))
         os.remove(os.path.join(cls.output_folder, 'Correlation.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Merged.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Merged_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Alignment.h5'))
@@ -96,17 +98,34 @@ class TestHitAnalysis(unittest.TestCase):
     def test_cluster_merging(self):
         cluster_files = [os.path.join(tests_data_folder, 'Cluster_DUT%d_cluster.h5') % i for i in range(4)]
         dut_alignment.merge_cluster_data(cluster_files,
-                                         output_merged_file=os.path.join(self.output_folder, 'Tracklets.h5'),
+                                         output_merged_file=os.path.join(self.output_folder, 'Merged.h5'),
                                          pixel_size=self.pixel_size)
-        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets.h5'))
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Merged_result.h5'), os.path.join(self.output_folder, 'Merged.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
         # Retest with tiny chunk size to force chunked merging
         dut_alignment.merge_cluster_data(cluster_files,
-                                         output_merged_file=os.path.join(self.output_folder, 'Tracklets_2.h5'),
+                                         output_merged_file=os.path.join(self.output_folder, 'Merged_2.h5'),
                                          pixel_size=self.pixel_size,
                                          chunk_size=293)
 
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Merged_result.h5'), os.path.join(self.output_folder, 'Merged_2.h5'))
+        self.assertTrue(data_equal, msg=error_msg)
+
+    def test_apply_alignment(self):
+        dut_alignment.apply_alignment(input_hit_file=os.path.join(tests_data_folder, 'Merged_result.h5'),
+                                      input_alignment=os.path.join(self.output_folder, 'Alignment_result.h5'),
+                                      output_hit_aligned_file=os.path.join(tests_data_folder, 'Tracklets.h5'),
+                                      force_prealignment=True)
+        data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets.h5'))
+        self.assertTrue(data_equal, msg=error_msg)
+
+        # Retest with tiny chunk size to force chunked merging
+        dut_alignment.apply_alignment(input_hit_file=os.path.join(tests_data_folder, 'Merged_result.h5'),
+                                      input_alignment=os.path.join(self.output_folder, 'Alignment_result.h5'),
+                                      output_hit_aligned_file=os.path.join(tests_data_folder, 'Tracklets_2.h5'),
+                                      force_prealignment=True,
+                                      chunk_size=293)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
