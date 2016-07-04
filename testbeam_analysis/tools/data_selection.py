@@ -4,6 +4,7 @@ import tables as tb
 import numexpr as ne
 import re
 import logging
+import progressbar
 from numba import njit
 
 from testbeam_analysis.tools import analysis_utils
@@ -97,8 +98,10 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, tra
         with tb.open_file(hit_file[:-3] + '_reduced.h5', mode="w") as out_file_h5:
             for node in in_file_h5.root:
                 total_hits = node.shape[0]
+                progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=total_hits, term_width=80)
+                progress_bar.start()
                 hit_table_out = out_file_h5.createTable(out_file_h5.root, name=node.name, description=node.dtype, title=node.title, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                for hits, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
+                for hits, index in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                     n_hits = hits.shape[0]
                     if condition:
                         hits = _select_hits_with_condition(hits, condition)
@@ -120,6 +123,8 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, tra
                         hits = hits[selection]
 
                     hit_table_out.append(hits)
+                    progress_bar.update(index)
+                progress_bar.finish()
 
 
 def _select_hits_with_condition(hits_array, condition):
