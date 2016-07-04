@@ -127,9 +127,8 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
 
 def plot_correlation_fit(x, y, y_fit, xlabel, title, output_pdf):
     plt.clf()
-    plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Gauss-Offset')
-
     plt.plot(x, y, 'r.-', label='Data')
+    plt.plot(x, y_fit, 'g-', linewidth=2, label='Fit: Gauss-Gauss-Offset')
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('#')
