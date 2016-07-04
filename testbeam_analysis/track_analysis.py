@@ -4,6 +4,7 @@ from __future__ import division
 import logging
 from multiprocessing import Pool, cpu_count
 from math import sqrt
+import progressbar
 import os.path
 
 
@@ -85,9 +86,12 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         with tb.open_file(output_track_candidates_file, mode='w') as out_file_h5:
             track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=tracklets_node.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
+            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=tracklets_node.shape[0], term_width=80)
+            progress_bar.start()
+
             for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(tracklets_node, chunk_size=chunk_size):
                 # Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data
-                # This is needed to call a numba jitted function, since the numer of DUTs is not fixed
+                # This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format
                 tr_x = tracklets_data_chunk['x_dut_0']
                 tr_y = tracklets_data_chunk['y_dut_0']
                 tr_z = tracklets_data_chunk['z_dut_0']
@@ -105,16 +109,38 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 tracklets_data_chunk['track_quality'] = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
                 # Perform the track finding with jitted loop
-                tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge = _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance)
+                
+#                 n_slices = cpu_count()
+#                 slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
+#                 slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+#                 pool = Pool(n_slices)
+#                 results = pool.map(_fit_tracks_loop, slices)
+#                 pool.close()
+#                 pool.join()
+#                 del track_hits
+#                 
+#                 
+#                 n_slices = cpu_count()
+#                 process = Process(target=_find_tracks_loop, args=(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance))
+#                 for p in processes:
+#                     p.start()
+#                 for p in processes:
+#                     p.join()
+                
+                
+                
+                _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance)
 
                 # Merge result data from arrays into one recarray
                 combined = np.column_stack((tracklets_data_chunk['event_number'], tr_x, tr_y, tr_z, tr_charge, tracklets_data_chunk['track_quality'], tracklets_data_chunk['n_tracks']))
                 combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
 
                 track_candidates.append(combined)
+                progress_bar.update(index)
+            progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, ignore_duts=None, ignore_fit_duts=None, include_duts=[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -129,7 +155,10 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     fit_duts : iterable
         the duts to fit tracks for. If None all duts are used
     ignore_duts : iterable
-        the duts that are not taken in a fit. Needed to exclude bad planes from track fit. Also included Duts are ignored!
+        the duts that are not taken in the fit or for data selection. Needed to exclude bad planes from track fit. Also included Duts are ignored!
+    ignore_fit_duts : iterable
+        the duts that are not taken in the fit but are used for data selection. Needed to include timing devices in track selection, but to ignore their bad
+        position information in the fit.
     include_duts : iterable
         The relative dut positions of DUTs to use in the track fit. The position is relative to the actual dut the tracks are fitted for
         e.g. actual track fit dut = 2, include_duts = [-3, -2, -1, 1] means that duts 0, 1, 3 are used for the track fit
@@ -246,6 +275,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         # Plot chi2 distribution
         plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
 
+    pool = Pool()
     with PdfPages(output_tracks_file[:-3] + '.pdf') as output_fig:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             try:  # If file exists already delete it first
@@ -273,40 +303,58 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     else:  # Special case: use all DUTs in the fit, looping over fit_dut not needed
                         logging.info('Fit tracks for all DUTs, will lead to constrained residuals!')
 
-                    for track_candidates_chunk, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
+                    # Select track candidates
+                    dut_selection = 0  # DUTs to be used in the fit
+                    quality_mask = 0  # Masks DUTs to check track quality for
+                    info_str = ''  # For info output
+                    if not all_duts:
+                        for include_dut in include_duts:  # Calculate relative mask to select DUT hits for fitting
+                            if fit_dut + include_dut < 0 or ((ignore_duts and fit_dut + include_dut in ignore_duts) or fit_dut + include_dut >= n_duts):
+                                continue
+                            if include_dut >= 0:
+                                dut_selection |= ((1 << fit_dut) << include_dut)
+                                info_str += 'DUT%d ' % (fit_dut + include_dut)
+                            else:
+                                dut_selection |= ((1 << fit_dut) >> abs(include_dut))
+                                info_str += 'DUT%d ' % (fit_dut - abs(include_dut))
 
-                        # Select track candidates
-                        dut_selection = 0  # DUTs to be used in the fit
-                        quality_mask = 0  # Masks DUTs to check track quality for
-                        if not all_duts:
-                            for include_dut in include_duts:  # Calculate relative mask to select DUT hits for fitting
-                                if fit_dut + include_dut < 0 or ((ignore_duts and fit_dut + include_dut in ignore_duts) or fit_dut + include_dut >= n_duts):
-                                    continue
-                                if include_dut >= 0:
-                                    dut_selection |= ((1 << fit_dut) << include_dut)
-                                else:
-                                    dut_selection |= ((1 << fit_dut) >> abs(include_dut))
+                            quality_mask = dut_selection | (1 << fit_dut)  # Include the DUT where the track is fitted for in quality check
+                    else:  # Special case, use all DUTs
+                        for i in range(n_duts):
+                            if ignore_duts and i in ignore_duts:
+                                continue
+                            dut_selection |= (1 << i)
+                            quality_mask |= (1 << i)
 
-                                quality_mask = dut_selection | (1 << fit_dut)  # Include the DUT where the track is fitted for in quality check
-                        else:  # Special case, use all DUTs
-                            for i in range(n_duts):
-                                if ignore_duts and i in ignore_duts:
-                                    continue
-                                dut_selection |= (1 << i)
-                                quality_mask |= (1 << i)
+                    logging.info('Use %d DUTs for track selection: %s', bin(dut_selection).count("1"), info_str)
 
-                        if bin(dut_selection).count("1") < 2:
-                            logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
-                            continue
+                    if bin(dut_selection).count("1") < 2:
+                        logging.warning('Insufficient track hits to do fit (< 2). Omit DUT %d', fit_dut)
+                        continue
 
-                        logging.debug("Use %d DUTs in the fit", bin(dut_selection).count("1"))
+                    logging.debug("Use %d DUTs in the fit", bin(dut_selection).count("1"))
+
+                    dut_fit_selection = dut_selection  # The DUTs used in the fit
+                    if ignore_fit_duts:
+                        for ignore_fit_dut in ignore_fit_duts:
+                            dut_fit_selection &= ~(1 << ignore_fit_dut)
+
+                    n_fit_duts = bin(dut_fit_selection).count("1")
+
+                    info_str = ', '.join(["DUT%d" % bit for bit in range(8 - 1, -1, -1) if (dut_fit_selection >> bit) & 1 == 1][::-1])  # Sorry
+                    logging.info('Use %d DUTs for fitting: %s', n_fit_duts, info_str)
+
+                    progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.TrackCandidates.shape[0], term_width=80)
+                    progress_bar.start()
+
+                    for track_candidates_chunk, index_candidates in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
 
                         # Select tracks based on given track_quality
                         good_track_selection = (track_candidates_chunk['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
 
                         n_track_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection)
 
-                        good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] > 0)  # n_tracks < 0 means merged tracks, omit these to allow valid efficiency calculation
+                        good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] > 0)  # n_tracks < 0 means merged cluster, omit these to allow valid efficiency calculation
 
                         n_merged_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection) - n_track_cut
 
@@ -333,11 +381,11 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         good_track_candidates = track_candidates_chunk[good_track_selection]
 
                         # Prepare track hits array to be fitted
-                        n_fit_duts = bin(dut_selection).count("1")
                         index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
                         track_hits = np.zeros((n_tracks, n_fit_duts, 3))
+
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
-                            if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
+                            if (1 << dut_index) & dut_fit_selection == (1 << dut_index):  # True if DUT is used in fit
                                 xyz = np.column_stack((good_track_candidates['x_dut_%s' % dut_index], good_track_candidates['y_dut_%s' % dut_index], good_track_candidates['z_dut_%s' % dut_index]))
                                 track_hits[:, index, :] = xyz
                                 index += 1
@@ -346,10 +394,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         n_slices = cpu_count()
                         slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
                         slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
-                        pool = Pool(n_slices)
+
                         results = pool.map(_fit_tracks_loop, slices)
-                        pool.close()
-                        pool.join()
                         del track_hits
 
                         # Store results
@@ -363,8 +409,13 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         else:
                             for fit_dut in range(n_duts):
                                 store_track_data(fit_dut, min_track_distance)
+
+                        progress_bar.update(index_candidates)
+                    progress_bar.finish()
                     if all_duts:  # Stop fit Dut loop since all DUTs were fitted at once
                         break
+    pool.close()
+    pool.join()
 
 
 # Helper functions that are not meant to be called during analysis
@@ -447,7 +498,7 @@ def _set_n_tracks(start_index, stop_index, tracklets, n_actual_tracks, tr_column
 @njit
 def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
-    is given a quality identifier. Each hit is put to the best fitting track. Tracks are assued to have
+    is given a quality identifier. Each hit is put to the best fitting track. Tracks are assumed to have
     no big angle, otherwise this approach does not work.
     Optimizations included to make it compile with numba. Can be called from
     several real threads if they work on different areas of the array'''
@@ -553,8 +604,6 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                       min_cluster_distance=min_cluster_distance,
                       n_duts=n_duts)
 
-    return tracklets, tr_column, tr_row, tr_z, tr_charge
-
 @njit
 def _find_merged_tracks(tracks_array, min_track_distance):
     i = 0
@@ -576,8 +625,6 @@ def _find_merged_tracks(tracks_array, min_track_distance):
                 if sqrt((offset_x - tracks_array[j]['offset_0']) * (offset_x - tracks_array[j]['offset_0']) + (offset_y - tracks_array[j]['offset_1']) * (offset_y - tracks_array[j]['offset_1'])) < min_track_distance:
                     tracks_array[j]['n_tracks'] = -1
             i += 1
-
-    return tracks_array
 
 
 def _fit_tracks_loop(track_hits):
