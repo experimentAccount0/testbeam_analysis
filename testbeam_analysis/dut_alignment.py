@@ -604,7 +604,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     logging.debug('File with newly aligned hits %s', output_hit_aligned_file)
 
 
-def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel_size, ignore_duts=None, max_iterations=10, use_n_tracks=100000, plot_result=True, chunk_size=1000000):
+def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel_size, ignore_duts=None, ignore_fit_duts=None, max_iterations=10, use_n_tracks=100000, plot_result=True, chunk_size=1000000):
     ''' This function does an alignment of the DUTs and sets translation and rotation values for all DUTs.
     The reference DUT defines the global coordinate system position at 0, 0, 0 and should be well in the beam and not heavily rotated.
 
@@ -634,7 +634,10 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         The pixel sizer per DUT in (column, row) in um.
         E.g.: two DUTS: [(50, 250), (50, 250)]
     ignore_duts : iterable
-        the duts that are not taken in a fit. Needed to exclude small planes / very bad working planes from the fit
+        the duts that are not taken in a fit and for track selection. Needed to exclude small planes / very bad working planes from the fit
+        to make a good alignment possible
+    ignore_fit_duts : iterable
+        the duts that are not taken in the track fit. Needed to exclude small planes / very bad working planes from the fit
         to make a good alignment possible
     max_iterations : number
         Maximum iterations of calc residuals, apply rotation refit loop until constant result is expected.
@@ -668,6 +671,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                    output_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
                    track_quality=1,
                    include_duts=include_duts,
+                   ignore_fit_duts=ignore_fit_duts,
                    ignore_duts=ignore_duts)  # In the first iteration there is no alignment
 
         # Step 3: Calculate the residuals for each DUT
@@ -754,15 +758,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     if plot_result:
         logging.info('= Alignment step 6: Plot final result =')
         with PdfPages(os.path.join(os.path.dirname(os.path.realpath(input_track_candidates_file)), 'Alignment.pdf')) as output_pdf:
-            # Revert prealignment
-            apply_alignment(input_hit_file=input_track_candidates_file,
-                            input_alignment=input_alignment_file,
-                            output_hit_aligned_file=input_track_candidates_file[:-3] + '_no_prealignment_tmp.h5',
-                            inverse=True,  # Revert prealignment
-                            force_prealignment=True,
-                            chunk_size=chunk_size)
             # Apply final alignment result
-            apply_alignment(input_hit_file=input_track_candidates_file[:-3] + '_no_prealignment_tmp.h5',
+            apply_alignment(input_hit_file=reduced_track_candidates_file[:-3] + '_no_align_tmp.h5',
                             input_alignment=input_alignment_file,
                             output_hit_aligned_file=input_track_candidates_file[:-3] + '_final_tmp.h5',
                             # reset_z=True,
@@ -771,6 +768,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                        input_alignment_file=input_alignment_file,
                        output_tracks_file=input_track_candidates_file[:-3] + '_tracks_final_tmp.h5',
                        track_quality=1,
+                       ignore_fit_duts=ignore_fit_duts,
                        ignore_duts=ignore_duts)
             calculate_residuals(input_tracks_file=input_track_candidates_file[:-3] + '_tracks_final_tmp.h5',
                                 input_alignment_file=input_alignment_file,
