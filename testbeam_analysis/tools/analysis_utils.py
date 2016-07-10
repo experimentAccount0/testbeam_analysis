@@ -8,6 +8,8 @@ import numexpr as ne
 import tables as tb
 from numba import njit
 from scipy.interpolate import splrep, sproot
+from scipy import stats
+from scipy.optimize import curve_fit
 
 from testbeam_analysis import analysis_functions
 from testbeam_analysis.cpp import data_struct
@@ -523,7 +525,7 @@ def get_mean_efficiency(array_pass, array_total, method=0):
             # Fit point of each efficiency bin using asymmetric error bars
             # Parameters described here: https://root.cern.ch/doc/master/classTGraph.html#a61269bcd47a57296f0f1d57ceff8feeb
             # This gives too high efficiency and too small error
-            
+
             # Convert numpy array to ROOT hists
             hist_pass = fill_1d_root_hist(array_pass, 'h_pass')
             hist_total = fill_1d_root_hist(array_total, 'h_total')
@@ -552,3 +554,100 @@ def fwhm(x, y, k=10):  # http://stackoverflow.com/questions/10582795/finding-the
         raise RuntimeError("Cannot determine FWHM")
     else:
         return roots[0], roots[1]
+
+
+def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy):
+#     print 'm_xx, m_xy, m_yx, m_yy', m_xx, m_xy, m_yx, m_yy
+
+    alpha_inverted = False
+    beta_inverted = False
+
+    if np.abs(m_xy) > 1. or np.abs(m_yx) > 1.:
+        raise NotImplementedError('Device seems to be heavilty tilted in gamma. This is not supported.')
+
+    # Detect device rotation around y-axis (beta angle)
+    if m_yy < -1.:
+        logging.info('Device most likely inverted in beam around the x axis (y coordinates switched)!')
+        alpha_inverted = True
+        m_yy = 2 + m_yy
+
+    # Detect device rotation around y-axis (beta angle)
+    if m_xx < -1.:
+        logging.info('Device most likely inverted in beam around the y axis (x coordinates switched)!')
+        beta_inverted = True
+        m_xx = 2 + m_xx
+
+    # Sanity checks
+    if m_xx < -2:
+        raise
+        m_xx = -2.
+
+    if m_yy < -2:
+        raise
+        m_yy = -2.
+
+    # Deduce from reidual correlations the rotation matrix
+
+    # tan(gamma) = mxy / (1 - mxx) ?
+    gamma = np.arctan2(m_xy, 1 - m_xx)
+
+    # cos(gamma) = 1 - m_xx / cos(gamma) = (1 - m_xx) * sqrt(m_xy**2 / (1 - m_xx**2) + 1.) ?
+    cosbeta = (1 - m_xx) * np.sqrt(np.square(m_xy) / np.square(1 - m_xx) + 1.)
+
+    # TODO: Why is this needed? Most likely stability reasons
+    if np.abs(cosbeta) > 1:
+        cosbeta = 1 - (cosbeta - 1)
+    beta = np.arccos(cosbeta)
+
+    # cos(alpha) = - myy - tan(gamma) * myx + 1 / (cos(gamma) + sin(gamma) * tan(gamma)) = - myy - m_xy / (1 - m_xx) * myx + 1 / (cos(gamma) + sin(gamma) * tan(gamma)) ?
+    cosalpha = (-m_yy - m_xy / (1 - m_xx) * m_yx + 1) / (np.cos(gamma) + np.sin(gamma) * np.tan(gamma))
+
+    # TODO: Why is this needed? Most likely stability reasons
+    if np.abs(cosalpha) > 1:
+        cosalpha = 1 - (cosalpha - 1)
+    alpha = np.arccos(cosalpha)
+
+    if alpha_inverted:
+        alpha -= np.pi
+
+        # Try to deduce correct beta sign
+        value_1 = -m_xy / (1 + m_xx)
+        value_2 = (m_yx - np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy - np.sin(alpha) * np.sin(beta) * np.sin(gamma))
+        value_3 = (m_yx + np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy + np.sin(alpha) * np.sin(beta) * np.sin(gamma))
+
+        if np.abs(value_2 - value_1) > np.abs(value_3 - value_1):
+            beta *= -1.
+
+        alpha *= -1.
+
+    if beta_inverted:
+        beta -= np.pi
+
+        # Try to deduce correct alpha sign
+        value_1 = -m_xy / (1 + m_xx)
+        value_2 = (m_yx - np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy - np.sin(alpha) * np.sin(beta) * np.sin(gamma))
+        value_3 = (m_yx + np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy + np.sin(alpha) * np.sin(beta) * np.sin(gamma))
+
+        if np.abs(value_2 - value_1) < np.abs(value_3 - value_1):
+            alpha *= -1.
+        beta *= -1.
+
+    return alpha, beta, gamma
+
+
+def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
+    ''' Takes unhistogrammed residuals as a function of the position, histograms and fits these with errors'''
+    def line(x, c0, c1):
+        return c0 + c1 * x
+
+    hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins, range=(min_pos, max_pos))
+    hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins, range=(min_pos, max_pos))
+    n_hits_threshold = np.percentile(hist_position_residual_count[0], 100 - 68.3)  # Simple threshold, take bins with 1 sigma of the data
+    selection = np.logical_and(hist_position_residual_count[0] >= n_hits_threshold, np.isfinite(hist_position_residual[0]))
+    position_residual_fit_x = hist_position_residual[1][:-1][selection]
+    position_residual_fit_y = hist_position_residual[0][selection]
+    position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
+
+    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
+
+    return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
