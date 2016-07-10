@@ -12,6 +12,7 @@ testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_
 # Set the converter script path
 tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/test_result_analysis/'))
 
+
 class TestResultAnalysis(unittest.TestCase):
 
     @classmethod
@@ -24,20 +25,23 @@ class TestResultAnalysis(unittest.TestCase):
             except (ImportError, EnvironmentError):
                 pass
         cls.output_folder = tests_data_folder
-        cls.pixel_size = (250, 50)  # in um
+        cls.pixel_size = [250, 50] * 4  # in um
+        cls.n_pixels = [80, 336] * 4
         cls.z_positions = [0., 19500, 108800, 128300]  # in um
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        os.remove(os.path.join(cls.output_folder, 'Efficiency.pdf'))
-        os.remove(os.path.join(cls.output_folder, 'Residuals.pdf'))
+        pass
+#         os.remove(os.path.join(cls.output_folder, 'Efficiency.pdf'))
+#         os.remove(os.path.join(cls.output_folder, 'Residuals.pdf'))
 
     @unittest.SkipTest
     def test_residuals_calculation(self):
-        residuals = result_analysis.calculate_residuals(tracks_file=os.path.join(tests_data_folder, 'Tracks_result.h5'),
-                                                        output_pdf=os.path.join(self.output_folder, 'Residuals.pdf'),
-                                                        z_positions=self.z_positions,
-                                                        use_duts=None,
+        residuals = result_analysis.calculate_residuals(input_tracks_file=os.path.join(tests_data_folder, 'Tracks_result.h5'),
+                                                        input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
+                                                        output_residuals_file=os.path.join(self.output_folder, 'Residuals.h5'),
+                                                        n_pixels=self.n_pixels,
+                                                        pixel_size=self.pixel_size,
                                                         max_chi2=10000)
         # Only test row residuals, columns are too large (250 um) for meaningfull gaussian residuals distribution
         self.assertAlmostEqual(residuals[1], 22.9135, msg='DUT 0 row residuals do not match', places=3)
