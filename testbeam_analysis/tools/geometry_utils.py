@@ -386,7 +386,7 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     np.array with shape 3, 3
     '''
 
-    positions = np.column_stack((x, y, z)).T  # Add extra 4th dimension
+    positions = np.column_stack((x, y, z)).T
     positions_transformed = np.dot(rotation_matrix, positions).T
 
     return positions_transformed[:, 0], positions_transformed[:, 1], positions_transformed[:, 2]
@@ -465,23 +465,26 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     return hits_x, hits_y, hits_z
 
 
-def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute'):
+def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', select_duts=None):
     ''' Stores the alignment parameters (rotations, translations) into the alignment file.
     Absolute (overwriting) and relative mode (add angles, translations) is supported.
-
+ 
     Paramter:
     --------
-
+ 
     alignment_file : pytables file
         The pytables file with the alignment
     alignment_parameters : numpy recarray
         An array with the alignment values
     mode : string
-        'relative' and 'absolute' supported.
+        'relative' and 'absolute' supported
+    use_duts : iterable
+        In relative mode only change specified DUTs
     '''
-
+ 
     if 'absolute' not in mode and 'relative' not in mode:
         raise RuntimeError('Mode %s is unknown', str(mode))
+ 
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
         alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from prealignment
         try:
@@ -496,24 +499,37 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
             else:
                 logging.info('Merge new alignment with old alignment')
                 old_alignment = out_file_h5.root.Alignment[:]
+                selection = np.ones(old_alignment.shape[0], dtype=np.bool)
+ 
+                print 'select_duts', select_duts
+                if select_duts:
+                    for index in range(selection.shape[0]):
+                        if index not in select_duts:
+                            selection[index] = False
+
+                print 'selection', selection
+                print 'alignment_parameters', alignment_parameters
+ 
                 out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
                 alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 new_alignment = old_alignment
-                new_alignment['translation_x'] += alignment_parameters['translation_x']
-                new_alignment['translation_y'] += alignment_parameters['translation_y']
-                new_alignment['translation_z'] += alignment_parameters['translation_z']  # FIXME: has to be off right now
-
-                new_alignment['alpha'] += alignment_parameters['alpha']
-                new_alignment['beta'] += alignment_parameters['beta']
-                new_alignment['gamma'] += alignment_parameters['gamma']
-
+                new_alignment['translation_x'][selection] += alignment_parameters['translation_x'][selection]
+                new_alignment['translation_y'][selection] += alignment_parameters['translation_y'][selection]
+                new_alignment['translation_z'][selection] += alignment_parameters['translation_z'][selection]
+ 
+                new_alignment['alpha'][selection] += alignment_parameters['alpha'][selection]
+                new_alignment['beta'][selection] += alignment_parameters['beta'][selection]
+                new_alignment['gamma'][selection] += alignment_parameters['gamma'][selection]
+ 
+                # TODO: Is this always a good idea? Usually works, but what if one heavily tilted device?
                 # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
-                new_alignment['alpha'] -= np.mean(new_alignment['alpha'])
-                new_alignment['beta'] -= np.mean(new_alignment['beta'])
-                new_alignment['gamma'] -= np.mean(new_alignment['gamma'])
-                new_alignment['translation_x'] -= np.mean(new_alignment['translation_x'])
-                new_alignment['translation_y'] -= np.mean(new_alignment['translation_y'])
-
+                if np.count_nonzero(selection) > 1:
+                    new_alignment['alpha'][selection] -= np.mean(new_alignment['alpha'][selection])
+                    new_alignment['beta'][selection] -= np.mean(new_alignment['beta'][selection])
+                    new_alignment['gamma'][selection] -= np.mean(new_alignment['gamma'][selection])
+                    new_alignment['translation_x'][selection] -= np.mean(new_alignment['translation_x'][selection])
+                    new_alignment['translation_y'][selection] -= np.mean(new_alignment['translation_y'][selection])
+ 
                 logging.info('Change translation to:')
                 string = '\n\n'
                 for dut_values in new_alignment:
