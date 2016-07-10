@@ -65,7 +65,7 @@ class TestTrackAnalysis(unittest.TestCase):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks.h5'),
-                                  track_quality=1)
+                                  selection_track_quality=1)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_result.h5'), os.path.join(self.output_folder, 'Tracks.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
@@ -73,7 +73,7 @@ class TestTrackAnalysis(unittest.TestCase):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_2.h5'),
-                                  track_quality=1,
+                                  selection_track_quality=1,
                                   chunk_size=4999)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_result.h5'), os.path.join(self.output_folder, 'Tracks_2.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
@@ -83,14 +83,14 @@ class TestTrackAnalysis(unittest.TestCase):
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_All.h5'),
                                   exclude_dut_hit=False,
-                                  track_quality=1)
+                                  selection_track_quality=1)
         # Fit DUTs consecutevly, but use always the same DUTs. Should result in the same data as above
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_All_Iter.h5'),
                                   selection_hit_duts=range(4),
                                   exclude_dut_hit=False,
-                                  track_quality=1)
+                                  selection_track_quality=1)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_All.h5'), os.path.join(self.output_folder, 'Tracks_All_Iter.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
         # Fit DUTs consecutevly, but use always the same DUTs defined for each DUT separately. Should result in the same data as above
@@ -99,7 +99,7 @@ class TestTrackAnalysis(unittest.TestCase):
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_All_Iter_2.h5'),
                                   selection_hit_duts=[range(4), range(4), range(4), range(4)],
                                   exclude_dut_hit=False,
-                                  track_quality=1)
+                                  selection_track_quality=1)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_All.h5'), os.path.join(self.output_folder, 'Tracks_All_Iter_2.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
@@ -107,12 +107,14 @@ class TestTrackAnalysis(unittest.TestCase):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_merged.h5'),
-                                  track_quality=1,
+                                  selection_track_quality=1,
                                   min_track_distance=True  # Activate track merge cut
                                   )
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_merged_result.h5'), os.path.join(self.output_folder, 'Tracks_merged.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
     suite = unittest.TestLoader().loadTestsFromTestCase(TestTrackAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)
