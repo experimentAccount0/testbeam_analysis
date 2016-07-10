@@ -637,10 +637,7 @@ def plot_position_residuals(hist, x, y, x_label, y_label, title=None, yerr=None,
     plt.plot(x, y, 'go', linewidth=2, label='Median residual')
     if fit:
         line = lambda x, c0, c1: c0 + c1 * x
-        if np.any(yerr):
-            plt.errorbar(x=x, y=line(x, *fit[0]), yerr=yerr, fmt='r-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
-        else:
-            plt.plot(x, line(x, *fit[0]), 'r-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
+        plt.plot(x, line(x, *fit[0]), 'b-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
 
     plt.plot()
     plt.grid()
