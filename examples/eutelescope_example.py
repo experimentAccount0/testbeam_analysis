@@ -112,12 +112,9 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealignment.h5'),
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
-                              output_pdf_file=os.path.join(output_folder, 'Tracks_prealigned.pdf'),
-                              fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
-                              include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
-                              ignore_duts=None,
+                              exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
                               force_prealignment=True,  # This is just for demonstration purpose, you usually fully aligned hits
-                              track_quality=1)
+                              selection_track_quality=1)
 
     # Step 2.:  Calculate the residuals to check the alignment (using the prealignment!)
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
@@ -133,7 +130,8 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     dut_alignment.alignment(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealignment.h5'),
                             input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                             n_pixels=n_pixels,
-                            pixel_size=pixel_size)
+                            pixel_size=pixel_size,
+                            align_duts=[0, 1, 2, 4, 5])
 
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
@@ -148,11 +146,8 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                              output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
-                              fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
-                              include_duts=None,  # Use only the DUT before and after the actual DUT for track fitting / interpolation
-                              ignore_duts=None,
-                              track_quality=0)  # Take all tracks
+                              exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
+                              track_quality=1)
 
     # Create unconstrained residuals
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
