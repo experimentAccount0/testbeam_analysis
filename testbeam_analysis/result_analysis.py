@@ -138,48 +138,57 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            difference[:, 0],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_x - 1 * std_x, mean_x + 1 * std_x)))
+                        fit_x_residual_x = analysis_utils.fit_residuals(intersection_x, difference[:, 0], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # Y residual agains y position
                         hist_y_residual_y = np.histogram2d(intersection_y,
                                                            difference[:, 1],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_y - 1 * std_y, mean_y + 1 * std_y)))
+                        fit_y_residual_y = analysis_utils.fit_residuals(intersection_y, difference[:, 1], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # Y residual agains x position
                         hist_x_residual_y = np.histogram2d(intersection_x,
                                                            difference[:, 1],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_y - 1 * std_y, mean_y + 1 * std_y)))
+                        fit_x_residual_y = analysis_utils.fit_residuals(intersection_x, difference[:, 1], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # X residual agains y position
                         hist_y_residual_x = np.histogram2d(intersection_y,
                                                            difference[:, 0],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_x - 1 * std_x, mean_x + 1 * std_x)))
+                        fit_y_residual_x = analysis_utils.fit_residuals(intersection_y, difference[:, 0], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # Column residual agains column position
                         hist_col_residual_col = np.histogram2d(intersection_x_local,
                                                                difference_local[:, 0],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_column - 1 * std_column, mean_column + 1 * std_column)))
+                        fit_col_residual_col = analysis_utils.fit_residuals(intersection_x_local, difference_local[:, 0], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # Row residual agains row position
                         hist_row_residual_row = np.histogram2d(intersection_y_local,
                                                                difference_local[:, 1],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_row - 1 * std_row, mean_row + 1 * std_row)))
+                        fit_row_residual_row = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # Row residual agains column position
                         hist_col_residual_row = np.histogram2d(intersection_x_local,
                                                                difference_local[:, 1],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_row - 1 * std_row, mean_row + 1 * std_row)))
+                        fit_col_residual_row = analysis_utils.fit_residuals(intersection_x_local, difference_local[:, 1], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # Column residual agains row position
                         hist_row_residual_col = np.histogram2d(intersection_y_local,
                                                                difference_local[:, 0],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_column - 1 * std_column, mean_column + 1 * std_column)))
+                        fit_row_residual_col = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
+
                     else:  # Add data to existing hists
                         # X residual agains x position
                         hist_x_residual_x += np.histogram2d(intersection_x,
@@ -261,6 +270,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_x_res_x.attrs.x_edges = (hist_x_residual_x[1][0], hist_x_residual_x[1][-1])
                 out_x_res_x.attrs.y_edges = (hist_x_residual_x[2][0], hist_x_residual_x[2][-1])
+                out_x_res_x.attrs.fit_coeff = fit_x_residual_x[0]
+                out_x_res_x.attrs.fit_cov = fit_x_residual_x[1]
                 out_x_res_x[:] = hist_x_residual_x[0]
 
                 out_y_res_y = out_file_h5.createCArray(out_file_h5.root,
@@ -271,6 +282,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_y_res_y.attrs.x_edges = (hist_y_residual_y[1][0], hist_y_residual_y[1][-1])
                 out_y_res_y.attrs.y_edges = (hist_y_residual_y[2][0], hist_y_residual_y[2][-1])
+                out_y_res_y.attrs.fit_coeff = fit_y_residual_y[0]
+                out_y_res_y.attrs.fit_cov = fit_y_residual_y[1]
                 out_y_res_y[:] = hist_y_residual_y[0]
 
                 out_x_res_y = out_file_h5.createCArray(out_file_h5.root,
@@ -281,6 +294,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_x_res_y.attrs.x_edges = (hist_x_residual_y[1][0], hist_x_residual_y[1][-1])
                 out_x_res_y.attrs.y_edges = (hist_x_residual_y[2][0], hist_x_residual_y[2][-1])
+                out_x_res_y.attrs.fit_coeff = fit_x_residual_y[0]
+                out_x_res_y.attrs.fit_cov = fit_x_residual_y[1]
                 out_x_res_y[:] = hist_x_residual_y[0]
 
                 out_y_res_x = out_file_h5.createCArray(out_file_h5.root,
@@ -291,6 +306,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_y_res_x.attrs.x_edges = (hist_y_residual_x[1][0], hist_y_residual_x[1][-1])
                 out_y_res_x.attrs.y_edges = (hist_y_residual_x[2][0], hist_y_residual_x[2][-1])
+                out_y_res_x.attrs.fit_coeff = fit_y_residual_x[0]
+                out_y_res_x.attrs.fit_cov = fit_y_residual_x[1]
                 out_y_res_x[:] = hist_y_residual_x[0]
 
                 # Local residuals
@@ -320,6 +337,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_col_res_col.attrs.x_edges = (hist_col_residual_col[1][0], hist_col_residual_col[1][-1])
                 out_col_res_col.attrs.y_edges = (hist_col_residual_col[2][0], hist_col_residual_col[2][-1])
+                out_col_res_col.attrs.fit_coeff = fit_col_residual_col[0]
+                out_col_res_col.attrs.fit_cov = fit_col_residual_col[1]
                 out_col_res_col[:] = hist_col_residual_col[0]
 
                 out_row_res_row = out_file_h5.createCArray(out_file_h5.root,
@@ -330,6 +349,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_row_res_row.attrs.x_edges = (hist_row_residual_row[1][0], hist_row_residual_row[1][-1])
                 out_row_res_row.attrs.y_edges = (hist_row_residual_row[2][0], hist_row_residual_row[2][-1])
+                out_row_res_row.attrs.fit_coeff = fit_row_residual_row[0]
+                out_row_res_row.attrs.fit_cov = fit_row_residual_row[1]
                 out_row_res_row[:] = hist_row_residual_row[0]
 
                 out_col_res_row = out_file_h5.createCArray(out_file_h5.root,
@@ -340,6 +361,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_col_res_row.attrs.x_edges = (hist_col_residual_row[1][0], hist_col_residual_row[1][-1])
                 out_col_res_row.attrs.y_edges = (hist_col_residual_row[2][0], hist_col_residual_row[2][-1])
+                out_col_res_row.attrs.fit_coeff = fit_col_residual_row[0]
+                out_col_res_row.attrs.fit_cov = fit_col_residual_row[1]
                 out_col_res_row[:] = hist_col_residual_row[0]
 
                 out_row_res_col = out_file_h5.createCArray(out_file_h5.root,
@@ -350,6 +373,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_row_res_col.attrs.x_edges = (hist_row_residual_col[1][0], hist_row_residual_col[1][-1])
                 out_row_res_col.attrs.y_edges = (hist_row_residual_col[2][0], hist_row_residual_col[2][-1])
+                out_row_res_col.attrs.fit_coeff = fit_row_residual_col[0]
+                out_row_res_col.attrs.fit_cov = fit_row_residual_col[1]
                 out_row_res_col[:] = hist_row_residual_col[0]
 
                 # Create plots
@@ -375,6 +400,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     except:  # Fit error
                         pass
 
+                    def line(x, c0, c1):
+                        return c0 + c1 * x
+
                     plot_utils.plot_residuals(histogram=hist_residual_y,
                                               fit=coeff,
                                               fit_errors=var_matrix,
@@ -382,51 +410,48 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                               x_label='Y residual [um]',
                                               output_fig=output_fig)
 
-                    def get_median(array, values):  # Calculate the median of a 2D histogram along axis=1 with given values
-                        def find_nearest(array, value):
-                            return (np.abs(array - value[:, np.newaxis])).argmin(axis=1)
-                        cumsum = np.cumsum(array, axis=1)
-                        idx = find_nearest(cumsum, np.max(cumsum, axis=1) / 2.)
-                        return values[idx]
-
-                    x = np.linspace(hist_x_residual_x[1][0], hist_x_residual_x[1][-1], num=hist_x_residual_x[0].shape[0])
-                    values = np.linspace(hist_x_residual_x[2][0], hist_x_residual_x[2][-1], num=hist_x_residual_x[0].shape[1])
-                    y = get_median(hist_x_residual_x[0], values)
+                    x = fit_x_residual_x[2]
+                    y = fit_x_residual_x[3]
+                    fit = [fit_x_residual_x[0], fit_x_residual_x[1]]
                     plot_utils.plot_position_residuals(hist_x_residual_x,
                                                        x,
                                                        y,
                                                        x_label='X position [um]',
                                                        y_label='X residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1], hist_y_residual_y[0].shape[0])
-                    values = np.linspace(mean_y - 1 * std_y, mean_y + 1 * std_y, 800)
-                    y = get_median(hist_y_residual_y[0], values)
+                    x = fit_y_residual_y[2]
+                    y = fit_y_residual_y[3]
+                    fit = [fit_y_residual_y[0], fit_y_residual_y[1]]
                     plot_utils.plot_position_residuals(hist_y_residual_y,
                                                        x,
                                                        y,
                                                        x_label='Y position [um]',
                                                        y_label='Y residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0], hist_x_residual_y[0].shape[0])
-                    values = np.linspace(mean_y - 1 * std_y, mean_y + 1 * std_y, 800)
-                    y = get_median(hist_x_residual_y[0], values)
+                    x = fit_x_residual_y[2]
+                    y = fit_x_residual_y[3]
+                    fit = [fit_x_residual_y[0], fit_x_residual_y[1]]
                     plot_utils.plot_position_residuals(hist_x_residual_y,
                                                        x,
                                                        y,
                                                        x_label='X position [um]',
                                                        y_label='Y residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1], hist_y_residual_x[0].shape[0])
-                    values = np.linspace(mean_x - 1 * std_x, mean_x + 1 * std_x, 800)
-                    y = get_median(hist_y_residual_x[0], values)
+                    x = fit_y_residual_x[2]
+                    y = fit_y_residual_x[3]
+                    fit = [fit_y_residual_x[0], fit_y_residual_x[1]]
                     plot_utils.plot_position_residuals(hist_y_residual_x,
                                                        x,
                                                        y,
-                                                       x_label='X position [um]',
-                                                       y_label='Y residual [um]',
+                                                       x_label='Y position [um]',
+                                                       y_label='X residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
                     # Local residuals
@@ -456,44 +481,48 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                               x_label='Row residual [um]',
                                               output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0], hist_col_residual_col[0].shape[0])
-                    values = np.linspace(mean_column - 1 * std_column, mean_column + 1 * std_column, 800)
-                    y = get_median(hist_col_residual_col[0], values)
+                    x = fit_col_residual_col[2]
+                    y = fit_col_residual_col[3]
+                    fit = [fit_col_residual_col[0], fit_col_residual_col[1]]
                     plot_utils.plot_position_residuals(hist_col_residual_col,
                                                        x,
                                                        y,
                                                        x_label='Column position [um]',
                                                        y_label='Column residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1], hist_row_residual_row[0].shape[0])
-                    values = np.linspace(mean_row - 1 * std_row, mean_row + 1 * std_row, 800)
-                    y = get_median(hist_row_residual_row[0], values)
+                    x = fit_row_residual_row[2]
+                    y = fit_row_residual_row[3]
+                    fit = [fit_row_residual_row[0], fit_row_residual_row[1]]
                     plot_utils.plot_position_residuals(hist_row_residual_row,
                                                        x,
                                                        y,
                                                        x_label='Row position [um]',
                                                        y_label='Row residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0], hist_col_residual_row[0].shape[0])
-                    values = np.linspace(mean_row - 1 * std_row, mean_row + 1 * std_row, 800)
-                    y = get_median(hist_col_residual_row[0], values)
+                    x = fit_col_residual_row[2]
+                    y = fit_col_residual_row[3]
+                    fit = [fit_col_residual_row[0], fit_col_residual_row[1]]
                     plot_utils.plot_position_residuals(hist_col_residual_row,
                                                        x,
                                                        y,
                                                        x_label='Column position [um]',
                                                        y_label='Row residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
-                    x = np.linspace(0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1], hist_row_residual_col[0].shape[0])
-                    values = np.linspace(mean_column - 1 * std_column, mean_column + 1 * std_column, 800)
-                    y = get_median(hist_row_residual_col[0], values)
+                    x = fit_row_residual_col[2]
+                    y = fit_row_residual_col[3]
+                    fit = [fit_row_residual_col[0], fit_row_residual_col[1]]
                     plot_utils.plot_position_residuals(hist_row_residual_col,
                                                        x,
                                                        y,
                                                        x_label='Row position [um]',
                                                        y_label='Column residual [um]',
+                                                       fit=fit,
                                                        output_fig=output_fig)
 
     if output_fig:
