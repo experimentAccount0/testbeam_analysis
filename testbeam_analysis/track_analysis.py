@@ -140,7 +140,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
@@ -167,12 +167,13 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         selection_hit_duts = (0, 1, 3, 4)
         selection_fit_duts = (0, 1, 4)
     exclude_dut_hit: boolean
-        Set to require a hit in the actual fit DUT (e.g.: for uncontrained residuals)
-        False: do not take this parameter into account
+        Set to not require a hit in the actual fit DUT (e.g.: for uncontrained residuals)
+        False: Just use all devices as specified in selection_hit_duts.
         True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts
     max_tracks : int, None
         only events with tracks <= max tracks are taken
-    track_quality : int
+    selection_track_quality : int, iterable
+        One number valid for all DUTs or an iterable with a number for each DUT.
         0: All tracks with hits in DUT and references are taken
         1: The track hits in DUT and reference are within 2-sigma of the correlation
         2: The track hits in DUT and reference are within 1-sigma of the correlation
@@ -211,29 +212,40 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     else:
         logging.info('Use alignment data')
 
-    # Special mode: use all DUTs in the fit
-    if not selection_hit_duts and not selection_fit_duts and not exclude_dut_hit:
-        all_duts = True
-    else:
-        all_duts = False
-
     # Create track, hit selection
     if not selection_hit_duts:  # If None: use all DUTs
         selection_hit_duts = [i for i in range(n_duts)]
+
+    if not isinstance(selection_track_quality, list):
+        selection_track_quality = [selection_track_quality for _ in selection_hit_duts]
 
     # Std. case: use all DUTs that are required to have a hit for track fitting
     if not selection_fit_duts:
         selection_fit_duts = selection_hit_duts
 
+    if not isinstance(selection_fit_duts, list):
+        selection_fit_duts = [selection_hit_duts for _ in range(n_duts)]
+
     # Convert potenital selection valied for all duts to required selection for each DUT
     if not isinstance(selection_hit_duts[0], list):
-        selection_hit_duts = [selection_hit_duts for _ in selection_hit_duts]
+        selection_hit_duts = [selection_hit_duts for _ in range(n_duts)]
     if not isinstance(selection_fit_duts[0], list):
-        selection_fit_duts = [selection_fit_duts for _ in selection_fit_duts]
+        selection_fit_duts = [selection_fit_duts for _ in range(n_duts)]
+    if not isinstance(selection_track_quality[0], list):
+        selection_track_quality = [selection_track_quality for _ in range(n_duts)]
+
+    if len(selection_hit_duts) != len(selection_track_quality):
+        raise ValueError('The length of the hit dut selection has to be equal to the quality selection!')
 
     for (sel_1, sel_2) in zip(selection_hit_duts, selection_fit_duts):
         if not all(x in sel_1 for x in sel_2):
-            raise ValueError('All DUTs defined in selection_fit_duts have to be defined in selection_hit_duts')
+            raise NotImplementedError('All DUTs defined in selection_fit_duts have to be defined in selection_hit_duts!')
+
+    # Special mode: use all DUTs in the fit and the selections are all the same --> the data does only have to be fitted once
+    if not exclude_dut_hit and all(x == selection_hit_duts[0] for x in selection_hit_duts) and all(x == selection_fit_duts[0] for x in selection_fit_duts) and all(x == selection_track_quality[0] for x in selection_track_quality):
+        all_duts = True
+    else:
+        all_duts = False
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
         # Define description
@@ -311,33 +323,36 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     def select_data(dut_index):  # Select track by and DUT hits to use
 
         dut_selection = 0  # DUTs to be used in the fit
-        dut_fit_selection = 0  # Masks DUTs to check track quality for
+        dut_fit_selection = 0  # DUT to use in fit
         info_str_hit = ''  # For info output
         info_str_fit = ''  # For info output
 
-        if not all_duts:
-            for hit_dut in selection_hit_duts[dut_index]:
-                if exclude_dut_hit and hit_dut == dut_index:
-                    continue
-                dut_selection |= ((1 << hit_dut))
-                info_str_hit += 'DUT%d ' % (hit_dut)
-            for selected_fit_dut in selection_fit_duts[dut_index]:
-                if exclude_dut_hit and selected_fit_dut == dut_index:
-                    continue
-                dut_fit_selection |= ((1 << selected_fit_dut))
-                info_str_fit += 'DUT%d ' % (selected_fit_dut)
-        else:  # Special case, use all DUTs for track selection and fitting
-            for i in range(n_duts):
-                dut_selection |= (1 << i)
-                info_str_hit += 'DUT%d ' % (i)
-                info_str_fit += 'DUT%d ' % (i)
-            dut_fit_selection = dut_selection
+        for hit_dut in selection_hit_duts[dut_index]:
+            if exclude_dut_hit and hit_dut == dut_index:
+                continue
+            dut_selection |= ((1 << hit_dut))
+            info_str_hit += 'DUT%d ' % (hit_dut)
+        for selected_fit_dut in selection_fit_duts[dut_index]:
+            if exclude_dut_hit and selected_fit_dut == dut_index:
+                continue
+            dut_fit_selection |= ((1 << selected_fit_dut))
+            info_str_fit += 'DUT%d ' % (selected_fit_dut)
+
+        if all_duts:
             logging.info('Fit tracks for all DUTs, will lead to constrained residuals!')
 
         logging.info('Use %d DUTs for track selection: %s', bin(dut_selection).count("1"), info_str_hit)
         logging.info("Use %d DUTs for track fit: %s", bin(dut_fit_selection).count("1"), info_str_fit)
 
-        return dut_selection, dut_fit_selection, all_duts
+        track_quality_mask = 0
+        for index, dut in enumerate(selection_hit_duts[dut_index]):
+            if exclude_dut_hit and dut == dut_index:
+                continue
+            for quality in range(3):
+                if quality <= selection_track_quality[dut_index][index]:
+                    track_quality_mask |= ((1 << dut) << quality * 8)
+        logging.info("Use track quality: %s", str(selection_track_quality[dut_index])[1:-1])
+        return dut_selection, dut_fit_selection, track_quality_mask, all_duts
 
     pool = Pool()
     with PdfPages(output_tracks_file[:-3] + '.pdf') as output_fig:
@@ -360,7 +375,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT %d', fit_dut)
 
-                    dut_selection, dut_fit_selection, all_duts = select_data(fit_dut)
+                    dut_selection, dut_fit_selection, track_quality_mask, all_duts = select_data(fit_dut)
                     n_fit_duts = bin(dut_fit_selection).count("1")
                     if n_fit_duts < 2:
                         logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', fit_dut)
@@ -372,7 +387,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     for track_candidates_chunk, index_candidates in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
 
                         # Select tracks based on the dut that are required to have a hit (dut_selection) with a certain quality (track_quality)
-                        good_track_selection = (track_candidates_chunk['track_quality'] & (dut_selection << (track_quality * 8))) == (dut_selection << (track_quality * 8))
+
+                        good_track_selection = (track_candidates_chunk['track_quality'] & track_quality_mask) == track_quality_mask
 
                         n_track_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection)
 
@@ -429,7 +445,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         if not all_duts:  # Check if all DUTs were fitted at once
                             store_track_data(fit_dut, min_track_distance)
                         else:
-                            for fit_dut in range(n_duts):
+                            for fit_dut in fit_duts:
                                 store_track_data(fit_dut, min_track_distance)
 
                         progress_bar.update(index_candidates)
