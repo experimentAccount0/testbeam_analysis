@@ -74,7 +74,7 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
                     hit_table_out.append(_delete_events(hits, fraction))
 
 
-def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, track_quality_mask=None, chunk_size=10000000):
+def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, track_quality_mask=None, output_file=None, chunk_size=10000000):
     ''' Function to select a fraction of hits fullfilling a condition. Needed for analysis speed up, when
     very large runs are used.
     Parameters
@@ -95,7 +95,9 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, tra
     '''
 
     with tb.open_file(hit_file, mode='r') as in_file_h5:
-        with tb.open_file(hit_file[:-3] + '_reduced.h5', mode="w") as out_file_h5:
+        if not output_file:
+            output_file = hit_file[:-3] + '_reduced.h5'
+        with tb.open_file(output_file, mode="w") as out_file_h5:
             for node in in_file_h5.root:
                 total_hits = node.shape[0]
                 progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=total_hits, term_width=80)
