@@ -9,6 +9,7 @@ from math import sqrt, ceil
 import numpy as np
 import tables as tb
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import colors, cm
 import matplotlib as mpl
@@ -23,35 +24,37 @@ from testbeam_analysis import analysis_utils
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")  # Plot backend error not important
 
 
-def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None):
-    extent = [0.5, plot_range[0] + .5, plot_range[1] + .5, 0.5]
+def plot_2d_pixel_hist(fig, ax, hist2d, extent=None, title=None, x_axis_title=None, y_axis_title=None, z_min=0, z_max=None, aspect="auto"):
+    # fix weird matplotlib behavior
+    if extent is not None:
+        aspect = "auto"
     if z_max is None:
         if hist2d.all() is np.ma.masked:  # check if masked array is fully masked
             z_max = 1
         else:
-            z_max = ceil(hist2d.max())
+            z_max = np.percentile(np.ma.array(hist2d, mask=(hist2d == 0)).compressed(), 99)
+            z_max = max(z_max, 1)
     bounds = np.linspace(start=z_min, stop=z_max, num=255, endpoint=True)
     cmap = cm.get_cmap('viridis')
-    cmap.set_bad('w')
+#     cmap.set_bad('w')
     norm = colors.BoundaryNorm(bounds, cmap.N)
-    im = ax.imshow(hist2d, interpolation='none', aspect="auto", cmap=cmap, norm=norm, extent=extent)
+    im = ax.imshow(hist2d, interpolation='none', aspect=aspect, cmap=cmap, norm=norm, extent=extent, clim=(0, z_max))
     if title is not None:
         ax.set_title(title)
     if x_axis_title is not None:
         ax.set_xlabel(x_axis_title)
     if y_axis_title is not None:
         ax.set_ylabel(y_axis_title)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
+    fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), fraction=0.04, pad=0.05)
 
 
 def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, dut_name=None):
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
-        occupancy = np.ma.masked_array(input_file_h5.root.HistOcc[:], mask=input_file_h5.root.NoisyPixelsMask[:])
+        occupancy = input_file_h5.root.HistOcc[:].T
+        mask = input_file_h5.root.NoisyPixelsMask[:].T
 
     if pixel_size:
-        aspect = pixel_size[0] / pixel_size[1]
+        aspect = pixel_size[1] / pixel_size[0]
     else:
         aspect = "auto"
 
@@ -71,25 +74,47 @@ def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, du
         norm = None
         c_max = np.percentile(occupancy, 99)
 
-        noisy_pixels = np.nonzero(np.ma.getmaskarray(occupancy))
-        # check for any noisy pixels
-        if noisy_pixels[0].shape[0] != 0:
-            ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)
-        ax.set_title('%s with %d noisy pixel' % (dut_name, np.ma.count_masked(occupancy)))
-        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
+        ax.set_title('Occupancy of %s' % (dut_name))
+        ax.imshow(np.ma.masked_where(occupancy == 0, occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', clim=(0, c_max))
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
-        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        ax.set_ylim(occupancy.shape[0] - 0.5, -0.5)
 
         output_pdf.savefig()
 
         plt.figure()
         ax = plt.subplot(111)
 
-        ax.set_title('%s with %d noisy pixel removed' % (dut_name, np.ma.count_masked(occupancy)))
-        ax.imshow(occupancy, aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
-    #     np.ma.filled(occupancy, fill_value=0)
+        cmap = cm.get_cmap('viridis')
+    #     cmap.set_bad('w')
+    #     norm = colors.LogNorm()
+        norm = None
+        c_max = np.percentile(occupancy, 99)
+
+        noisy_pixels = np.nonzero(mask)
+        # check for any noisy pixels
+        if noisy_pixels[0].shape[0] != 0:
+            ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)
+        ax.set_title('Occupancy of %s with %d noisy pixels' % (dut_name, np.count_nonzero(mask)))
+        ax.imshow(np.ma.masked_where(occupancy == 0, occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', clim=(0, c_max))
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
-        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        ax.set_ylim(occupancy.shape[0] - 0.5, -0.5)
+
+        output_pdf.savefig()
+
+        plt.figure()
+        ax = plt.subplot(111)
+
+        ax.set_title('Occupancy of %s with %d noisy pixels removed' % (dut_name, np.count_nonzero(mask)))
+        ax.imshow(np.ma.masked_where(occupancy == 0, np.ma.masked_array(occupancy, mask=mask)), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', clim=(0, c_max))
+    #     np.ma.filled(occupancy, fill_value=0)
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
+        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax.set_ylim(occupancy.shape[0] - 0.5, -0.5)
 
         output_pdf.savefig()
 
@@ -105,7 +130,7 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
             cluster_n_hits = input_file_h5.root.Cluster[:]['n_hits']
             # Save cluster size histogram
-            max_cluster_size = np.amax(cluster_n_hits) + 1
+            max_cluster_size = np.max(cluster_n_hits) + 1
             plt.clf()
             left = np.arange(max_cluster_size)
             hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size,))
@@ -119,27 +144,28 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
             plt.ylim(ymin=1e-1)
             output_pdf.savefig()
             plt.yscale('linear')
-            plt.ylim(ymax=np.amax(hight))
+            plt.ylim(ymax=np.max(hight))
             plt.xlim(0.5, min(10, max_cluster_size - 1) + 0.5)
             output_pdf.savefig()
 
 
-def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_fig):
-    def gauss(x, *p):
+def plot_correlation_fit(x, y, coeff, var_matrix, xlabel, title, output_pdf):
+    def gauss_offset(x, *p):
         A, mu, sigma, offset = p
-        return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2)) + offset
+        return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0)) + offset
+
     plt.clf()
-    gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm% .1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+    gauss_fit_legend_entry = 'Gaussian fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm% .1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
     plt.bar(x - 0.5, y, label='data', width=1)  # substract .5 to get edges of bins correct, since x parameter is center of bins
-    x_fit = np.arange(np.amin(x), np.amax(x), 0.1)
-    y_fit = gauss(x_fit, *coeff)
+    x_fit = np.arange(np.min(x), np.max(x), 0.1)
+    y_fit = gauss_offset(x_fit, *coeff)
     plt.plot(x_fit, y_fit, '-', label=gauss_fit_legend_entry)
     plt.legend(loc=0)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('#')
     plt.grid()
-    output_fig.savefig()
+    output_pdf.savefig()
 
 
 def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_name, title, non_interactive=False):
@@ -180,138 +206,173 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_hits, ref_name, dut_nam
         return c0 + c1 * x
 
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
         global offset_limit
-        global left_limit
-        global right_limit
         offset_limit = offset_limit_new
         offset_limit_plot.set_ydata([offset_limit * 10., offset_limit * 10.])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
 
     def update_error(error_limit_new):  # Function called when error slider is moved
-        global selected_data  # Globals needed to manipulate them
         global error_limit
-        global offset_limit
-        global left_limit
-        global right_limit
         error_limit = error_limit_new
         error_limit_plot.set_ydata([error_limit * 1000., error_limit * 1000.])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
 
     def update_left_limit(left_limit_new):  # Function called when left limit slider is moved
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
-        global offset_limit
         global left_limit
-        global right_limit
         left_limit = left_limit_new
         left_limit_plot.set_xdata([left_limit, left_limit])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
 
     def update_right_limit(right_limit_new):  # Function called when left limit slider is moved
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
-        global offset_limit
-        global left_limit
         global right_limit
         right_limit = right_limit_new
         right_limit_plot.set_xdata([right_limit, right_limit])
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
+
+    def update_selected_data():
+        global selected_data
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+        init_selected_data()
+#         selected_data &= np.logical_and(np.logical_and(np.logical_and(np.abs(offset) <= offset_limit, np.abs(mean_error_fitted) <= error_limit), x >= left_limit), x <= right_limit)
+        selected_data[selected_data] &= (np.abs(offset[selected_data]) <= offset_limit)
+        selected_data[selected_data] &= (np.abs(mean_error_fitted[selected_data]) <= error_limit)
+        selected_data &= (x >= left_limit)
+        selected_data &= (x <= right_limit)
 
     def update_auto(event):  # Function called when auto button is pressed
+        global selected_data
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+
         # This function automatically applies cuts according to these percentiles
         n_hit_percentile = 5
         mean_error_percentile = 95
         offset_percentile = 99
 
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
-        global offset_limit
-        global left_limit
-        global right_limit
-
-        n_hit_cut = np.percentile(n_hits, n_hit_percentile)  # Cut of low/high 5 % of the hits
-        n_hit_cut_index = np.where(n_hits < n_hit_cut)[0]
-
-        if np.any(n_hit_cut_index):  # If data is rather constant n_hit_cut_index is empty
-            def consecutive(data, stepsize=1):  # Returns group of consecutive increasing values
-                return np.split(data, np.where(np.diff(data) != stepsize)[0] + 1)
-
-            cons = consecutive(n_hit_cut_index)
-
-            # Set the minimum, maximum  number of hits cut values
-            min_cut = cons[0][-1] if len(np.atleast_1d(cons[0][-1])) == 1 else cons[0][-1][0]
-            max_cut = cons[-1][0] if len(np.atleast_1d(cons[-1][0])) == 1 else cons[-1][0][0]
-
-            # Validity check, needed e.g. if there are areas without data
-            n_hits_max = np.where(n_hits == np.amax(n_hits))[0]
-            n_hits_max_min_index = n_hits_max if len(np.atleast_1d(n_hits_max)) == 1 else n_hits_max[0]  # Cut down to first index with maximum entries
-            n_hits_max_max_index = n_hits_max if len(np.atleast_1d(n_hits_max)) == 1 else n_hits_max[-1]  # Cut down to first index with maximum entries
-
-            if min_cut > max_cut or min_cut > n_hits_max_min_index:
-                min_cut = 0
-            if max_cut < min_cut or max_cut < n_hits_max_max_index:
-                max_cut = n_hits.shape[0] - 1
-
-            if min_cut:
-                left_limit = x[min_cut]
-                left_limit_plot.set_xdata([left_limit, left_limit])
-                left_slider.set_val(left_limit)
-            if max_cut:
-                right_limit = x[max_cut]
-                right_slider.set_val(right_limit)
-                right_limit_plot.set_xdata([right_limit, right_limit])
-
-        error_limit = np.percentile(mean_error_fitted, mean_error_percentile)
-        offset_limit = np.percentile(np.abs(offset), offset_percentile)  # Do not cut too much on the offset, it depends on the fit that might be off
+        error_median = np.nanmedian(mean_error_fitted)
+        error_limit = max(error_median * 2, np.percentile(np.abs(mean_error_fitted[selected_data]), mean_error_percentile))
+        print "True error" if error_median * 2 < np.percentile(np.abs(mean_error_fitted[selected_data]), mean_error_percentile) else "False error"
+        offset_median = np.nanmedian(offset)
+        offset_limit = max(offset_median * 2, np.percentile(np.abs(offset[selected_data]), offset_percentile))  # Do not cut too much on the offset, it depends on the fit that might be off
+        print "True offset" if offset_median * 2 < np.percentile(np.abs(offset[selected_data]), offset_percentile) else "False offset"
         error_slider.set_val(error_limit)
         offset_slider.set_val(offset_limit)
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
 
-    def update_plot(selected_data):  # Replot correlation data with new selection
+        n_hit_cut = np.percentile(n_hits[selected_data], n_hit_percentile)  # Cut of low/high 5 % of the hits
+        n_hit_cut_index = np.zeros_like(n_hits, dtype=np.bool)
+        n_hit_cut_index |= (n_hits < n_hit_cut)
+        n_hit_cut_index[selected_data] |= (np.abs(offset[selected_data]) > offset_limit)
+        n_hit_cut_index[~np.isfinite(offset)] = 1
+        n_hit_cut_index[selected_data] |= (np.abs(mean_error_fitted[selected_data]) > error_limit)
+        n_hit_cut_index[~np.isfinite(mean_error_fitted)] = 1
+        n_hit_cut_index = np.where(n_hit_cut_index == 1)[0]
+#         print "n_hit_cut_index before left right cut", n_hit_cut_index
+        print "left right limit", left_limit, right_limit
+        left_index = np.where(x <= left_limit)[0][-1]
+        right_index = np.where(x >= right_limit)[0][0]
+        print "left right index", left_index, right_index
+        n_hit_cut_index = n_hit_cut_index[n_hit_cut_index >= left_index]
+        n_hit_cut_index = n_hit_cut_index[n_hit_cut_index <= right_index]
+        if not np.any(n_hit_cut_index == left_index):
+            n_hit_cut_index = np.r_[[left_index], n_hit_cut_index]
+        if not np.any(n_hit_cut_index == right_index):
+            n_hit_cut_index = np.r_[n_hit_cut_index, [right_index]]
+        print "n_hit_cut_index with left right cut", n_hit_cut_index
+        print "limit", left_index, right_index
+#         n_hit_cut_index = n_hit_cut_index[n_hit_cut_index >= left_index]
+#         n_hit_cut_index = n_hit_cut_index[n_hit_cut_index <= right_index]
+#         print "n_hit_cut_index", n_hit_cut_index
+
+#         diff_val = np.argmax(np.diff(n_hit_cut_index))
+#         largest_gap = n_hit_cut_index[diff_val:diff_val+2]
+#         print "largest_gap", largest_gap
+
+        if np.any(n_hit_cut_index.shape):  # If data is rather constant n_hit_cut_index is empty
+            def consecutive(data, max_stepsize=5):  # Returns group of consecutive increasing values
+                return np.split(data, np.where(np.diff(data) > max_stepsize)[0] + 1)
+
+            cons = consecutive(n_hit_cut_index)
+            print "cons", cons
+
+            left_cut = left_index if cons[0].shape[0] == 1 else cons[0][-1] + 1
+            right_cut = right_index if cons[-1].shape[0] == 1 else cons[-1][0] - 1
+            print "left right cut", left_cut, right_cut
+#             left_cut = largest_gap[0]
+#             right_cut = largest_gap[1]
+
+            print "set left val", left_limit
+            left_limit = x[left_cut]
+#                 left_limit_plot.set_xdata([left_limit, left_limit])
+            left_slider.set_val(left_limit)
+            print "set right val", right_limit
+            right_limit = x[right_cut]
+#                 right_limit_plot.set_xdata([right_limit, right_limit])
+            right_slider.set_val(right_limit)
+
+
+        print error_limit
+        print offset_limit
+        print left_limit
+        print right_limit
+        update_selected_data()
+        update_plot()
+        print selected_data.shape  # Globals needed to manipulate them
+
+    def update_plot():  # Replot correlation data with new selection
+        global selected_data
         if np.count_nonzero(selected_data) > 1:
             mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
         else:
             if non_interactive:
-                raise RuntimeError('Coarse alignment in non interactive mode failed. Rerun with less iterations or in interactive mode!')
+                raise RuntimeError('Coarse alignment in non-interactive mode failed. Rerun with less iterations or in interactive mode!')
             else:
                 logging.info('Cuts are too tight. Not enough data to fit')
 
+    def init_selected_data():
+        global selected_data
+        selected_data = np.ones_like(mean_fitted, dtype=np.bool)
+        selected_data &= np.isfinite(mean_fitted)
+        selected_data &= np.isfinite(mean_error_fitted)
+
+    # Require the gaussian fit error to be reasonable
+#     selected_data = (mean_error_fitted < 1e-2)
+    init_selected_data()
     # Calculate and plot selected data + fit + fit offset and gauss fit error
-    selected_data = (mean_error_fitted > 1e-3)  # Require the gaussian fit arror to be reasonable
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
-    fit, _ = curve_fit(f, x, mean_fitted)  # Fit stragiht line
+    fit, _ = curve_fit(f, x[selected_data], mean_fitted[selected_data])  # Fit stragiht line
     fit_fn = np.poly1d(fit[::-1])
-    offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
-    offset_limit = np.amax(offset)  # Calculate starting offset cut
-    error_limit = np.amax(mean_error_fitted)  # Calculate starting fit error cut
-    left_limit = np.amin(x) - 1  # Calculate starting left cut
-    right_limit = np.amax(x) + 1  # Calculate starting right cut
+    offset = np.empty_like(mean_fitted)
+    offset.fill(np.nan)
+    offset[selected_data] = fit_fn(x[selected_data]) - mean_fitted[selected_data]  # Calculate straight line fit offset
+    offset_limit = np.max(np.abs(offset[selected_data]))  # Calculate starting offset cut
+    error_limit = np.max(np.abs(mean_error_fitted[selected_data]))  # Calculate starting fit error cut
+    left_limit = np.min(x[selected_data])  # Calculate starting left cut
+    right_limit = np.max(x[selected_data])  # Calculate starting right cut
 
-    mean_plot, = ax.plot(x, mean_fitted, 'o-', label='Data prefit')  # Plot correlatioin
-    ax.plot(x, fit_fn(x), '-', label='Line fit')  # Plot line fit
-    ax.plot(x, mean_error_fitted * 1000., 'ro-', label='Error x 1000')  # Plot gaussian fit error
-    ax.plot(x, offset * 10., 'go-', label='Offset x 10')  # Plot line fit offset
-    offset_limit_plot, = ax.plot([np.min(x), np.max(x)], [offset_limit * 10., offset_limit * 10.], 'g--', linewidth=2)  # Plot offset cut as a line
-    error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit * 1000., error_limit * 1000.], 'r--', linewidth=2)  # Plot error cut as a line
-    left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-', linewidth=2)  # Plot left cut as a vertical line
-    right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-', linewidth=2)  # Plot right cut as a vertical line
-    plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
+    mean_plot, = ax.plot(x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')  # Plot correlatioin
+    ax.plot(x[selected_data], fit_fn(x[selected_data]), '-', label='Line fit')  # Plot line fit
+    ax.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 1000.0, 'ro-', label='Error x 1000')  # Plot gaussian fit error
+    ax.plot(x[selected_data], np.abs(offset[selected_data]) * 10.0, 'go-', label='Offset x 10')  # Plot line fit offset
+    ax.axvline()
+    offset_limit_plot = ax.axhline(offset_limit * 10.0, linestyle='--', color='g', linewidth=2)  # Plot offset cut as a line
+    error_limit_plot = ax.axhline(error_limit * 1000.0, linestyle='--', color='r', linewidth=2)  # Plot error cut as a line
+    left_limit_plot = ax.axvline(left_limit, linestyle='-', color='b', linewidth=2)  # Plot left cut as a vertical line
+    right_limit_plot = ax.axvline(right_limit, linestyle='-', color='b', linewidth=2)  # Plot right cut as a vertical line
+    plt.bar(x[selected_data], n_hits[selected_data] / np.max(n_hits[selected_data]).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
 
     plt.ylim(ymin=0.0)
+    plt.xlim((np.nanmin(x), np.nanmax(x)))
     ax.set_title(title)
     ax.set_xlabel(dut_name)
     ax.set_ylabel(ref_name)
@@ -455,7 +516,7 @@ def plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, xlabel, titl
     left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-')  # Plot left cut as a vertical line
     right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-')  # Plot right cut as a vertical line
     plt.bar(x, n_hits / np.amax(n_hits).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
-    
+
     if coord is not None and res is not None and xedges is not None and yedges is not None:
         acr = fig.add_subplot(2, 1, 1)
         acr.hist2d(coord, res, [xedges, yedges])
@@ -499,9 +560,8 @@ def plot_alignments_fine(x, mean_fitted, mean_error_fitted, n_hits, xlabel, titl
 
     plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
     plt.show()
-    
-    return selected_data, fit, do_refit  # Return cut data for further processing
 
+    return selected_data, fit, do_refit  # Return cut data for further processing
 
 
 def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
@@ -572,14 +632,14 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 plt.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
 #                 divider = make_axes_locatable(plt.gca())
 #                 cax = divider.append_axes("right", size="5%", pad=0.1)
-#                 z_max = np.amax(data)
+#                 z_max = np.max(data)
 #                 plt.colorbar(im, cax=cax, ticks=np.linspace(start=0, stop=z_max, num=9, endpoint=True))
                 output_pdf.savefig()
 
 
 def plot_hit_alignment(title, difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100):
     plt.clf()
-    plt.hist(difference, bins=bins, range=(-1. / 100. * np.amax(particles[:][ref_dut_column]) / 1., 1. / 100. * np.amax(particles[:][ref_dut_column]) / 1.))
+    plt.hist(difference, bins=bins, range=(-1. / 100. * np.max(particles[:][ref_dut_column]) / 1., 1. / 100. * np.max(particles[:][ref_dut_column]) / 1.))
     try:
         plt.yscale('log')
     except ValueError:
@@ -608,13 +668,13 @@ def plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, 
 
 def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, dut_index, output_fig):
     plt.clf()
-    plt.plot([dut_z_col.x, dut_z_col.x], [0., 1.], "--", label="DUT%d, col, z=%1.4f" % (dut_index, dut_z_col.x))
-    plt.plot([dut_z_row.x, dut_z_row.x], [0., 1.], "--", label="DUT%d, row, z=%1.4f" % (dut_index, dut_z_row.x))
-    plt.plot(z, dut_z_col_pos_errors / np.amax(dut_z_col_pos_errors), "-", label="DUT%d, column" % dut_index)
-    plt.plot(z, dut_z_row_pos_errors / np.amax(dut_z_row_pos_errors), "-", label="DUT%d, row" % dut_index)
+    plt.plot([dut_z_col.x, dut_z_col.x], [0., 1.], "--", label="DUT %d, column, z=%1.4f" % (dut_index, dut_z_col.x))
+    plt.plot([dut_z_row.x, dut_z_row.x], [0., 1.], "--", label="DUT %d, row, z=%1.4f" % (dut_index, dut_z_row.x))
+    plt.plot(z, dut_z_col_pos_errors / np.max(dut_z_col_pos_errors), "-", label="DUT %d, column" % dut_index)
+    plt.plot(z, dut_z_row_pos_errors / np.max(dut_z_row_pos_errors), "-", label="DUT %d, row" % dut_index)
     plt.grid()
     plt.legend(loc=1)
-    plt.ylim((np.amin(dut_z_col_pos_errors / np.amax(dut_z_col_pos_errors)), 1.))
+    plt.ylim((np.min(dut_z_col_pos_errors / np.max(dut_z_col_pos_errors)), 1.))
     plt.xlabel('Relative z-position')
     plt.ylabel('Mean squared offset [a.u.]')
     plt.gca().set_yscale('log')
@@ -729,7 +789,7 @@ def plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matr
         plt.ylabel('#')
 
         if plot_log:
-            plt.ylim(1, int(ceil(np.amax(hist) / 10.0)) * 100)
+            plt.ylim(1, int(ceil(np.max(hist) / 10.0)) * 100)
 
         plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
         if fit_ok:
@@ -741,10 +801,10 @@ def plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matr
                 plt.plot([np.median(slopes[:, i]), np.median(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='green', linewidth=2)
                 plt.plot([np.mean(slopes[:, i]), np.mean(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='red', linewidth=2)
             if parName == 'Slope':
-                gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.6f\pm %.6f$\nsigma=$%.6f\pm %.6f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+                gauss_fit_legend_entry = 'Gaussian fit: \nA=$%.1f\pm %.1f$\nmu=$%.6f\pm %.6f$\nsigma=$%.6f\pm %.6f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
             elif parName == 'Offset':
-                gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+                gauss_fit_legend_entry = 'Gaussian fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+            plt.plot(np.arange(np.min(edges[:-1]), np.max(edges[:-1]), 0.1), gauss(np.arange(np.min(edges[:-1]), np.max(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             # plt.plot(np.arange((edges[0]), (edges[-1]), 0.1), gauss(np.arange((edges[0]), (edges[-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         if output_fig is not None:
@@ -772,7 +832,7 @@ def plot_track_slope(i, actual_dut, edges, hist, fit_ok, coeff, gauss, slopes, v
         plt.ylabel('#')
 
         if plot_log:
-            plt.ylim(1, int(ceil(np.amax(hist) / 10.0)) * 100)
+            plt.ylim(1, int(ceil(np.max(hist) / 10.0)) * 100)
 
         plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
         if fit_ok:
@@ -780,38 +840,38 @@ def plot_track_slope(i, actual_dut, edges, hist, fit_ok, coeff, gauss, slopes, v
             plt.plot([np.median(slopes[:, i]), np.median(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='green', linewidth=2)
             plt.plot([np.mean(slopes[:, i]), np.mean(slopes[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(slopes[:, i]), 1.253 * np.std(slopes[:, i]) / float(sqrt(slopes[:, i].shape[0]))), color='red', linewidth=2)
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.6f\pm %.6f$\nsigma=$%.6f\pm %.6f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            plt.plot(np.arange(np.min(edges[:-1]), np.max(edges[:-1]), 0.1), gauss(np.arange(np.min(edges[:-1]), np.max(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
-            
+
         if output_fig is not None:
             output_fig.savefig()
         else:
             plt.show()
 
 
-def plot_residuals(i, actual_dut, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_fig):
+def plot_residuals(i, dut_name, edges, hist, fit_ok, coeff, gauss, difference, var_matrix, output_pdf):
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
         plot_range = (-5 * get_rms_from_histogram(hist, edges), 5. * get_rms_from_histogram(hist, edges))
         plt.xlim(plot_range)
         plt.grid()
-        plt.title('Residuals for DUT %d' % actual_dut)
+        plt.title('Residuals for %s' % dut_name)
         plt.xlabel('Residual Column [um]' if i == 0 else 'Residual Row [um]')
         plt.ylabel('#')
 
         if plot_log:
-            plt.ylim(1, int(ceil(np.amax(hist) / 10.0)) * 100)
+            plt.ylim(1, int(ceil(np.max(hist) / 10.0)) * 100)
 
         plt.bar(edges[:-1], hist, width=(edges[1] - edges[0]), log=plot_log)
         if fit_ok:
             plt.plot([coeff[1], coeff[1]], [0, plt.ylim()[1]], color='red')
             plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
             plt.plot([np.mean(difference[:, i]), np.mean(difference[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='red', linewidth=2)
-            gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
-            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            gauss_fit_legend_entry = 'Gaussian fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (coeff[0], np.absolute(var_matrix[0][0] ** 0.5), coeff[1], np.absolute(var_matrix[1][1] ** 0.5), coeff[2], np.absolute(var_matrix[2][2] ** 0.5))
+            plt.plot(np.arange(np.min(edges[:-1]), np.max(edges[:-1]), 0.1), gauss(np.arange(np.min(edges[:-1]), np.max(edges[:-1]), 0.1), *coeff), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
-        if output_fig is not None:
-            output_fig.savefig()
+        if output_pdf is not None:
+            output_pdf.savefig()
         else:
             plt.show()
 
@@ -837,8 +897,8 @@ def plot_residuals_correlations(i, j, actual_dut, xedges, yedges, x, y, output_f
 
 
 def plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitted, selected_data, fit, pcov, output_fig):
-    f = lambda x: fit[0] + fit[1] * x
-    # f = lambda x: 0*x
+    def f(x, c0, c1):
+        return c0 + c1 * x
     plt.clf()
     plot_range_x = (xedges[0], xedges[-1])
     plt.xlim(plot_range_x)
@@ -852,7 +912,7 @@ def plot_residuals_correlations_fit(i, j, actual_dut, xedges, yedges, mean_fitte
     plt.plot(xedges[selected_data], mean_fitted[selected_data], '-o', Label="data")
     if fit is not None and pcov is not None:
         fit_legend = 'Fit: \np0=$%.6f\pm%.6f$\np1=$%.6f\pm%.6f$\n' % (fit[0], np.absolute(pcov[0][0] ** 0.5), fit[1], np.absolute(pcov[1][1] ** 0.5))
-        plt.plot(xedges, f(xedges), '-', label=fit_legend, linewidth=2)
+        plt.plot(xedges, f(xedges, fit[0], fit[1]), '-', label=fit_legend, linewidth=2)
     plt.legend(loc=0)
     if output_fig is not None:
         output_fig.savefig()
@@ -917,7 +977,7 @@ def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y,
                     fig = Figure()
                     fig.patch.set_facecolor('white')
                     ax = fig.add_subplot(111)
-                    plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
+                    plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="Column [um]", y_axis_title="Row [um]")
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
@@ -941,14 +1001,14 @@ def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y,
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="Column [um]", y_axis_title="Row [um]")
                 fig.tight_layout()
                 output_fig.savefig(fig)
 
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="Column [um]", y_axis_title="Row [um]")
                 fig.tight_layout()
                 output_fig.savefig(fig)
 
@@ -997,7 +1057,7 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
 
                     track_array = in_file_h5.root.TrackCandidates[:]
 
-                    n_bins_charge = int(np.amax(track_array['charge_dut_%d' % actual_dut]))
+                    n_bins_charge = int(np.max(track_array['charge_dut_%d' % actual_dut]))
 
                     x_y_charge = np.column_stack((track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], track_array['charge_dut_%d' % actual_dut]))
                     hit_hist, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(n_bin_x, n_bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
@@ -1009,82 +1069,139 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
                     fig = Figure()
                     fig.patch.set_facecolor('white')
                     ax = fig.add_subplot(111)
-                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
+                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
 
-def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
+def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density_with_hit, efficiency, dut_name, minimum_track_density, plot_range, n_pixels, cut_distance, output_fig, mean_charge_array=None, mask_zero=True, aspect="auto", flip_column=False, flip_row=False):
     # get number of entries for every histogram
-    n_hits_distance_min_array = distance_min_array.count()
-    n_hits_distance_max_array = distance_max_array.count()
+#     n_hits_distance_min_array = distance_min_array.count()
+#     z_max_distance_min_array = np.ma.max(distance_min_array[distance_min_array.nonzero()])
+#     n_hits_distance_max_array = distance_max_array.count()
+#     z_max_distance_max_array = np.ma.max(distance_max_array[distance_max_array.nonzero()])
     n_hits_distance_mean_array = distance_mean_array.count()
+    z_max_distance_mean_array = 2 * np.ma.median(distance_mean_array[distance_mean_array.nonzero()])
     n_hits_hit_hist = np.count_nonzero(hit_hist)
     n_tracks_track_density = np.count_nonzero(track_density)
-    n_tracks_track_density_with_DUT_hit = np.count_nonzero(track_density_with_DUT_hit)
-    n_hits_efficiency = np.count_nonzero(efficiency)
+    n_tracks_track_density_with_DUT_hit = np.count_nonzero(track_density_with_hit)
+    n_hits_efficiency = np.ma.count(efficiency)
 
     # for better readability allow masking of entries that are zero
     if mask_zero:
         hit_hist = np.ma.array(hit_hist, mask=(hit_hist == 0))
         track_density = np.ma.array(track_density, mask=(track_density == 0))
-        track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
+        track_density_with_hit = np.ma.array(track_density_with_hit, mask=(track_density_with_hit == 0))
+
+    extend = np.array(plot_range).flatten()
+    n_pixels_extend = [0.5, n_pixels[0] + 0.5, n_pixels[1] + 0.5, 0.5]
+#     if flip_column:
+#         n_pixels_extend[:2] = [n_pixels[0] - 0.5, -0.5]
+#     if flip_row:
+#         n_pixels_extend[2:] = [n_pixels[1] - 0.5, -0.5]
+#     print n_pixels_extend
+#
+#     fig = Figure()
+#     fig.patch.set_facecolor('white')
+#     ax = fig.add_subplot(111)
+#     plot_2d_pixel_hist(fig, ax, distance_min_array.T, extend, title='Minimal distance for %s (%d Hits)' % (dut_name, n_hits_distance_min_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_distance_min_array, aspect=aspect)
+#     fig.tight_layout()
+#     output_fig.savefig(fig)
+#
+#     fig = Figure()
+#     fig.patch.set_facecolor('white')
+#     ax = fig.add_subplot(111)
+#     plot_2d_pixel_hist(fig, ax, distance_max_array.T, extend, title='Maximal distance for %s (%d Hits)' % (dut_name, n_hits_distance_max_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_distance_max_array, aspect=aspect)
+#     fig.tight_layout()
+#     output_fig.savefig(fig)
+
+# use r'$\mathrm{Histogram\ of\ IQ:}\ \mu=100,\ \sigma=15$'
+
+    if mean_charge_array is not None:
+        z_max_mean_charge_array = 2 * np.ma.median(mean_charge_array)
+        fig = Figure()
+        fig.patch.set_facecolor('white')
+        ax = fig.add_subplot(111)
+        plot_2d_pixel_hist(fig, ax, mean_charge_array.T, extend, title='Mean charge for %s (%d Hits)' % (dut_name, n_hits_distance_mean_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_mean_charge_array, aspect=aspect)
+        fig.tight_layout()
+        output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, extend, title='Mean distance for %s (%d Hits)' % (dut_name, n_hits_distance_mean_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_distance_mean_array, aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, hit_hist.T, extend, title='Density of hits for %s (%d Hits)' % (dut_name, n_hits_hit_hist), x_axis_title="Column [um]", y_axis_title="Row [um]", aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
+    plot_2d_pixel_hist(fig, ax, track_density.T, extend, title='Density of tracks for %s (%d Tracks)' % (dut_name, n_tracks_track_density), x_axis_title="Column [um]", y_axis_title="Row [um]", aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density_with_hit.T, extend, title='Density of tracks with hits for %s (%d Tracks)' % (dut_name, n_tracks_track_density_with_DUT_hit), x_axis_title="Column [um]", y_axis_title="Row [um]", aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, efficiency.T, extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=np.min(efficiency), z_max=100.0, aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
+
+    efficiency_flipped = efficiency.copy()
+    if flip_column:
+        efficiency_flipped = np.flipud(efficiency)
+    if flip_row:
+        efficiency_flipped = np.fliplr(efficiency)
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, efficiency_flipped.T, n_pixels_extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column", y_axis_title="Row", z_min=np.min(efficiency), z_max=100.0, aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
 
     fig = Figure()
+    FigureCanvas(fig)
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=np.amin(efficiency), z_max=100.)
+    ax.grid()
+    ax.set_title('Efficiency per bin for %s: %.2f' % (dut_name, np.ma.mean(efficiency)))
+    ax.set_xlabel('Efficiency [%]')
+    ax.set_ylabel('#')
+    ax.set_yscale('log')
+    ax.set_xlim(0, 101)
+    ax.hist(efficiency.compressed(), bins=101, range=(0, 101))  # Histogram not masked pixel efficiency
+    output_fig.savefig(fig)
+    if (efficiency > 100).any():
+        raise Exception("Efficiency greater than 100%")
+
+
+def plot_efficiency_with_masked_pixels(efficiency, n_pixels, dut_name, output_fig, masked_positions, aspect="auto", flip_column=False, flip_row=False):
+    efficiency_flipped = efficiency.copy()
+    if flip_column:
+        efficiency_flipped = np.flipud(efficiency)
+    if flip_row:
+        efficiency_flipped = np.fliplr(efficiency)
+    n_pixels_extend = [0.5, n_pixels[0] + 0.5, n_pixels[1] + 0.5, 0.5]
+    n_hits_efficiency = np.ma.count(efficiency)
+    fig = Figure()
+    fig.patch.set_facecolor('white')
+    ax = fig.add_subplot(111)
+    ax.plot(masked_positions[1], masked_positions[0], 'ro', mfc='none', mec='r', ms=10)
+    plot_2d_pixel_hist(fig, ax, efficiency_flipped.T, n_pixels_extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column", y_axis_title="Row", z_min=np.min(efficiency), z_max=100.0, aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
-
-    plt.clf()
-    plt.grid()
-    plt.title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
-    plt.xlabel('Efficiency [%]')
-    plt.ylabel('#')
-    plt.yscale('log')
-    plt.xlim([-0.5, 101.5])
-    plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
-    output_fig.savefig()

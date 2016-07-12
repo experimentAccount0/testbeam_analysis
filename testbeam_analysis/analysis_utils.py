@@ -23,17 +23,14 @@ def merge_on_event_number(data_1, data_2):
         df.dropna(inplace=True)
     But results in 4 x faster code.
 
-    Parameter
-    --------
-
+    Parameters
+    ----------
     data_1, data_2: np.recarray with event_number column
 
     Returns
     -------
-
     Tuple np.recarray, np.recarray
         Is the data_1, data_2 array extended by the permutations.
-
     """
     result_array_size = 0
     event_index_data_2 = 0

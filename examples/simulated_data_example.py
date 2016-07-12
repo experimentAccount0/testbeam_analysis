@@ -50,6 +50,14 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # The simulated data files, one file per DUT
     data_files = [r'simulated_data_DUT%d.h5' % i for i in range(simulate_data.n_duts)]
 
+    # Dimensions
+    pixel_size = [(50, 50), (50, 50), (50, 50), (50, 50), (50, 50), (50, 50)]  # in um
+    n_pixel = [(1000, 1000), (1000, 1000), (1000, 1000), (1000, 1000), (1000, 1000), (1000, 1000)]
+    z_positions = [0, 10000, 20000, 30000, 40000, 50000]  # in um
+    dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
+
+    output_folder = ''  # define a folder where all output data and plots are stored
+
     # The following shows a complete test beam analysis by calling the separate function in correct order
 
     # Cluster hits off all DUTs
@@ -59,7 +67,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'max_y_distance': 1,
         'max_time_distance': 2,
         'max_cluster_hits':1000,
-        "dut_name": data_files[i]} for i in range(len(data_files))]
+        "dut_name": dut_names[i]} for i in range(len(data_files))]
+
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
@@ -69,14 +78,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Correlate the row / column of each DUT
     dut_alignment.correlate_hits(input_hits_files=data_files,
                                  output_correlation_file='Correlation.h5',
-                                 n_pixels=simulate_data.dut_n_pixel)
+                                 n_pixels=simulate_data.dut_n_pixel,
+                                 dut_names=dut_names)
 
     # Create alignment data for the DUT positions to the first DUT from the correlation data
     # When needed, set offset and error cut for each DUT as list of tuples
     dut_alignment.coarse_alignment(input_correlation_file='Correlation.h5',
                                    output_alignment_file='Alignment.h5',
                                    pixel_size=simulate_data.dut_pixel_size,
-                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
+                                   non_interactive=True,  # Tries to find cuts automatically; use False to do this manually
+                                   dut_names=dut_names)
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
@@ -92,9 +103,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file='TrackCandidates.h5',
                               output_tracks_file='Tracks.h5',
-                              output_pdf='Tracks.pdf',
                               z_positions=simulate_data.z_positions,
-                              include_duts=[-3, -2, -1, 1, 2, 3],
+                              fit_selection=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
@@ -112,12 +122,13 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     result_analysis.calculate_efficiency(input_tracks_file='Tracks.h5',
-                                         output_pdf='Efficiency.pdf',
+                                         input_alignment_file='Alignment.h5',
+                                         output_efficiency_file='Efficiency.h5',
                                          z_positions=simulate_data.z_positions,
-                                         bin_size=(50, 50),
+                                         pixel_size=simulate_data.dut_pixel_size,
+                                         n_pixels=simulate_data.dut_n_pixel,
+                                         bin_size=[(50, 50)] * len(dut_names),
                                          minimum_track_density=2,
                                          use_duts=None,
                                          cut_distance=None,
-                                         max_distance=500,
-                                         col_range=None,
-                                         row_range=None)
+                                         max_distance=500)

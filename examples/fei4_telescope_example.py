@@ -59,7 +59,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                    pixel_size=pixel_size,
                                    dut_names=dut_names,
-                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
+                                   non_interactive=True)  # Tries to find cuts automatically; use False to do this manually
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
@@ -79,10 +79,9 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                              output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
                               z_positions=z_positions,
                               fit_duts=[0, 1, 2, 3],
-                              include_duts=[-3, -2, -1, 1, 2, 3],
+                              fit_selection=[-3, -2, -1, 1, 2, 3],
                               track_quality=1)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
@@ -116,12 +115,13 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Calculate the efficiency and mean hit/track hit distance
     # When needed, set included column and row range for each DUT as list of tuples
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                                         output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
+                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                         output_efficiency_file=os.path.join(output_folder, 'Efficiency.h5'),
                                          z_positions=z_positions,
-                                         bin_size=(250, 50),
+                                         pixel_size=pixel_size,
+                                         n_pixels=pixel_size,
+                                         bin_size=pixel_size,
                                          minimum_track_density=2,
                                          use_duts=None,
                                          cut_distance=500,
-                                         max_distance=500,
-                                         col_range=(1250, 17500),
-                                         row_range=(1000, 16000))
+                                         max_distance=500)

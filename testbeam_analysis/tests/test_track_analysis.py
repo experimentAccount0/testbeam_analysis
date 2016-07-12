@@ -50,10 +50,9 @@ class TestTrackAnalysis(unittest.TestCase):
     def test_track_fitting(self):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder + 'TrackCandidates_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder + 'Tracks.h5'),
-                                  output_pdf_file=os.path.join(self.output_folder + 'Tracks.pdf'),
                                   z_positions=self.z_positions,
                                   fit_duts=None,
-                                  include_duts=[-3, -2, -1, 1, 2, 3],
+                                  fit_selection=[-3, -2, -1, 1, 2, 3],
                                   ignore_duts=None,
                                   track_quality=1,
                                   use_correlated=False)

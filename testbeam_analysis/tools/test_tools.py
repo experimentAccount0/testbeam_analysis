@@ -92,7 +92,7 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
     with tb.open_file(first_file, 'r') as first_h5_file:
         with tb.open_file(second_file, 'r') as second_h5_file:
             n_expected_nodes = sum(1 for _ in enumerate(first_h5_file.root)) if expected_nodes is None else expected_nodes  # set the number of expected nodes
-            n_nodes = sum(1 for _ in enumerate(second_h5_file.root))  # calculated the number of nodes
+            n_nodes = len(second_h5_file.list_nodes("/"))
             if n_nodes != n_expected_nodes:
                 checks_passed = False
                 error_msg += 'The number of nodes in the file is wrong.\n'

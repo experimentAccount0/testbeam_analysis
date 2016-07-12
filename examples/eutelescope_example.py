@@ -42,14 +42,15 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
     # Remove hot pixel, only needed for devices wih noisy pixel like Mimosa 26
+
     kwargs = [{
         'input_hits_file': data_files[i],
         'n_pixel': n_pixels[i],
         'pixel_size': pixel_size[i],
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwarg)
+    multiple_results = [pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwargs[i]) for i in range(len(data_files))]
+    noisy_pixels_files = [res.get() for res in multiple_results]
     pool.close()
     pool.join()
 
@@ -62,13 +63,13 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
         'max_cluster_hits': 1000000,
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
-    for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
+    multiple_results = [pool.apply_async(hit_analysis.cluster_hits, kwds=kwargs[i]) for i in range(len(data_files))]
+    noisy_pixels_cluster_files = [res.get() for res in multiple_results]
     pool.close()
     pool.join()
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_hits(input_hits_files=[data_file[:-3] + '_noisy_pixels.h5' for data_file in data_files],
+    dut_alignment.correlate_hits(input_hits_files=noisy_pixels_files,
                                  output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                  n_pixels=n_pixels,
                                  pixel_size=pixel_size,
@@ -80,10 +81,10 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                    output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                    pixel_size=pixel_size,
                                    dut_names=dut_names,
-                                   non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
+                                   non_interactive=True)  # Tries to find cuts automatically; use False to do this manually
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+    dut_alignment.merge_cluster_data(noisy_pixels_cluster_files,
                                      input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                      output_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
                                      pixel_size=pixel_size)
@@ -96,10 +97,9 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                              output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
                               z_positions=z_positions,
                               fit_duts=[1, 2, 3, 4],  # Fit tracks for all DUTs
-                              include_duts=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
+                              fit_selection=[-1, 1],  # Use only the DUT before and after the actual DUT for track fitting / interpolation
                               ignore_duts=None,
                               track_quality=2)
 
