@@ -1,6 +1,22 @@
 '''Example script to run a full analysis on telescope data. The original data can be found in the example folder of the EuTelescope framework.
-The telescope consists of 6 planes with 15 cm clearance between the planes. The residual for the second plane (DUT 1) is about 8 um and comparable
-to the residuals from EuTelescope software (6 um).
+
+The residuals are calculated with different cuts on prealigned and aligned data for demonstration purpose:
+
+When only prealigning the DUTs and using all DUT hits and cutting on the chi2:
+The residuals are very dependent if the prealignment is sufficient. Residuals usually rather high (several 10 um)
+
+When aligning the DUTs and only interpolating the tracks from 2 DUTs:
+The residual for the planes 2 - 4 (DUT 1 - DUT 3) are about 6.5 um in x/y and comparable to the residuals from the EuTelescope software (6 um).
+
+When aligning the DUTs and using all DUT hits and cutting on the chi2:
+The residuals and selected number of tracks are highly dependent on the chi2 cut and are at least 6 um and usually < 10 um depending on the plane position.
+This is an effect of multiple scattering. The outer most plans have a rather high residual (~ 18 um)
+
+
+SETUP:
+
+The telescope consists of 6 planes with 15 cm clearance between the planes.
+The data was taken at Desy with ~ 3-4 GeV/c (to be checked). 
 
 The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
 The total size of the chip is 21.5mm x 13.7mm x 0.036mm (radiation length 9.3660734)
@@ -39,8 +55,10 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # z position in um
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")  # Friednly names for plotting
 
-    # Folder where all output data and plots are stored
-    output_folder = os.path.split(data_files[0])[0]
+    # Create output subfolder where all output data and plots are stored
+    output_folder = os.path.split(data_files[0])[0] + r'\output'
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
@@ -114,7 +132,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                               output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                               exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
                               force_prealignment=True,  # This is just for demonstration purpose, you usually fully aligned hits
-                              selection_track_quality=1)
+                              selection_track_quality=0)  # We will cut on chi2
 
     # Step 2.:  Calculate the residuals to check the alignment (using the prealignment!)
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
@@ -122,16 +140,14 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                         output_residuals_file=os.path.join(output_folder, 'Residuals_prealigned.h5'),
                                         n_pixels=n_pixels,
                                         pixel_size=pixel_size,
-                                        use_duts=None,
-                                        force_prealignment=True,  # This is just for demonstration purpose, you usually use fully aligned hits
-                                        max_chi2=None)
+                                        max_chi2=2000,
+                                        force_prealignment=True)  # This is just for demonstration purpose, you usually use fully aligned hits
 
     # Do an alignment step with the track candidates, corrects rotations and is therefore much more precise than simple prealignment
     dut_alignment.alignment(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealignment.h5'),
                             input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                             n_pixels=n_pixels,
-                            pixel_size=pixel_size,
-                            align_duts=[0, 1, 2, 4, 5])
+                            pixel_size=pixel_size)
 
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
@@ -143,15 +159,38 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
+    # Example 1: use all DUTs in fit and cut on chi2
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                              output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+                              output_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
                               exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
-                              selection_track_quality=1)
+                              selection_track_quality=0)    # We do not cut on track quality but on chi2 later
 
     # Create unconstrained residuals
-    result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+    result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                        output_residuals_file=os.path.join(output_folder, 'Residuals.h5'),
+                                        output_residuals_file=os.path.join(output_folder, 'Residuals_all.h5'),
+                                        max_chi2=500,  # The chi2 cut has a large influence on the residuals and number of tracks, since the resolution is dominated by multiple scattering
+                                        n_pixels=n_pixels,
+                                        pixel_size=pixel_size)
+
+    # Example 2: Use only 2 DUTs next to the fit DUT and cut on track quality. Thus the track fit is just a track interpolation with chi2 = 0.
+    # This is better here due to heavily scatterd tracks, where a straight line assumption for all DUTs is wrong.
+    # This leads to symmetric residuals in x and y for all DUTs between 2 fits DUTs: 1, 2, 3, 4
+    track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
+                              input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                              output_tracks_file=os.path.join(output_folder, 'Tracks_some.h5'),
+                              selection_hit_duts=[[1, 2],  # Only select DUTs next to the DUT to fit
+                                                  [0, 2],
+                                                  [1, 3],
+                                                  [2, 4],
+                                                  [3, 5],
+                                                  [3, 4]],
+                              selection_track_quality=1)    # We cut on track quality
+
+    # Create unconstrained residuals
+    result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks_some.h5'),
+                                        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                        output_residuals_file=os.path.join(output_folder, 'Residuals_some.h5'),
                                         n_pixels=n_pixels,
                                         pixel_size=pixel_size)
