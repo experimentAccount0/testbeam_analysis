@@ -133,7 +133,7 @@ class TestHitAnalysis(unittest.TestCase):
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
-    def test_alignment(self):  # Create fake data with known angles and reconstruct the angles from the residuals and check for similarity
+    def test_rotation_reconstruction(self):  # Create fake data with known angles and reconstruct the angles from the residuals and check for similarity. Does only work for the abolute annge not with sign.
 
         def create_track_intersections(alpha, beta, gamma, x_global, y_global):  # Create fake data
 
