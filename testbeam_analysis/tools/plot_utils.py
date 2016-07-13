@@ -593,10 +593,8 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
 def plot_track_chi2(chi2s, fit_dut, output_fig):
     # Plot track chi2 and angular distribution
     plt.clf()
-    plot_range = (0, 40000)
-    plt.hist(chi2s, bins=200, range=plot_range)
+    plt.hist(chi2s, bins=200)
     plt.grid()
-    plt.xlim(plot_range)
     plt.xlabel('Track Chi2 [um*um]')
     plt.ylabel('#')
     plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
@@ -606,8 +604,8 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
 def plot_residuals(histogram, fit, fit_errors, x_label, title, output_fig=None):
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
-        plot_range = (analysis_utils.get_mean_from_histogram(histogram[0], histogram[1][:-1]) - 2 * analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]), 
-                      analysis_utils.get_mean_from_histogram(histogram[0], histogram[1][:-1]) + 2 * analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]))
+        plot_range = (analysis_utils.get_mean_from_histogram(histogram[0], histogram[1][:-1]) - 5 * analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]), 
+                      analysis_utils.get_mean_from_histogram(histogram[0], histogram[1][:-1]) + 5 * analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]))
         plt.xlim(plot_range)
         plt.grid()
         plt.title(title)
