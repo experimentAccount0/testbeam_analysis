@@ -109,26 +109,6 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 tracklets_data_chunk['track_quality'] = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
                 # Perform the track finding with jitted loop
-                
-#                 n_slices = cpu_count()
-#                 slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
-#                 slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
-#                 pool = Pool(n_slices)
-#                 results = pool.map(_fit_tracks_loop, slices)
-#                 pool.close()
-#                 pool.join()
-#                 del track_hits
-#                 
-#                 
-#                 n_slices = cpu_count()
-#                 process = Process(target=_find_tracks_loop, args=(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance))
-#                 for p in processes:
-#                     p.start()
-#                 for p in processes:
-#                     p.join()
-                
-                
-                
                 _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance)
 
                 # Merge result data from arrays into one recarray
@@ -339,7 +319,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             info_str_fit += 'DUT%d ' % (selected_fit_dut)
 
         if all_duts:
-            logging.info('Fit tracks for all DUTs, will lead to constrained residuals!')
+            logging.info('Fit tracks for all DUTs at the same time!')
 
         logging.info('Use %d DUTs for track selection: %s', bin(dut_selection).count("1"), info_str_hit)
         logging.info("Use %d DUTs for track fit: %s", bin(dut_fit_selection).count("1"), info_str_fit)
