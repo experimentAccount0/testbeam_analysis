@@ -465,13 +465,49 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     return hits_x, hits_y, hits_z
 
 
+def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', select_duts=None):
+    selection = np.ones(old_alignment.shape[0], dtype=np.bool)
+
+    if select_duts:
+        for index in range(selection.shape[0]):
+            if index not in select_duts:
+                selection[index] = False
+
+    if mode == 'absolute':
+        logging.info('Set alignment')
+        old_alignment[selection] = new_alignment[selection]
+        return old_alignment
+    else:
+        logging.info('Merge new alignment with old alignment')
+
+        alignment_parameters = old_alignment
+        alignment_parameters['translation_x'][selection] += new_alignment['translation_x'][selection]
+        alignment_parameters['translation_y'][selection] += new_alignment['translation_y'][selection]
+        alignment_parameters['translation_z'][selection] += new_alignment['translation_z'][selection]
+
+        alignment_parameters['alpha'][selection] += new_alignment['alpha'][selection]
+        alignment_parameters['beta'][selection] += new_alignment['beta'][selection]
+        alignment_parameters['gamma'][selection] += new_alignment['gamma'][selection]
+
+        # TODO: Is this always a good idea? Usually works, but what if one heavily tilted device?
+        # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
+        if np.count_nonzero(selection) > 1:
+            alignment_parameters['alpha'][selection] -= np.mean(alignment_parameters['alpha'][selection])
+            alignment_parameters['beta'][selection] -= np.mean(alignment_parameters['beta'][selection])
+            alignment_parameters['gamma'][selection] -= np.mean(alignment_parameters['gamma'][selection])
+            alignment_parameters['translation_x'][selection] -= np.mean(alignment_parameters['translation_x'][selection])
+            alignment_parameters['translation_y'][selection] -= np.mean(alignment_parameters['translation_y'][selection])
+
+        return alignment_parameters
+
+
 def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', select_duts=None):
     ''' Stores the alignment parameters (rotations, translations) into the alignment file.
     Absolute (overwriting) and relative mode (add angles, translations) is supported.
- 
+
     Paramter:
     --------
- 
+
     alignment_file : pytables file
         The pytables file with the alignment
     alignment_parameters : numpy recarray
@@ -481,64 +517,34 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
     use_duts : iterable
         In relative mode only change specified DUTs
     '''
- 
+
     if 'absolute' not in mode and 'relative' not in mode:
         raise RuntimeError('Mode %s is unknown', str(mode))
- 
+
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
         alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from prealignment
         try:
             alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             alignment_table.append(alignment_parameters)
         except tb.NodeError:
-            if mode == 'absolute':
-                logging.warning('Overwrite existing alignment!')
-                out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
-                alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                alignment_table.append(alignment_parameters)
-            else:
-                logging.info('Merge new alignment with old alignment')
-                old_alignment = out_file_h5.root.Alignment[:]
-                selection = np.ones(old_alignment.shape[0], dtype=np.bool)
- 
-                print 'select_duts', select_duts
-                if select_duts:
-                    for index in range(selection.shape[0]):
-                        if index not in select_duts:
-                            selection[index] = False
+            alignment_parameters = merge_alignment_parameters(old_alignment=out_file_h5.root.Alignment[:],
+                                                              new_alignment=alignment_parameters,
+                                                              mode=mode,
+                                                              select_duts=select_duts)
 
-                print 'selection', selection
-                print 'alignment_parameters', alignment_parameters
- 
-                out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
-                alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                new_alignment = old_alignment
-                new_alignment['translation_x'][selection] += alignment_parameters['translation_x'][selection]
-                new_alignment['translation_y'][selection] += alignment_parameters['translation_y'][selection]
-                new_alignment['translation_z'][selection] += alignment_parameters['translation_z'][selection]
- 
-                new_alignment['alpha'][selection] += alignment_parameters['alpha'][selection]
-                new_alignment['beta'][selection] += alignment_parameters['beta'][selection]
-                new_alignment['gamma'][selection] += alignment_parameters['gamma'][selection]
- 
-                # TODO: Is this always a good idea? Usually works, but what if one heavily tilted device?
-                # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
-                if np.count_nonzero(selection) > 1:
-                    new_alignment['alpha'][selection] -= np.mean(new_alignment['alpha'][selection])
-                    new_alignment['beta'][selection] -= np.mean(new_alignment['beta'][selection])
-                    new_alignment['gamma'][selection] -= np.mean(new_alignment['gamma'][selection])
-                    new_alignment['translation_x'][selection] -= np.mean(new_alignment['translation_x'][selection])
-                    new_alignment['translation_y'][selection] -= np.mean(new_alignment['translation_y'][selection])
- 
-                logging.info('Change translation to:')
-                string = '\n\n'
-                for dut_values in new_alignment:
-                    string += 'DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um\n' % (dut_values['DUT'],
-                                                                                                        dut_values['alpha'],
-                                                                                                        dut_values['beta'],
-                                                                                                        dut_values['gamma'],
-                                                                                                        dut_values['translation_x'],
-                                                                                                        dut_values['translation_y'],
-                                                                                                        dut_values['translation_z'])
-                logging.info(string)
-                alignment_table.append(new_alignment)
+            logging.info('Overwrite existing alignment!')
+            out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
+            alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            alignment_table.append(alignment_parameters)
+
+        logging.info('Set alignment to:')
+        string = '\n\n'
+        for dut_values in alignment_parameters:
+            string += 'DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um\n' % (dut_values['DUT'],
+                                                                                                dut_values['alpha'],
+                                                                                                dut_values['beta'],
+                                                                                                dut_values['gamma'],
+                                                                                                dut_values['translation_x'],
+                                                                                                dut_values['translation_y'],
+                                                                                                dut_values['translation_z'])
+        logging.info(string)
