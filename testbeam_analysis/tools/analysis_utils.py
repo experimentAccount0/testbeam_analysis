@@ -648,14 +648,7 @@ def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
     position_residual_fit_x = hist_position_residual[1][:-1][selection]
     position_residual_fit_y = hist_position_residual[0][selection]
     position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
-    try:
-        position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
-    except TypeError:
-        print 'positions', positions
-        print 'min_pos, max_pos', min_pos, max_pos
-        print residuals
-        print 'NHITS', n_hits_threshold.sum()
-        print position_residual_fit_x
-        print position_residual_fit_y
-        print position_residual_fit_y_err
+
+    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
+
     return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
