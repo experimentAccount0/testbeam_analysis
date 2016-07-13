@@ -556,26 +556,27 @@ def fwhm(x, y, k=10):  # http://stackoverflow.com/questions/10582795/finding-the
         return roots[0], roots[1]
 
 
-def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy):
+def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, beta_inverted=None):
 #     print 'm_xx, m_xy, m_yx, m_yy', m_xx, m_xy, m_yx, m_yy
 
-    alpha_inverted = False
-    beta_inverted = False
-
     if np.abs(m_xy) > 1. or np.abs(m_yx) > 1.:
-        raise NotImplementedError('Device seems to be heavilty tilted in gamma. This is not supported.')
+        raise NotImplementedError('Device seems to be heavily tilted in gamma. This is not supported.')
 
     # Detect device rotation around y-axis (beta angle)
-    if m_yy < -1.:
+    if m_yy < -1. or alpha_inverted:
         logging.info('Device most likely inverted in beam around the x axis (y coordinates switched)!')
         alpha_inverted = True
         m_yy = 2 + m_yy
+    else:
+        alpha_inverted = False
 
     # Detect device rotation around y-axis (beta angle)
     if m_xx < -1.:
         logging.info('Device most likely inverted in beam around the y axis (x coordinates switched)!')
         beta_inverted = True
         m_xx = 2 + m_xx
+    else:
+        beta_inverted = False
 
     # Sanity checks
     if m_xx < -2:
@@ -640,14 +641,21 @@ def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
     def line(x, c0, c1):
         return c0 + c1 * x
 
-    hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins, range=(min_pos, max_pos))
-    hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins, range=(min_pos, max_pos))
+    hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
+    hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins)
     n_hits_threshold = np.percentile(hist_position_residual_count[0], 100 - 68.3)  # Simple threshold, take bins with 1 sigma of the data
     selection = np.logical_and(hist_position_residual_count[0] >= n_hits_threshold, np.isfinite(hist_position_residual[0]))
     position_residual_fit_x = hist_position_residual[1][:-1][selection]
     position_residual_fit_y = hist_position_residual[0][selection]
     position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
-
-    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
-
+    try:
+        position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
+    except TypeError:
+        print 'positions', positions
+        print 'min_pos, max_pos', min_pos, max_pos
+        print residuals
+        print 'NHITS', n_hits_threshold.sum()
+        print position_residual_fit_x
+        print position_residual_fit_y
+        print position_residual_fit_y_err
     return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
