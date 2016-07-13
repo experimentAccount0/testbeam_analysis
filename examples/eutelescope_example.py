@@ -147,7 +147,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                               exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
-                              track_quality=1)
+                              selection_track_quality=1)
 
     # Create unconstrained residuals
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
