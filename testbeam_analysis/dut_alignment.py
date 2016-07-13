@@ -719,7 +719,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                               plot_title_praefix=plot_title_praefix)
 
             os.remove(reduced_track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration)
-            logging.info('Total residual %1.2e', new_total_residual)
+            logging.info('Total residual %1.4e', new_total_residual)
 
             if total_residual and new_total_residual > total_residual:  # True if actual alignment is worse than last iteration
                 logging.info('!! Best alignment found !!')
@@ -731,10 +731,11 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                 return
             else:
                 total_residual = new_total_residual
-                with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-                    alignment_last_iteration = in_file_h5.root.Alignment[:]
 
-            logging.info('= Alignment step 5/ iteration %d: Set rotation information in alignment file =', iteration)
+            with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+                alignment_last_iteration = in_file_h5.root.Alignment[:]
+
+            logging.info('= Alignment step 5/ iteration %d: Set new rotation / translation information in alignment file =', iteration)
             geometry_utils.store_alignment_parameters(input_alignment_file,
                                                       new_alignment_parameters,
                                                       mode='relative',
@@ -801,11 +802,11 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                     pixel_size=pixel_size,
                                     output_pdf=output_pdf,
                                     chunk_size=chunk_size)
-#                 os.remove(input_track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index)
+                os.remove(input_track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.pdf' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index)
-#                 os.remove(input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index)
+                os.remove(input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index)
 
     # Open the prealignment and create empty alignment info (at the beginning only the z position is set)
