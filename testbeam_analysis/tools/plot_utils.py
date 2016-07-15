@@ -619,7 +619,7 @@ def plot_residuals(histogram, fit, fit_errors, x_label, title, output_fig=None):
 
         plt.bar(histogram[1][:-1], histogram[0], width=(histogram[1][1] - histogram[1][0]), log=plot_log, align='edge')
         if np.any(fit):
-            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='RMS %d um' % analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]))
+            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram[0].sum(), analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1])))
 #             plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
 #             plt.plot([np.mean(difference[:, i]), np.mean(difference[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='red', linewidth=2)
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (fit[0], np.absolute(fit_errors[0][0] ** 0.5), fit[1], np.absolute(fit_errors[1][1] ** 0.5), np.absolute(fit[2]), np.absolute(fit_errors[2][2] ** 0.5))
@@ -806,30 +806,19 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
-
-def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
+def plot_track_distances(distance_min_array, distance_max_array, distance_mean_array, actual_dut, plot_range, cut_distance, output_fig):
     # get number of entries for every histogram
     n_hits_distance_min_array = distance_min_array.count()
     n_hits_distance_max_array = distance_max_array.count()
     n_hits_distance_mean_array = distance_mean_array.count()
-    n_hits_hit_hist = np.count_nonzero(hit_hist)
-    n_tracks_track_density = np.count_nonzero(track_density)
-    n_tracks_track_density_with_DUT_hit = np.count_nonzero(track_density_with_DUT_hit)
-    n_hits_efficiency = np.count_nonzero(efficiency)
-
-    # for better readability allow masking of entries that are zero
-    if mask_zero:
-        hit_hist = np.ma.array(hit_hist, mask=(hit_hist == 0))
-        track_density = np.ma.array(track_density, mask=(track_density == 0))
-        track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
-
+    
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_fig.savefig(fig)
-
+    
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
@@ -843,6 +832,20 @@ def efficiency_plots(distance_min_array, distance_max_array, distance_mean_array
     plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
     fig.tight_layout()
     output_fig.savefig(fig)
+
+
+def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
+    # get number of entries for every histogram
+    n_hits_hit_hist = np.count_nonzero(hit_hist)
+    n_tracks_track_density = np.count_nonzero(track_density)
+    n_tracks_track_density_with_DUT_hit = np.count_nonzero(track_density_with_DUT_hit)
+    n_hits_efficiency = np.count_nonzero(efficiency)
+
+    # for better readability allow masking of entries that are zero
+    if mask_zero:
+        hit_hist = np.ma.array(hit_hist, mask=(hit_hist == 0))
+        track_density = np.ma.array(track_density, mask=(track_density == 0))
+        track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
 
     fig = Figure()
     fig.patch.set_facecolor('white')
