@@ -5,6 +5,7 @@ import logging
 from multiprocessing import Pool, cpu_count
 from math import sqrt
 import progressbar
+import os
 
 import tables as tb
 import numpy as np
@@ -203,18 +204,27 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     if not isinstance(selection_fit_duts, list):
         selection_fit_duts = [selection_hit_duts for _ in range(n_duts)]
 
-    # Convert potenital selection valied for all duts to required selection for each DUT
-    if not isinstance(selection_hit_duts[0], list):
+    # Convert potential selection valid for all duts to required selection for each DUT
+    try:
+        iter(selection_hit_duts[0])
+    except TypeError:  # not iterable
         selection_hit_duts = [selection_hit_duts for _ in range(n_duts)]
-    if not isinstance(selection_fit_duts[0], list):
+    try:
+        iter(selection_fit_duts[0])
+    except:
         selection_fit_duts = [selection_fit_duts for _ in range(n_duts)]
-    if not isinstance(selection_track_quality[0], list):
+    try:
+        iter(selection_track_quality[0])
+    except:
         selection_track_quality = [selection_track_quality for _ in range(n_duts)]
 
     if len(selection_hit_duts) != len(selection_track_quality):
         raise ValueError('The length of the hit dut selection has to be equal to the quality selection!')
 
+    print('selection_hit_duts', selection_hit_duts)
+    print('selection_fit_duts', selection_fit_duts)
     for (sel_1, sel_2) in zip(selection_hit_duts, selection_fit_duts):
+        print('sel_1, sel_2', sel_1, sel_2)
         if not all(x in sel_1 for x in sel_2):
             raise NotImplementedError('All DUTs defined in selection_fit_duts have to be defined in selection_hit_duts!')
 
