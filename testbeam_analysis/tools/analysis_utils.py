@@ -546,7 +546,7 @@ def fwhm(x, y, k=10):  # http://stackoverflow.com/questions/10582795/finding-the
     s = splrep(x, y - half_max)
     roots = sproot(s)
 
-    if len(roots) > 2 or len(roots) < 2:
+    if len(roots) != 2:
         raise RuntimeError("Cannot determine FWHM")
     else:
         return roots[0], roots[1]
