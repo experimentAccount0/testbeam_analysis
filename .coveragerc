@@ -9,6 +9,6 @@ exclude_lines =
 
 omit = 
     */__init__.py
-    tests/*
+    testing/*
     converter/*
     tools/*
