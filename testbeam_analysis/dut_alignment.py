@@ -325,11 +325,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 if fit_converged:  # Set start values from last successfull fit, no large difference expected
                     p0 = coeff  # Set start values from last successfull fit
                     bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
-                else:  # No successfull fit so far, try to dedeuce reasonable start values
-                    signal = A_peak[index]
-                    noise = A_background[index]
-                    p0 = [signal, mu_peak[index], A_peak.shape[0] / 30., noise, mu_background[index], A_peak.shape[0] / 3., 0.]
-                    bounds = [[0, 0, 0, 0, 0, 0, 0], [10 * signal, 2 * data.shape[1], data.shape[1], 10 * signal, 2 * data.shape[1], data.shape[1], data.shape[1]]]
+                else:  # No (last) successfull fit, try to dedeuce reasonable start values
+                    p0 = [A_peak[index], mu_peak[index], A_peak.shape[0] / 30., A_background[index], mu_background[index], A_peak.shape[0] / 3., 0.]
+                    bounds = [[0, 0, 0, 0, 0, 0, 0], [10 * A_peak[index], 2 * data.shape[1], data.shape[1], 10 * A_peak[index], 2 * data.shape[1], data.shape[1], data.shape[1]]]
 
                 # Fit correlation
                 if fit_background:  # Describe background with addidional gauss + offset
