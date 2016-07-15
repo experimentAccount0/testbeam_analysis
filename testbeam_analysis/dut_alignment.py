@@ -383,7 +383,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     sigma_fitted[index] = np.abs(coeff[2])
                     chi2[index] = get_chi2(y_data=data[index, :], y_fit=double_gauss_offset(x_hist_fit, *coeff))
 
-            except RuntimeError:  # Can happen, nothing to worry about
+            except RuntimeError:  # curve_fit failed
                 fit_converged = False
 
             # Select correlation fit of beam center to plot
