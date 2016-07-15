@@ -255,13 +255,13 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
     def get_chi2(y_data, y_fit):
         return np.square(y_data - y_fit).sum()
 
-    def signal_sanity_check(coeff, s_n, A_peak):
+    def signal_sanity_check(coeff, signal_noise, A_peak):
         ''' Sanity check if signal was deducted correctly from background. 3 Conditions:
             1. The given signal to noise value has to be fullfilled: S/N > Amplitude Signal / ( Amplidude background + Offset)
             2. The signal + background has to be large enough: Amplidute 1 + Amplitude 2 + Offset > Data maximum / 2
             3. The Signal Sigma has to be smaller than the background sigma, otherwise beam would be larger than one pixel pitch
         '''
-        if coeff[0] < (coeff[3] + coeff[6]) * s_n or coeff[0] + coeff[3] + coeff[6] < A_peak / 2. or coeff[2] > coeff[5] / 2.:
+        if coeff[0] < (coeff[3] + coeff[6]) * signal_noise or coeff[0] + coeff[3] + coeff[6] < A_peak / 2. or coeff[2] > coeff[5] / 2.:
             return False
         return True
 
