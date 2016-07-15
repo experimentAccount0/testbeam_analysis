@@ -3,7 +3,7 @@
 The residuals are calculated with different cuts on prealigned and aligned data for demonstration purpose:
 
 When only prealigning the DUTs and using all DUT hits and cutting on the chi2:
-The residuals are very dependent if the prealignment is sufficient. Residuals usually rather high (several 10 um)
+The residuals are very dependent if the prealignment is sufficient. Residuals are usually rather high (several 10 um)
 
 When aligning the DUTs and only interpolating the tracks from 2 DUTs:
 The residual for the planes 2 - 4 (DUT 1 - DUT 3) are about 6.5 um in x/y and comparable to the residuals from the EuTelescope software (6 um).
@@ -16,7 +16,7 @@ This is an effect of multiple scattering. The outer most plans have a rather hig
 SETUP:
 
 The telescope consists of 6 planes with 15 cm clearance between the planes.
-The data was taken at Desy with ~ 3-4 GeV/c (to be checked). 
+The data was taken at Desy with ~ 3-4 GeV/c (to be checked).
 
 The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
 The total size of the chip is 21.5mm x 13.7mm x 0.036mm (radiation length 9.3660734)
