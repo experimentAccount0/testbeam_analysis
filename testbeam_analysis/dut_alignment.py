@@ -300,7 +300,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         n_entries = np.sum(data, axis=1)
         A_background = np.mean(data, axis=1)
         mu_background = np.zeros_like(n_entries)
-        mu_background[n_entries > 0] = np.average(data, axis=1, weights=range(0, data.shape[1]))[n_entries > 0] * sum(range(0, data.shape[1])) / n_entries[n_entries > 0]
+        mu_background[n_entries > 0] = np.average(data, axis=1, weights=range(1, data.shape[1] + 1))[n_entries > 0] * sum(range(1, data.shape[1] + 1)) / n_entries[n_entries > 0]  # +1 because col/row start at 1
 
         n_cluster_last = 0  # The number of entries of the last converged correlation fit
         coeff = None
