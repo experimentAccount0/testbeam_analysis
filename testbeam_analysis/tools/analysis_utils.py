@@ -93,8 +93,7 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
     But results in > 10 x faster code.
 
     Parameter
-    --------
-
+    ---------
     data_1, data_2: np.recarray with event_number column
     column_corr_hist, row_corr_hist: np.arrays to be filled with correlation data
 
