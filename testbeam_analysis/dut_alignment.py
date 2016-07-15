@@ -27,7 +27,7 @@ from testbeam_analysis import track_analysis
 warnings.simplefilter("ignore", OptimizeWarning)  # Fit errors are handled internally, turn of warnings
 
 
-def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pixel_size, dut_names=None, output_pdf_file=None, chunk_size=4999999):
+def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, output_pdf_file=None, chunk_size=4999999):
     '''Histograms the cluster mean column (row) of two different devices on an event basis. If the cluster means are correlated a line should be seen.
     The cluster means are round to 1 um precision to increase the histogramming speed.
     All permutations are considered (all cluster of the first device are correlated with all cluster of the second device).
