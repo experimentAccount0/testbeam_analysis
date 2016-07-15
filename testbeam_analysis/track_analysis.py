@@ -5,8 +5,6 @@ import logging
 from multiprocessing import Pool, cpu_count
 from math import sqrt
 import progressbar
-import os.path
-
 
 import tables as tb
 import numpy as np
