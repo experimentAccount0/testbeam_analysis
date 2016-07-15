@@ -216,7 +216,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         The output file for correlation data.
     z_positions : iterable
         The positions of the devices in z in um
-    s_n : number
+    s_n : float
         The signal to noise ratio for peak signal over background peak. This should be specified when the background is fitted with a gaussian.
         Usually data with a lot if tracks per event have a gaussian background. The S/N can be guesses by looking at the correlation plot. The std.
         value is usually fine.
