@@ -308,8 +308,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
         for index in np.arange(data.shape[0]):  # Loop over x dimension of correlation histogram
 
-            # Absolutely no correlation is expected at sensor edges, thus omit these
-            if not np.any(data[index, :]):
+            # omit correlation fit with no entries / correlation (e.g. sensor edges, masked columns)
+            if np.all(data[index, :] == 0):
+                logging.warning('No correlation entries for index %d. Omit correlation fit.', index)
                 continue
 
             # If correlation data is < 1 % of last data omit it.
