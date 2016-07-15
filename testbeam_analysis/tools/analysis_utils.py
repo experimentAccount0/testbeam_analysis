@@ -98,28 +98,24 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
     column_corr_hist, row_corr_hist: np.arrays to be filled with correlation data
 
     """
-    event_index_data_2 = 0
-    result_array_size = 0
+    index_data_2 = 0
 
     # Loop to determine the needed result array size
     for index_data_1 in range(data_1.shape[0]):
 
-        while event_index_data_2 < data_2.shape[0] and data_2[event_index_data_2]['event_number'] < data_1[index_data_1]['event_number']:  # Catch up with outer loop
-            event_index_data_2 += 1
+        while index_data_2 < data_2.shape[0] and data_2[index_data_2]['event_number'] < data_1[index_data_1]['event_number']:  # Catch up with outer loop
+            index_data_2 += 1
 
-        for index_data_2 in range(event_index_data_2, data_2.shape[0]):
-            if data_1[index_data_1]['event_number'] == data_2[index_data_2]['event_number']:
-                # Bin cluster positions with 1 um precision
+        for event_index_data_2 in range(index_data_2, data_2.shape[0]):
+            if data_1[index_data_1]['event_number'] == data_2[event_index_data_2]['event_number']:
                 column_index_dut_1 = int(data_1[index_data_1]['mean_column'] - 1.)
                 row_index_dut_1 = int(data_1[index_data_1]['mean_row'] - 1.)
-                column_index_dut_2 = int(data_2[index_data_2]['mean_column'] - 1.)
-                row_index_dut_2 = int(data_2[index_data_2]['mean_row'] - 1.)
+                column_index_dut_2 = int(data_2[event_index_data_2]['mean_column'] - 1.)
+                row_index_dut_2 = int(data_2[event_index_data_2]['mean_row'] - 1.)
 
                 # Add correlation to histogram
                 column_corr_hist[column_index_dut_2, column_index_dut_1] += 1
                 row_corr_hist[row_index_dut_2, row_index_dut_1] += 1
-
-                result_array_size += 1
             else:
                 break
 
