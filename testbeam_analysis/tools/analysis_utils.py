@@ -544,7 +544,7 @@ def fwhm(x, y, k=10):
     See also http://stackoverflow.com/questions/10582795/finding-the-full-width-half-maximum-of-a-peak
     """
 
-    half_max = np.amax(y) / 2.0
+    half_max = np.max(y) / 2.0
     s = splrep(x, y - half_max)
     roots = sproot(s)
 
