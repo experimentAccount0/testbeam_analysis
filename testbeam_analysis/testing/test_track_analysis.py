@@ -18,13 +18,10 @@ class TestTrackAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if os.name != 'nt':
-            try:
-                from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
-                cls.vdisplay = Xvfb()
-                cls.vdisplay.start()
-            except (ImportError, EnvironmentError):
-                pass
+        if os.getenv('TRAVIS', False):
+            from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
+            cls.vdisplay = Xvfb()
+            cls.vdisplay.start()
         cls.output_folder = tests_data_folder
         cls.pixel_size = (250, 50)  # in um
 

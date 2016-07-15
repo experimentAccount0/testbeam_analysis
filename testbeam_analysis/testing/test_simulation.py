@@ -19,13 +19,10 @@ class TestHitAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        if os.name != 'nt':
-            try:
-                from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
-                self.vdisplay = Xvfb()
-                self.vdisplay.start()
-            except (ImportError, EnvironmentError):
-                pass
+        if os.getenv('TRAVIS', False):
+            from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
+            cls.vdisplay = Xvfb()
+            cls.vdisplay.start()
 
         self.simulate_data = simulate_data.SimulateData(0)
         self.simulate_data.n_duts = 6
@@ -303,5 +300,7 @@ class TestHitAnalysis(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
     suite = unittest.TestLoader().loadTestsFromTestCase(TestHitAnalysis)
     unittest.TextTestRunner(verbosity=2).run(suite)
