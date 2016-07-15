@@ -333,19 +333,20 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 if fit_background:  # Describe background with addidional gauss + offset
                     coeff, var_matrix = curve_fit(double_gauss_offset, x_hist_fit, data[index, :], p0=p0, bounds=bounds)
 
+                    fit_converged = True
+
                     if not signal_sanity_check(coeff, s_n, A_peak[index]):
-                        logging.debug('No signal peak found. Try refit.')
-                        # Refit with wrong converged result as starting value
+                        logging.debug('No correlation peak found. Try another fit...')
+                        # Use parameters from last fit as start parameters for the refit
                         y_fit = double_gauss_offset(x_hist_fit, *coeff)
                         coeff, var_matrix = refit_advanced(x_data=x_hist_fit, y_data=data[index, :], y_fit=y_fit, p0=coeff)
 
-                    fit_converged = True
-                    # Check result again:
-                    if not signal_sanity_check(coeff, s_n, A_peak[index]):
-                        logging.debug('No signal peak found in refit!')
-                        fit_converged = False
+                        # Check result again:
+                        if not signal_sanity_check(coeff, s_n, A_peak[index]):
+                            logging.debug('No correlation peak found after refit!')
+                            fit_converged = False
 
-                else:    # Describe background with offset only.
+                else:  # Describe background with offset only.
                     # Do not use the second gauss, thus fix values by redifining fit funtion
                     # http://stackoverflow.com/questions/12208634/fitting-only-one-paramter-of-a-function-with-many-parameters-in-python
                     # Change  start parameters and boundaries
