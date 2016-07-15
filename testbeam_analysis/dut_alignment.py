@@ -399,8 +399,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
     with PdfPages(os.path.join(os.path.dirname(os.path.abspath(output_alignment_file)), 'Prealignment.pdf')) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
-            n_nodes = len(in_file_h5.list_nodes("/")) // 2 + 1
-            result = np.zeros(shape=(n_nodes,), dtype=[('DUT', np.uint8), ('column_c0', np.float), ('column_c0_error', np.float), ('column_c1', np.float), ('column_c1_error', np.float), ('column_sigma', np.float), ('column_sigma_error', np.float), ('row_c0', np.float), ('row_c0_error', np.float), ('row_c1', np.float), ('row_c1_error', np.float), ('row_sigma', np.float), ('row_sigma_error', np.float), ('z', np.float)])
+            n_duts = len(in_file_h5.list_nodes("/")) // 2 + 1  # no correlation for reference DUT0
+            result = np.zeros(shape=(n_duts,), dtype=[('DUT', np.uint8), ('column_c0', np.float), ('column_c0_error', np.float), ('column_c1', np.float), ('column_c1_error', np.float), ('column_sigma', np.float), ('column_sigma_error', np.float), ('row_c0', np.float), ('row_c0_error', np.float), ('row_c1', np.float), ('row_c1_error', np.float), ('row_sigma', np.float), ('row_sigma_error', np.float), ('z', np.float)])
             # Set std. settings for reference DUT0
             result[0]['column_c0'], result[0]['column_c0_error'] = 0., 0.
             result[0]['column_c1'], result[0]['column_c1_error'] = 1., 0.
