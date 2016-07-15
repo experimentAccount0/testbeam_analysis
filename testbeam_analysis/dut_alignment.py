@@ -414,7 +414,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 result[dut_idx]['DUT'] = dut_idx
                 dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
                 ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
-                logging.info('Aligning with %s data', node.name)
+                logging.info('Aligning data from %s', node.name)
 
                 if "column" in node.name.lower():
                     pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][0], pixel_size[ref_idx][0]
