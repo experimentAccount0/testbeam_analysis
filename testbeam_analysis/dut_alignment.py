@@ -470,7 +470,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 # Linear fit, usually describes correlation very well, slope is close to 1.
                 # With low energy beam and / or beam with diverse agular distribution, the correlation will not be perfectly straight
 
-                praefix = 'column' if 'column' in node.name.lower() else 'row'
+                table_prefix = 'column' if 'column' in node.name.lower() else 'row'
 
                 def line(x, c0, c1):
                     return c0 + c1 * x
@@ -479,8 +479,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 re_fit, re_fit_pcov = curve_fit(line, x, mean_fitted, sigma=mean_error_fitted, absolute_sigma=True, p0=[fit[0], fit[1]])
 
                 # Write fit results to array
-                result[dut_idx]['%s_c0' % praefix], result[dut_idx]['%s_c0_error' % praefix] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
-                result[dut_idx]['%s_c1' % praefix], result[dut_idx]['%s_c1_error' % praefix] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
+                result[dut_idx][table_prefix + '_c0'], result[dut_idx][table_prefix + '_c0_error'] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
+                result[dut_idx][table_prefix + '_c1'], result[dut_idx][table_prefix + '_c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
                 result[dut_idx]['z'] = z_positions[dut_idx]
 
                 # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
@@ -488,7 +488,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted))
                 mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted)) / np.sqrt(np.array(sigma_fitted).shape[0])
 
-                result[dut_idx]['%s_sigma' % praefix], result[dut_idx]['%s_sigma_error' % praefix] = mean_sigma, mean_sigma_error
+                result[dut_idx][table_prefix + '_sigma'], result[dut_idx][table_prefix + '_sigma_error'] = mean_sigma, mean_sigma_error
 
                 # Plot selected data with fit
                 fit_fn = np.poly1d(re_fit[::-1])
