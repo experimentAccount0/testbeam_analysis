@@ -193,7 +193,6 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     non_interactive : boolean
         Deactivate user interaction to apply cuts
     '''
-
     # Global variables needed to manipulate them within a matplotlib QT slot function
     global selected_data
     global fit
@@ -209,138 +208,143 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         return c0 + c1 * x
 
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
         global offset_limit
-        global left_limit
-        global right_limit
         offset_limit = offset_limit_new
         offset_limit_plot.set_ydata([offset_limit * 10., offset_limit * 10.])
-        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
 
     def update_error(error_limit_new):  # Function called when error slider is moved
-        global selected_data  # Globals needed to manipulate them
         global error_limit
-        global offset_limit
-        global left_limit
-        global right_limit
         error_limit = error_limit_new
         error_limit_plot.set_ydata([error_limit * 1000., error_limit * 1000.])
-        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
 
     def update_left_limit(left_limit_new):  # Function called when left limit slider is moved
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
-        global offset_limit
         global left_limit
-        global right_limit
         left_limit = left_limit_new
         left_limit_plot.set_xdata([left_limit, left_limit])
-        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
 
     def update_right_limit(right_limit_new):  # Function called when left limit slider is moved
-        global selected_data  # Globals needed to manipulate them
-        global error_limit
-        global offset_limit
-        global left_limit
         global right_limit
         right_limit = right_limit_new
         right_limit_plot.set_xdata([right_limit, right_limit])
-        selected_data = np.logical_and(mean_error_fitted > 1e-10, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
+        update_selected_data()
+        update_plot()
+
+    def update_selected_data():
+        global selected_data
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
+        init_selected_data()
+#         selected_data &= np.logical_and(np.logical_and(np.logical_and(np.abs(offset) <= offset_limit, np.abs(mean_error_fitted) <= error_limit), x >= left_limit), x <= right_limit)
+        selected_data[selected_data] &= (np.abs(offset[selected_data]) <= offset_limit)
+        selected_data[selected_data] &= (np.abs(mean_error_fitted[selected_data]) <= error_limit)
+        selected_data &= (x >= left_limit)
+        selected_data &= (x <= right_limit)
 
     def update_auto(event):  # Function called when auto button is pressed
-        # This function automatically applies cuts according to these percentiles
-        n_hit_percentile = 5
-        mean_error_percentile = 95
-        offset_percentile = 99
-
-        global selected_data  # Globals needed to manipulate them
+        global selected_data
         global error_limit
         global offset_limit
         global left_limit
         global right_limit
 
-        n_hit_cut = np.percentile(n_cluster, n_hit_percentile)  # Cut of low/high 5 % of the hits
-        n_hit_cut_index = np.where(n_cluster < n_hit_cut)[0]
+        # This function automatically applies cuts according to these percentiles
+        n_hit_percentile = 1
+        mean_error_percentile = 95
+        offset_percentile = 99
 
-        if np.any(n_hit_cut_index):  # If data is rather constant n_hit_cut_index is empty
-            def consecutive(data, stepsize=1):  # Returns group of consecutive increasing values
-                return np.split(data, np.where(np.diff(data) != stepsize)[0] + 1)
-
-            cons = consecutive(n_hit_cut_index)
-
-            # Set the minimum, maximum  number of hits cut values
-            min_cut = cons[0][-1] if len(np.atleast_1d(cons[0][-1])) == 1 else cons[0][-1][0]
-            max_cut = cons[-1][0] if len(np.atleast_1d(cons[-1][0])) == 1 else cons[-1][0][0]
-
-            # Validity check, needed e.g. if there are areas without data
-            n_cluster_max = np.where(n_cluster == np.amax(n_cluster))[0]
-            n_cluster_max_min_index = n_cluster_max if len(np.atleast_1d(n_cluster_max)) == 1 else n_cluster_max[0]  # Cut down to first index with maximum entries
-            n_cluster_max_max_index = n_cluster_max if len(np.atleast_1d(n_cluster_max)) == 1 else n_cluster_max[-1]  # Cut down to first index with maximum entries
-
-            if min_cut > max_cut or min_cut > n_cluster_max_min_index:
-                min_cut = 0
-            if max_cut < min_cut or max_cut < n_cluster_max_max_index:
-                max_cut = n_cluster.shape[0] - 1
-
-            if min_cut:
-                left_limit = x[min_cut]
-                left_limit_plot.set_xdata([left_limit, left_limit])
-                left_slider.set_val(left_limit)
-            if max_cut:
-                right_limit = x[max_cut]
-                right_slider.set_val(right_limit)
-                right_limit_plot.set_xdata([right_limit, right_limit])
-
-        error_limit = np.percentile(mean_error_fitted, mean_error_percentile)
-        offset_limit = np.percentile(np.abs(offset), offset_percentile)  # Do not cut too much on the offset, it depends on the fit that might be off
+        error_median = np.nanmedian(mean_error_fitted)
+        error_limit = max(error_median * 2, np.percentile(np.abs(mean_error_fitted[selected_data]), mean_error_percentile))
+        offset_median = np.nanmedian(offset)
+        offset_limit = max(offset_median * 2, np.percentile(np.abs(offset[selected_data]), offset_percentile))  # Do not cut too much on the offset, it depends on the fit that might be off
         error_slider.set_val(error_limit)
         offset_slider.set_val(offset_limit)
-        selected_data = np.logical_and(mean_error_fitted > 1e-3, np.logical_and(np.abs(offset) <= offset_limit, mean_error_fitted <= error_limit))
-        selected_data = np.logical_and(np.logical_and(selected_data, x > left_limit), x < right_limit)
-        update_plot(selected_data)
 
-    def update_plot(selected_data):  # Replot correlation data with new selection
+        n_hit_cut = np.percentile(n_cluster[selected_data], n_hit_percentile)  # Cut of low/high 5 % of the hits
+        n_hit_cut_index = np.zeros_like(n_cluster, dtype=np.bool)
+        n_hit_cut_index |= (n_cluster < n_hit_cut)
+        n_hit_cut_index[selected_data] |= (np.abs(offset[selected_data]) > offset_limit)
+        n_hit_cut_index[~np.isfinite(offset)] = 1
+        n_hit_cut_index[selected_data] |= (np.abs(mean_error_fitted[selected_data]) > error_limit)
+        n_hit_cut_index[~np.isfinite(mean_error_fitted)] = 1
+        n_hit_cut_index = np.where(n_hit_cut_index == 1)[0]
+#         print "n_hit_cut_index before left right cut", n_hit_cut_index
+        left_index = np.where(x <= left_limit)[0][-1]
+        right_index = np.where(x >= right_limit)[0][0]
+        n_hit_cut_index = n_hit_cut_index[n_hit_cut_index >= left_index]
+        n_hit_cut_index = n_hit_cut_index[n_hit_cut_index <= right_index]
+        if not np.any(n_hit_cut_index == left_index):
+            n_hit_cut_index = np.r_[[left_index], n_hit_cut_index]
+        if not np.any(n_hit_cut_index == right_index):
+            n_hit_cut_index = np.r_[n_hit_cut_index, [right_index]]
+
+        if np.any(n_hit_cut_index.shape):  # If data is rather constant n_hit_cut_index is empty
+            def consecutive(data, max_stepsize=5):  # Returns group of consecutive increasing values
+                return np.split(data, np.where(np.diff(data) > max_stepsize)[0] + 1)
+            cons = consecutive(n_hit_cut_index)
+            left_cut = left_index if cons[0].shape[0] == 1 else cons[0][-1] + 1
+            right_cut = right_index if cons[-1].shape[0] == 1 else cons[-1][0] - 1
+            left_limit = x[left_cut]
+            left_slider.set_val(left_limit)
+            right_limit = x[right_cut]
+            right_slider.set_val(right_limit)
+
+        update_selected_data()
+        update_plot()
+
+    def update_plot():  # Replot correlation data with new selection
+        global selected_data
         if np.count_nonzero(selected_data) > 1:
             mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
         else:
             if non_interactive:
-                raise RuntimeError('Coarse alignment in non interactive mode failed. Rerun with less iterations or in interactive mode!')
+                raise RuntimeError('Coarse alignment in non-interactive mode failed. Rerun with less iterations or in interactive mode!')
             else:
                 logging.info('Cuts are too tight. Not enough data to fit')
 
+    def init_selected_data():
+        global selected_data
+        selected_data = np.ones_like(mean_fitted, dtype=np.bool)
+        selected_data &= np.isfinite(mean_fitted)
+        selected_data &= np.isfinite(mean_error_fitted)
+
+    # Require the gaussian fit error to be reasonable
+#     selected_data = (mean_error_fitted < 1e-2)
+    init_selected_data()
     # Calculate and plot selected data + fit + fit offset and gauss fit error
-    selected_data = (mean_error_fitted > 1e-10)  # Require the gaussian fit arror to be reasonable
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
-    fit, _ = curve_fit(f, x, mean_fitted)  # Fit stragiht line
+    fit, _ = curve_fit(f, x[selected_data], mean_fitted[selected_data])  # Fit stragiht line
     fit_fn = np.poly1d(fit[::-1])
-    offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
-    offset_limit = np.max(np.abs(offset))  # Calculate starting offset cut
-    error_limit = np.max(mean_error_fitted)  # Calculate starting fit error cut
-    left_limit = np.min(x) - 1  # Calculate starting left cut
-    right_limit = np.max(x) + 1  # Calculate starting right cut
+    offset = np.empty_like(mean_fitted)
+    offset.fill(np.nan)
+    offset[selected_data] = fit_fn(x[selected_data]) - mean_fitted[selected_data]  # Calculate straight line fit offset
+    offset_limit = np.max(np.abs(offset[selected_data]))  # Calculate starting offset cut
+    error_limit = np.max(np.abs(mean_error_fitted[selected_data]))  # Calculate starting fit error cut
+    left_limit = np.min(x[selected_data])  # Calculate starting left cut
+    right_limit = np.max(x[selected_data])  # Calculate starting right cut
 
-    mean_plot, = ax.plot(x, mean_fitted, 'o-', label='Data prefit')  # Plot correlatioin
-    ax.plot(x, fit_fn(x), '-', label='Line fit')  # Plot line fit
-    ax.plot(x, mean_error_fitted * 1000., 'ro-', label='Error x 1000')  # Plot gaussian fit error
-    ax.plot(x, offset * 10., 'go-', label='Offset x 10')  # Plot line fit offset
-    offset_limit_plot, = ax.plot([np.min(x), np.max(x)], [offset_limit * 10., offset_limit * 10.], 'g--', linewidth=2)  # Plot offset cut as a line
-    error_limit_plot, = ax.plot([np.min(x), np.max(x)], [error_limit * 1000., error_limit * 1000.], 'r--', linewidth=2)  # Plot error cut as a line
-    left_limit_plot, = ax.plot([left_limit, left_limit], [0, plt.ylim()[1]], 'b-', linewidth=2)  # Plot left cut as a vertical line
-    right_limit_plot, = ax.plot([right_limit, right_limit], [0, plt.ylim()[1]], 'b-', linewidth=2)  # Plot right cut as a vertical line
-    plt.bar(x, n_cluster / np.amax(n_cluster).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.amin(np.diff(x)))  # Plot number of hits for each correlation point
+    mean_plot, = ax.plot(x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')  # Plot correlatioin
+    ax.plot(x[selected_data], fit_fn(x[selected_data]), '-', label='Line fit')  # Plot line fit
+    ax.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 1000.0, 'ro-', label='Error x 1000')  # Plot gaussian fit error
+    ax.plot(x[selected_data], np.abs(offset[selected_data]) * 10.0, 'go-', label='Offset x 10')  # Plot line fit offset
+    ax.axvline()
+    offset_limit_plot = ax.axhline(offset_limit * 10.0, linestyle='--', color='g', linewidth=2)  # Plot offset cut as a line
+    error_limit_plot = ax.axhline(error_limit * 1000.0, linestyle='--', color='r', linewidth=2)  # Plot error cut as a line
+    left_limit_plot = ax.axvline(left_limit, linestyle='-', color='b', linewidth=2)  # Plot left cut as a vertical line
+    right_limit_plot = ax.axvline(right_limit, linestyle='-', color='b', linewidth=2)  # Plot right cut as a vertical line
+    plt.bar(x[selected_data], n_cluster[selected_data] / np.max(n_cluster[selected_data]).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
 
     plt.ylim(ymin=0.0)
+    plt.xlim((np.nanmin(x), np.nanmax(x)))
     ax.set_title(title)
     ax.set_xlabel(dut_name)
     ax.set_ylabel(ref_name)
@@ -389,17 +393,20 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_alignment_fit(x, mean_fitted, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
+def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
     plt.clf()
-    plt.errorbar(x, mean_fitted, yerr=mean_error_fitted, fmt='.')
-    plt.plot(x, mean_error_fitted * 1000.0, 'ro-', label='Error x1000')
-    plt.errorbar(x, (fit_fn(x) - mean_fitted) * 10., mean_error_fitted * 10., fmt='go-', label='Offset x10')
+    plt.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation')
+    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
+    plt.plot(x[mask], mean_error_fitted[mask] * 1000.0, linestyle='', color="red", marker='o', label='Error x1000')
+    plt.plot(x[~mask], mean_error_fitted[~mask] * 1000.0, linestyle='', color="darkred", marker='o')
+    plt.errorbar(x[mask], (fit_fn(x[mask]) - mean_fitted[mask]) * 10.0, mean_error_fitted[mask] * 10.0, linestyle='', color="lightgreen", marker='o', label='Offset x10')
+    plt.errorbar(x[~mask], (fit_fn(x[~mask]) - mean_fitted[~mask]) * 10.0, mean_error_fitted[~mask] * 10.0, linestyle='', color="darkgreen", marker='o')
     if len(pcov) > 1:
         fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     else:
         fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
-    plt.plot(x, fit_fn(x), '-', label=fit_legend_entry)
-    plt.plot(x, chi2 / 1.e7)
+    plt.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+    plt.plot(x, chi2 / 1.e7, 'r--', label="Chi$^2$")
     plt.legend(loc=0)
     plt.title(title)
     plt.xlabel('%s [um]' % dut_name)
