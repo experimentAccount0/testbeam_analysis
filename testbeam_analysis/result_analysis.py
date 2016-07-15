@@ -33,8 +33,10 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
     pixel_size
     use_duts : iterable
         The duts to calculate residuals for. If None all duts in the input_tracks_file are used
-    max_chi2 : int
-        Use only converged fits (cut on chi2)
+    max_chi2 : int, iterable, None
+        Use only not heavily scattered tracks to increase track pointing resolution (cut on chi2).
+        Cut can be a number and is used then for all DUTS or a list with a chi 2 cut for each DUT.
+        If None no cut is applied.
     force_prealignment : boolean
         Take the prealignment, although if a coarse alignment is availale
     output_pdf : boolean. PDF pages object
@@ -53,6 +55,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
         prealignment = in_file_h5.root.PreAlignment[:]
+        n_duts = prealignment.shape[0]
         if not use_prealignment:
             try:
                 alignment = in_file_h5.root.Alignment[:]
@@ -77,10 +80,14 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
     residuals = []
 
+    if not isinstance(max_chi2, list):
+        max_chi2 = [max_chi2] * n_duts
+
     with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
         with tb.open_file(output_residuals_file, mode='w') as out_file_h5:
-            for node in in_file_h5.root:
+            for dut_index, node in enumerate(in_file_h5.root):
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                actual_max_chi2 = max_chi2[dut_index]
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.debug('Calculate residuals for DUT %d', actual_dut)
@@ -90,8 +97,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
 
-                    if max_chi2:
-                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
+                    if actual_max_chi2:
+                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= actual_max_chi2]
                     tracks_chunk = tracks_chunk[np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] != 0., tracks_chunk['y_dut_%d' % actual_dut] != 0.)]  # Take only tracks where actual dut has a hit, otherwise residual wrong
 
                     # Coordinates in global coordinate system (x, y, z)
@@ -535,7 +542,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
     return residuals
 
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, sensor_size, minimum_track_density, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, chunk_size=1000000):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, sensor_size, minimum_track_density=1, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, chunk_size=1000000):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -572,6 +579,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
 
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
         prealignment = in_file_h5.root.PreAlignment[:]
+        n_duts = prealignment.shape[0]
         if not use_prealignment:
             try:
                 alignment = in_file_h5.root.Alignment[:]
@@ -579,6 +587,9 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
             except tb.exceptions.NodeError:
                 use_prealignment = True
                 logging.info('Use prealignment data')
+
+    if not isinstance(max_chi2, list):
+        max_chi2 = [max_chi2] * n_duts
 
     with PdfPages(output_pdf) as output_fig:
         efficiencies = []
@@ -608,14 +619,16 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 n_bin_y = dimensions[1] / actual_bin_size_y
 
                 # Define result histograms, these are filled for each hit chunk
-                total_distance_array = np.zeros(shape=(n_bin_x, n_bin_y, max_distance))
-                total_hit_hist = np.zeros(shape=(n_bin_x, n_bin_y))
+#                 total_distance_array = np.zeros(shape=(n_bin_x, n_bin_y, max_distance))
+                total_hit_hist = np.zeros(shape=(n_bin_x, n_bin_y), dtype=np.uint32)
                 total_track_density = np.zeros(shape=(n_bin_x, n_bin_y))
                 total_track_density_with_DUT_hit = np.zeros(shape=(n_bin_x, n_bin_y))
 
+                actual_max_chi2 = max_chi2[index]
+
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                     # Cut in Chi 2 of the track fit
-                    if max_chi2:
+                    if actual_max_chi2:
                         tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
 
                     # Transform the hits and track intersections into the local coordinate system
@@ -677,8 +690,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
 
                     col_row_distance = np.column_stack((hits_local[:, 0], hits_local[:, 1], distance))
 
-                    total_distance_array += np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[0, dimensions[0]], [0, dimensions[1]], [0, max_distance]])[0]
-                    total_hit_hist += np.histogram2d(hits_local[:, 0], hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
+#                     total_distance_array += np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[0, dimensions[0]], [0, dimensions[1]], [0, max_distance]])[0]
+                    total_hit_hist += (np.histogram2d(hits_local[:, 0], hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]).astype(np.uint32)
 
                     # Calculate efficiency
                     if cut_distance:  # Select intersections where hit is in given distance around track intersection
@@ -702,14 +715,15 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                     raise RuntimeError('All efficiencies for DUT%d are zero, consider changing cut values!', actual_dut)
 
                 # Calculate distances between hit and intersection
-                distance_mean_array = np.average(total_distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
-                distance_mean_array = np.ma.masked_invalid(distance_mean_array)
-                distance_max_array = np.amax(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
-                distance_min_array = np.amin(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
-                distance_max_array = np.ma.masked_invalid(distance_max_array)
-                distance_min_array = np.ma.masked_invalid(distance_min_array)
+#                 distance_mean_array = np.average(total_distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+#                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
+#                 distance_max_array = np.amax(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+#                 distance_min_array = np.amin(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+#                 distance_max_array = np.ma.masked_invalid(distance_max_array)
+#                 distance_min_array = np.ma.masked_invalid(distance_min_array)
 
-                plot_utils.efficiency_plots(distance_min_array, distance_max_array, distance_mean_array, total_hit_hist, total_track_density, total_track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
+#                 plot_utils.plot_track_distances(distance_min_array, distance_max_array, distance_mean_array)
+                plot_utils.efficiency_plots(total_hit_hist, total_track_density, total_track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
 
                 logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
