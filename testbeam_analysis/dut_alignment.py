@@ -38,9 +38,9 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
         Input files with cluster data. One file per DUT.
     output_correlation_file : pytables file
         Output file with the correlation histograms.
-    n_pixel : iterable of tuples
+    n_pixels : iterable of tuples
         One tuple per DUT describing the number of pixels in column, row direction
-        e.g. for 2 DUTs: n_pixel = [(80, 336), (80, 336)]
+        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension in um in column, row direction
         e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
