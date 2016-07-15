@@ -50,9 +50,8 @@ data_clusterizer.cpp
 .project
 .pydevproject
 # Examples output data
-!examples/data/output
+examples/data/output
 tmp
-*.h5
 *.pdf
 *tmp*.*
 .coverage*
