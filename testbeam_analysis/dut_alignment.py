@@ -293,7 +293,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             return coeff, var_matrix
 
         # Start values for fitting
-        # Correaltion peak
+        # Correlation peak
         mu_peak = np.argmax(data, axis=1) + 1  # +1 because col/row start at 1
         A_peak = np.max(data, axis=1)  # signal / correlation peak
         # Background of uncorrelated data
@@ -374,7 +374,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     p0.insert(4, 1.)
                     p0.insert(5, 1.)
 
-                # Set fit results for given index if succesful
+                # Set fit results for given index if successful
                 if fit_converged:
                     coeff_fitted[index] = coeff
                     mean_fitted[index] = coeff[1]
@@ -415,11 +415,11 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 # initialize arrays with np.nan (invalid)
                 x = np.linspace(1.0, data.shape[0], num=data.shape[0], endpoint=True, dtype=np.float)
                 coeff_fitted = [None] * data.shape[0]
-                mean_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Peak of the Gaussfit
+                mean_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Peak of the Gauss fit
                 mean_fitted.fill(np.nan)
                 mean_error_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Error of the fit of the peak
                 mean_error_fitted.fill(np.nan)
-                sigma_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Sigma of the Gaussfit
+                sigma_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Sigma of the Gauss fit
                 sigma_fitted.fill(np.nan)
                 chi2 = np.empty(shape=(data.shape[0],), dtype=np.float)  # Chi2 of the fit
                 chi2.fill(np.nan)

@@ -267,7 +267,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         error_slider.set_val(error_limit)
         offset_slider.set_val(offset_limit)
 
-        n_hit_cut = np.percentile(n_cluster[selected_data], n_hit_percentile)  # Cut of low/high 5 % of the hits
+        n_hit_cut = np.percentile(n_cluster[selected_data], n_hit_percentile)  # Cut off low/high % of the hits
         n_hit_cut_index = np.zeros_like(n_cluster, dtype=np.bool)
         n_hit_cut_index |= (n_cluster < n_hit_cut)
         n_hit_cut_index[selected_data] |= (np.abs(offset[selected_data]) > offset_limit)
@@ -322,7 +322,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
-    fit, _ = curve_fit(f, x[selected_data], mean_fitted[selected_data])  # Fit stragiht line
+    fit, _ = curve_fit(f, x[selected_data], mean_fitted[selected_data])  # Fit straight line
     fit_fn = np.poly1d(fit[::-1])
     offset = np.empty_like(mean_fitted)
     offset.fill(np.nan)
@@ -332,7 +332,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     left_limit = np.min(x[selected_data])  # Calculate starting left cut
     right_limit = np.max(x[selected_data])  # Calculate starting right cut
 
-    mean_plot, = ax.plot(x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')  # Plot correlatioin
+    mean_plot, = ax.plot(x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')  # Plot correlation
     ax.plot(x[selected_data], fit_fn(x[selected_data]), '-', label='Line fit')  # Plot line fit
     ax.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 1000.0, 'ro-', label='Error x 1000')  # Plot gaussian fit error
     ax.plot(x[selected_data], np.abs(offset[selected_data]) * 10.0, 'go-', label='Offset x 10')  # Plot line fit offset
