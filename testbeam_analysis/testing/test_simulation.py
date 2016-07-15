@@ -21,8 +21,8 @@ class TestHitAnalysis(unittest.TestCase):
     def setUpClass(self):
         if os.getenv('TRAVIS', False):
             from xvfbwrapper import Xvfb  # virtual X server for plots under headless LINUX travis testing is needed
-            cls.vdisplay = Xvfb()
-            cls.vdisplay.start()
+            self.vdisplay = Xvfb()
+            self.vdisplay.start()
 
         self.simulate_data = simulate_data.SimulateData(0)
         self.simulate_data.n_duts = 6
