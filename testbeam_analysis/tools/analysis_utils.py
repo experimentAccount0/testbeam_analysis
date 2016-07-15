@@ -553,8 +553,6 @@ def fwhm(x, y, k=10):  # http://stackoverflow.com/questions/10582795/finding-the
 
 
 def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, beta_inverted=None):
-#     print 'm_xx, m_xy, m_yx, m_yy', m_xx, m_xy, m_yx, m_yy
-
     if np.abs(m_xy) > 1. or np.abs(m_yx) > 1.:
         raise NotImplementedError('Device seems to be heavily tilted in gamma. This is not supported.')
 
