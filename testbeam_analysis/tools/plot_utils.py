@@ -192,8 +192,6 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         Plot title
     non_interactive : boolean
         Deactivate user interaction to apply cuts
-    iterations : number
-        Only used in non interactive mode. Sets how often automatic cuts are applied.
     '''
 
     # Global variables needed to manipulate them within a matplotlib QT slot function
