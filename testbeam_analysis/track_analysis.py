@@ -622,7 +622,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                       n_duts=n_duts)
 
 @njit
-def _find_merged_tracks(tracks_array, min_track_distance):
+def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several tracks are less than min_track_distance apart. Then exclude these tracks (set n_tracks = -1)
     i = 0
     for _ in range(0, tracks_array.shape[0]):
         track_index = i
@@ -640,6 +640,7 @@ def _find_merged_tracks(tracks_array, min_track_distance):
                 if tracks_array[j]['event_number'] != actual_event:  # Next event reached, break loop
                     break
                 if sqrt((offset_x - tracks_array[j]['offset_0']) * (offset_x - tracks_array[j]['offset_0']) + (offset_y - tracks_array[j]['offset_1']) * (offset_y - tracks_array[j]['offset_1'])) < min_track_distance:
+                    tracks_array[i]['n_tracks'] = -1
                     tracks_array[j]['n_tracks'] = -1
             i += 1
 
