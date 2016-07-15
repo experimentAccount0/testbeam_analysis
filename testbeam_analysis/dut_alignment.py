@@ -302,7 +302,6 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         mu_background = np.zeros_like(n_entries)
         mu_background[n_entries > 0] = np.average(data, axis=1, weights=range(1, data.shape[1] + 1))[n_entries > 0] * sum(range(1, data.shape[1] + 1)) / n_entries[n_entries > 0]  # +1 because col/row start at 1
 
-        n_cluster_last = 0  # The number of entries of the last converged correlation fit
         coeff = None
         fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
 
@@ -313,9 +312,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 logging.warning('No correlation entries for index %d. Omit correlation fit.', index)
                 continue
 
-            # If correlation data is < 1 % of last data omit it.
-            # This can be the case for random noisy pixels that are not in the beam
-            if fit_converged and data[index, :].sum() < n_cluster_last * 0.01:
+            # omit correlation fit if sum of correlation entries is < 1 % of total entries devided by number of indices
+            # (e.g. columns not in the beam)
+            n_cluster_curr_index = data[index, :].sum()
+            if fit_converged and n_cluster_curr_index < data.sum() / data.shape[0] * 0.01:
                 logging.warning('Very few correlation entries for index %d. Omit correlation fit.', index)
                 continue
 
@@ -379,7 +379,6 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 # Set fit results if fit converged
                 if fit_converged:
-                    n_cluster_last = n_cluster[index].sum()
                     mean_fitted[index] = coeff[1]
                     mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
                     sigma_fitted[index] = np.abs(coeff[2])
