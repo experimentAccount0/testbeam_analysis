@@ -77,6 +77,7 @@ def merge_on_event_number(data_1, data_2):
 
     return result_1, result_2
 
+
 @njit
 def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr_hist):
     """
