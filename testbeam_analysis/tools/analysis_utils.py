@@ -545,8 +545,8 @@ def fwhm(x, y, k=10):
     """
 
     half_max = np.max(y) / 2.0
-    s = splrep(x, y - half_max)
-    roots = sproot(s)
+    spl = splrep(x, y - half_max)
+    roots = sproot(spl)
 
     if len(roots) != 2:
         raise RuntimeError("Cannot determine FWHM")
