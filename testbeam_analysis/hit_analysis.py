@@ -81,7 +81,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
 
                 hit_table_out.append(hits)
 
-            logging.info('Reducing data by %.2f in %s', hit_table_out.nrows / input_file_h5.root.Hits.nrows, out_file_h5.filename)
+            logging.info('Reducing data by a factor of %.2f in file %s', input_file_h5.root.Hits.nrows / hit_table_out.nrows, out_file_h5.filename)
 
             # creating occupancy table without masking noisy pixels
             occupancy_array_table = out_file_h5.createCArray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
