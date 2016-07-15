@@ -159,7 +159,7 @@ def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y
     # Plot row check
     plt.clf()
     plt.title('Coarse alignment check, row of DUT%d against reference DUT' % dut_index)
-    median = np.median(row_1 - row_0) 
+    median = np.median(row_1 - row_0)
     std = np.std(row_1 - row_0)
     y, _, _ = plt.hist(row_1 - row_0, bins=100, range=(-2 * std, 2 * std), label='Data')
     plt.plot([median, median], [0, y.max()], label='Median %1.2f um' % median)
