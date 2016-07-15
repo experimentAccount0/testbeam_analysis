@@ -295,10 +295,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         # Start values for fitting
         # Peak Gauss of correlation
         mu_peak = np.argmax(data, axis=1) + 1  # +1 because col/row start at 1
-        A_peak = np.max(data, axis=1)
+        A_peak = np.max(data, axis=1)  # signal / correlation peak
         # Background gauss of uncorrelated data
         n_entries = np.sum(data, axis=1)
-        A_background = np.mean(data, axis=1)
+        A_background = np.mean(data, axis=1)  # noise / background halo
         mu_background = np.zeros_like(n_entries)
         mu_background[n_entries > 0] = np.average(data, axis=1, weights=range(1, data.shape[1] + 1))[n_entries > 0] * sum(range(1, data.shape[1] + 1)) / n_entries[n_entries > 0]  # +1 because col/row start at 1
 
@@ -318,6 +318,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 logging.warning('Very few correlation entries for index %d. Omit correlation fit.', index)
                 continue
 
+            # handle exception that might occur during fitting the data
             try:
                 # Set start values and fit limits
                 if fit_converged:  # Set start values from last successfull fit, no large difference expected
