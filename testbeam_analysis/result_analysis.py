@@ -29,8 +29,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         File name of the input aligment data
     output_residuals_file : pytables file
         File name of the output file with the residual data
-    n_pixels
-    pixel_size
+    n_pixels : iterable of tuples
+        One tuple per DUT describing the number of pixels in column, row direction
+        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension in um in column, row direction
+        e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
     use_duts : iterable
         The duts to calculate residuals for. If None all duts in the input_tracks_file are used
     max_chi2 : int, iterable, None
