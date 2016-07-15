@@ -78,7 +78,6 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         except tb.exceptions.NoSuchNodeError:
             try:  # Second try: normal track candidates assumed
                 tracklets_node = in_file_h5.root.TrackCandidates
-                output_track_candidates_file = os.path.splitext(output_track_candidates_file)[0] + '_2.h5'
                 logging.info('Additional find track run on track candidates file %s', input_tracklets_file)
                 logging.info('Output file with new track candidates file %s', output_track_candidates_file)
             except tb.exceptions.NoSuchNodeError:  # Last try: not used yet
