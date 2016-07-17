@@ -46,7 +46,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(os.path.dirname(testbeam_analysis.__file__))) + r'/examples/data'))
 
     # The location of the example data files, one file per DUT
-    data_files = [(os.path.join(tests_data_folder, r'TestBeamData_Mimosa26_DUT%d' % i + '.h5')) for i in range(6)]  # The first device is the reference for the coordinate system
+    data_files = [(os.path.join(tests_data_folder, 'TestBeamData_Mimosa26_DUT%d' % i + '.h5')) for i in range(6)]  # The first device is the reference for the coordinate system
 
     # Pixel dimesions and matrix size of the DUTs
     pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
