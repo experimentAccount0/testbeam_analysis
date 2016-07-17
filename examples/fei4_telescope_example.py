@@ -22,7 +22,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     tests_data_folder = os.path.join(os.getcwd(), 'data')
 
     # The location of the data files, one file per DUT
-    data_files = [(os.path.join(tests_data_folder, r'TestBeamData_FEI4_DUT%d' % i + '.h5')) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
+    data_files = [(os.path.join(tests_data_folder, 'TestBeamData_FEI4_DUT%d' % i + '.h5')) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
 
     # Dimensions
     pixel_size = [(250, 50)] * 4  # in um
