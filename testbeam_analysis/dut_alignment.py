@@ -412,8 +412,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 data = node[:]
 
-                # initialize arrays with np.nan (invalid)
-                x = np.linspace(1.0, data.shape[0], num=data.shape[0], endpoint=True, dtype=np.float)
+                # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
+                # matrix index 0 is cluster index 1 ranging from 0.5 to 1.4999, which becomes position 0.0 to 0.999, etc.
+                x = np.linspace(1.0, data.shape[0], num=data.shape[0], endpoint=True, dtype=np.float) + 0.5
                 coeff_fitted = [None] * data.shape[0]
                 mean_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Peak of the Gauss fit
                 mean_fitted.fill(np.nan)
