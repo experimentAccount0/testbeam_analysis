@@ -19,7 +19,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
     # Get the absolute example path, only needed to test this example
-    tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(os.path.dirname(testbeam_analysis.__file__))) + r'/examples/data'))
+    tests_data_folder = os.path.join(os.getcwd(), 'data')
+
     # The location of the data files, one file per DUT
     data_files = [(os.path.join(tests_data_folder, r'TestBeamData_FEI4_DUT%d' % i + '.h5')) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
 
