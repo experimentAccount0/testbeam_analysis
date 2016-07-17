@@ -108,10 +108,11 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
 
         for event_index_data_2 in range(index_data_2, data_2.shape[0]):
             if data_1[index_data_1]['event_number'] == data_2[event_index_data_2]['event_number']:
-                column_index_dut_1 = int(data_1[index_data_1]['mean_column'] - 1.)
-                row_index_dut_1 = int(data_1[index_data_1]['mean_row'] - 1.)
-                column_index_dut_2 = int(data_2[event_index_data_2]['mean_column'] - 1.)
-                row_index_dut_2 = int(data_2[event_index_data_2]['mean_row'] - 1.)
+                # assuming value is an index, cluster index 1 from 0.5 to 1.4999, index 2 from 1.5 to 2.4999, etc.
+                column_index_dut_1 = int(np.floor(data_1[index_data_1]['mean_column'] - 0.5))
+                row_index_dut_1 = int(np.floor(data_1[index_data_1]['mean_row'] - 0.5))
+                column_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_column'] - 0.5))
+                row_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_row'] - 0.5))
 
                 # Add correlation to histogram
                 column_corr_hist[column_index_dut_2, column_index_dut_1] += 1
