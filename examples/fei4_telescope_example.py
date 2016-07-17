@@ -4,6 +4,7 @@ The first and last plane were IBL n-in-n planar sensors and the 2 devices in the
 '''
 
 import os
+import inspect
 import logging
 from multiprocessing import Pool
 
@@ -18,8 +19,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(leve
 
 
 if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
-    # Get the absolute example path, only needed to test this example
-    tests_data_folder = os.path.join(os.getcwd(), 'data')
+    # Get the absolute path of example data
+    tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
 
     # The location of the data files, one file per DUT
     data_files = [(os.path.join(tests_data_folder, 'TestBeamData_FEI4_DUT%d' % i + '.h5')) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
