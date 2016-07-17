@@ -56,7 +56,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")  # Friednly names for plotting
 
     # Create output subfolder where all output data and plots are stored
-    output_folder = os.path.split(data_files[0])[0] + r'\output'
+    output_folder = os.path.join(os.path.split(data_files[0])[0], 'output')
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
