@@ -396,17 +396,24 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
 def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
     plt.clf()
     plt.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation')
-    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
     plt.plot(x[mask], mean_error_fitted[mask] * 1000.0, linestyle='', color="red", marker='o', label='Error x1000')
-    plt.plot(x[~mask], mean_error_fitted[~mask] * 1000.0, linestyle='', color="darkred", marker='o')
     plt.errorbar(x[mask], (fit_fn(x[mask]) - mean_fitted[mask]) * 10.0, mean_error_fitted[mask] * 10.0, linestyle='', color="lightgreen", marker='o', label='Offset x10')
-    plt.errorbar(x[~mask], (fit_fn(x[~mask]) - mean_fitted[~mask]) * 10.0, mean_error_fitted[~mask] * 10.0, linestyle='', color="darkgreen", marker='o')
     if len(pcov) > 1:
         fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     else:
         fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
-    plt.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+    plt.plot(x, fit_fn(x), linestyle='-', color="darkorange")
     plt.plot(x, chi2 / 1.e7, 'r--', label="Chi$^2$")
+    axes = plt.gca()
+    y_limits = axes.get_ylim()
+    # plot masked data points
+    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
+    plt.plot(x[~mask], mean_error_fitted[~mask] * 1000.0, linestyle='', color="darkred", marker='o')
+    plt.errorbar(x[~mask], (fit_fn(x[~mask]) - mean_fitted[~mask]) * 10.0, mean_error_fitted[~mask] * 10.0, linestyle='', color="darkgreen", marker='o')
+    axes.set_ylim(y_limits)
+    # plot again to draw line above the markers
+    plt.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+
     plt.legend(loc=0)
     plt.title(title)
     plt.xlabel('%s [um]' % dut_name)
