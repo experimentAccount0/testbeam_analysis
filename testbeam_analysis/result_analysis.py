@@ -103,7 +103,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                     if actual_max_chi2:
                         tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= actual_max_chi2]
-                    tracks_chunk = tracks_chunk[np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] != 0., tracks_chunk['y_dut_%d' % actual_dut] != 0.)]  # Take only tracks where actual dut has a hit, otherwise residual wrong
+                    tracks_chunk = tracks_chunk[np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] != 0.0, tracks_chunk['y_dut_%d' % actual_dut] != 0.0)]  # Take only tracks where actual dut has a hit, otherwise residual wrong
 
                     # Coordinates in global coordinate system (x, y, z)
                     hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
@@ -143,10 +143,10 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                         mean_column, std_column = np.mean(difference_local[:, 0]), np.std(difference_local[:, 0])
                         mean_row, std_row = np.mean(difference_local[:, 1]), np.std(difference_local[:, 1])
 
-                        hist_residual_x = np.histogram(difference[:, 0], range=(mean_x - 5. * std_x, mean_x + 5. * std_x), bins=1000)
-                        hist_residual_y = np.histogram(difference[:, 1], range=(mean_y - 5. * std_y, mean_y + 5. * std_y), bins=1000)
-                        hist_residual_col = np.histogram(difference_local[:, 0], range=(mean_column - 5. * std_column, mean_column + 5. * std_column), bins=1000)
-                        hist_residual_row = np.histogram(difference_local[:, 1], range=(mean_row - 5. * std_row, mean_row + 5. * std_row), bins=1000)
+                        hist_residual_x = np.histogram(difference[:, 0], range=(mean_x - 5.0 * std_x, mean_x + 5.0 * std_x), bins=1000)
+                        hist_residual_y = np.histogram(difference[:, 1], range=(mean_y - 5.0 * std_y, mean_y + 5.0 * std_y), bins=1000)
+                        hist_residual_col = np.histogram(difference_local[:, 0], range=(mean_column - 5.0 * std_column, mean_column + 5.0 * std_column), bins=1000)
+                        hist_residual_row = np.histogram(difference_local[:, 1], range=(mean_row - 5.0 * std_row, mean_row + 5.0 * std_row), bins=1000)
 
                         # X residual agains x position
                         hist_x_residual_x = np.histogram2d(intersection_x,
