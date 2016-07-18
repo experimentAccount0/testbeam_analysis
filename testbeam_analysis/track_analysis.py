@@ -55,7 +55,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             column_sigma = correlations['correlation_x']
             row_sigma = correlations['correlation_y']
         except tb.exceptions.NoSuchNodeError:
-            logging.info('Taking correlation cut values from prealignment')
+            logging.info('Taking correlation cut values from pre-alignment')
             correlations = in_file_h5.root.PreAlignment[:]
             n_duts = correlations.shape[0]
             if min_cluster_distance is True:
@@ -186,7 +186,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         n_duts = z_positions.shape[0]
 
     if use_prealignment:
-        logging.info('Use prealignment data')
+        logging.info('Use pre-alignment data')
     else:
         logging.info('Use alignment data')
 
@@ -276,7 +276,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                                                              gamma=alignment[fit_dut]['gamma'])
             basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
             dut_plane_normal = basis_global[2]
-        else:  # Prealignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+        else:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
             dut_position = np.array([0., 0., z_positions[fit_dut]])
             dut_plane_normal = np.array([0., 0., 1.])
 
