@@ -137,7 +137,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     difference_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local)) - np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
 
                     # Histogram residuals in different ways
-                    if not mean_column:  # Only true at the first run, create hists here
+                    if mean_column is None:  # Only true at the first run, create hists here
                         mean_x, std_x = np.mean(difference[:, 0]), np.std(difference[:, 0])
                         mean_y, std_y = np.mean(difference[:, 1]), np.std(difference[:, 1])
                         mean_column, std_column = np.mean(difference_local[:, 0]), np.std(difference_local[:, 0])
