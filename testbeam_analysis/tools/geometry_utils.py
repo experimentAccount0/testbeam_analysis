@@ -404,7 +404,7 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     Paramter:
     --------
 
-    hits_i : numpy arrays with hit position infos
+    hits_x, hits_y, hits_z : numpy arrays with corresponding hit positions
     dut_index : integer
         Needed to select the corrct alignment info
     alignment : nunmpy array
