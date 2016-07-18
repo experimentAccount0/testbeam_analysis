@@ -396,7 +396,7 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     ''' Helper function that takes hits and applies a transformation according to the alignment data given.
     If alignment data with rotations and translations are given the hits are transformed according to the
     rotations and translations.
-    If prealignment data with offsets and slopes are given the hits are transformed according to the
+    If pre-alignment data with offsets and slopes are given the hits are transformed according to the
     slopes and offsets.
     If both are given alignment data is taken.
     The transformation can be inverted.
@@ -410,7 +410,7 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     alignment : nunmpy array
         Alignment information with rotations and translations
     prealignment : numpy array
-        Prealignment information with offsets and slopes
+        Pre-alignment information with offsets and slopes
     inverse : boolean
         Apply inverse transformation if true
 
@@ -451,12 +451,12 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
         z = prealignment[dut_index]['z']
 
         if inverse:
-            logging.debug('Transform hit position into the local coordinate system using prealignment data')
+            logging.debug('Transform hit position into the local coordinate system using pre-alignment data')
             hits_x = (hits_x - c0_column) / c1_column
             hits_y = (hits_y - c0_row) / c1_row
             hits_z -= z
         else:
-            logging.debug('Transform hit position into the global coordinate system using prealignment data')
+            logging.debug('Transform hit position into the global coordinate system using pre-alignment data')
             hits_x = (c1_column * hits_x + c0_column)
             hits_y = (c1_row * hits_y + c0_row)
             hits_z += z
@@ -521,7 +521,7 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
         raise RuntimeError('Mode %s is unknown', str(mode))
 
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
-        alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from prealignment
+        alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from pre-alignment
         try:
             alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             alignment_table.append(alignment_parameters)
