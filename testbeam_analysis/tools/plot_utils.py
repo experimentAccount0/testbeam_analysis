@@ -645,19 +645,18 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
 
 def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=None, yerr=None, output_fig=None, fit=None):  # Plot the residuals as a function of the position
     plt.clf()
-
-    plt.plot(x, y, 'go', linewidth=2, label='Median residual')
-    if fit is not None:
-        line = lambda x, c0, c1: c0 + c1 * x
-        plt.plot(x, line(x, *fit[0]), 'b-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
-
-    plt.plot()
     plt.grid()
     if title:
         plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    plt.imshow(np.ma.masked_equal(hist, 0).T, origin='low', aspect='auto', interpolation='nearest', extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]], label='Residual')
+    plt.imshow(np.ma.masked_equal(hist, 0).T, origin='low', aspect='auto', interpolation='none', extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]], label='Residual')
+    plt.plot(x, y, 'go', linewidth=2, label='Median residual')
+    if fit is not None:
+        axis = plt.gca()
+        x_lim = np.array(axis.get_xlim(), dtype=np.float)
+        line = lambda x, c0, c1: c0 + c1 * x
+        plt.plot(x_lim, line(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
     plt.legend(loc=0)
     if output_fig:
         output_fig.savefig()
