@@ -174,7 +174,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
 
                 # Fill result array with DUT 0 data
                 actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
-                selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
+                selection = actual_cluster['mean_column'] != 0.0  # Add only real hits, 0 is a virtual hit
 
                 merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
                 merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
@@ -187,13 +187,13 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
                         for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
-                            selection = actual_cluster['mean_column'] != 0  # Add only real hits, 0 is a virtual hit
+                            selection = actual_cluster['mean_column'] != 0.0  # Add only real hits, 0 is a virtual hit
                             actual_mean_column = pixel_size[dut_index][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
                             actual_mean_row = pixel_size[dut_index][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
 
                             merged_cluster_array['x_dut_%d' % (dut_index)][selection] = actual_mean_column
                             merged_cluster_array['y_dut_%d' % (dut_index)][selection] = actual_mean_row
-                            merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.
+                            merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.0
 
                             merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
 
