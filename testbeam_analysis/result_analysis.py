@@ -188,7 +188,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                                difference_local[:, 1],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_row - 2 * std_row, mean_row + 2 * std_row)))
-                        fit_row_residual_row = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
+                        fit_row_residual_row = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 1], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # local row residual against column position
                         hist_col_residual_row = np.histogram2d(intersection_x_local,
