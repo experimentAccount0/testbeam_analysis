@@ -153,56 +153,56 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            difference[:, 0],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_x - 2 * std_x, mean_x + 2 * std_x)))
-                        fit_x_residual_x = analysis_utils.fit_residuals(intersection_x, difference[:, 0], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
+                        fit_x_residual_x = analysis_utils.fit_residuals(intersection_x, difference[:, 0], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # global y residual against y position
                         hist_y_residual_y = np.histogram2d(intersection_y,
                                                            difference[:, 1],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_y - 2 * std_y, mean_y + 2 * std_y)))
-                        fit_y_residual_y = analysis_utils.fit_residuals(intersection_y, difference[:, 1], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
+                        fit_y_residual_y = analysis_utils.fit_residuals(intersection_y, difference[:, 1], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # global y residual against x position
                         hist_x_residual_y = np.histogram2d(intersection_x,
                                                            difference[:, 1],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_y - 2 * std_y, mean_y + 2 * std_y)))
-                        fit_x_residual_y = analysis_utils.fit_residuals(intersection_x, difference[:, 1], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
+                        fit_x_residual_y = analysis_utils.fit_residuals(intersection_x, difference[:, 1], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # global x residual against y position
                         hist_y_residual_x = np.histogram2d(intersection_y,
                                                            difference[:, 0],
                                                            bins=(200, 800),
                                                            range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_x - 2 * std_x, mean_x + 2 * std_x)))
-                        fit_y_residual_x = analysis_utils.fit_residuals(intersection_y, difference[:, 0], n_bins=200, min_pos=0., max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
+                        fit_y_residual_x = analysis_utils.fit_residuals(intersection_y, difference[:, 0], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # local column residual against column position
                         hist_col_residual_col = np.histogram2d(intersection_x_local,
                                                                difference_local[:, 0],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_column - 2 * std_column, mean_column + 2 * std_column)))
-                        fit_col_residual_col = analysis_utils.fit_residuals(intersection_x_local, difference_local[:, 0], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
+                        fit_col_residual_col = analysis_utils.fit_residuals(intersection_x_local, difference_local[:, 0], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # local row residual against row position
                         hist_row_residual_row = np.histogram2d(intersection_y_local,
                                                                difference_local[:, 1],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_row - 2 * std_row, mean_row + 2 * std_row)))
-                        fit_row_residual_row = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
+                        fit_row_residual_row = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                         # local row residual against column position
                         hist_col_residual_row = np.histogram2d(intersection_x_local,
                                                                difference_local[:, 1],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0]), (mean_row - 2 * std_row, mean_row + 2 * std_row)))
-                        fit_col_residual_row = analysis_utils.fit_residuals(intersection_x_local, difference_local[:, 1], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
+                        fit_col_residual_row = analysis_utils.fit_residuals(intersection_x_local, difference_local[:, 1], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][0] * pixel_size[actual_dut][0])
 
                         # local column residual against row position
                         hist_row_residual_col = np.histogram2d(intersection_y_local,
                                                                difference_local[:, 0],
                                                                bins=(200, 800),
                                                                range=((0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1]), (mean_column - 2 * std_column, mean_column + 2 * std_column)))
-                        fit_row_residual_col = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
+                        fit_row_residual_col = analysis_utils.fit_residuals(intersection_y_local, difference_local[:, 0], n_bins=200, min_pos=0.0, max_pos=n_pixels[actual_dut][1] * pixel_size[actual_dut][1])
 
                     else:  # Add data to existing hists
                         # global x residual against x position
