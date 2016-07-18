@@ -178,7 +178,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
 
                 merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * actual_cluster['mean_column'][selection]  # Convert channel indices to um
                 merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * actual_cluster['mean_row'][selection]  # Convert channel indices to um
-                merged_cluster_array['z_dut_0'][selection] = 0.
+                merged_cluster_array['z_dut_0'][selection] = 0.0
                 merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
 
                 # Fill result array with other DUT data
@@ -264,14 +264,14 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             2. The signal + background has to be large enough: Amplidute 1 + Amplitude 2 + Offset > Data maximum / 2
             3. The Signal Sigma has to be smaller than the background sigma, otherwise beam would be larger than one pixel pitch
         '''
-        if coeff[0] < (coeff[3] + coeff[6]) * signal_noise or coeff[0] + coeff[3] + coeff[6] < A_peak / 2. or coeff[2] > coeff[5] / 2.:
+        if coeff[0] < (coeff[3] + coeff[6]) * signal_noise or coeff[0] + coeff[3] + coeff[6] < A_peak / 2.0 or coeff[2] > coeff[5] / 2.0:
             return False
         return True
 
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
-        return [[0.01 * coeff[0], 0., 0.1 * coeff[2], 0.01 * coeff[3], 0., 0.1 * coeff[5], 0.1 * coeff[6]],
-                [1000 * coeff[0], np.inf, 10 * coeff[2], 1000 * coeff[3], np.inf, 10 * coeff[5], 10 * coeff[6]]]
+        return [[0.01 * coeff[0], 0.0, 0.1 * coeff[2], 0.01 * coeff[3], 0.0, 0.1 * coeff[5], 0.1 * coeff[6]],
+                [1000.0 * coeff[0], np.inf, 10.0 * coeff[2], 1000.0 * coeff[3], np.inf, 10.0 * coeff[5], 10.0 * coeff[6]]]
 
     def fit_data(data):
 
@@ -285,10 +285,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             peak_sigma = (fwhm_2 - fwhm_1) / 2.35  # Determine start value for sigma
 
             # Fit a Gauss + Offset to the background substracted data
-            coeff_peak, _ = curve_fit(gauss_offset, x_data, y_peak, p0=[peak_A, peak_mu, peak_sigma, 0., 0.], bounds=([0., 0., 0., -10000, -10], [1.1 * peak_A, np.inf, np.inf, 10000, 10]))
+            coeff_peak, _ = curve_fit(gauss_offset, x_data, y_peak, p0=[peak_A, peak_mu, peak_sigma, 0.0, 0.0], bounds=([0.0, 0.0, 0.0, -10000.0, -10.0], [1.1 * peak_A, np.inf, np.inf, 10000.0, 10.0]))
 
             # Refit orignial double Gauss function with proper start values for the small signal peak
-            coeff, var_matrix = curve_fit(double_gauss_offset, x_data, y_data, p0=[coeff_peak[0], coeff_peak[1], coeff_peak[2], p0[3], p0[4], p0[5], p0[6]], bounds=[0, np.inf])
+            coeff, var_matrix = curve_fit(double_gauss_offset, x_data, y_data, p0=[coeff_peak[0], coeff_peak[1], coeff_peak[2], p0[3], p0[4], p0[5], p0[6]], bounds=[0.0, np.inf])
 
             return coeff, var_matrix
 
@@ -326,8 +326,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     p0 = coeff  # Set start values from last successfull fit
                     bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
                 else:  # No (last) successfull fit, try to dedeuce reasonable start values
-                    p0 = [A_peak[index], mu_peak[index], A_peak.shape[0] / 30., A_background[index], mu_background[index], A_peak.shape[0] / 3., 0.]
-                    bounds = [[0, 0, 0, 0, 0, 0, 0], [10 * A_peak[index], 2 * data.shape[1], data.shape[1], 10 * A_peak[index], 2 * data.shape[1], data.shape[1], data.shape[1]]]
+                    p0 = [A_peak[index], mu_peak[index], A_peak.shape[0] / 30.0, A_background[index], mu_background[index], A_peak.shape[0] / 3.0, 0.0]
+                    bounds = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [10.0 * A_peak[index], 2.0 * data.shape[1], data.shape[1], 10.0 * A_peak[index], 2.0 * data.shape[1], data.shape[1], data.shape[1]]]
 
                 # Fit correlation
                 if fit_background:  # Describe background with addidional gauss + offset
@@ -363,16 +363,16 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     if bounds[0][1] > mu_peak[index]:
                         bounds[0][1] = 0
 
-                    coeff, var_matrix = curve_fit(lambda x, A_1, mu_1, sigma_1, offset: double_gauss_offset(x, A_1, mu_1, sigma_1, 0., 1., 1., offset), x, data[index, :], p0=p0, bounds=bounds)
+                    coeff, var_matrix = curve_fit(lambda x, A_1, mu_1, sigma_1, offset: double_gauss_offset(x, A_1, mu_1, sigma_1, 0.0, 1.0, 1.0, offset), x, data[index, :], p0=p0, bounds=bounds)
 
                     fit_converged = True
                     # Change back start parameters and boundaries
-                    coeff = np.insert(coeff, 3, 0.)
-                    coeff = np.insert(coeff, 4, 1.)
-                    coeff = np.insert(coeff, 5, 1.)
-                    p0.insert(3, 0.)
-                    p0.insert(4, 1.)
-                    p0.insert(5, 1.)
+                    coeff = np.insert(coeff, 3, 0.0)
+                    coeff = np.insert(coeff, 4, 1.0)
+                    coeff = np.insert(coeff, 5, 1.0)
+                    p0.insert(3, 0.0)
+                    p0.insert(4, 1.0)
+                    p0.insert(5, 1.0)
 
                 # Set fit results for given index if successful
                 if fit_converged:
@@ -391,10 +391,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             n_duts = len(in_file_h5.list_nodes("/")) // 2 + 1  # no correlation for reference DUT0
             result = np.zeros(shape=(n_duts,), dtype=[('DUT', np.uint8), ('column_c0', np.float), ('column_c0_error', np.float), ('column_c1', np.float), ('column_c1_error', np.float), ('column_sigma', np.float), ('column_sigma_error', np.float), ('row_c0', np.float), ('row_c0_error', np.float), ('row_c1', np.float), ('row_c1_error', np.float), ('row_sigma', np.float), ('row_sigma_error', np.float), ('z', np.float)])
             # Set std. settings for reference DUT0
-            result[0]['column_c0'], result[0]['column_c0_error'] = 0., 0.
-            result[0]['column_c1'], result[0]['column_c1_error'] = 1., 0.
-            result[0]['row_c0'], result[0]['row_c0_error'] = 0., 0.
-            result[0]['row_c1'], result[0]['row_c1_error'] = 1., 0.
+            result[0]['column_c0'], result[0]['column_c0_error'] = 0.0, 0.0
+            result[0]['column_c1'], result[0]['column_c1_error'] = 1.0, 0.0
+            result[0]['row_c0'], result[0]['row_c0_error'] = 0.0, 0.0
+            result[0]['row_c1'], result[0]['row_c1_error'] = 1.0, 0.0
             result[0]['z'] = z_positions[0]
             for node in in_file_h5.root:
                 indices = re.findall(r'\d+', node.name)
