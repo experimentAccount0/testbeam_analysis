@@ -560,12 +560,12 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
                     logging.info('Use alignment data from file')
                 except tb.exceptions.NodeError:
                     use_prealignment = True
-                    logging.info('Use prealignment data from file')
+                    logging.info('Use pre-alignment data from file')
     except TypeError:  # The input_alignment is an array
         alignment = input_alignment
         try:  # Check if array is prealignent array
             alignment['column_c0']
-            logging.info('Use prealignment data')
+            logging.info('Use pre-alignment data')
             use_prealignment = True
         except ValueError:
             logging.info('Use alignment data')
