@@ -89,9 +89,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
     with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
         with tb.open_file(output_residuals_file, mode='w') as out_file_h5:
-            for dut_index, node in enumerate(in_file_h5.root):
+            for node in in_file_h5.root:
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                actual_max_chi2 = max_chi2[dut_index]
+                actual_max_chi2 = max_chi2[actual_dut]
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.debug('Calculate residuals for DUT %d', actual_dut)
