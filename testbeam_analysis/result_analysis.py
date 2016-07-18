@@ -667,9 +667,9 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
 
                     # Only transform real hits, thus reset them to x/y/z = 0/0/0
                     selection = np.logical_or(tracks_chunk['x_dut_%d' % actual_dut] == 0., tracks_chunk['y_dut_%d' % actual_dut] == 0.)
-                    hits_local[selection, :] = 0.
+                    hits_local[selection, :] = 0.0
 
-                    if not np.allclose(hits_local[0][2], 0.) or not np.allclose(intersection_z_local, 0.):
+                    if not np.allclose(hits_local[0][2], 0.0) or not np.allclose(intersection_z_local, 0.0):
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
                     # Usefull for debugging, print some inefficient events that can be cross checked
