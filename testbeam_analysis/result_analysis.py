@@ -401,7 +401,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     coeff, var_matrix = None, None
                     try:
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x[1][:-1], hist_residual_x[0], p0=[np.amax(hist_residual_x[0]), mean_x, std_x])
-                    except:  # Fit error
+                    except RuntimeError:  # Fit error
                         pass
 
                     plot_utils.plot_residuals(histogram=hist_residual_x,
@@ -414,7 +414,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     coeff, var_matrix = None, None
                     try:
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y[1][:-1], hist_residual_y[0], p0=[np.amax(hist_residual_y[0]), mean_y, std_y])
-                    except:  # Fit error
+                    except RuntimeError:  # Fit error
                         pass
 
                     def line(x, c0, c1):
@@ -475,7 +475,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     coeff, var_matrix = None, None
                     try:
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_col[1][:-1], hist_residual_col[0], p0=[np.amax(hist_residual_col[0]), mean_column, std_column])
-                    except:  # Fit error
+                    except RuntimeError:  # Fit error
                         pass
 
                     plot_utils.plot_residuals(histogram=hist_residual_col,
@@ -488,7 +488,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     coeff, var_matrix = None, None
                     try:
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_row[1][:-1], hist_residual_row[0], p0=[np.amax(hist_residual_row[0]), mean_row, std_row])
-                    except:  # Fit error
+                    except RuntimeError:  # Fit error
                         pass
 
                     plot_utils.plot_residuals(histogram=hist_residual_row,
