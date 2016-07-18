@@ -132,7 +132,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                               exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
-                              force_prealignment=True,  # This is just for demonstration purpose, you usually fully aligned hits
+                              force_prealignment=True,  # This is just for demonstration purpose, usually uses fully aligned hits
                               selection_track_quality=0)  # We will cut on chi2
 
     # Step 2.:  Calculate the residuals to check the alignment (using the prealignment!)
