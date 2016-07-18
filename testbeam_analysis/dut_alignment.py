@@ -574,7 +574,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     n_duts = alignment.shape[0]
 
     def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
-        selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change vitual hits
+        selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change virtual hits
 
         if use_prealignment:
             hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
