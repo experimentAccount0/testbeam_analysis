@@ -647,7 +647,7 @@ def plot_position_residuals(hist, x, y, x_label, y_label, title=None, yerr=None,
     plt.clf()
 
     plt.plot(x, y, 'go', linewidth=2, label='Median residual')
-    if fit:
+    if fit is not None:
         line = lambda x, c0, c1: c0 + c1 * x
         plt.plot(x, line(x, *fit[0]), 'b-', linewidth=3, label='Mean residual fit\n%1.2e + %1.2e x' % (fit[0][0], fit[0][1]))
 
