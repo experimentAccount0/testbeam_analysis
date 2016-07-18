@@ -416,7 +416,7 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
 
     Returns:
     --------
-    hit_x, hit_y, hit_z: numpy arrays
+    hits_x, hits_y, hits_z : numpy arrays
     '''
     if (alignment is None and prealignment is None) or (alignment is not None and prealignment is not None):
         raise RuntimeError('Either pre-alignment or alignment data has to be given.')
