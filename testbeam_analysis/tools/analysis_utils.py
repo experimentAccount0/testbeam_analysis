@@ -638,7 +638,9 @@ def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
     def line(x, c0, c1):
         return c0 + c1 * x
 
+    # calculating the data points
     hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
+    # selecting data points to be included into fit
     hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins)
     n_hits_threshold = np.percentile(hist_position_residual_count[0], 100 - 68.3)  # Simple threshold, take bins with 1 sigma of the data
     selection = np.logical_and(hist_position_residual_count[0] >= n_hits_threshold, np.isfinite(hist_position_residual[0]))
