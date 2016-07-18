@@ -615,11 +615,11 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     output_fig.savefig()
 
 
-def plot_residuals(histogram, fit, fit_errors, x_label, title, output_fig=None):
+def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig=None):
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
-        plot_range = (analysis_utils.get_mean_from_histogram(histogram[0], histogram[1][:-1]) - 5 * analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]), 
-                      analysis_utils.get_mean_from_histogram(histogram[0], histogram[1][:-1]) + 5 * analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1]))
+        plot_range = (analysis_utils.get_mean_from_histogram(histogram, edges[:-1]) - 5 * analysis_utils.get_rms_from_histogram(histogram, edges[:-1]),
+                      analysis_utils.get_mean_from_histogram(histogram, edges[:-1]) + 5 * analysis_utils.get_rms_from_histogram(histogram, edges[:-1]))
         plt.xlim(plot_range)
         plt.grid()
         plt.title(title)
@@ -627,15 +627,15 @@ def plot_residuals(histogram, fit, fit_errors, x_label, title, output_fig=None):
         plt.ylabel('#')
 
         if plot_log:
-            plt.ylim(1, int(ceil(np.amax(histogram[0]) / 10.0)) * 100)
+            plt.ylim(1, int(ceil(np.amax(histogram) / 10.0)) * 100)
 
-        plt.bar(histogram[1][:-1], histogram[0], width=(histogram[1][1] - histogram[1][0]), log=plot_log, align='edge')
+        plt.bar(edges[:-1], histogram, width=(edges[1] - edges[0]), log=plot_log, align='edge')
         if np.any(fit):
-            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram[0].sum(), analysis_utils.get_rms_from_histogram(histogram[0], histogram[1][:-1])))
+            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram.sum(), analysis_utils.get_rms_from_histogram(histogram, edges[:-1])))
 #             plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
 #             plt.plot([np.mean(difference[:, i]), np.mean(difference[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='red', linewidth=2)
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (fit[0], np.absolute(fit_errors[0][0] ** 0.5), fit[1], np.absolute(fit_errors[1][1] ** 0.5), np.absolute(fit[2]), np.absolute(fit_errors[2][2] ** 0.5))
-            plt.plot(np.arange(np.amin(histogram[1][:-1]), np.amax(histogram[1][:-1]), 0.1), analysis_utils.gauss(np.arange(np.amin(histogram[1][:-1]), np.amax(histogram[1][:-1]), 0.1), *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), analysis_utils.gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         if output_fig:
             output_fig.savefig()
@@ -643,7 +643,7 @@ def plot_residuals(histogram, fit, fit_errors, x_label, title, output_fig=None):
             plt.show()
 
 
-def plot_position_residuals(hist, x, y, x_label, y_label, title=None, yerr=None, output_fig=None, fit=None):  # Plot the residuals as a function of the position
+def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=None, yerr=None, output_fig=None, fit=None):  # Plot the residuals as a function of the position
     plt.clf()
 
     plt.plot(x, y, 'go', linewidth=2, label='Median residual')
@@ -657,7 +657,7 @@ def plot_position_residuals(hist, x, y, x_label, y_label, title=None, yerr=None,
         plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    plt.imshow(np.ma.masked_equal(hist[0], 0).T, origin='low', aspect='auto', interpolation='nearest', extent=[hist[1][0], hist[1][-1], hist[2][0], hist[2][-1]], label='Residual')
+    plt.imshow(np.ma.masked_equal(hist, 0).T, origin='low', aspect='auto', interpolation='nearest', extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]], label='Residual')
     plt.legend(loc=0)
     if output_fig:
         output_fig.savefig()
