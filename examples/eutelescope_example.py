@@ -22,7 +22,7 @@ The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix consists
 The total size of the chip is 21.5mm x 13.7mm x 0.036mm (radiation length 9.3660734)
 
 The matrix is divided into 4 areas. For each area the threshold can be set up individually.
-The quartes are from column 0-287, 288,575, 576-863 and 864-1151.
+The quartes are from column 0-287, 288-575, 576-863 and 864-1151.
 
 The Mimosa26 detects ionizing particle with a density of up to 10^6 hits / cm^2 / s. The hit rate for a beam telescope is ~5 hits / frame.
 '''
