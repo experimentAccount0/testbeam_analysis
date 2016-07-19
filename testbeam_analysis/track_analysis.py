@@ -6,6 +6,7 @@ from multiprocessing import Pool, cpu_count
 from math import sqrt
 import progressbar
 import os
+from collections import Iterable
 
 import tables as tb
 import numpy as np
@@ -194,14 +195,14 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     if not selection_hit_duts:  # If None: use all DUTs
         selection_hit_duts = [i for i in range(n_duts)]
 
-    if not isinstance(selection_track_quality, list):
+    if not isinstance(selection_track_quality, Iterable):
         selection_track_quality = [selection_track_quality for _ in selection_hit_duts]
 
     # Std. case: use all DUTs that are required to have a hit for track fitting
     if not selection_fit_duts:
         selection_fit_duts = selection_hit_duts
 
-    if not isinstance(selection_fit_duts, list):
+    if not isinstance(selection_fit_duts, Iterable):
         selection_fit_duts = [selection_hit_duts for _ in range(n_duts)]
 
     # Convert potential selection valid for all duts to required selection for each DUT

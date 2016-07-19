@@ -3,6 +3,7 @@ from __future__ import division
 
 import logging
 import re
+from collections import Iterable
 
 import tables as tb
 import numpy as np
@@ -84,7 +85,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
     residuals = []
 
-    if not isinstance(max_chi2, list):
+    if not isinstance(max_chi2, Iterable):
         max_chi2 = [max_chi2] * n_duts
 
     with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
@@ -619,7 +620,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 use_prealignment = True
                 logging.info('Use prealignment data')
 
-    if not isinstance(max_chi2, list):
+    if not isinstance(max_chi2, Iterable):
         max_chi2 = [max_chi2] * n_duts
 
     with PdfPages(output_pdf) as output_fig:
@@ -634,14 +635,14 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 logging.info('Calculate efficiency for DUT %d', actual_dut)
 
                 # Calculate histogram properties (bins size and number of bins)
-                bin_size = [bin_size, ] if not isinstance(bin_size, list) else bin_size
+                bin_size = [bin_size, ] if not isinstance(bin_size, Iterable) else bin_size
                 if len(bin_size) != 1:
                     actual_bin_size_x = bin_size[index][0]
                     actual_bin_size_y = bin_size[index][1]
                 else:
                     actual_bin_size_x = bin_size[0][0]
                     actual_bin_size_y = bin_size[0][1]
-                dimensions = [sensor_size, ] if not isinstance(sensor_size, list) else sensor_size  # Sensor dimensions for each DUT
+                dimensions = [sensor_size, ] if not isinstance(sensor_size, Iterable) else sensor_size  # Sensor dimensions for each DUT
                 if len(dimensions) == 1:
                     dimensions = dimensions[0]
                 else:
@@ -702,8 +703,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                         logging.info('These events are inefficient: %s', str(tracks_chunk['event_number'][selection]))
 
                     # Select hits from column, row range (e.g. to supress edge pixels)
-                    col_range = [col_range, ] if not isinstance(col_range, list) else col_range
-                    row_range = [row_range, ] if not isinstance(row_range, list) else row_range
+                    col_range = [col_range, ] if not isinstance(col_range, Iterable) else col_range
+                    row_range = [row_range, ] if not isinstance(row_range, Iterable) else row_range
                     if len(col_range) == 1:
                         index = 0
                     if len(row_range) == 1:

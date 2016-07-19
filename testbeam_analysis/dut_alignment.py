@@ -6,6 +6,7 @@ import re
 import os
 import progressbar
 import warnings
+from collections import Iterable
 
 import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
@@ -831,7 +832,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         alignment_parameters['translation_z'] = prealignment['z']
 
         if initial_rotation:
-            if isinstance(initial_rotation[0], list):
+            if isinstance(initial_rotation[0], Iterable):
                 for dut_index in range(n_duts):
                     alignment_parameters['alpha'][dut_index] = initial_rotation[dut_index][0]
                     alignment_parameters['beta'][dut_index] = initial_rotation[dut_index][1]
@@ -843,7 +844,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                     alignment_parameters['gamma'][dut_index] = initial_rotation[2]
 
         if initial_translation:
-            if isinstance(initial_translation[0], list):
+            if isinstance(initial_translation[0], Iterable):
                 for dut_index in range(n_duts):
                     alignment_parameters['translation_x'][dut_index] = initial_translation[dut_index][0]
                     alignment_parameters['translation_y'][dut_index] = initial_translation[dut_index][1]
@@ -862,7 +863,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     # Create list with combinations of DUTs to align
     if align_duts is None:  # Align all duts
         align_duts = [range(n_duts)]
-    elif not isinstance(align_duts[0], list):
+    elif not isinstance(align_duts[0], Iterable):
         align_duts = [align_duts]
 
     # Check if some DUTs are not aligned
@@ -878,19 +879,19 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     for index, actual_align_duts in enumerate(align_duts):
         if not selection_fit_duts:
             actual_selection_fit_duts = actual_align_duts
-        elif isinstance(selection_fit_duts[index], list):
+        elif isinstance(selection_fit_duts[index], Iterable):
             actual_selection_fit_duts = selection_fit_duts[index]
         else:
             actual_selection_fit_duts = selection_fit_duts
         if not selection_hit_duts:
             actual_selection_hit_duts = actual_align_duts
-        elif isinstance(selection_hit_duts[index], list):
+        elif isinstance(selection_hit_duts[index], Iterable):
             actual_selection_hit_duts = selection_hit_duts[index]
         else:
             actual_selection_hit_duts = selection_hit_duts
         if not selection_track_quality:
             actual_selection_track_quality = [1] * len(actual_selection_hit_duts)
-        elif isinstance(selection_track_quality[index], list):
+        elif isinstance(selection_track_quality[index], Iterable):
             actual_selection_track_quality = selection_track_quality[index]
         else:
             actual_selection_track_quality = selection_track_quality
