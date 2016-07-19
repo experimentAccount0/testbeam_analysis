@@ -118,9 +118,9 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
     '''Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.
     Empty entries are signaled with column = row = charge = 0.
 
-    Alignment information from the alignment file is used to correct the column/row positions. If alignment is
-    available it is used (translation/rotations for each plane), otherwise pre-alignment data (offset, slope of correlation)
-    is used.
+    Alignment information from the alignment file is used to correct the column/row positions. Use alignment data if
+    available (translation/rotation for each plane), otherwise pre-alignment data (offset, slope of correlation)
+    will be used.
 
     Parameters
     ----------
