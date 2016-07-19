@@ -119,7 +119,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
     Empty entries are signaled with column = row = charge = 0.
 
     Alignment information from the alignment file is used to correct the column/row positions. If alignment is
-    available it is used (translation/rotations for each plane), otherwise prealignment data (offset, slope of correlation)
+    available it is used (translation/rotations for each plane), otherwise pre-alignment data (offset, slope of correlation)
     is used.
 
     Parameters
@@ -205,7 +205,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
 
 
 def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, dut_names=None, non_interactive=True, iterations=2):
-    '''Deduce a prealignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
+    '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
         Parameters
@@ -234,7 +234,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         Only used in non interactive mode. Sets how often automatic cuts are applied.
     '''
 
-    logging.info('=== Prealignment ===')
+    logging.info('=== Pre-alignment ===')
 
     def linear(x, c0, c1):
         return c0 + c1 * x
@@ -522,7 +522,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
 def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
     ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hits positions. The alignment data is used. If this is not
-    available a fallback to the prealignment is done.
+    available a fallback to the pre-alignment is done.
     One can also inverse the alignment or apply the alignment without changing the z position.
 
     This function cannot be easily made faster with multiprocessing since the computation function (apply_alignment_to_chunk) does not contribute significantly to the runtime (< 20 %),
@@ -539,7 +539,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     inverse : boolean
         Apply the inverse alignment
     force_prealignment : boolean
-        Take the prealignment, although if a coarse alignment is availale
+        Take the pre-alignment, although if a coarse alignment is availale
     no_z : boolean
         Do not change the z alignment. Needed since the z position is special for x / y based plane measurements.
     use_duts : iterable
@@ -630,7 +630,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     function work only on already prealigned hits belonging to one track. Thus this function can be called only after track finding.
 
     These steps are done
-    1. Take the found tracks and revert the prealignment
+    1. Take the found tracks and revert the pre-alignment
     2. Take the track hits belonging to one track and fit tracks for all DUTs
     3. Calculate the residuals for each DUT
     4. Deduce rotations from the residuals and apply them to the hits
@@ -824,7 +824,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                 os.remove(input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index)
 
-    # Open the prealignment and create empty alignment info (at the beginning only the z position is set)
+    # Open the pre-alignment and create empty alignment info (at the beginning only the z position is set)
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
         prealignment = in_file_h5.root.PreAlignment[:]
         n_duts = prealignment.shape[0]
