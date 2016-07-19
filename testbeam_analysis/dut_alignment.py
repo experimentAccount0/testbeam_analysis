@@ -860,7 +860,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                               mode='absolute')
 
     # Create list with combinations of DUTs to align
-    if not align_duts:  # Take all duts
+    if align_duts is None:  # Align all duts
         align_duts = [range(n_duts)]
     elif not isinstance(align_duts[0], list):
         align_duts = [align_duts]
