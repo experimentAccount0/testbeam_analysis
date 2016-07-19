@@ -755,17 +755,17 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                       mode='relative',
                                                       select_duts=fit_duts)
 
-    def duts_alignment(align_duts, actual_selection_fit_duts, actual_selection_hit_duts, actual_selection_track_quality, alignment_index):  # Called for each list of DUTs to align
+    def duts_alignment(align_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, alignment_index):  # Called for each list of DUTs to align
 
         # Step 0: Reduce the number of tracks to increase the calculation time
         logging.info('= Alignment step 0: Reduce number of tracks to %d =', use_n_tracks)
         track_quality_mask = 0
-        for index, dut in enumerate(actual_selection_hit_duts):
+        for index, dut in enumerate(selection_hit_duts):
             for quality in range(3):
-                if quality <= actual_selection_track_quality[index]:
+                if quality <= selection_track_quality[index]:
                     track_quality_mask |= ((1 << dut) << quality * 8)
 
-        logging.info('Use track with hits in DUTs %s', str(actual_selection_hit_duts)[1:-1])
+        logging.info('Use track with hits in DUTs %s', str(selection_hit_duts)[1:-1])
         data_selection.select_hits(hit_file=input_track_candidates_file,
                                    output_file=input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index,
                                    max_hits=use_n_tracks,
@@ -786,9 +786,9 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         # Stage N: Repeat alignment with constrained residuals until total residual does not decrease anymore
         calculate_translation_alignment(reduced_track_candidates_file=input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index,
                                         fit_duts=align_duts,  # Only use the actual DUTs to align
-                                        selection_fit_duts=actual_selection_fit_duts,
-                                        selection_hit_duts=actual_selection_hit_duts,
-                                        selection_track_quality=actual_selection_track_quality,
+                                        selection_fit_duts=selection_fit_duts,
+                                        selection_hit_duts=selection_hit_duts,
+                                        selection_track_quality=selection_track_quality,
                                         max_iterations=max_iterations,
                                         output_pdf=False)
 
@@ -805,10 +805,10 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                            input_alignment_file=input_alignment_file,
                            output_tracks_file=input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
                            fit_duts=align_duts,  # Only create residuals of selected DUTs
-                           selection_fit_duts=actual_selection_fit_duts,  # Only use selected duts
-                           selection_hit_duts=actual_selection_hit_duts,
+                           selection_fit_duts=selection_fit_duts,  # Only use selected duts
+                           selection_hit_duts=selection_hit_duts,
                            exclude_dut_hit=True,  # For unconstrained residuals
-                           selection_track_quality=actual_selection_track_quality)
+                           selection_track_quality=selection_track_quality)
                 calculate_residuals(input_tracks_file=input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
                                     input_alignment_file=input_alignment_file,
                                     output_residuals_file=input_track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index,
@@ -897,7 +897,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
         logging.info('Align DUTs %s', str(actual_align_duts)[1:-1])
 
-        duts_alignment(actual_align_duts, actual_selection_fit_duts, actual_selection_hit_duts, actual_selection_track_quality, index)
+        duts_alignment(align_duts=actual_align_duts, selection_fit_duts=actual_selection_fit_duts, selection_hit_duts=actual_selection_hit_duts, selection_track_quality=actual_selection_track_quality, alignment_index=index)
 
     logging.info('Alignment finished successfully!')
 
