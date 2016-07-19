@@ -775,8 +775,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                    chunk_size=chunk_size)
         input_track_candidates_reduced = input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index
 
-        # Step 1: Take the found tracks and revert the prealignment to start alignment from the beginning
-        logging.info('= Alignment step 1: Revert prealignment =')
+        # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
+        logging.info('= Alignment step 1: Revert pre-alignment =')
         apply_alignment(input_hit_file=input_track_candidates_reduced,
                         input_alignment=input_alignment_file,  # Revert prealignent
                         output_hit_aligned_file=input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index,
