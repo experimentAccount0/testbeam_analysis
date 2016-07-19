@@ -536,14 +536,11 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
             alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             alignment_table.append(alignment_parameters)
 
-        logging.info('Set alignment to:')
-        string = '\n\n'
-        for dut_values in alignment_parameters:
-            string += 'DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um\n' % (dut_values['DUT'],
+        string = "\n".join(['DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, x/y/z=%d/%d/%d um' % (dut_values['DUT'],
                                                                                                 dut_values['alpha'],
                                                                                                 dut_values['beta'],
                                                                                                 dut_values['gamma'],
                                                                                                 dut_values['translation_x'],
                                                                                                 dut_values['translation_y'],
-                                                                                                dut_values['translation_z'])
-        logging.info(string)
+                                                                                                dut_values['translation_z']) for dut_values in alignment_parameters])
+        logging.info('Set alignment parameters to:\n%s' % string)
