@@ -479,22 +479,22 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', se
         logging.info('Merge new alignment with old alignment')
 
         alignment_parameters = old_alignment
-        alignment_parameters['translation_x'][selection] += new_alignment['translation_x'][selection]
-        alignment_parameters['translation_y'][selection] += new_alignment['translation_y'][selection]
-        alignment_parameters['translation_z'][selection] += new_alignment['translation_z'][selection]
+        alignment_parameters['translation_x'][dut_selection] += new_alignment['translation_x'][dut_selection]
+        alignment_parameters['translation_y'][dut_selection] += new_alignment['translation_y'][dut_selection]
+        alignment_parameters['translation_z'][dut_selection] += new_alignment['translation_z'][dut_selection]
 
-        alignment_parameters['alpha'][selection] += new_alignment['alpha'][selection]
-        alignment_parameters['beta'][selection] += new_alignment['beta'][selection]
-        alignment_parameters['gamma'][selection] += new_alignment['gamma'][selection]
+        alignment_parameters['alpha'][dut_selection] += new_alignment['alpha'][dut_selection]
+        alignment_parameters['beta'][dut_selection] += new_alignment['beta'][dut_selection]
+        alignment_parameters['gamma'][dut_selection] += new_alignment['gamma'][dut_selection]
 
         # TODO: Is this always a good idea? Usually works, but what if one heavily tilted device?
         # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
-        if np.count_nonzero(selection) > 1:
-            alignment_parameters['alpha'][selection] -= np.mean(alignment_parameters['alpha'][selection])
-            alignment_parameters['beta'][selection] -= np.mean(alignment_parameters['beta'][selection])
-            alignment_parameters['gamma'][selection] -= np.mean(alignment_parameters['gamma'][selection])
-            alignment_parameters['translation_x'][selection] -= np.mean(alignment_parameters['translation_x'][selection])
-            alignment_parameters['translation_y'][selection] -= np.mean(alignment_parameters['translation_y'][selection])
+        if np.count_nonzero(dut_selection) > 1:
+            alignment_parameters['alpha'][dut_selection] -= np.mean(alignment_parameters['alpha'][dut_selection])
+            alignment_parameters['beta'][dut_selection] -= np.mean(alignment_parameters['beta'][dut_selection])
+            alignment_parameters['gamma'][dut_selection] -= np.mean(alignment_parameters['gamma'][dut_selection])
+            alignment_parameters['translation_x'][dut_selection] -= np.mean(alignment_parameters['translation_x'][dut_selection])
+            alignment_parameters['translation_y'][dut_selection] -= np.mean(alignment_parameters['translation_y'][dut_selection])
 
         return alignment_parameters
 
