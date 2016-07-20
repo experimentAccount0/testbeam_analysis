@@ -208,7 +208,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
     '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
-        Parameters
+    Parameters
     ----------
     input_correlation_file : pytbales file
         The input file with the correlation histograms.
