@@ -939,24 +939,24 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             x = (hist_node._v_attrs.xedges[1:] + hist_node._v_attrs.xedges[:-1]) / 2
             y = hist_node[:]
             mu_x = analysis_utils.get_mean_from_histogram(y, x)
-            std = analysis_utils.get_rms_from_histogram(y, x)
-            coeff_x, var_matrix = None, None
+            std_x = analysis_utils.get_rms_from_histogram(y, x)
+            coeff_x, cov_x = None, None
             try:
-                coeff_x, var_matrix = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_x, std])
+                coeff_x, cov_x = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_x, std_x])
             except RuntimeError:  # Fit failed
                 pass
 
             # Add resdidual to total residual normalized to pixel pitch in x
-            total_residual = np.sqrt(np.square(total_residual) + np.square(std / pixel_size[dut_index][0]))  # Maybe better to use sigma from gauss fit?
+            total_residual = np.sqrt(np.square(total_residual) + np.square(std_x / pixel_size[dut_index][0]))  # Maybe better to use sigma from gauss fit?
 
-            alignment_parameters[dut_index]['correlation_x'] = std
+            alignment_parameters[dut_index]['correlation_x'] = std_x
             alignment_parameters[dut_index]['translation_x'] = -mu_x
 
             if output_fig is not False:
                 plot_utils.plot_residuals(histogram=y,
                                           edges=hist_node._v_attrs.xedges,
                                           fit=coeff_x,
-                                          fit_errors=var_matrix,
+                                          fit_errors=cov_x,
                                           title='Residuals for DUT %d' % dut_index,
                                           x_label='X residual [um]',
                                           output_fig=output_fig)
@@ -966,17 +966,17 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             x = (hist_node._v_attrs.yedges[1:] + hist_node._v_attrs.yedges[:-1]) / 2
             y = hist_node[:]
             mu_y = analysis_utils.get_mean_from_histogram(y, x)
-            std = analysis_utils.get_rms_from_histogram(y, x)
-            coeff_x, var_matrix = None, None
+            std_y = analysis_utils.get_rms_from_histogram(y, x)
+            coeff_y, cov_y = None, None
             try:
-                coeff_y, var_matrix = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_y, std])
+                coeff_y, cov_y = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_y, std_y])
             except RuntimeError:  # Fit failed
                 pass
 
             # Add resdidual to total residual normalized to pixel pitch in y
-            total_residual = np.sqrt(np.square(total_residual) + np.square(std / pixel_size[dut_index][1]))  # Maybe better to use sigma from gauss fit?
+            total_residual = np.sqrt(np.square(total_residual) + np.square(std_y / pixel_size[dut_index][1]))  # Maybe better to use sigma from gauss fit?
 
-            alignment_parameters[dut_index]['correlation_y'] = std
+            alignment_parameters[dut_index]['correlation_y'] = std_y
             alignment_parameters[dut_index]['translation_y'] = -mu_y
 
             if translation_only:
@@ -986,7 +986,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
                 plot_utils.plot_residuals(histogram=y,
                                           edges=hist_node._v_attrs.yedges,
                                           fit=coeff_y,
-                                          fit_errors=var_matrix,
+                                          fit_errors=cov_y,
                                           title='Residuals for DUT %d' % dut_index,
                                           x_label='Y residual [um]',
                                           output_fig=output_fig)
