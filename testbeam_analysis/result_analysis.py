@@ -267,6 +267,13 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 logging.debug('Storing residual histograms...')
 
                 # Global residuals
+                hist_residual_x_x = (hist_residual_x_xedges[1:] + hist_residual_x_xedges[:-1]) / 2
+                mu_x = analysis_utils.get_mean_from_histogram(hist_residual_x_hist, hist_residual_x_x)
+                std_x = analysis_utils.get_rms_from_histogram(hist_residual_x_hist, hist_residual_x_x)
+                try:
+                    fit_residual_x, cov_residual_x = curve_fit(analysis_utils.gauss, hist_residual_x_x, hist_residual_x_hist, p0=[np.amax(hist_residual_x_hist), mu_x, std_x])
+                except RuntimeError:  # Fit error
+                    fit_residual_x, cov_residual_x = np.full((3,), np.nan), np.full((3, 3), np.nan)
                 out_res_x = out_file_h5.createCArray(out_file_h5.root,
                                                      name='ResidualsX_DUT%d' % (actual_dut),
                                                      title='Residual distribution in x direction for DUT %d ' % (actual_dut),
@@ -274,8 +281,17 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                      shape=hist_residual_x_hist.shape,
                                                      filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_res_x.attrs.xedges = hist_residual_x_xedges
+                out_res_x.attrs.fit_coeff = fit_residual_x
+                out_res_x.attrs.fit_cov = cov_residual_x
                 out_res_x[:] = hist_residual_x_hist
 
+                hist_residual_y_y = (hist_residual_y_yedges[1:] + hist_residual_y_yedges[:-1]) / 2
+                mu_y = analysis_utils.get_mean_from_histogram(hist_residual_y_hist, hist_residual_y_y)
+                std_y = analysis_utils.get_rms_from_histogram(hist_residual_y_hist, hist_residual_y_y)
+                try:
+                    fit_residual_y, cov_residual_y = curve_fit(analysis_utils.gauss, hist_residual_y_y, hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mu_y, std_y])
+                except RuntimeError:  # Fit error
+                    fit_residual_y, cov_residual_y = np.full((3,), np.nan), np.full((3, 3), np.nan)
                 out_res_y = out_file_h5.createCArray(out_file_h5.root,
                                                      name='ResidualsY_DUT%d' % (actual_dut),
                                                      title='Residual distribution in y direction for DUT %d ' % (actual_dut),
@@ -283,6 +299,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                      shape=hist_residual_y_hist.shape,
                                                      filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_res_y.attrs.yedges = hist_residual_y_yedges
+                out_res_y.attrs.fit_coeff = fit_residual_y
+                out_res_y.attrs.fit_cov = cov_residual_y
                 out_res_y[:] = hist_residual_y_hist
 
                 out_x_res_x = out_file_h5.createCArray(out_file_h5.root,
@@ -402,33 +420,21 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                 # Create plots
                 if output_fig is not False:
-                    # Global residuals
                     logging.debug('Creating residual plots...')
-                    coeff, var_matrix = None, None
-                    hist_residual_x_x = (hist_residual_x_xedges[1:] + hist_residual_x_xedges[:-1]) / 2
-                    try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x_x, hist_residual_x_hist, p0=[np.amax(hist_residual_x_hist), mean_x, std_x])
-                    except RuntimeError:  # Fit error
-                        pass
 
+                    # Global residuals
                     plot_utils.plot_residuals(histogram=hist_residual_x_hist,
                                               edges=hist_residual_x_xedges,
-                                              fit=coeff,
-                                              fit_errors=var_matrix,
+                                              fit=fit_residual_x,
+                                              fit_errors=cov_residual_x,
                                               title='Residuals for DUT %d' % actual_dut,
                                               x_label='X residual [um]',
                                               output_fig=output_fig)
 
-                    coeff, var_matrix = None, None
-                    hist_residual_y_y = (hist_residual_y_yedges[1:] + hist_residual_y_yedges[:-1]) / 2
-                    try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y_y, hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mean_y, std_y])
-                    except RuntimeError:  # Fit error
-                        pass
                     plot_utils.plot_residuals(histogram=hist_residual_y_hist,
                                               edges=hist_residual_y_yedges,
-                                              fit=coeff,
-                                              fit_errors=var_matrix,
+                                              fit=fit_residual_y,
+                                              fit_errors=cov_residual_y,
                                               title='Residuals for DUT %d' % actual_dut,
                                               x_label='Y residual [um]',
                                               output_fig=output_fig)
