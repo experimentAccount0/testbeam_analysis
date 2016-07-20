@@ -686,8 +686,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
             alignment_last_iteration = in_file_h5.root.Alignment[:]
 
-        total_residual = 0
-        for iteration in range(0, max_iterations):
+        total_residual = None
+        for iteration in range(max_iterations):
             if iteration >= max_iterations:
                 raise RuntimeError('Did not converge to good solution in %d iterations. Increase max_iterations', iteration)
 
@@ -736,7 +736,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             os.remove(track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration)
             logging.info('Total residual %1.4e', new_total_residual)
 
-            if total_residual and new_total_residual > total_residual:  # True if actual alignment is worse than last iteration
+            if total_residual is not None and new_total_residual > total_residual:  # True if actual alignment is worse than last iteration
                 logging.info('!! Best alignment found !!')
                 # Step 5: Set alignment from last iteration
                 geometry_utils.store_alignment_parameters(input_alignment_file,  # Store last iteration alignment
