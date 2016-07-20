@@ -423,10 +423,6 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                         coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y_yedges[:-1], hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mean_y, std_y])
                     except RuntimeError:  # Fit error
                         pass
-
-                    def line(x, c0, c1):
-                        return c0 + c1 * x
-
                     plot_utils.plot_residuals(histogram=hist_residual_y_hist,
                                               edges=hist_residual_y_yedges,
                                               fit=coeff,
