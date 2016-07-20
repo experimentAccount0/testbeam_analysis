@@ -313,7 +313,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        name='XResidualsY_DUT%d' % (actual_dut),
                                                        title='Residual distribution in y direction as a function of the x position for DUT %d ' % (actual_dut),
                                                        atom=tb.Atom.from_dtype(hist_x_residual_y_hist.dtype),
-                                                       shape=hist_x_residual_x_hist.shape,
+                                                       shape=hist_x_residual_y_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_x_res_y.attrs.xedges = hist_x_residual_y_xedges
                 out_x_res_y.attrs.yedges = hist_x_residual_y_yedges
