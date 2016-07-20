@@ -936,7 +936,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             # Global residuals
             hist_node = in_file_h5.get_node('/ResidualsX_DUT%d' % dut_index)
             # Calculate bins from edges
-            edges_x = np.linspace(hist_node._v_attrs.x_edges[0], hist_node._v_attrs.x_edges[-1], num=hist_node[:].shape[0] + 1)
+            edges_x = hist_node._v_attrs.xedges
             x = edges_x + np.diff(edges_x)[0]  # Center bins
             x = x[:-1]  # Get rid of extra bin
             y = hist_node[:]
@@ -965,7 +965,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
 
             hist_node = in_file_h5.get_node('/ResidualsY_DUT%d' % dut_index)
             # Calculate bins from edges
-            edges_x = np.linspace(hist_node._v_attrs.x_edges[0], hist_node._v_attrs.x_edges[-1], num=hist_node[:].shape[0] + 1)
+            edges_x = hist_node._v_attrs.yedges
             x = edges_x + np.diff(x)[0]  # Center bins
             x = x[:-1]  # Get rid of extra bin
             y = hist_node[:]

@@ -144,10 +144,10 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                         mean_column, std_column = np.mean(difference_local[:, 0]), np.std(difference_local[:, 0])
                         mean_row, std_row = np.mean(difference_local[:, 1]), np.std(difference_local[:, 1])
 
-                        hist_residual_x_hist, hist_residual_x_edges = np.histogram(difference[:, 0], range=(mean_x - 5.0 * std_x, mean_x + 5.0 * std_x), bins=1000)
-                        hist_residual_y_hist, hist_residual_y_edges = np.histogram(difference[:, 1], range=(mean_y - 5.0 * std_y, mean_y + 5.0 * std_y), bins=1000)
-                        hist_residual_col_hist, hist_residual_col_edges = np.histogram(difference_local[:, 0], range=(mean_column - 5.0 * std_column, mean_column + 5.0 * std_column), bins=1000)
-                        hist_residual_row_hist, hist_residual_row_edges = np.histogram(difference_local[:, 1], range=(mean_row - 5.0 * std_row, mean_row + 5.0 * std_row), bins=1000)
+                        hist_residual_x_hist, hist_residual_x_xedges = np.histogram(difference[:, 0], range=(mean_x - 5.0 * std_x, mean_x + 5.0 * std_x), bins=1000)
+                        hist_residual_y_hist, hist_residual_y_yedges = np.histogram(difference[:, 1], range=(mean_y - 5.0 * std_y, mean_y + 5.0 * std_y), bins=1000)
+                        hist_residual_col_hist, hist_residual_col_xedges = np.histogram(difference_local[:, 0], range=(mean_column - 5.0 * std_column, mean_column + 5.0 * std_column), bins=1000)
+                        hist_residual_row_hist, hist_residual_row_yedges = np.histogram(difference_local[:, 1], range=(mean_row - 5.0 * std_row, mean_row + 5.0 * std_row), bins=1000)
 
                         # global x residual against x position
                         hist_x_residual_x_hist, hist_x_residual_x_xedges, hist_x_residual_x_yedges = np.histogram2d(intersection_x,
@@ -273,7 +273,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                      atom=tb.Atom.from_dtype(hist_residual_x_hist.dtype),
                                                      shape=hist_residual_x_hist.shape,
                                                      filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_res_x.attrs.x_edges = (hist_residual_x_edges[0], hist_residual_x_edges[-1])
+                out_res_x.attrs.xedges = hist_residual_x_xedges
                 out_res_x[:] = hist_residual_x_hist
 
                 out_res_y = out_file_h5.createCArray(out_file_h5.root,
@@ -282,7 +282,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                      atom=tb.Atom.from_dtype(hist_residual_y_hist.dtype),
                                                      shape=hist_residual_y_hist.shape,
                                                      filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_res_y.attrs.x_edges = (hist_residual_y_edges[0], hist_residual_y_edges[-1])
+                out_res_y.attrs.yedges = hist_residual_y_yedges
                 out_res_y[:] = hist_residual_y_hist
 
                 out_x_res_x = out_file_h5.createCArray(out_file_h5.root,
@@ -291,8 +291,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        atom=tb.Atom.from_dtype(hist_x_residual_x_hist.dtype),
                                                        shape=hist_x_residual_x_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_x_res_x.attrs.x_edges = (hist_x_residual_x_xedges[0], hist_x_residual_x_xedges[-1])
-                out_x_res_x.attrs.y_edges = (hist_x_residual_x_yedges[0], hist_x_residual_x_yedges[-1])
+                out_x_res_x.attrs.xedges = hist_x_residual_x_xedges
+                out_x_res_x.attrs.yedges = hist_x_residual_x_yedges
                 out_x_res_x.attrs.fit_coeff = fit_x_residual_x[0]
                 out_x_res_x.attrs.fit_cov = fit_x_residual_x[1]
                 out_x_res_x[:] = hist_x_residual_x_hist
@@ -303,8 +303,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        atom=tb.Atom.from_dtype(hist_y_residual_y_hist.dtype),
                                                        shape=hist_y_residual_y_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_y_res_y.attrs.x_edges = (hist_y_residual_y_xedges[0], hist_y_residual_y_xedges[-1])
-                out_y_res_y.attrs.y_edges = (hist_y_residual_y_yedges[0], hist_y_residual_y_yedges[-1])
+                out_y_res_y.attrs.xedges = hist_y_residual_y_xedges
+                out_y_res_y.attrs.yedges = hist_y_residual_y_yedges
                 out_y_res_y.attrs.fit_coeff = fit_y_residual_y[0]
                 out_y_res_y.attrs.fit_cov = fit_y_residual_y[1]
                 out_y_res_y[:] = hist_y_residual_y_hist
@@ -315,8 +315,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        atom=tb.Atom.from_dtype(hist_x_residual_y_hist.dtype),
                                                        shape=hist_x_residual_x_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_x_res_y.attrs.x_edges = (hist_x_residual_y_xedges[0], hist_x_residual_y_xedges[-1])
-                out_x_res_y.attrs.y_edges = (hist_x_residual_y_yedges[0], hist_x_residual_y_yedges[-1])
+                out_x_res_y.attrs.xedges = hist_x_residual_y_xedges
+                out_x_res_y.attrs.yedges = hist_x_residual_y_yedges
                 out_x_res_y.attrs.fit_coeff = fit_x_residual_y[0]
                 out_x_res_y.attrs.fit_cov = fit_x_residual_y[1]
                 out_x_res_y[:] = hist_x_residual_y_hist
@@ -327,8 +327,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        atom=tb.Atom.from_dtype(hist_y_residual_x_hist.dtype),
                                                        shape=hist_y_residual_x_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_y_res_x.attrs.x_edges = (hist_y_residual_x_xedges[0], hist_y_residual_x_xedges[-1])
-                out_y_res_x.attrs.y_edges = (hist_y_residual_x_yedges[0], hist_y_residual_x_yedges[-1])
+                out_y_res_x.attrs.xedges = hist_y_residual_x_xedges
+                out_y_res_x.attrs.yedges = hist_y_residual_x_yedges
                 out_y_res_x.attrs.fit_coeff = fit_y_residual_x[0]
                 out_y_res_x.attrs.fit_cov = fit_y_residual_x[1]
                 out_y_res_x[:] = hist_y_residual_x_hist
@@ -340,7 +340,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        atom=tb.Atom.from_dtype(hist_residual_col_hist.dtype),
                                                        shape=hist_residual_col_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_res_col.attrs.x_edges = (hist_residual_col_edges[0], hist_residual_col_edges[-1])
+                out_res_col.attrs.xedges = hist_residual_col_xedges
                 out_res_col[:] = hist_residual_col_hist
 
                 out_res_row = out_file_h5.createCArray(out_file_h5.root,
@@ -349,7 +349,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                        atom=tb.Atom.from_dtype(hist_residual_row_hist.dtype),
                                                        shape=hist_residual_row_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_res_row.attrs.x_edges = (hist_residual_row_edges[0], hist_residual_row_edges[-1])
+                out_res_row.attrs.yedges = hist_residual_row_yedges
                 out_res_row[:] = hist_residual_row_hist
 
                 out_col_res_col = out_file_h5.createCArray(out_file_h5.root,
@@ -358,8 +358,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            atom=tb.Atom.from_dtype(hist_col_residual_col_hist.dtype),
                                                            shape=hist_col_residual_col_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_col_res_col.attrs.x_edges = (hist_col_residual_col_xedges[0], hist_col_residual_col_xedges[-1])
-                out_col_res_col.attrs.y_edges = (hist_col_residual_col_yedges[0], hist_col_residual_col_yedges[-1])
+                out_col_res_col.attrs.xedges = hist_col_residual_col_xedges
+                out_col_res_col.attrs.yedges = hist_col_residual_col_yedges
                 out_col_res_col.attrs.fit_coeff = fit_col_residual_col[0]
                 out_col_res_col.attrs.fit_cov = fit_col_residual_col[1]
                 out_col_res_col[:] = hist_col_residual_col_hist
@@ -370,8 +370,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            atom=tb.Atom.from_dtype(hist_row_residual_row_hist.dtype),
                                                            shape=hist_row_residual_row_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_row_res_row.attrs.x_edges = (hist_row_residual_row_xedges[0], hist_row_residual_row_xedges[-1])
-                out_row_res_row.attrs.y_edges = (hist_row_residual_row_yedges[0], hist_row_residual_row_yedges[-1])
+                out_row_res_row.attrs.xedges = hist_row_residual_row_xedges
+                out_row_res_row.attrs.yedges = hist_row_residual_row_yedges
                 out_row_res_row.attrs.fit_coeff = fit_row_residual_row[0]
                 out_row_res_row.attrs.fit_cov = fit_row_residual_row[1]
                 out_row_res_row[:] = hist_row_residual_row_hist
@@ -382,8 +382,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            atom=tb.Atom.from_dtype(hist_col_residual_row_hist.dtype),
                                                            shape=hist_col_residual_col_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_col_res_row.attrs.x_edges = (hist_col_residual_row_xedges[0], hist_col_residual_row_xedges[-1])
-                out_col_res_row.attrs.y_edges = (hist_col_residual_row_yedges[0], hist_col_residual_row_yedges[-1])
+                out_col_res_row.attrs.xedges = hist_col_residual_row_xedges
+                out_col_res_row.attrs.yedges = hist_col_residual_row_yedges
                 out_col_res_row.attrs.fit_coeff = fit_col_residual_row[0]
                 out_col_res_row.attrs.fit_cov = fit_col_residual_row[1]
                 out_col_res_row[:] = hist_col_residual_row_hist
@@ -394,8 +394,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            atom=tb.Atom.from_dtype(hist_row_residual_col_hist.dtype),
                                                            shape=hist_row_residual_col_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                out_row_res_col.attrs.x_edges = (hist_row_residual_col_xedges[0], hist_row_residual_col_xedges[-1])
-                out_row_res_col.attrs.y_edges = (hist_row_residual_col_yedges[0], hist_row_residual_col_yedges[-1])
+                out_row_res_col.attrs.xedges = hist_row_residual_col_xedges
+                out_row_res_col.attrs.yedges = hist_row_residual_col_yedges
                 out_row_res_col.attrs.fit_coeff = fit_row_residual_col[0]
                 out_row_res_col.attrs.fit_cov = fit_row_residual_col[1]
                 out_row_res_col[:] = hist_row_residual_col_hist
@@ -406,12 +406,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     logging.debug('Creating residual plots...')
                     coeff, var_matrix = None, None
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x_edges[:-1], hist_residual_x_hist, p0=[np.amax(hist_residual_x_hist), mean_x, std_x])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x_xedges[:-1], hist_residual_x_hist, p0=[np.amax(hist_residual_x_hist), mean_x, std_x])
                     except RuntimeError:  # Fit error
                         pass
 
                     plot_utils.plot_residuals(histogram=hist_residual_x_hist,
-                                              edges=hist_residual_x_edges,
+                                              edges=hist_residual_x_xedges,
                                               fit=coeff,
                                               fit_errors=var_matrix,
                                               title='Residuals for DUT %d' % actual_dut,
@@ -420,7 +420,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                     coeff, var_matrix = None, None
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y_edges[:-1], hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mean_y, std_y])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y_yedges[:-1], hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mean_y, std_y])
                     except RuntimeError:  # Fit error
                         pass
 
@@ -428,7 +428,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                         return c0 + c1 * x
 
                     plot_utils.plot_residuals(histogram=hist_residual_y_hist,
-                                              edges=hist_residual_y_edges,
+                                              edges=hist_residual_y_yedges,
                                               fit=coeff,
                                               fit_errors=var_matrix,
                                               title='Residuals for DUT %d' % actual_dut,
@@ -490,12 +490,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     # Local residuals
                     coeff, var_matrix = None, None
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_col_edges[:-1], hist_residual_col_hist, p0=[np.amax(hist_residual_col_hist), mean_column, std_column])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_col_xedges[:-1], hist_residual_col_hist, p0=[np.amax(hist_residual_col_hist), mean_column, std_column])
                     except RuntimeError:  # Fit error
                         pass
 
                     plot_utils.plot_residuals(histogram=hist_residual_col_hist,
-                                              edges=hist_residual_col_edges,
+                                              edges=hist_residual_col_xedges,
                                               fit=coeff,
                                               fit_errors=var_matrix,
                                               title='Residuals for DUT %d' % actual_dut,
@@ -504,12 +504,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                     coeff, var_matrix = None, None
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_row_edges[:-1], hist_residual_row_hist, p0=[np.amax(hist_residual_row_hist), mean_row, std_row])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_row_yedges[:-1], hist_residual_row_hist, p0=[np.amax(hist_residual_row_hist), mean_row, std_row])
                     except RuntimeError:  # Fit error
                         pass
 
                     plot_utils.plot_residuals(histogram=hist_residual_row_hist,
-                                              edges=hist_residual_row_edges,
+                                              edges=hist_residual_row_yedges,
                                               fit=coeff,
                                               fit_errors=var_matrix,
                                               title='Residuals for DUT %d' % actual_dut,
