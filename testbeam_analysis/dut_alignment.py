@@ -782,13 +782,13 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         logging.info('= Alignment step 1: Revert pre-alignment =')
         apply_alignment(input_hit_file=input_track_candidates_reduced,
                         input_alignment=input_alignment_file,  # Revert prealignent
-                        output_hit_aligned_file=input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index,
+                        output_hit_aligned_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
                         inverse=True,
                         force_prealignment=True,
                         chunk_size=chunk_size)
 
         # Stage N: Repeat alignment with constrained residuals until total residual does not decrease anymore
-        calculate_translation_alignment(track_candidates_file=input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index,
+        calculate_translation_alignment(track_candidates_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
                                         fit_duts=align_duts,  # Only use the actual DUTs to align
                                         selection_fit_duts=selection_fit_duts,
                                         selection_hit_duts=selection_hit_duts,
@@ -801,7 +801,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             logging.info('= Alignment step 6: Plot final result =')
             with PdfPages(os.path.join(os.path.dirname(os.path.realpath(input_track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
                 # Apply final alignment result
-                apply_alignment(input_hit_file=input_track_candidates_reduced[:-3] + '_not_aligned_%d.h5' % alignment_index,
+                apply_alignment(input_hit_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
                                 input_alignment=input_alignment_file,
                                 output_hit_aligned_file=input_track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
                                 chunk_size=chunk_size)
