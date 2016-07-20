@@ -694,6 +694,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             apply_alignment(input_hit_file=track_candidates_file,  # Always apply alignment to starting file
                             input_alignment=input_alignment_file,
                             output_hit_aligned_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
+                            inverse=False,
+                            force_prealignment=False,
                             chunk_size=chunk_size)
 
             # Step 2: Fit tracks for all DUTs
