@@ -952,7 +952,8 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             alignment_parameters[dut_index]['translation_x'] = -mu_x
 
             if output_fig is not False:
-                plot_utils.plot_residuals(histogram=(y, edges_x),
+                plot_utils.plot_residuals(histogram=y,
+                                          edges=edges_x,
                                           fit=coeff_x,
                                           fit_errors=var_matrix,
                                           title='Residuals for DUT %d' % dut_index,
@@ -983,7 +984,8 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
                 return alignment_parameters, total_residual
 
             if output_fig is not False:
-                plot_utils.plot_residuals(histogram=(y, edges_x),
+                plot_utils.plot_residuals(histogram=y,
+                                          edges=edges_x,
                                           fit=coeff_y,
                                           fit_errors=var_matrix,
                                           title='Residuals for DUT %d' % dut_index,
