@@ -405,8 +405,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     # Global residuals
                     logging.debug('Creating residual plots...')
                     coeff, var_matrix = None, None
+                    hist_residual_x_x = (hist_residual_x_xedges[1:] + hist_residual_x_xedges[:-1]) / 2
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x_xedges[:-1], hist_residual_x_hist, p0=[np.amax(hist_residual_x_hist), mean_x, std_x])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_x_x, hist_residual_x_hist, p0=[np.amax(hist_residual_x_hist), mean_x, std_x])
                     except RuntimeError:  # Fit error
                         pass
 
@@ -419,8 +420,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                               output_fig=output_fig)
 
                     coeff, var_matrix = None, None
+                    hist_residual_y_y = (hist_residual_y_yedges[1:] + hist_residual_y_yedges[:-1]) / 2
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y_yedges[:-1], hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mean_y, std_y])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_y_y, hist_residual_y_hist, p0=[np.amax(hist_residual_y_hist), mean_y, std_y])
                     except RuntimeError:  # Fit error
                         pass
                     plot_utils.plot_residuals(histogram=hist_residual_y_hist,
@@ -485,8 +487,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                     # Local residuals
                     coeff, var_matrix = None, None
+                    hist_residual_col_x = (hist_residual_col_xedges[1:] + hist_residual_col_xedges[:-1]) / 2
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_col_xedges[:-1], hist_residual_col_hist, p0=[np.amax(hist_residual_col_hist), mean_column, std_column])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_col_x, hist_residual_col_hist, p0=[np.amax(hist_residual_col_hist), mean_column, std_column])
                     except RuntimeError:  # Fit error
                         pass
 
@@ -499,8 +502,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                               output_fig=output_fig)
 
                     coeff, var_matrix = None, None
+                    hist_residual_row_y = (hist_residual_row_yedges[1:] + hist_residual_row_yedges[:-1]) / 2
                     try:
-                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_row_yedges[:-1], hist_residual_row_hist, p0=[np.amax(hist_residual_row_hist), mean_row, std_row])
+                        coeff, var_matrix = curve_fit(analysis_utils.gauss, hist_residual_row_y, hist_residual_row_hist, p0=[np.amax(hist_residual_row_hist), mean_row, std_row])
                     except RuntimeError:  # Fit error
                         pass
 

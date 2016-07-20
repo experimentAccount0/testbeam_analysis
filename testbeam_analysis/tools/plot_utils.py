@@ -618,8 +618,10 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
 def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig=None):
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
-        plot_range = (analysis_utils.get_mean_from_histogram(histogram, edges[:-1]) - 5 * analysis_utils.get_rms_from_histogram(histogram, edges[:-1]),
-                      analysis_utils.get_mean_from_histogram(histogram, edges[:-1]) + 5 * analysis_utils.get_rms_from_histogram(histogram, edges[:-1]))
+        # Calculate bin centers
+        x = (edges[1:] + edges[:-1]) / 2
+        plot_range = (analysis_utils.get_mean_from_histogram(histogram, x) - 5 * analysis_utils.get_rms_from_histogram(histogram, x),
+                      analysis_utils.get_mean_from_histogram(histogram, x) + 5 * analysis_utils.get_rms_from_histogram(histogram, x))
         plt.xlim(plot_range)
         plt.grid()
         plt.title(title)
@@ -629,13 +631,11 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
         if plot_log:
             plt.ylim(1, int(ceil(np.amax(histogram) / 10.0)) * 100)
 
-        plt.bar(edges[:-1], histogram, width=(edges[1] - edges[0]), log=plot_log, align='edge')
+        plt.bar(x, histogram, log=plot_log, align='center')
         if np.any(fit):
-            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram.sum(), analysis_utils.get_rms_from_histogram(histogram, edges[:-1])))
-#             plt.plot([np.median(difference[:, i]), np.median(difference[:, i])], [0, plt.ylim()[1]], '-', label='Median: $%.1f\pm %.1f$' % (np.median(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='green', linewidth=2)
-#             plt.plot([np.mean(difference[:, i]), np.mean(difference[:, i])], [0, plt.ylim()[1]], '-', label='Mean: $%.1f\pm %.1f$' % (np.mean(difference[:, i]), 1.253 * np.std(difference[:, i]) / float(sqrt(difference[:, i].shape[0]))), color='red', linewidth=2)
+            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram.sum(), analysis_utils.get_rms_from_histogram(histogram, x)))
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (fit[0], np.absolute(fit_errors[0][0] ** 0.5), fit[1], np.absolute(fit_errors[1][1] ** 0.5), np.absolute(fit[2]), np.absolute(fit_errors[2][2] ** 0.5))
-            plt.plot(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), analysis_utils.gauss(np.arange(np.amin(edges[:-1]), np.amax(edges[:-1]), 0.1), *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            plt.plot(x, analysis_utils.gauss(x, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         if output_fig:
             output_fig.savefig()
