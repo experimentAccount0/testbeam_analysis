@@ -678,7 +678,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
     logging.info('=== Aligning DUTs ===')
 
-    def calculate_translation_alignment(track_candidates_file, fit_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, max_iterations, output_pdf, plot_title_praefix=''):
+    def calculate_translation_alignment(track_candidates_file, fit_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, max_iterations, output_pdf, plot_title_prefix=''):
         ''' Main function that fits tracks, calculates the residuals, deduces rotation and translation values from the residuals
         and applies the new alignment to the track hits. The alignment result is scored as a combined
         residual value of all planes that are being aligned in x and y weighted by the pixel pitch in x and y. '''
@@ -734,7 +734,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                               pixel_size=pixel_size,
                                                                               n_duts=n_duts,
                                                                               translation_only=False,
-                                                                              plot_title_praefix=plot_title_praefix)
+                                                                              plot_title_prefix=plot_title_prefix)
 
             os.remove(track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration)
             logging.info('Total residual %1.4e', new_total_residual)
@@ -924,7 +924,7 @@ def _create_alignment_array(n_duts):
     return array
 
 
-def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_duts, translation_only=False, plot_title_praefix=''):
+def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_duts, translation_only=False, plot_title_prefix=''):
     ''' Take the residual plots and deduce rotation and translation angles from them '''
     alignment_parameters = _create_alignment_array(n_duts)
 
