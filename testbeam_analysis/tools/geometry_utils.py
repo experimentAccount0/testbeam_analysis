@@ -473,7 +473,7 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', se
 
     if mode == 'absolute':
         logging.info('Set alignment')
-        old_alignment[selection] = new_alignment[selection]
+        old_alignment[dut_selection] = new_alignment[dut_selection]
         return old_alignment
     else:
         logging.info('Merge new alignment with old alignment')
