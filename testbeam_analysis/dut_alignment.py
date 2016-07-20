@@ -707,7 +707,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                        selection_fit_duts=selection_fit_duts,   # Only use selected DUTs for track fit
                        selection_hit_duts=selection_hit_duts,  # Only use selected duts
                        exclude_dut_hit=False,  # For constrained residuals
-                       selection_track_quality=selection_track_quality)
+                       selection_track_quality=selection_track_quality,
+                       force_prealignment=False)
 
             os.remove(track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration)
 
