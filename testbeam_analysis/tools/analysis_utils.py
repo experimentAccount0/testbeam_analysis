@@ -430,7 +430,7 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_cha
 
 def gauss(x, *p):
     A, mu, sigma = p
-    return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
+    return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
 
 
 def get_mean_from_histogram(counts, bin_positions):
