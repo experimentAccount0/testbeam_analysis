@@ -465,12 +465,11 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
 
 
 def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', select_duts=None):
-    selection = np.ones(old_alignment.shape[0], dtype=np.bool)
-
-    if select_duts:
-        for index in range(selection.shape[0]):
-            if index not in select_duts:
-                selection[index] = False
+    if select_duts is None:  # select all DUTs
+        dut_selection = np.ones(old_alignment.shape[0], dtype=np.bool)
+    else:
+        dut_selection = np.zeros(old_alignment.shape[0], dtype=np.bool)
+        dut_selection[np.array(select_duts)] = True
 
     if mode == 'absolute':
         logging.info('Set alignment')
