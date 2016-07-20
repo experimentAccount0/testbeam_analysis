@@ -935,16 +935,14 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             alignment_parameters[dut_index]['DUT'] = dut_index
             # Global residuals
             hist_node = in_file_h5.get_node('/ResidualsX_DUT%d' % dut_index)
-            # Calculate bins from edges
-            edges_x = hist_node._v_attrs.xedges
-            x = edges_x + np.diff(edges_x)[0]  # Center bins
-            x = x[:-1]  # Get rid of extra bin
+            # Calculate bins centers
+            x = (hist_node._v_attrs.xedges[1:] + hist_node._v_attrs.xedges[:-1]) / 2
             y = hist_node[:]
-            mu_x = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
-            std = analysis_utils.get_rms_from_histogram(y, edges_x[:-1])
+            mu_x = analysis_utils.get_mean_from_histogram(y, x)
+            std = analysis_utils.get_rms_from_histogram(y, x)
             coeff_x, var_matrix = None, None
             try:
-                coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu_x, std])
+                coeff_x, var_matrix = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_x, std])
             except RuntimeError:  # Fit failed
                 pass
 
@@ -956,7 +954,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
 
             if output_fig is not False:
                 plot_utils.plot_residuals(histogram=y,
-                                          edges=edges_x,
+                                          edges=hist_node._v_attrs.xedges,
                                           fit=coeff_x,
                                           fit_errors=var_matrix,
                                           title='Residuals for DUT %d' % dut_index,
@@ -964,10 +962,8 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
                                           output_fig=output_fig)
 
             hist_node = in_file_h5.get_node('/ResidualsY_DUT%d' % dut_index)
-            # Calculate bins from edges
-            edges_x = hist_node._v_attrs.yedges
-            x = edges_x + np.diff(x)[0]  # Center bins
-            x = x[:-1]  # Get rid of extra bin
+            # Calculate bins centers
+            x = (hist_node._v_attrs.yedges[1:] + hist_node._v_attrs.yedges[:-1]) / 2
             y = hist_node[:]
             mu_y = analysis_utils.get_mean_from_histogram(y, x)
             std = analysis_utils.get_rms_from_histogram(y, x)
@@ -988,7 +984,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
 
             if output_fig is not False:
                 plot_utils.plot_residuals(histogram=y,
-                                          edges=edges_x,
+                                          edges=hist_node._v_attrs.yedges,
                                           fit=coeff_y,
                                           fit_errors=var_matrix,
                                           title='Residuals for DUT %d' % dut_index,
