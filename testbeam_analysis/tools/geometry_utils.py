@@ -517,7 +517,7 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
         In relative mode only change specified DUTs
     '''
 
-    if 'absolute' not in mode and 'relative' not in mode:
+    if mode != 'absolute' and mode != 'relative':
         raise RuntimeError('Mode %s is unknown', str(mode))
 
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
