@@ -398,7 +398,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                            name='ColumnResidualsRow_DUT%d' % (actual_dut),
                                                            title='Residual distribution in row direction as a function of the column position for DUT %d ' % (actual_dut),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_row_hist.dtype),
-                                                           shape=hist_col_residual_col_hist.shape,
+                                                           shape=hist_col_residual_row_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 out_col_res_row.attrs.xedges = hist_col_residual_row_xedges
                 out_col_res_row.attrs.yedges = hist_col_residual_row_yedges
