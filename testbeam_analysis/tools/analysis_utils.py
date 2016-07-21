@@ -451,6 +451,9 @@ def find_closest(arr, values):
     idx -= values - left < right - values
     return idx
 
+def line(x, c0, c1):
+    return c0 + c1 * x
+
 def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
@@ -676,9 +679,6 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
 
 def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
     ''' Takes unhistogrammed residuals as a function of the position, histograms and fits these with errors'''
-    def line(x, c0, c1):
-        return c0 + c1 * x
-
     # calculating the data points
     hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
     # selecting data points to be included into fit

@@ -656,8 +656,7 @@ def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=
     if fit is not None:
         axis = plt.gca()
         x_lim = np.array(axis.get_xlim(), dtype=np.float)
-        line = lambda x, c0, c1: c0 + c1 * x
-        plt.plot(x_lim, line(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
+        plt.plot(x_lim, analysis_utils.line(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
     plt.legend(loc=0)
     if output_fig:
         output_fig.savefig()
