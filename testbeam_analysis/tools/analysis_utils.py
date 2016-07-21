@@ -427,6 +427,28 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_cha
     n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
     return correlated, n_fixes
 
+def find_closest(arr, values):
+    '''Returns a list of indices with values closest to arr values.
+
+    Parameters
+    ----------
+    arr : iterable
+        Iterable of numbers. Arr must be sorted.
+    values : iterable
+        Iterable of numbers.
+
+    Returns
+    -------
+    A list of indices with values closest to arr values.
+
+    See also: http://stackoverflow.com/questions/8914491/finding-the-nearest-value-and-return-the-index-of-array-in-python
+    '''
+    idx = arr.searchsorted(values)
+    idx = np.clip(idx, 1, len(arr)-1)
+    left = arr[idx-1]
+    right = arr[idx]
+    idx -= values - left < right - values
+    return idx
 
 def gauss(x, *p):
     A, mu, sigma = p
