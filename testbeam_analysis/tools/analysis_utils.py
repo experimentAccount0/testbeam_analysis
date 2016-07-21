@@ -474,10 +474,6 @@ def gauss_box(x, *p):
 # Vetorize function to use with np.arrays
 gauss_box_vfunc = np.vectorize(gauss_box, excluded=["*p"])
 
-def vfunc(x, *p):
-    evaluations = np.array([gauss_box(i, p) for i in x])
-    return evaluations
-
 def get_mean_from_histogram(counts, bin_positions):
     return np.dot(counts, np.array(bin_positions)) / np.sum(counts).astype('f4')
 
