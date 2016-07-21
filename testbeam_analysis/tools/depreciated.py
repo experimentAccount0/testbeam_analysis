@@ -511,14 +511,12 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
 
                         pool = Pool(n_slices)
                         if method == "interpolation":
-                            slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+                            slices = np.array_split(track_hits, n_slices)
                             results = pool.map(_fit_tracks_loop, slices)
                         elif method == "kalman":
-                            slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
-                            # arg = (slices, pixel_size, z_positions)
-                            args = [(track_hits[i:i + slice_length], pixel_size, z_positions) for i in range(0, n_tracks, slice_length)]
-                            # args = [(data_files[i], n_pixels[i][0], n_pixels[i][1], 16, 14) for i in range(0, len(data_files))]
-                            results = pool.map(_function_wrapper_fit_tracks_kalman_loop, args)
+                            slices = np.array_split(track_hits, n_slices)
+                            slices = [(slice, pixel_size, z_positions) for slice in slices]
+                            results = pool.map(_function_wrapper_fit_tracks_kalman_loop, slices)
                         pool.close()
                         pool.join()
 

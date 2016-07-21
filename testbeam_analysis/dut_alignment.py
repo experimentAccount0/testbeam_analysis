@@ -1051,8 +1051,7 @@ def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=1000
 
         # Split data and fit on all available cores
         n_slices = cpu_count()
-        slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
-        slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
+        slices = np.array_split(track_hits, n_slices)
         pool = Pool(n_slices)
         results = pool.map(track_analysis._fit_tracks_loop, slices)
         pool.close()

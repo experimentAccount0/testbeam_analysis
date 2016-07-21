@@ -418,9 +418,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Split data and fit on all available cores
                         n_slices = cpu_count()
-                        slice_length = np.ceil(1. * n_tracks / n_slices).astype(np.int32)
-                        slices = [track_hits[i:i + slice_length] for i in range(0, n_tracks, slice_length)]
-
+                        slices = np.array_split(n_tracks, n_slices)
                         results = pool.map(_fit_tracks_loop, slices)
                         del track_hits
 
