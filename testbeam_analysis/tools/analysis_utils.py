@@ -10,6 +10,7 @@ from numba import njit
 from scipy.interpolate import splrep, sproot
 from scipy import stats
 from scipy.optimize import curve_fit
+from scipy.integrate import quad
 
 from testbeam_analysis import analysis_functions
 from testbeam_analysis.cpp import data_struct
@@ -454,6 +455,28 @@ def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
 
+def gauss2(x, *p):
+    mu, sigma = p
+    return (sigma * np.sqrt(2.0 * np.pi))**-1.0 * np.exp(-0.5 * ((x - mu) / sigma)**2.0)
+
+def gauss_box(x, *p):
+    ''''Convolution of gaussian and rectangle is a gaussian integral.
+
+    Parameters
+    ----------
+    A, mu, sigma, a (width of the rectangle) : float
+
+    See also: http://stackoverflow.com/questions/24230233/fit-gaussian-integral-function-to-data
+    '''
+    A, mu, sigma, a = p
+    return quad(lambda t: gauss(x-t,A,mu,sigma),-a,a)[0]
+
+# Vetorize function to use with np.arrays
+gauss_box_vfunc = np.vectorize(gauss_box, excluded=["*p"])
+
+def vfunc(x, *p):
+    evaluations = np.array([gauss_box(i, p) for i in x])
+    return evaluations
 
 def get_mean_from_histogram(counts, bin_positions):
     return np.dot(counts, np.array(bin_positions)) / np.sum(counts).astype('f4')
