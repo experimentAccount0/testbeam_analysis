@@ -587,7 +587,7 @@ def fwhm(x, y, k=10):
     """
 
     half_max = np.max(y) / 2.0
-    spl = splrep(x, y - half_max)
+    spl = splrep(x, y - half_max, k=k)
     roots = sproot(spl)
 
     if len(roots) != 2:
