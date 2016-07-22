@@ -482,11 +482,8 @@ def get_mean_from_histogram(counts, bin_positions):
 
 
 def get_rms_from_histogram(counts, bin_positions):
-    values = []
-    for index, one_bin in enumerate(counts):
-        for _ in range(one_bin):
-            values.append(bin_positions[index])
-    return np.std(values)
+    return np.std(np.repeat(bin_positions, counts))
+
 
 def get_mean_efficiency(array_pass, array_total, method=0):
     ''' Function to calculate the mean and the error of the efficiency using different approaches.
