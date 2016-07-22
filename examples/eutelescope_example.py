@@ -69,7 +69,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
         'input_hits_file': data_files[i],
         'n_pixel': n_pixels[i],
         'pixel_size': pixel_size[i],
-        'threshold': 5,
+        'threshold': 0.5,
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
