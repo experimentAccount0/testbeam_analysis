@@ -428,6 +428,7 @@ def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_cha
     n_fixes = analysis_functions.fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, correlated, error, n_bad_events, correlation_search_range, n_good_events, good_events_search_range)
     return correlated, n_fixes
 
+
 def find_closest(arr, values):
     '''Returns a list of indices with values closest to arr values.
 
@@ -451,16 +452,20 @@ def find_closest(arr, values):
     idx -= values - left < right - values
     return idx
 
+
 def line(x, c0, c1):
     return c0 + c1 * x
+
 
 def gauss(x, *p):
     A, mu, sigma = p
     return A * np.exp(-(x - mu) ** 2.0 / (2.0 * sigma ** 2.0))
 
+
 def gauss2(x, *p):
     mu, sigma = p
     return (sigma * np.sqrt(2.0 * np.pi))**-1.0 * np.exp(-0.5 * ((x - mu) / sigma)**2.0)
+
 
 def gauss_box(x, *p):
     ''''Convolution of gaussian and rectangle is a gaussian integral.
@@ -476,6 +481,7 @@ def gauss_box(x, *p):
 
 # Vetorize function to use with np.arrays
 gauss_box_vfunc = np.vectorize(gauss_box, excluded=["*p"])
+
 
 def get_mean_from_histogram(counts, bin_positions):
     return np.dot(counts, np.array(bin_positions)) / np.sum(counts).astype('f4')
