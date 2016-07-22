@@ -13,7 +13,7 @@ from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools.plot_utils import plot_noisy_pixels, plot_cluster_size
 
 
-def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_size=None, threshold=10.0, dut_name=None, plot=True, chunk_size=1000000):
+def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
     '''Removes noisy pixel from the data file containing the hit table.
     The hit table is read in chunks and for each chunk the noisy pixel are determined and removed.
 
@@ -29,7 +29,9 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     pixel_size : tuple
         Pixel dimension for column and row. If None, assuming square pixels.
     threshold : float
-        The threshold for pixel masking. The threshold is given in units of sigma of the pixel noise (background subtracted).
+        The threshold for pixel masking. The threshold is given in units of sigma of the pixel noise (background subtracted). The lower the value the more pixels are masked.
+    filter_size : scalar or tuple
+        Adjust the median filter size by giving the number of columns and rows. The higher the value the more the background is smoothed and more pixels are masked.
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
@@ -50,7 +52,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
                 occupancy = occupancy + chunk_occ
 
     # run median filter across data, assuming 0 filling past the edges
-    blurred = median_filter(occupancy.astype(np.int32), size=2, mode='constant', cval=0.0)
+    blurred = median_filter(occupancy.astype(np.int32), size=filter_size, mode='constant', cval=0.0)
     difference = np.ma.masked_array(occupancy - blurred)
 
     std = np.ma.std(difference)
