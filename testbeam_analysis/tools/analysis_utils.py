@@ -603,6 +603,30 @@ def fwhm(x, y):
         return roots[0], roots[1]
 
 
+def peak_detect(x, y):
+    try:
+        fwhm_left_right = fwhm(x=x, y=y)
+    except RuntimeError:
+        raise RuntimeError("Cannot determine peak")
+    fwhm_value = fwhm_left_right[-1] - fwhm_left_right[0]
+    max_position = x[np.argmax(y)]
+    center = (fwhm_left_right[0] + fwhm_left_right[-1]) / 2.0
+    return max_position, center, fwhm_value, fwhm_left_right
+
+
+def simple_peak_detect(x, y):
+    half_maximum = np.max(y) * 0.5
+    greater = (y > half_maximum)
+    change_indices = np.where(greater[:-1] != greater[1:])[0]
+    if np.all(greater == False) or greater[0] == True or greater[-1] == True:
+        raise RuntimeError("Cannot determine peak")
+    fwhm_left_right = (x[change_indices[0]], x[change_indices[-1]])
+    fwhm_value = fwhm_left_right[-1] - fwhm_left_right[0]
+    max_position = x[np.argmax(y)]
+    center = (fwhm_left_right[0] + fwhm_left_right[-1]) / 2.0
+    return max_position, center, fwhm_value, fwhm_left_right
+
+
 def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, beta_inverted=None):
     if np.abs(m_xy) > 1. or np.abs(m_yx) > 1.:
         raise NotImplementedError('Device seems to be heavily tilted in gamma. This is not supported.')
@@ -696,3 +720,56 @@ def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
     position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
 
     return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
+
+
+def fit_residuals(hist, edges, label="", title="", output_fig=None):
+    bin_center = (edges[1:] + edges[:-1]) / 2.0
+    hist_mean = get_mean_from_histogram(hist, bin_center)
+    hist_std = get_rms_from_histogram(hist, bin_center)
+    fit, cov = curve_fit(gauss, bin_center, hist, p0=[np.amax(hist), hist_mean, hist_std])
+
+    if output_fig is not None:
+        testbeam_analysis.tools.plot_utils.plot_residuals(
+            histogram=hist,
+            edges=edges,
+            fit=fit,
+            fit_errors=cov,
+            x_label=label,
+            title=title,
+            output_fig=output_fig
+        )
+
+    return fit, cov
+
+
+def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_fig=None):
+    xcenter = (xedges[1:] + xedges[:-1]) / 2.0
+    ycenter = (yedges[1:] + yedges[:-1]) / 2.0
+    y_sum = np.sum(hist, axis=1)
+    #sum_threshold = np.percentile(y_sum, 100 - 50)
+    x_sel = (y_sum > 0.0) & np.isfinite(y_sum)
+    y_mean = np.full_like(y_sum, np.nan, dtype=np.float)
+    y_mean[x_sel] = np.average(hist, axis=1, weights=ycenter)[x_sel] * np.sum(ycenter) / y_sum[x_sel]
+    n_hits_threshold = np.percentile(y_sum, 50)
+    x_sel = (y_sum >= n_hits_threshold) & np.isfinite(y_sum)
+    y_rel_err = np.full_like(y_sum, np.nan, dtype=np.float)
+    y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
+    fit, cov = curve_fit(line, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
+
+    if output_fig is not None:
+        testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(
+            hist,
+            xedges=xedges,
+            yedges=yedges,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            res_mean=y_mean,
+            res_pos=xcenter,
+            selection=x_sel,
+            fit=fit,
+            cov=cov,
+            title=title,
+            output_fig=output_fig
+        )
+
+    return fit, cov

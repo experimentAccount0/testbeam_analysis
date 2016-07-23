@@ -665,6 +665,32 @@ def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=
         plt.show()
 
 
+def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, output_fig=None, fit=None, cov=None):  # Plot the residuals as a function of the position
+    plt.clf()
+    plt.grid()
+    if title:
+        plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.imshow(np.ma.masked_equal(hist, 0).T, extent=[xedges[0], xedges[-1] , yedges[0], yedges[-1]], origin='low', aspect='auto', interpolation='none')
+    if res_mean is not None and res_pos is not None:
+        if selection is None:
+            selection = np.full_like(res_pos, True, dtype=np.bool)
+        plt.plot(res_pos[selection], res_mean[selection], linestyle='', color="blue", marker='o',  label='Mean residual')
+        plt.plot(res_pos[~selection], res_mean[~selection], linestyle='', color="darkblue", marker='o')
+    if fit is not None:
+        axis = plt.gca()
+        x_lim = np.array(axis.get_xlim(), dtype=np.float)
+        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.line(x_lim, *fit), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0], fit[1]))
+    plt.xlim([xedges[0], xedges[-1]])
+    plt.ylim([yedges[0], yedges[-1]])
+    plt.legend(loc=0)
+    if output_fig:
+        output_fig.savefig()
+    elif output_fig is None:
+        plt.show(),
+
+
 def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
     Parameters

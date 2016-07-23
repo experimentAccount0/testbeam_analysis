@@ -935,22 +935,13 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             alignment_parameters[dut_index]['DUT'] = dut_index
             # Global residuals
             hist_node = in_file_h5.get_node('/ResidualsX_DUT%d' % dut_index)
-            # Calculate bins centers
-            x = (hist_node._v_attrs.xedges[1:] + hist_node._v_attrs.xedges[:-1]) / 2
-            y = hist_node[:]
-            mu_x = analysis_utils.get_mean_from_histogram(y, x)
-            std_x = analysis_utils.get_rms_from_histogram(y, x)
-            coeff_x, cov_x = None, None
-            try:
-                coeff_x, cov_x = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_x, std_x])
-            except RuntimeError:  # Fit failed
-                pass
-
-            # Add resdidual to total residual normalized to pixel pitch in x
-            total_residual = np.sqrt(np.square(total_residual) + np.square(std_x / pixel_size[dut_index][0]))  # Maybe better to use sigma from gauss fit?
-
+            mu_x = hist_node._v_attrs.fit_coeff[1]
+            std_x = hist_node._v_attrs.fit_coeff[2]
             alignment_parameters[dut_index]['correlation_x'] = std_x
             alignment_parameters[dut_index]['translation_x'] = -mu_x
+
+            # Add resdidual to total residual normalized to pixel pitch in x
+            total_residual = np.sqrt(np.square(total_residual) + np.square(std_x / pixel_size[dut_index][0]))
 
             if output_fig is not False:
                 plot_utils.plot_residuals(histogram=y,
@@ -962,22 +953,13 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
                                           output_fig=output_fig)
 
             hist_node = in_file_h5.get_node('/ResidualsY_DUT%d' % dut_index)
-            # Calculate bins centers
-            x = (hist_node._v_attrs.yedges[1:] + hist_node._v_attrs.yedges[:-1]) / 2
-            y = hist_node[:]
-            mu_y = analysis_utils.get_mean_from_histogram(y, x)
-            std_y = analysis_utils.get_rms_from_histogram(y, x)
-            coeff_y, cov_y = None, None
-            try:
-                coeff_y, cov_y = curve_fit(analysis_utils.gauss, x, y, p0=[np.max(y), mu_y, std_y])
-            except RuntimeError:  # Fit failed
-                pass
-
-            # Add resdidual to total residual normalized to pixel pitch in y
-            total_residual = np.sqrt(np.square(total_residual) + np.square(std_y / pixel_size[dut_index][1]))  # Maybe better to use sigma from gauss fit?
-
+            mu_y = hist_node._v_attrs.fit_coeff[1]
+            std_y = hist_node._v_attrs.fit_coeff[2]
             alignment_parameters[dut_index]['correlation_y'] = std_y
             alignment_parameters[dut_index]['translation_y'] = -mu_y
+
+            # Add resdidual to total residual normalized to pixel pitch in y
+            total_residual = np.sqrt(np.square(total_residual) + np.square(std_y / pixel_size[dut_index][1]))
 
             if translation_only:
                 return alignment_parameters, total_residual
