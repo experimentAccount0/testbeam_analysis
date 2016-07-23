@@ -582,21 +582,21 @@ def get_mean_efficiency(array_pass, array_total, method=0):
             return eff_mean, eff_err_low, eff_err_up
 
 
-def fwhm(x, y, k=10):
+def fwhm(x, y):
     """
     Determine full-with-half-maximum of a peaked set of points, x and y.
 
     Assumes that there is only one peak present in the datasset. The function
-    uses a spline interpolation of order k.
+    uses a spline interpolation of order 3.
 
     See also http://stackoverflow.com/questions/10582795/finding-the-full-width-half-maximum-of-a-peak
     """
 
     half_max = np.max(y) / 2.0
-    spl = splrep(x, y - half_max, k=k)
+    spl = splrep(x, y - half_max)
     roots = sproot(spl)
 
-    if len(roots) != 2:
+    if len(roots) != 2:  # multiple peaks or no peaks
         raise RuntimeError("Cannot determine FWHM")
     else:
         return roots[0], roots[1]
