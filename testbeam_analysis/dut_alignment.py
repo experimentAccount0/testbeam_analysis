@@ -739,10 +739,10 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             os.remove(track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration)
             logging.info('Total residual %1.4e', new_total_residual)
 
-            if total_residual is not None and new_total_residual > total_residual:  # True if actual alignment is worse than last iteration
+            if total_residual is not None and new_total_residual > total_residual:  # True if actual alignment is worse than the alignment from last iteration
                 logging.info('!! Best alignment found !!')
                 # Step 5: Set alignment from last iteration
-                geometry_utils.store_alignment_parameters(input_alignment_file,  # Store last iteration alignment
+                geometry_utils.store_alignment_parameters(input_alignment_file,  # Store alignment from last iteration
                                                           alignment_last_iteration,
                                                           mode='absolute',
                                                           select_duts=fit_duts)
