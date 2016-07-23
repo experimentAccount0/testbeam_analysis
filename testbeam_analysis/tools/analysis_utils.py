@@ -705,7 +705,7 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
     return alpha, beta, gamma
 
 
-def fit_residuals(positions, residuals, n_bins, min_pos, max_pos):
+def fit_residuals(positions, residuals, n_bins):
     ''' Takes unhistogrammed residuals as a function of the position, histograms and fits these with errors'''
     # calculating the data points
     hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
