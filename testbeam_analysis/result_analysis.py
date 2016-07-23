@@ -311,8 +311,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 out_res_x[:] = hist_residual_x_hist
 
                 fit_residual_y, cov_residual_y = analysis_utils.fit_residuals(
-                    hist=hist_residual_x_hist,
-                    edges=hist_residual_x_xedges,
+                    hist=hist_residual_y_hist,
+                    edges=hist_residual_y_yedges,
                     label='Y residual [um]',
                     title='Residuals for DUT %d' % actual_dut,
                     output_fig=output_fig
@@ -415,8 +415,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                 # Local residuals
                 fit_residual_col, cov_residual_col = analysis_utils.fit_residuals(
-                    hist=hist_residual_x_hist,
-                    edges=hist_residual_x_xedges,
+                    hist=hist_residual_col_hist,
+                    edges=hist_residual_col_xedges,
                     label='Column residual [um]',
                     title='Residuals for DUT %d' % actual_dut,
                     output_fig=output_fig
@@ -433,8 +433,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 out_res_col[:] = hist_residual_col_hist
 
                 fit_residual_row, cov_residual_row = analysis_utils.fit_residuals(
-                    hist=hist_residual_x_hist,
-                    edges=hist_residual_x_xedges,
+                    hist=hist_residual_row_hist,
+                    edges=hist_residual_row_yedges,
                     label='Row residual [um]',
                     title='Residuals for DUT %d' % actual_dut,
                     output_fig=output_fig
