@@ -638,6 +638,7 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
             x_gauss = np.arange(np.floor(np.min(edges)), np.ceil(np.max(edges)), step=0.1)
             plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
+        plt.xlim([edges[0], edges[-1]])
         if output_fig:
             output_fig.savefig()
         elif output_fig is None:
