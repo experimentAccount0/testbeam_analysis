@@ -294,13 +294,13 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
         # Start values for fitting
         # Correlation peak
-        mu_peak = np.argmax(data, axis=1) + 1  # +1 because col/row start at 1
+        mu_peak = np.argmax(data, axis=1) + 0.5  # +1 because col/row start at 1
         A_peak = np.max(data, axis=1)  # signal / correlation peak
         # Background of uncorrelated data
         n_entries = np.sum(data, axis=1)
         A_background = np.mean(data, axis=1)  # noise / background halo
         mu_background = np.zeros_like(n_entries)
-        mu_background[n_entries > 0] = np.average(data, axis=1, weights=range(1, data.shape[1] + 1))[n_entries > 0] * sum(range(1, data.shape[1] + 1)) / n_entries[n_entries > 0]  # +1 because col/row start at 1
+        mu_background[n_entries > 0] = np.average(data, axis=1, weights=np.arange(data.shape[1]) + 0.5)[n_entries > 0] * sum(np.arange(data.shape[1]) + 0.5) / n_entries[n_entries > 0]  # +1 because col/row start at 1
 
         coeff = None
         fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
@@ -414,7 +414,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
                 # matrix index 0 is cluster index 1 ranging from 0.5 to 1.4999, which becomes position 0.0 to 0.999, etc.
-                x = np.linspace(1.0, data.shape[0], num=data.shape[0], endpoint=True, dtype=np.float) + 0.5
+                x = np.linspace(0.0, data.shape[0], num=data.shape[0], endpoint=False, dtype=np.float) + 0.5
                 coeff_fitted = [None] * data.shape[0]
                 mean_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Peak of the Gauss fit
                 mean_fitted.fill(np.nan)
