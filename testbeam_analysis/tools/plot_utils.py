@@ -18,7 +18,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.widgets import Slider, Button
 from scipy.optimize import curve_fit
 
-from testbeam_analysis.tools import analysis_utils
+import testbeam_analysis.tools.analysis_utils
 
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")  # Plot backend error not important
 
@@ -109,7 +109,7 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
             max_cluster_size = np.amax(cluster_n_hits) + 1
             plt.clf()
             left = np.arange(max_cluster_size)
-            hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size,))
+            hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size,))
             plt.bar(left, hight, align='center')
             plt.title('Cluster size of %s' % dut_name)
             plt.xlabel('Cluster size')
@@ -554,7 +554,7 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
 
         n_duts = sum(['charge' in col for col in table.dtype.names])
         array = table[:]
-        tracks = analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+        tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
         if tracks.shape[0] == 0:
             logging.warning('No tracks in event selection, cannot plot events!')
             return
@@ -620,8 +620,8 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
         plt.clf()
         # Calculate bin centers
         x = (edges[1:] + edges[:-1]) / 2
-        plot_range = (analysis_utils.get_mean_from_histogram(histogram, x) - 5 * analysis_utils.get_rms_from_histogram(histogram, x),
-                      analysis_utils.get_mean_from_histogram(histogram, x) + 5 * analysis_utils.get_rms_from_histogram(histogram, x))
+        plot_range = (testbeam_analysis.tools.analysis_utils.get_mean_from_histogram(histogram, x) - 5 * testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x),
+                      testbeam_analysis.tools.analysis_utils.get_mean_from_histogram(histogram, x) + 5 * testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x))
         plt.xlim(plot_range)
         plt.grid()
         plt.title(title)
@@ -633,10 +633,10 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
 
         plt.bar(x, histogram, log=plot_log, align='center')
         if np.any(fit):
-            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram.sum(), analysis_utils.get_rms_from_histogram(histogram, x)))
+            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram.sum(), testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x)))
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (fit[0], np.absolute(fit_errors[0][0] ** 0.5), fit[1], np.absolute(fit_errors[1][1] ** 0.5), np.absolute(fit[2]), np.absolute(fit_errors[2][2] ** 0.5))
             x_gauss = np.arange(np.floor(np.min(edges)), np.ceil(np.max(edges)), step=0.1)
-            plt.plot(x_gauss, analysis_utils.gauss(x_gauss, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
+            plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         if output_fig:
             output_fig.savefig()
@@ -656,7 +656,7 @@ def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=
     if fit is not None:
         axis = plt.gca()
         x_lim = np.array(axis.get_xlim(), dtype=np.float)
-        plt.plot(x_lim, analysis_utils.line(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
+        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.line(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
     plt.legend(loc=0)
     if output_fig:
         output_fig.savefig()

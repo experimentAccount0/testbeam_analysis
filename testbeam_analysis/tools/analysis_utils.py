@@ -13,6 +13,7 @@ from scipy.optimize import curve_fit
 from scipy.integrate import quad
 
 from testbeam_analysis import analysis_functions
+import testbeam_analysis.tools.plot_utils
 from testbeam_analysis.cpp import data_struct
 
 
