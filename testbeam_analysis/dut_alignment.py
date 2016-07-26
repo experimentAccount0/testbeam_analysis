@@ -331,15 +331,15 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 # Fit correlation
                 if fit_background:  # Describe background with addidional gauss + offset
-                    coeff, var_matrix = curve_fit(double_gauss_offset, x, data[index, :], p0=p0, bounds=bounds)
+                    coeff, var_matrix = curve_fit(double_gauss_offset, x_ref, data[index, :], p0=p0, bounds=bounds)
 
                     fit_converged = True
 
                     if not signal_sanity_check(coeff, s_n, A_peak[index]):
                         logging.debug('No correlation peak found. Try another fit...')
                         # Use parameters from last fit as start parameters for the refit
-                        y_fit = double_gauss_offset(x, *coeff)
-                        coeff, var_matrix = refit_advanced(x_data=x, y_data=data[index, :], y_fit=y_fit, p0=coeff)
+                        y_fit = double_gauss_offset(x_ref, *coeff)
+                        coeff, var_matrix = refit_advanced(x_data=x_ref, y_data=data[index, :], y_fit=y_fit, p0=coeff)
 
                         # Check result again:
                         if not signal_sanity_check(coeff, s_n, A_peak[index]):
@@ -380,7 +380,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     mean_fitted[index] = coeff[1]
                     mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
                     sigma_fitted[index] = np.abs(coeff[2])
-                    chi2[index] = get_chi2(y_data=data[index, :], y_fit=double_gauss_offset(x, *coeff))
+                    chi2[index] = get_chi2(y_data=data[index, :], y_fit=double_gauss_offset(x_ref, *coeff))
                 n_cluster[index] = data[index, :].sum()
 
             except RuntimeError:  # curve_fit failed
@@ -411,10 +411,11 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][1], pixel_size[ref_idx][1]
 
                 data = node[:]
-
+                
                 # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
                 # matrix index 0 is cluster index 1 ranging from 0.5 to 1.4999, which becomes position 0.0 to 0.999, etc.
-                x = np.linspace(0.0, data.shape[0], num=data.shape[0], endpoint=False, dtype=np.float) + 0.5
+                x_ref = np.linspace(0.0, data.shape[1], num=data.shape[1], endpoint=False, dtype=np.float) + 0.5
+                x_dut = np.linspace(0.0, data.shape[0], num=data.shape[0], endpoint=False, dtype=np.float) + 0.5
                 coeff_fitted = [None] * data.shape[0]
                 mean_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Peak of the Gauss fit
                 mean_fitted.fill(np.nan)
@@ -431,13 +432,13 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 fit_data(data)
 
                 # Convert fit results to metric units for alignment fit
-                x_scaled = x * pixel_length_dut
+                x_dut_scaled = x_dut * pixel_length_dut
                 mean_fitted_scaled = mean_fitted * pixel_length_ref
                 mean_error_fitted_scaled = mean_error_fitted * pixel_length_ref
 
                 # Selected data arrays
-                x_selected = x.copy()
-                x_scaled_selected = x_scaled.copy()
+                x_selected = x_dut.copy()
+                x_dut_scaled_selected = x_dut_scaled.copy()
                 mean_fitted_scaled_selected = mean_fitted_scaled.copy()
                 mean_error_fitted_scaled_selected = mean_error_fitted_scaled.copy()
                 sigma_fitted_selected = sigma_fitted.copy()
@@ -447,10 +448,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 # Show the straigt line correlation fit including fit errors and offsets from the fit
                 # Let the user change the cuts (error limit, offset limit) and refit until result looks good
                 refit = True
-                selected_data = np.ones_like(mean_fitted, dtype=np.bool)
+                selected_data = np.ones_like(x_dut, dtype=np.bool)
                 actual_iteration = 0  # Refit counter for non interactive mode
                 while(refit):
-                    selected_data, fit, refit = plot_utils.plot_alignments(x=x_scaled_selected,
+                    selected_data, fit, refit = plot_utils.plot_alignments(x=x_dut_scaled_selected,
                                                                            mean_fitted=mean_fitted_scaled_selected,
                                                                            mean_error_fitted=mean_error_fitted_scaled_selected,
                                                                            n_cluster=n_cluster_selected,
@@ -459,7 +460,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                                                            title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", dut_name, ref_name),
                                                                            non_interactive=non_interactive)
                     x_selected = x_selected[selected_data]
-                    x_scaled_selected = x_scaled_selected[selected_data]
+                    x_dut_scaled_selected = x_dut_scaled_selected[selected_data]
                     mean_fitted_scaled_selected = mean_fitted_scaled_selected[selected_data]
                     mean_error_fitted_scaled_selected = mean_error_fitted_scaled_selected[selected_data]
                     sigma_fitted_selected = sigma_fitted_selected[selected_data]
@@ -474,7 +475,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 # Linear fit, usually describes correlation very well, slope is close to 1.
                 # With low energy beam and / or beam with diverse agular distribution, the correlation will not be perfectly straight
                 # Use results from straight line fit as start values for this final fit
-                re_fit, re_fit_pcov = curve_fit(linear, x_scaled_selected, mean_fitted_scaled_selected, sigma=mean_error_fitted_scaled_selected, absolute_sigma=True, p0=[fit[0], fit[1]])
+                re_fit, re_fit_pcov = curve_fit(linear, x_dut_scaled_selected, mean_fitted_scaled_selected, sigma=mean_error_fitted_scaled_selected, absolute_sigma=True, p0=[fit[0], fit[1]])
 
                 # Write fit results to array
                 table_prefix = 'column' if 'column' in node.name.lower() else 'row'
@@ -495,8 +496,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 idx = (np.abs(x_selected - 1 - plot_index)).argmin()
                 plot_index = np.array(x_selected - 1, dtype=np.int)[idx]
 
-                y_fit = double_gauss_offset(x, *coeff_fitted[plot_index])
-                plot_utils.plot_correlation_fit(x=x,
+                y_fit = double_gauss_offset(x_ref, *coeff_fitted[plot_index])
+                plot_utils.plot_correlation_fit(x=x_ref,
                                                 y=data[plot_index, :],
                                                 y_fit=y_fit,
                                                 xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
@@ -506,10 +507,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 # Plot selected data with fit
                 fit_fn = np.poly1d(re_fit[::-1])
-                selected_indices = np.searchsorted(x_scaled, x_scaled_selected)
-                mask = np.zeros_like(x_scaled, dtype=np.bool)
+                selected_indices = np.searchsorted(x_dut_scaled, x_dut_scaled_selected)
+                mask = np.zeros_like(x_dut_scaled, dtype=np.bool)
                 mask[selected_indices] = True
-                plot_utils.plot_alignment_fit(x=x_scaled, mean_fitted=mean_fitted_scaled, mask=mask, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted_scaled, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
+                plot_utils.plot_alignment_fit(x=x_dut_scaled, mean_fitted=mean_fitted_scaled, mask=mask, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted_scaled, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
 
             logging.info('Store pre alignment data in %s', output_alignment_file)
             with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
