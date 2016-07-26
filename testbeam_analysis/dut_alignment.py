@@ -711,8 +711,6 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                        selection_track_quality=selection_track_quality,
                        force_prealignment=False)
 
-            os.remove(track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration)
-
             # Step 3: Calculate the residuals for each DUT
             logging.info('= Alignment step 3 / iteration %d: Calculate the residuals for each selected DUT =', iteration)
             calculate_residuals(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
@@ -723,20 +721,28 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                 output_pdf=False,
                                 chunk_size=chunk_size)
 
-            # Delete not needed files
-            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration)
-            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.pdf' % iteration)
-
             # Step 4: Deduce rotations from the residuals
             logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
-            new_alignment_parameters, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
+            alignment_parameters_change, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
                                                                               output_fig=output_pdf,
                                                                               fit_duts=fit_duts,
                                                                               pixel_size=pixel_size,
                                                                               n_duts=n_duts,
                                                                               translation_only=False,
                                                                               plot_title_prefix=plot_title_prefix)
+            new_alignment_parameters = geometry_utils.merge_alignment_parameters(alignment_last_iteration, alignment_parameters_change)  # Create actual alignment (old alignment + the actual relative change)
 
+            # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
+            logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
+            new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
+                                                                               alignment_last_iteration=alignment_last_iteration, 
+                                                                               new_alignment_parameters=new_alignment_parameters,
+                                                                               pixel_size=pixel_size)
+
+            # Delete not needed files
+            os.remove(track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration)
+            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration)
+            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.pdf' % iteration)
             os.remove(track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration)
             logging.info('Total residual %1.4e', new_total_residual)
 
@@ -751,13 +757,13 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             else:
                 total_residual = new_total_residual
 
-            with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-                alignment_last_iteration = in_file_h5.root.Alignment[:]
+#             with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+            alignment_last_iteration = new_alignment_parameters.copy() #in_file_h5.root.Alignment[:]
 
-            logging.info('= Alignment step 5/ iteration %d: Set new rotation / translation information in alignment file =', iteration)
+            logging.info('= Alignment step 6 / iteration %d: Set new rotation / translation information in alignment file =', iteration)
             geometry_utils.store_alignment_parameters(input_alignment_file,
                                                       new_alignment_parameters,
-                                                      mode='relative',
+                                                      mode='absolute',
                                                       select_duts=fit_duts)
 
     def duts_alignment(align_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, alignment_index):  # Called for each list of DUTs to align
@@ -778,7 +784,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                    track_quality_mask=track_quality_mask,
                                    chunk_size=chunk_size)
         input_track_candidates_reduced = input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index
-
+ 
         # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
         logging.info('= Alignment step 1: Revert pre-alignment =')
         apply_alignment(input_hit_file=input_track_candidates_reduced,
@@ -989,6 +995,141 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
     return alignment_parameters, total_residual
 
 
+def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignment_parameters, pixel_size):
+    ''' Changes the angles of a virtual plane such that the projected track intersections onto this virtual plane
+    are most close to the measured hits on the real DUT at this position. Then the angles of the virtual plane
+    should correspond to the real DUT angles. The distance is not weighted quadratically (RMS) but linearly since
+    this leads to better results (most likely heavily scattered tracks / beam angle spread at the edges are weighted less).'''
+    # Create new absolute alignment
+    alignment_result = new_alignment_parameters
+    
+    def _minimize_me(align, dut_position, hit_x_local, hit_y_local, hit_z_local, pixel_size, offsets, slopes):
+        # Calculate intersections with a dut plane given by alpha, beta, gamma at the dut_position in the global coordinate system
+        rotation_matrix = geometry_utils.rotation_matrix(alpha=align[0],
+                                                         beta=align[1],
+                                                         gamma=align[2])
+        basis_global = rotation_matrix.T.dot(np.eye(3))
+        dut_plane_normal = basis_global[2]
+        actual_dut_position = dut_position.copy()
+        actual_dut_position[2] = align[3] * 1e6  # z position in meter
+        intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                         line_directions=slopes,
+                                                                         position_plane=actual_dut_position,
+                                                                         normal_plane=dut_plane_normal)
+
+        # Transform to the local coordinate system to compare with measured hits
+        transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=actual_dut_position[0],
+                                                                                      y=actual_dut_position[1],
+                                                                                      z=actual_dut_position[2],
+                                                                                      alpha=align[0],
+                                                                                      beta=align[1],
+                                                                                      gamma=align[2])
+
+        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_transformation_matrix(x=intersections[:, 0], 
+                                                                                                                      y=intersections[:, 1], 
+                                                                                                                      z=intersections[:, 2], 
+                                                                                                                      transformation_matrix=transformation_matrix)
+        
+        # Cross check if transformations are correct (z == 0 in the local coordinate system)
+        if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
+            logging.error('Hit z position = %s and z intersection %s', 
+                          str(hit_z_local[~np.isclose(hit_z_local, 0)[:3]]), 
+                          str(intersection_z_local[~np.isclose(intersection_z_local, 0)[:3]]))
+            raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
+
+        return np.sum(np.abs(hit_x_local - intersection_x_local) / pixel_size[0]) + np.sum(np.abs(hit_y_local - intersection_y_local)) / pixel_size[1]
+#         return np.sqrt(np.square(np.std(hit_x_local - intersection_x_local) / pixel_size[0]) + np.square(np.std(hit_y_local - intersection_y_local)) / pixel_size[1])
+
+    with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
+        residuals_before = []
+        residuals_after = []
+        for node in in_file_h5.root:
+            actual_dut = int(re.findall(r'\d+', node.name)[-1])
+            dut_position = np.array([alignment_last_iteration[actual_dut]['translation_x'], alignment_last_iteration[actual_dut]['translation_y'], alignment_last_iteration[actual_dut]['translation_z']])
+            
+            # Hits with the actual alignment
+            hits = np.vstack((node[:]['x_dut_%d' % actual_dut], node[:]['y_dut_%d' % actual_dut], node[:]['z_dut_%d' % actual_dut])).T
+            
+            # Transform hits to the local coordinate system
+            hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hits_x=hits[:, 0], 
+                                                                                   hits_y=hits[:, 1], 
+                                                                                   hits_z=hits[:, 2], 
+                                                                                   dut_index=actual_dut,
+                                                                                   alignment=alignment_last_iteration,
+                                                                                   inverse=True)
+            
+            # Track infos
+            offsets = np.vstack((node[:]['offset_0'], node[:]['offset_1'], node[:]['offset_2'])).T
+            slopes = np.vstack((node[:]['slope_0'], node[:]['slope_1'], node[:]['slope_2'])).T
+            
+            # Rotation start values of minimizer
+            alpha = alignment_result[actual_dut]['alpha']
+            beta = alignment_result[actual_dut]['beta']
+            gamma = alignment_result[actual_dut]['gamma']
+            z_position = alignment_result[actual_dut]['translation_z']
+            
+            # Trick to have the same order of magnitue of variation for angles and position, otherwise scipy minimizers
+            # do not converge if step size of parameters is very different
+            z_position_in_m = z_position * 1e-6
+
+            residual = _minimize_me(np.array([alpha, beta, gamma, z_position_in_m]), 
+                                      dut_position, 
+                                      hit_x_local, 
+                                      hit_y_local, 
+                                      hit_z_local, 
+                                      pixel_size[actual_dut], 
+                                      offsets, 
+                                      slopes)
+            residuals_before.append(residual)
+            logging.info('Optimize angles / z of DUT %d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' %(actual_dut, 
+                                                                                                                     alpha, 
+                                                                                                                     beta, 
+                                                                                                                     gamma,
+                                                                                                                     z_position_in_m * 1e6, 
+                                                                                                                     residual))
+
+            #FIXME:
+            # Has to be heavily restricted otherwise converges to unphysical solutions since the scoring with residuals is not really working well
+            bounds = [(alpha - 0.01, alpha + 0.01), (beta - 0.01, beta + 0.01), (gamma - 0.001, gamma + 0.001), (z_position_in_m - 10e-6, z_position_in_m + 10e-6)]
+ 
+            result = minimize(fun=_minimize_me,
+                    x0=np.array([alpha, beta, gamma, z_position_in_m]),  # Start values from residual fit
+                    args=(dut_position, hit_x_local, hit_y_local, hit_z_local, pixel_size[actual_dut], offsets, slopes),
+                    bounds=bounds,
+                    method='SLSQP')
+             
+            alpha, beta, gamma, z_position_in_m = result.x
+            residual = _minimize_me(result.x, 
+                                          dut_position, 
+                                          hit_x_local, 
+                                          hit_y_local, 
+                                          hit_z_local, 
+                                          pixel_size[actual_dut], 
+                                          offsets, 
+                                          slopes)
+            residuals_after.append(residual)
+ 
+            logging.info('Found angles of DUT %d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' %(actual_dut, 
+                                                                                                                     alpha, 
+                                                                                                                     beta, 
+                                                                                                                     gamma,
+                                                                                                                     z_position_in_m * 1e6, 
+                                                                                                                     residual))
+            # Rotation start values of minimizer
+            alignment_result[actual_dut]['alpha'] = alpha
+            alignment_result[actual_dut]['beta'] = beta
+            alignment_result[actual_dut]['gamma'] = gamma
+            alignment_result[actual_dut]['translation_z'] = z_position_in_m * 1e6
+
+    total_residuals_before = np.sqrt(np.sum(np.square(np.array(residuals_before))))
+    total_residuals_after = np.sqrt(np.sum(np.square(np.array(residuals_after))))
+    logging.info('Reduced the total residuals in the optimization steps from %1.2e to %1.2e', total_residuals_before, total_residuals_after)
+    if total_residuals_before < total_residuals_after:
+        raise RuntimeError('Alignment optimization did not converge!')
+    
+    return alignment_result, total_residuals_after  # Return alignment result and total residual
+
+
 # Helper functions to be called from multiple processes
 def _correlate_cluster(cluster_dut_0, cluster_file, start_index, start_event_number, stop_event_number, column_correlation, row_correlation, chunk_size):
     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
@@ -1000,289 +1141,3 @@ def _correlate_cluster(cluster_dut_0, cluster_file, start_index, start_event_num
                                                              row_corr_hist=row_correlation)
 
     return start_index, column_correlation, row_correlation
-
-
-def align_z(input_track_candidates_file, input_alignment_file, use_n_tracks=100000, ignore_duts=None, chunk_size=10000000):
-    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        prealignment = in_file_h5.root.PreAlignment[:]
-        alignment = in_file_h5.root.Alignment[:]
-#         z_positions = alignment['translation_z']
-        n_duts = prealignment.shape[0]
-
-    def _reduce_data(input_track_candidates_file, dut_selection, use_n_tracks):  # Step 0: Reduce the number of tracks to increase the calculation time
-        logging.info('= Z step 0: Reduce number of tracks to %d =', use_n_tracks)
-        track_quality = 1
-        data_selection.select_hits(hit_file=input_track_candidates_file,
-                                   max_hits=use_n_tracks,
-                                   track_quality=(dut_selection << (track_quality * 8)),
-                                   track_quality_mask=(dut_selection << (track_quality * 8)),
-                                   chunk_size=chunk_size)
-        reduced_track_candidates_file = input_track_candidates_file[:-3] + '_reduced.h5'  # Rename to reduced file
-        with tb.open_file(reduced_track_candidates_file) as in_file_h5:
-            return in_file_h5.root.TrackCandidates[:]
-
-    def _fit_tracks(track_candidates, dut_selection, z_corrections):  # Step 1: Fit tracks, do not use fit track method to reduce the overhead and save time
-        # Prepare track hits array to be fitted
-        n_fit_duts = bin(dut_selection).count("1")
-        index, n_tracks = 0, track_candidates['event_number'].shape[0]  # Index of tmp track hits array
-        track_hits = np.zeros((n_tracks, n_fit_duts, 3))
-        for dut_index in range(n_duts):  # Fill index loop of new array
-            if (1 << dut_index) & dut_selection == (1 << dut_index):  # True if DUT is used in fit
-                xyz = np.column_stack((track_candidates['x_dut_%s' % dut_index], track_candidates['y_dut_%s' % dut_index], track_candidates['z_dut_%s' % dut_index])) + z_corrections[dut_index]
-                track_hits[:, index, :] = xyz
-                index += 1
-
-        # Split data and fit on all available cores
-        n_slices = cpu_count()
-        slices = np.array_split(track_hits, n_slices)
-        pool = Pool(n_slices)
-        results = pool.map(track_analysis._fit_tracks_loop, slices)
-        pool.close()
-        pool.join()
-
-        offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
-        slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
-
-        return track_hits, offsets, slopes
-
-    def _minimize_me(z_correction, actual_dut):
-        dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z'] + z_correction])
-        rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
-                                                         beta=alignment[actual_dut]['beta'],
-                                                         gamma=alignment[actual_dut]['gamma'])
-        basis_global = rotation_matrix.T.dot(np.eye(3))
-        dut_plane_normal = basis_global[2]
-
-        intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                         line_directions=slopes,
-                                                                         position_plane=dut_position,
-                                                                         normal_plane=dut_plane_normal)
-
-        return np.sqrt(np.square(np.std(track_hits[:, actual_dut, 0] - intersections[:, 0])) + np.square(np.std(track_hits[:, actual_dut, 1] - intersections[:, 1])))
-
-    dut_selection = 0
-    for i in range(n_duts):
-        if ignore_duts and i in ignore_duts:
-            continue
-        dut_selection |= (1 << i)
-
-    dut_selection = (1 << (n_duts - 1) | 1)
-    z_corrections = np.zeros(n_duts)
-    track_candidates = _reduce_data(input_track_candidates_file, dut_selection, use_n_tracks=use_n_tracks)
-
-    residuals = np.zeros(n_duts)
-
-    _, offsets, slopes = _fit_tracks(track_candidates, dut_selection, z_corrections=z_corrections)
-
-    for actual_dut in range(n_duts):
-        residuals_plt = []
-        #_, offsets, slopes = _fit_tracks(track_candidates, dut_selection | (1 << actual_dut), z_corrections=z_corrections)
-        for z_correction in range(-1000000, 1000000, 10000):
-            dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z'] + z_correction])
-            rotation_matrix = geometry_utils.rotation_matrix(alpha=0,
-                                                             beta=0,
-                                                             gamma=0)
-            basis_global = rotation_matrix.T.dot(np.eye(3))
-            dut_plane_normal = basis_global[2]
-
-            intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                             line_directions=slopes,
-                                                                             position_plane=dut_position,
-                                                                             normal_plane=dut_plane_normal)
-
-            residual = np.sqrt(np.square(np.std(track_candidates['x_dut_%s' % actual_dut] - intersections[:, 0])) + np.square(np.std(track_candidates['y_dut_%s' % actual_dut] - intersections[:, 1])))
-
-            residuals_plt.append(residual)
-
-        plt.title('DUT%d' % actual_dut)
-        plt.plot(range(-1000000, 1000000, 10000), residuals_plt)
-        plt.show()
-
-
-#     for actual_dut in range(n_duts):
-#         for i in range(100):
-#             track_hits, offsets, slopes = _fit_tracks(track_candidates, dut_selection, z_corrections=z_corrections)
-# res = minimize_scalar(_minimize_me, bounds=(-50000, 50000), args=(actual_dut), method='bounded')
-# z_corrections[actual_dut] = -res.x
-# residuals[actual_dut] = res.fun
-# print 'z_corrections', z_corrections
-# print 'residuals', residuals
-# print i, residuals.sum()
-#
-#             for actual_dut in range(n_duts):
-#                 residuals_plt =[]
-#                 for z_correction in range(-10000, 10000, 100):
-#                     dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z']]) + z_correction
-#                     rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
-#                                                                      beta=alignment[actual_dut]['beta'],
-#                                                                      gamma=alignment[actual_dut]['gamma'])
-#                     basis_global = rotation_matrix.T.dot(np.eye(3))
-#                     dut_plane_normal = basis_global[2]
-#
-#                     intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-#                                                                                       line_directions=slopes,
-#                                                                                       position_plane=dut_position,
-#                                                                                       normal_plane=dut_plane_normal)
-#
-#                     residual = np.sqrt(np.square(np.std(track_hits[:, actual_dut, 0] - intersections[:, 0])) + np.square(np.std(track_hits[:, actual_dut, 1] - intersections[:, 1])))
-#
-#                     residuals_plt.append(residual)
-#
-#                 plt.title('DUT%d' % actual_dut)
-#                 plt.plot(range(-10000, 10000, 100), residuals_plt)
-#                 plt.show()
-# #
-
-    def total_residuals(z_corrections, track_hits, offsets, slopes):
-        residual_sum = 0
-
-        # Step 2: Calcualte residual
-        for actual_dut in range(n_duts):
-            dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z']]) + z_corrections[actual_dut]
-            rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
-                                                             beta=alignment[actual_dut]['beta'],
-                                                             gamma=alignment[actual_dut]['gamma'])
-            basis_global = rotation_matrix.T.dot(np.eye(3))
-            dut_plane_normal = basis_global[2]
-
-            intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                             line_directions=slopes,
-                                                                             position_plane=dut_position,
-                                                                             normal_plane=dut_plane_normal)
-
-            residual = np.sqrt(np.square(np.std(track_hits[:, actual_dut, 0] - intersections[:, 0])) + np.square(np.std(track_hits[:, actual_dut, 1] - intersections[:, 1])))
-            residual_sum += residual
-
-        track_hits[:, :, 2] -= z_corrections[np.newaxis, :]  # Reverse change for next call
-        return residual_sum
-
-    def reconstruct_z(track_hits):
-        ''' Reconstructs the real rotation by changing the rotation angles until the correlation
-        in column/row can be described best by a straight line with the slope of 1.
-
-        Parameters:
-        ----------
-        column_0, row_0, column_1, row_1 : np.array
-            The column/row positions of DUT0 and other DUT
-        x0 : iterable
-            Start parameters from pre alignment or measurement (alpha_0, beta_0, gamma_0, alpha_1, beta_1, gamma_1, ...).
-            E.g. for 2 DUTs: x0 = (0., 0., 0., pi, 0.01, 0.)
-        errors : iterable of iterable
-            Maximum error for the angles of DUT 1. Sets the limit of the possible reconstructed rotation angles and should be choosen
-            carefully. E.g.: ((-np.pi, np.pi), (-np.pi, np.pi), (-np.pi, np.pi))
-            If None +- 5 degree maximum error from the starting values x0 is assumed
-
-        Returns:
-        -------
-
-        Tuple with (alha, beta, gamma) rotation angles
-        '''
-#         bounds = []
-# for i in range(3):  # Loop over angles
-#             bounds.append((x0[i] - errors[i], x0[i] + errors[i]))
-#
-#
-#
-        n_duts = track_hits.shape[1]
-        bounds = [(-5000, 5000)] * n_duts
-#
-# niter = 10  # Iterations of basinhopping, so far did never really change the result
-#
-#         progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=niter, term_width=80)
-#         progress_bar.start()
-#
-# def callback(x, f, accept):  # Callback called after each basinhopping step, used to show a progressbar
-#             progress_bar.update(progress_bar.currval + 1)
-#
-#         result = basinhopping(func=total_residuals,
-# T=0.5,
-#                               niter=niter,
-#                               x0=np.zeros(n_duts),
-#                               callback=callback,
-#                               minimizer_kwargs={'args': track_hits,
-#                                                 'method': 'SLSQP',
-#                                                 'bounds': bounds
-#                                                 })
-#
-#         progress_bar.finish()
-
-#         result = minimize(fun=total_residuals,
-#                 x0=np.zeros(n_duts),
-#                 args=(track_hits),
-#                 bounds=bounds,
-# method='SLSQP',
-#                 options={'eps':1000})
-#
-#         return result.x
-#
-#     minimm = 1000000
-#
-#     reconstruct_z(track_hits)
-
-#     a = np.zeros(n_duts)
-#
-#     for i in range(-10000, 10000, 1000):
-#         a[0] = i
-#         print i, total_residuals(a, track_hits)
-
-
-# print total_residuals(track_hits, z_corrections=np.zeros_like(z_positions))
-#     print total_residuals(track_hits, z_corrections=np.ones_like((z_positions)) * 100. )
-#     print total_residuals(track_hits, z_corrections=np.zeros_like(z_positions))
-
-#         y, edges_x = np.histogram(difference[:, 0], bins=1000)
-#
-#         mu_x = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
-#         std = analysis_utils.get_rms_from_histogram(y, edges_x[:-1])
-#         coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu_x, std])
-#         plt.bar(edges_x[:-1], y, width=np.diff(edges_x)[0])
-#         x = np.arange(edges_x[0], edges_x[-1])
-#         plt.plot(x, analysis_utils.gauss(x, *coeff_x))
-#         print 'sigma_x', std
-#         plt.show()
-#
-#         y, edges_x = np.histogram(difference[:, 1], bins=1000)
-#
-#         mu_x = analysis_utils.get_mean_from_histogram(y, edges_x[:-1])
-#         std = analysis_utils.get_rms_from_histogram(y, edges_x[:-1])
-#         coeff_x, var_matrix = curve_fit(analysis_utils.gauss, edges_x[:-1], y, p0=[np.max(y), mu_x, std])
-#         plt.bar(edges_x[:-1], y, width=np.diff(edges_x)[0])
-#         x = np.arange(edges_x[0], edges_x[-1])
-#         plt.plot(x, analysis_utils.gauss(x, *coeff_x))
-#         print 'sigma_y', std
-#         plt.show()
-
-#         dut_position = np.array([alignment[actual_dut]['translation_x'], alignment[actual_dut]['translation_y'], alignment[actual_dut]['translation_z']])
-#         rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
-#                                                          beta=alignment[fit_dut]['beta'],
-#                                                          gamma=alignment[fit_dut]['gamma'])
-# basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
-#         dut_plane_normal = basis_global[2]
-#
-#          actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-#                                                                           line_directions=slopes,
-#                                                                           position_plane=dut_position,
-#                                                                           normal_plane=dut_plane_normal)
-#
-#         transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=alignment[actual_dut]['translation_x'],
-#                                                                                      y=alignment[actual_dut]['translation_y'],
-#                                                                                      z=alignment[actual_dut]['translation_z'],
-#                                                                                      alpha=alignment[actual_dut]['alpha'],
-#                                                                                      beta=alignment[actual_dut]['beta'],
-#                                                                                      gamma=alignment[actual_dut]['gamma'])
-#
-#         hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_transformation_matrix(x=track_hits[:, actual_dut, :][0],
-#                                                                                            y=track_hits[:, actual_dut, :][1],
-#                                                                                            z=track_hits[:, actual_dut, :][2],
-#                                                                                            transformation_matrix=transformation_matrix)
-#
-#
-#
-#         intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_transformation_matrix(x=results[1][0],
-#                                                                                                                       y=results[1][1],
-#                                                                                                                       z=results[1][2],
-#                                                                                                                       transformation_matrix=transformation_matrix)
-#
-#         if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
-#             logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
-#             raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
