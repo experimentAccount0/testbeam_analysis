@@ -471,14 +471,15 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', se
         dut_selection = np.zeros(old_alignment.shape[0], dtype=np.bool)
         dut_selection[np.array(select_duts)] = True
 
+    alignment_parameters = old_alignment.copy()  # Do not change input parameters
+
     if mode == 'absolute':
         logging.info('Set alignment')
-        old_alignment[dut_selection] = new_alignment[dut_selection]
-        return old_alignment
+        alignment_parameters[dut_selection] = new_alignment[dut_selection]
+        return alignment_parameters
     else:
         logging.info('Merge new alignment with old alignment')
 
-        alignment_parameters = old_alignment
         alignment_parameters['translation_x'][dut_selection] += new_alignment['translation_x'][dut_selection]
         alignment_parameters['translation_y'][dut_selection] += new_alignment['translation_y'][dut_selection]
         alignment_parameters['translation_z'][dut_selection] += new_alignment['translation_z'][dut_selection]
@@ -520,7 +521,8 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
         raise RuntimeError('Mode %s is unknown', str(mode))
 
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
-        alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from pre-alignment
+        #FIXME: this does not make sence to be here: 
+#         alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from pre-alignment
         try:
             alignment_table = out_file_h5.create_table(out_file_h5.root, name='Alignment', title='Table containing the alignment geometry parameters (translations and rotations)', description=np.zeros((1,), dtype=alignment_parameters.dtype).dtype, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             alignment_table.append(alignment_parameters)
