@@ -97,9 +97,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     continue
                 logging.debug('Calculate residuals for DUT %d', actual_dut)
 
-                mean_column, std_column = None, None  # Column residual mean and RMS needed for histogramming range determination
-                mean_row, std_row = None, None  # Row residual mean and RMS needed for histogramming range determination
-
+                initialize = True  # initialize the histograms
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
 
                     if actual_max_chi2:
@@ -283,11 +281,6 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             intersection_y_local,
                             difference_local[:, 0],
                             bins=(hist_row_residual_col_xedges, hist_row_residual_col_yedges))[0]
-
-                    # for unit tests
-                    # FIXME: list length depends on chunk size and amount of data
-                    residuals.append(std_column)
-                    residuals.append(std_row)
 
                 logging.debug('Storing residual histograms...')
 
@@ -536,8 +529,6 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
     if output_fig and close_pdf:
         output_fig.close()
-
-    return residuals
 
 
 def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, sensor_size, minimum_track_density=1, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, chunk_size=1000000):
