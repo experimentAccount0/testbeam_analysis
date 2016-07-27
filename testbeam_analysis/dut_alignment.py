@@ -679,11 +679,10 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
     logging.info('=== Aligning DUTs ===')
 
-    def calculate_translation_alignment(track_candidates_file, fit_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, max_iterations, output_pdf, plot_title_prefix=''):
+    def calculate_translation_alignment(track_candidates_file, fit_duts, n_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, max_iterations, output_pdf, plot_title_prefix=''):
         ''' Main function that fits tracks, calculates the residuals, deduces rotation and translation values from the residuals
         and applies the new alignment to the track hits. The alignment result is scored as a combined
         residual value of all planes that are being aligned in x and y weighted by the pixel pitch in x and y. '''
-
         with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
             alignment_last_iteration = in_file_h5.root.Alignment[:]
 
@@ -766,7 +765,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                       mode='absolute',
                                                       select_duts=fit_duts)
 
-    def duts_alignment(align_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, alignment_index):  # Called for each list of DUTs to align
+    def duts_alignment(align_duts, n_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, alignment_index):  # Called for each list of DUTs to align
 
         # Step 0: Reduce the number of tracks to increase the calculation time
         logging.info('= Alignment step 0: Reduce number of tracks to %d =', use_n_tracks)
@@ -797,6 +796,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         # Stage N: Repeat alignment with constrained residuals until total residual does not decrease anymore
         calculate_translation_alignment(track_candidates_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
                                         fit_duts=align_duts,  # Only use the actual DUTs to align
+                                        n_duts=n_duts,
                                         selection_fit_duts=selection_fit_duts,
                                         selection_hit_duts=selection_hit_duts,
                                         selection_track_quality=selection_track_quality,
@@ -908,7 +908,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
         logging.info('Align DUTs %s', str(actual_align_duts)[1:-1])
 
-        duts_alignment(align_duts=actual_align_duts, selection_fit_duts=actual_selection_fit_duts, selection_hit_duts=actual_selection_hit_duts, selection_track_quality=actual_selection_track_quality, alignment_index=index)
+        duts_alignment(align_duts=actual_align_duts, n_duts=n_duts, selection_fit_duts=actual_selection_fit_duts, selection_hit_duts=actual_selection_hit_duts, selection_track_quality=actual_selection_track_quality, alignment_index=index)
 
     logging.info('Alignment finished successfully!')
 
