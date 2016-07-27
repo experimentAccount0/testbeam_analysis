@@ -733,7 +733,11 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                               plot_title_prefix=plot_title_prefix,
                                                                               relaxation_factor=0.5 if len(fit_duts) != n_duts else 1.0)
 
-            new_alignment_parameters = geometry_utils.merge_alignment_parameters(alignment_last_iteration, alignment_parameters_change)  # Create actual alignment (old alignment + the actual relative change)
+            # Create actual alignment (old alignment + the actual relative change)
+            new_alignment_parameters = geometry_utils.merge_alignment_parameters(
+                alignment_last_iteration,
+                alignment_parameters_change,
+                mode='relative')
 
             # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
             logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
