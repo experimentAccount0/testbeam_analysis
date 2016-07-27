@@ -718,7 +718,9 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                 n_pixels=n_pixels,
                                 pixel_size=pixel_size,
                                 output_pdf=False,
-                                chunk_size=chunk_size)
+                                chunk_size=chunk_size,
+                                npixels_per_bin=5 if (iteration in [0,1,2]) else None,  # use a coarse binning for the first steps
+                                nbins_per_pixel=1 if (iteration in [0,1,2]) else None)  # use a coarse binning for the first steps
 
             # Step 4: Deduce rotations from the residuals
             logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
