@@ -223,7 +223,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         raise ValueError('The length of the hit dut selection has to be equal to the quality selection!')
 
     for (sel_1, sel_2) in zip(selection_hit_duts, selection_fit_duts):
-        print('sel_1, sel_2', sel_1, sel_2)
         if not all(x in sel_1 for x in sel_2):
             raise NotImplementedError('All DUTs defined in selection_fit_duts have to be defined in selection_hit_duts!')
 
