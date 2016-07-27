@@ -731,7 +731,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                               n_duts=n_duts,
                                                                               translation_only=False,
                                                                               plot_title_prefix=plot_title_prefix,
-                                                                              relaxation_factor=0.5 if len(fit_duts) != n_duts else 1.0)
+                                                                              relaxation_factor=1.0)
 
             # Create actual alignment (old alignment + the actual relative change)
             new_alignment_parameters = geometry_utils.merge_alignment_parameters(
