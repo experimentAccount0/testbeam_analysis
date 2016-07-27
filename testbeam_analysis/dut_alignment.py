@@ -728,7 +728,9 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                               pixel_size=pixel_size,
                                                                               n_duts=n_duts,
                                                                               translation_only=False,
-                                                                              plot_title_prefix=plot_title_prefix)
+                                                                              plot_title_prefix=plot_title_prefix,
+                                                                              relaxation_factor=0.5 if len(fit_duts) != n_duts else 1.0)
+
             new_alignment_parameters = geometry_utils.merge_alignment_parameters(alignment_last_iteration, alignment_parameters_change)  # Create actual alignment (old alignment + the actual relative change)
 
             # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
@@ -931,7 +933,7 @@ def _create_alignment_array(n_duts):
     return array
 
 
-def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_duts, translation_only=False, plot_title_prefix=''):
+def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_duts, translation_only=False, relaxation_factor=1.0, plot_title_prefix=''):
     ''' Take the residual plots and deduce rotation and translation angles from them '''
     alignment_parameters = _create_alignment_array(n_duts)
 
@@ -987,10 +989,9 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
 
             alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy)
 
-            factor = 1.  # (len(fit_duts) - 1.) / len(fit_duts) if len(fit_duts) > 1 else 1.  # Set alignment data reduced by the a factor a account for the fact that the DUTs itself was used in the fit
-            alignment_parameters[dut_index]['alpha'] = alpha * factor
-            alignment_parameters[dut_index]['beta'] = beta * factor
-            alignment_parameters[dut_index]['gamma'] = gamma * factor
+            alignment_parameters[dut_index]['alpha'] = alpha * relaxation_factor
+            alignment_parameters[dut_index]['beta'] = beta * relaxation_factor
+            alignment_parameters[dut_index]['gamma'] = gamma * relaxation_factor
 
     return alignment_parameters, total_residual
 
