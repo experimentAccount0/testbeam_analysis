@@ -20,7 +20,7 @@ def gauss(x, *p):
     return A * np.exp(-(x - mu) ** 2 / (2. * sigma ** 2))
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, use_duts=None, max_chi2=None, force_prealignment=False, output_pdf=True, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, output_pdf=True, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
@@ -42,6 +42,10 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         Use only not heavily scattered tracks to increase track pointing resolution (cut on chi2).
         Cut can be a number and is used then for all DUTS or a list with a chi 2 cut for each DUT.
         If None no cut is applied.
+    nbins_per_pixel : int
+        Number of bins per pixel along the residual axis. Number is a positive integer or None to automatically set the binning.
+    npixels_per_bin : int
+        Number of pixels per bin along the position axis. Number is a positive integer or None to automatically set the binning.
     force_prealignment : boolean
         Take the prealignment, although if a coarse alignment is availale
     output_pdf : boolean. PDF pages object
@@ -136,49 +140,139 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     difference_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local)) - np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
 
                     # Histogram residuals in different ways
-                    if mean_column is None:  # Only true at the first run, create hists here
-                        hist, edges = np.histogram(difference[:, 0], bins="auto")
+                    if initialize:  # Only true for the first iteration, calculate the binning for the histograms
+                        initialize = False
+
+                        # detect peaks and calculate width to estimate the size of the histograms
+                        if nbins_per_pixel is not None:
+                            min_difference, max_difference = np.min(difference[:, 0]), np.max(difference[:, 0])
+                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][0] / nbins_per_pixel), pixel_size[actual_dut][0] / nbins_per_pixel)
+                        else:
+                            nbins = "auto"
+                        hist, edges = np.histogram(difference[:, 0], bins=nbins)
                         edge_center = (edges[1:] + edges[:-1]) / 2.0
                         try:
-                            max, center_x, fwhm_x, pos = analysis_utils.peak_detect(edge_center, hist)
+                            max_val, center_x, fwhm_x, pos = analysis_utils.peak_detect(edge_center, hist)
                         except RuntimeError:
                             # do some simple FWHM with numpy array
-                            max, center_x, fwhm_x, pos = analysis_utils.simple_peak_detect(edge_center, hist)
+                            max_val, center_x, fwhm_x, pos = analysis_utils.simple_peak_detect(edge_center, hist)
 
-                        hist, edges = np.histogram(difference[:, 1], bins="auto")
+                        if nbins_per_pixel is not None:
+                            min_difference, max_difference = np.min(difference[:, 1]), np.max(difference[:, 1])
+                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][1] / nbins_per_pixel), pixel_size[actual_dut][1] / nbins_per_pixel)
+                        else:
+                            nbins = "auto"
+                        hist, edges = np.histogram(difference[:, 1], bins=nbins)
                         edge_center = (edges[1:] + edges[:-1]) / 2.0
                         try:
-                            max, center_y, fwhm_y, pos = analysis_utils.peak_detect(edge_center, hist)
+                            max_val, center_y, fwhm_y, pos = analysis_utils.peak_detect(edge_center, hist)
                         except RuntimeError:
                             # do some simple FWHM with numpy array
-                            max, center_y, fwhm_y, pos = analysis_utils.simple_peak_detect(edge_center, hist)
+                            max_val, center_y, fwhm_y, pos = analysis_utils.simple_peak_detect(edge_center, hist)
 
-                        hist, edges = np.histogram(difference_local[:, 0], bins="auto")
+                        if nbins_per_pixel is not None:
+                            min_difference, max_difference = np.min(difference_local[:, 0]), np.max(difference_local[:, 0])
+                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][0] / nbins_per_pixel), pixel_size[actual_dut][0] / nbins_per_pixel)
+                        else:
+                            nbins = "auto"
+                        hist, edges = np.histogram(difference_local[:, 0], bins=nbins)
                         edge_center = (edges[1:] + edges[:-1]) / 2.0
                         try:
-                            max, center_col, fwhm_col, pos = analysis_utils.peak_detect(edge_center, hist)
+                            max_val, center_col, fwhm_col, pos = analysis_utils.peak_detect(edge_center, hist)
                         except RuntimeError:
                             # do some simple FWHM with numpy array
-                            max, center_col, fwhm_col, pos = analysis_utils.simple_peak_detect(edge_center, hist)
+                            max_val, center_col, fwhm_col, pos = analysis_utils.simple_peak_detect(edge_center, hist)
 
-                        hist, edges = np.histogram(difference_local[:, 1], bins="auto")
+                        if nbins_per_pixel is not None:
+                            min_difference, max_difference = np.min(difference_local[:, 1]), np.max(difference_local[:, 1])
+                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][1] / nbins_per_pixel), pixel_size[actual_dut][1] / nbins_per_pixel)
+                        else:
+                            nbins = "auto"
+                        hist, edges = np.histogram(difference_local[:, 1], bins=nbins)
                         edge_center = (edges[1:] + edges[:-1]) / 2.0
                         try:
-                            max, center_row, fwhm_row, pos = analysis_utils.peak_detect(edge_center, hist)
+                            max_val, center_row, fwhm_row, pos = analysis_utils.peak_detect(edge_center, hist)
                         except RuntimeError:
                             # do some simple FWHM with numpy array
-                            max, center_row, fwhm_row, pos = analysis_utils.simple_peak_detect(edge_center, hist)
+                            max_val, center_row, fwhm_row, pos = analysis_utils.simple_peak_detect(edge_center, hist)
 
-                        hist_residual_x_hist, hist_residual_x_xedges = np.histogram(difference[:, 0], range=(center_x - 2.5 * fwhm_x, center_x + 2.5 * fwhm_x), bins="auto")
-                        hist_residual_x_yedges = np.linspace(0.0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0], num=200, endpoint=True)
-                        hist_residual_y_hist, hist_residual_y_yedges = np.histogram(difference[:, 1], range=(center_y - 2.5 * fwhm_y, center_y + 2.5 * fwhm_y), bins="auto")
-                        hist_residual_y_xedges = np.linspace(0.0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1], num=200, endpoint=True)
-                        hist_residual_col_hist, hist_residual_col_xedges = np.histogram(difference_local[:, 0], range=(center_col - 2.5 * fwhm_col, center_col + 2.5 * fwhm_col), bins="auto")
-                        hist_residual_col_yedges = np.linspace(0.0, n_pixels[actual_dut][0] * pixel_size[actual_dut][0], num=200, endpoint=True)
-                        hist_residual_row_hist, hist_residual_row_yedges = np.histogram(difference_local[:, 1], range=(center_row - 2.5 * fwhm_row, center_row + 2.5 * fwhm_row), bins="auto")
-                        hist_residual_row_xedges = np.linspace(0.0, n_pixels[actual_dut][1] * pixel_size[actual_dut][1], num=200, endpoint=True)
+                        # calculate the binning of the histograms, the minimum size is given by plot_npixels, otherwise FWHM is taken into account
+                        plot_npixels = 6.0
+                        if nbins_per_pixel is not None:
+                            width = max(plot_npixels * pixel_size[actual_dut][0], pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][0]))
+                            if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
+                                width += pixel_size[actual_dut][0]
+                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][0]
+                            range = (center_x - 0.5 * width, center_x + 0.5 * width)
+                        else:
+                            nbins = "auto"
+                            width = pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][0])
+                            range = (center_x - width, center_x + width)
+                        hist_residual_x_hist, hist_residual_x_xedges = np.histogram(difference[:, 0], range=range, bins=nbins)
 
-                        # TODO: fit result based only on first iteration
+                        if npixels_per_bin is not None:
+                            min_intersection, max_intersection = np.min(intersection_x), np.max(intersection_x)
+                            nbins = np.arange(min_intersection, max_intersection + npixels_per_bin * pixel_size[actual_dut][1], npixels_per_bin * pixel_size[actual_dut][1])
+                        else:
+                            nbins = "auto"
+                        _, hist_residual_x_yedges = np.histogram(intersection_x, bins=nbins)
+
+                        if nbins_per_pixel is not None:
+                            width = max(plot_npixels * pixel_size[actual_dut][1], pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][1]))
+                            if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
+                                width += pixel_size[actual_dut][1]
+                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][1]
+                            range = (center_y - 0.5 * width, center_y + 0.5 * width)
+                        else:
+                            nbins = "auto"
+                            width = pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_y / pixel_size[actual_dut][1])
+                            range = (center_y - width, center_y + width)
+                        hist_residual_y_hist, hist_residual_y_yedges = np.histogram(difference[:, 1], range=range, bins=nbins)
+
+                        if npixels_per_bin is not None:
+                            min_intersection, max_intersection = np.min(intersection_y), np.max(intersection_y)
+                            nbins = np.arange(min_intersection, max_intersection + npixels_per_bin * pixel_size[actual_dut][0], npixels_per_bin * pixel_size[actual_dut][0])
+                        else:
+                            nbins = "auto"
+                        _, hist_residual_y_xedges = np.histogram(intersection_y, bins=nbins)
+
+                        if nbins_per_pixel is not None:
+                            width = max(plot_npixels * pixel_size[actual_dut][0], pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][0]))
+                            if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
+                                width += pixel_size[actual_dut][0]
+                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][0]
+                            range = (center_col - 0.5 * width, center_col + 0.5 * width)
+                        else:
+                            nbins = "auto"
+                            width = pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_col / pixel_size[actual_dut][0])
+                            range = (center_col - width, center_col + width)
+                        hist_residual_col_hist, hist_residual_col_xedges = np.histogram(difference_local[:, 0], range=range, bins=nbins)
+
+                        if npixels_per_bin is not None:
+                            min_intersection, max_intersection = np.min(intersection_x_local), np.max(intersection_x_local)
+                            nbins = np.arange(min_intersection, max_intersection + npixels_per_bin * pixel_size[actual_dut][1], npixels_per_bin * pixel_size[actual_dut][1])
+                        else:
+                            nbins = "auto"
+                        _, hist_residual_col_yedges = np.histogram(intersection_x_local, bins=nbins)
+
+                        if nbins_per_pixel is not None:
+                            width = max(plot_npixels * pixel_size[actual_dut][1], pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][1]))
+                            if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
+                                width += pixel_size[actual_dut][1]
+                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][1]
+                            range = (center_row - 0.5 * width, center_row + 0.5 * width)
+                        else:
+                            nbins = "auto"
+                            width = pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_row / pixel_size[actual_dut][1])
+                            range = (center_row - width, center_row + width)
+                        hist_residual_row_hist, hist_residual_row_yedges = np.histogram(difference_local[:, 1], range=range, bins=nbins)
+
+                        if npixels_per_bin is not None:
+                            min_intersection, max_intersection = np.min(intersection_y_local), np.max(intersection_y_local)
+                            nbins = np.arange(min_intersection, max_intersection + npixels_per_bin * pixel_size[actual_dut][0], npixels_per_bin * pixel_size[actual_dut][0])
+                        else:
+                            nbins = "auto"
+                        _, hist_residual_row_xedges = np.histogram(intersection_y_local, bins=nbins)
 
                         # global x residual against x position
                         hist_x_residual_x_hist, hist_x_residual_x_xedges, hist_x_residual_x_yedges = np.histogram2d(
@@ -228,7 +322,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             difference_local[:, 0],
                             bins=(hist_residual_row_xedges, hist_residual_col_xedges))
 
-                    else:  # Add data to existing hists
+                    else:  # adding data to existing histograms
                         hist_residual_x_hist += np.histogram(difference[:, 0], bins=hist_residual_x_xedges)[0]
                         hist_residual_y_hist += np.histogram(difference[:, 1], bins=hist_residual_y_yedges)[0]
                         hist_residual_col_hist += np.histogram(difference_local[:, 0], bins=hist_residual_col_xedges)[0]
