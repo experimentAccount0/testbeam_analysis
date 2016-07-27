@@ -835,8 +835,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                 os.remove(input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.pdf' % alignment_index)
                 os.remove(input_track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index)
-                os.remove(input_track_candidates_reduced[:-3] + '_not_aligned.h5')
-                os.remove(input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index)
+        os.remove(input_track_candidates_reduced[:-3] + '_not_aligned.h5')
+        os.remove(input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index)
 
     # Open the pre-alignment and create empty alignment info (at the beginning only the z position is set)
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
