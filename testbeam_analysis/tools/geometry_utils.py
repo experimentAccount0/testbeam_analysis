@@ -477,7 +477,7 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', se
         logging.info('Set alignment')
         alignment_parameters[dut_selection] = new_alignment[dut_selection]
         return alignment_parameters
-    else:
+    elif mode == 'relative':
         logging.info('Merge new alignment with old alignment')
 
         alignment_parameters['translation_x'][dut_selection] += new_alignment['translation_x'][dut_selection]
@@ -498,6 +498,8 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', se
             alignment_parameters['translation_y'][dut_selection] -= np.mean(alignment_parameters['translation_y'][dut_selection])
 
         return alignment_parameters
+    else:
+        raise RuntimeError('Unknown mode %s', str(mode))
 
 
 def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', select_duts=None):
@@ -516,9 +518,6 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
     use_duts : iterable
         In relative mode only change specified DUTs
     '''
-
-    if mode != 'absolute' and mode != 'relative':
-        raise RuntimeError('Mode %s is unknown', str(mode))
 
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
         #FIXME: this does not make sence to be here: 
