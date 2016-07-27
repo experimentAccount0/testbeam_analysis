@@ -146,7 +146,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                         # detect peaks and calculate width to estimate the size of the histograms
                         if nbins_per_pixel is not None:
                             min_difference, max_difference = np.min(difference[:, 0]), np.max(difference[:, 0])
-                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][0] / nbins_per_pixel), pixel_size[actual_dut][0] / nbins_per_pixel)
+                            nbins = np.arange(min_difference - (pixel_size[actual_dut][0] / nbins_per_pixel), max_difference + 2 * (pixel_size[actual_dut][0] / nbins_per_pixel), pixel_size[actual_dut][0] / nbins_per_pixel)
                         else:
                             nbins = "auto"
                         hist, edges = np.histogram(difference[:, 0], bins=nbins)
@@ -159,7 +159,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         if nbins_per_pixel is not None:
                             min_difference, max_difference = np.min(difference[:, 1]), np.max(difference[:, 1])
-                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][1] / nbins_per_pixel), pixel_size[actual_dut][1] / nbins_per_pixel)
+                            nbins = np.arange(min_difference - (pixel_size[actual_dut][1] / nbins_per_pixel), max_difference + 2 * (pixel_size[actual_dut][1] / nbins_per_pixel), pixel_size[actual_dut][1] / nbins_per_pixel)
                         else:
                             nbins = "auto"
                         hist, edges = np.histogram(difference[:, 1], bins=nbins)
@@ -172,7 +172,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         if nbins_per_pixel is not None:
                             min_difference, max_difference = np.min(difference_local[:, 0]), np.max(difference_local[:, 0])
-                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][0] / nbins_per_pixel), pixel_size[actual_dut][0] / nbins_per_pixel)
+                            nbins = np.arange(min_difference - (pixel_size[actual_dut][0] / nbins_per_pixel), max_difference + 2 * (pixel_size[actual_dut][0] / nbins_per_pixel), pixel_size[actual_dut][0] / nbins_per_pixel)
                         else:
                             nbins = "auto"
                         hist, edges = np.histogram(difference_local[:, 0], bins=nbins)
@@ -185,7 +185,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         if nbins_per_pixel is not None:
                             min_difference, max_difference = np.min(difference_local[:, 1]), np.max(difference_local[:, 1])
-                            nbins = np.arange(min_difference, max_difference + (pixel_size[actual_dut][1] / nbins_per_pixel), pixel_size[actual_dut][1] / nbins_per_pixel)
+                            nbins = np.arange(min_difference - (pixel_size[actual_dut][1] / nbins_per_pixel), max_difference + 2 * (pixel_size[actual_dut][1] / nbins_per_pixel), pixel_size[actual_dut][1] / nbins_per_pixel)
                         else:
                             nbins = "auto"
                         hist, edges = np.histogram(difference_local[:, 1], bins=nbins)
