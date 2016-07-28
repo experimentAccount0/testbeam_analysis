@@ -755,7 +755,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
             if total_residual is not None and new_total_residual > total_residual:  # True if actual alignment is worse than the alignment from last iteration
                 logging.info('!! Best alignment found !!')
-                # Step 5: Set alignment from last iteration
+                logging.info('= Alignment step 6 / iteration %d: Use rotation / translation information from previous iteration =', iteration)
                 geometry_utils.store_alignment_parameters(input_alignment_file,  # Store alignment from last iteration
                                                           alignment_last_iteration,
                                                           mode='absolute',
@@ -813,7 +813,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
         # Plot final result
         if plot_result:
-            logging.info('= Alignment step 6: Plot final result =')
+            logging.info('= Alignment step 7: Plot final result =')
             with PdfPages(os.path.join(os.path.dirname(os.path.realpath(input_track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
                 # Apply final alignment result
                 apply_alignment(input_hit_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
