@@ -114,7 +114,7 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
     plot_utils.plot_correlations(input_correlation_file=output_correlation_file, pixel_size=pixel_size, dut_names=dut_names)
 
 
-def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chunk_size=4999999):
+def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_size, chunk_size=4999999):
     '''Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.
     Empty entries are signaled with column = row = charge = 0.
 
@@ -126,12 +126,14 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
     ----------
     input_cluster_files : list of pytables files
         File name of the input cluster files with correlation data.
-    input_alignment_file : pytables file
-        File name of the input aligment data.
     output_merged_file : pytables file
         File name of the output tracklet file.
-    limit_events : int
-        Limit events to givien number. Only events with hits are counted. If None or 0, all events will be taken.
+    n_pixels : iterable of tuples
+        One tuple per DUT describing the number of pixels in column, row direction
+        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension in um in column, row direction
+        e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
     chunk_size: int
         Defines the amount of in RAM data. The higher the more RAM is used and the faster this function works.
     '''
@@ -175,9 +177,11 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
 
                 # Fill result array with DUT 0 data
                 actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
-                selection = actual_cluster['mean_column'] != 0.0  # Add only real hits, 0.0 is a virtual hit
-                merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5)  # Convert indices to positions
-                merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5)  # Convert indices to positions
+                # Add only real hits, 0.0 is a virtual hit
+                selection = actual_cluster['mean_column'] != 0.0
+                # Convert indices to positions, origin in the center of the sensor
+                merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * pixel_size[0][0]))
+                merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * pixel_size[0][1]))
                 merged_cluster_array['z_dut_0'][selection] = 0.0
                 merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
 
@@ -187,9 +191,11 @@ def merge_cluster_data(input_cluster_files, output_merged_file, pixel_size, chun
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
                         for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
-                            selection = actual_cluster['mean_column'] != 0.0  # Add only real hits, 0.0 is a virtual hit
-                            actual_mean_column = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5)  # Convert indices to positions
-                            actual_mean_row = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5)  # Convert indices to positions
+                            # Add only real hits, 0.0 is a virtual hit
+                            selection = actual_cluster['mean_column'] != 0.0
+                            # Convert indices to positions, origin in the center of the sensor
+                            actual_mean_column = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * pixel_size[dut_index][0]))
+                            actual_mean_row = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * pixel_size[dut_index][1]))
 
                             merged_cluster_array['x_dut_%d' % (dut_index)][selection] = actual_mean_column
                             merged_cluster_array['y_dut_%d' % (dut_index)][selection] = actual_mean_row

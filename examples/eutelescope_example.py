@@ -111,6 +111,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     # Merge the cluster tables to one merged table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
+                                     n_pixels=n_pixels,
                                      pixel_size=pixel_size)
 
     # Apply the prealignment to the merged cluster table to create tracklets
