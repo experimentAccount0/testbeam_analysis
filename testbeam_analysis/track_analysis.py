@@ -348,7 +348,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 pass
             with tb.open_file(output_tracks_file, mode='a') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
                 n_duts = sum(['charge' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
-                fit_duts = fit_duts if fit_duts else range(n_duts)  # Std. setting: fit tracks for all DUTs
+                fit_duts = fit_duts if fit_duts is not None else range(n_duts)  # Std. setting: fit tracks for all DUTs
 
                 if min_track_distance is True:
                     min_track_distance = np.array([(200.)] * n_duts)
