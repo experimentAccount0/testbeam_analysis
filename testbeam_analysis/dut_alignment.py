@@ -936,10 +936,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             alignment_parameters[dut_index]['DUT'] = dut_index
             # Global residuals
             hist_node = in_file_h5.get_node('/ResidualsX_DUT%d' % dut_index)
-            mu_x = hist_node._v_attrs.fit_coeff[1]
             std_x = hist_node._v_attrs.fit_coeff[2]
-            alignment_parameters[dut_index]['correlation_x'] = std_x
-            alignment_parameters[dut_index]['translation_x'] = -mu_x
 
             # Add resdidual to total residual normalized to pixel pitch in x
             total_residual = np.sqrt(np.square(total_residual) + np.square(std_x / pixel_size[dut_index][0]))
@@ -954,10 +951,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
                                           output_fig=output_fig)
 
             hist_node = in_file_h5.get_node('/ResidualsY_DUT%d' % dut_index)
-            mu_y = hist_node._v_attrs.fit_coeff[1]
             std_y = hist_node._v_attrs.fit_coeff[2]
-            alignment_parameters[dut_index]['correlation_y'] = std_y
-            alignment_parameters[dut_index]['translation_y'] = -mu_y
 
             # Add resdidual to total residual normalized to pixel pitch in y
             total_residual = np.sqrt(np.square(total_residual) + np.square(std_y / pixel_size[dut_index][1]))
@@ -974,6 +968,11 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
                                           x_label='Y residual [um]',
                                           output_fig=output_fig)
 
+            # use offset at origin of sensor (center of sensor) to calculate x and y correction
+            # do not use mean/median of 1D residual since it depends on the beam spot position when the device is rotated
+            mu_x = in_file_h5.get_node_attr('/YResidualsX_DUT%d' % dut_index, 'fit_coeff')[0]
+            mu_y = in_file_h5.get_node_attr('/XResidualsY_DUT%d' % dut_index, 'fit_coeff')[0]
+            # use slope to calculate alpha, beta and gamma
             m_xx = in_file_h5.get_node_attr('/XResidualsX_DUT%d' % dut_index, 'fit_coeff')[1]
             m_yy = in_file_h5.get_node_attr('/YResidualsY_DUT%d' % dut_index, 'fit_coeff')[1]
             m_xy = in_file_h5.get_node_attr('/XResidualsY_DUT%d' % dut_index, 'fit_coeff')[1]
@@ -981,6 +980,10 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
 
             alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy)
 
+            alignment_parameters[dut_index]['correlation_x'] = std_x
+            alignment_parameters[dut_index]['translation_x'] = -mu_x
+            alignment_parameters[dut_index]['correlation_y'] = std_y
+            alignment_parameters[dut_index]['translation_y'] = -mu_y
             alignment_parameters[dut_index]['alpha'] = alpha * relaxation_factor
             alignment_parameters[dut_index]['beta'] = beta * relaxation_factor
             alignment_parameters[dut_index]['gamma'] = gamma * relaxation_factor
