@@ -596,7 +596,6 @@ def fwhm(x, y):
 
     See also http://stackoverflow.com/questions/10582795/finding-the-full-width-half-maximum-of-a-peak
     """
-
     half_max = np.max(y) / 2.0
     spl = splrep(x, y - half_max)
     roots = sproot(spl)
@@ -610,7 +609,7 @@ def fwhm(x, y):
 def peak_detect(x, y):
     try:
         fwhm_left_right = fwhm(x=x, y=y)
-    except RuntimeError:
+    except (RuntimeError, TypeError):
         raise RuntimeError("Cannot determine peak")
     fwhm_value = fwhm_left_right[-1] - fwhm_left_right[0]
     max_position = x[np.argmax(y)]
