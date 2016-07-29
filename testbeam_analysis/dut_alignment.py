@@ -180,8 +180,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 # Add only real hits, 0.0 is a virtual hit
                 selection = actual_cluster['mean_column'] != 0.0
                 # Convert indices to positions, origin in the center of the sensor
-                merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * pixel_size[0][0]))
-                merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * pixel_size[0][1]))
+                merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[0][0]))
+                merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[0][1]))
                 merged_cluster_array['z_dut_0'][selection] = 0.0
                 merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
 
@@ -194,8 +194,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                             # Add only real hits, 0.0 is a virtual hit
                             selection = actual_cluster['mean_column'] != 0.0
                             # Convert indices to positions, origin in the center of the sensor
-                            actual_mean_column = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * pixel_size[dut_index][0]))
-                            actual_mean_row = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * pixel_size[dut_index][1]))
+                            actual_mean_column = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
+                            actual_mean_row = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
 
                             merged_cluster_array['x_dut_%d' % (dut_index)][selection] = actual_mean_column
                             merged_cluster_array['y_dut_%d' % (dut_index)][selection] = actual_mean_row
