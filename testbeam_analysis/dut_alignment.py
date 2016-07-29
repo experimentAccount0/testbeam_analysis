@@ -664,8 +664,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     ignore_fit_duts : iterable
         the duts that are not taken in the track fit. Needed to exclude small planes / very bad working planes from the fit
         to make a good alignment possible
-    max_iterations : number
-        Maximum iterations of calc residuals, apply rotation refit loop until constant result is expected.
+    max_iterations : int
+        Maximum number of iterations of calc residuals, apply rotation refit loop until constant result is expected.
         Usually the procedure converges rather fast (< 5 iterations)
     selection_hit_duts : iterable, or iterable of iterable
         The duts that are required to have a hit with the given track quality. Otherwise the track is omitted
