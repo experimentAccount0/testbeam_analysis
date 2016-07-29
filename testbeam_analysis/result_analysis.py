@@ -504,7 +504,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig
                 )
                 out_res_col = out_file_h5.createCArray(out_file_h5.root,
-                                                       name='ResidualsColumn_DUT%d' % (actual_dut),
+                                                       name='ResidualsCol_DUT%d' % (actual_dut),
                                                        title='Residual distribution in column direction for DUT %d ' % (actual_dut),
                                                        atom=tb.Atom.from_dtype(hist_residual_col_hist.dtype),
                                                        shape=hist_residual_col_hist.shape,
@@ -542,7 +542,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig
                 )
                 out_col_res_col = out_file_h5.createCArray(out_file_h5.root,
-                                                           name='ColumnResidualsCol_DUT%d' % (actual_dut),
+                                                           name='ColResidualsCol_DUT%d' % (actual_dut),
                                                            title='Residual distribution in column direction as a function of the column position for DUT %d ' % (actual_dut),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_col_hist.dtype),
                                                            shape=hist_col_residual_col_hist.shape,
@@ -584,7 +584,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig
                 )
                 out_col_res_row = out_file_h5.createCArray(out_file_h5.root,
-                                                           name='ColumnResidualsRow_DUT%d' % (actual_dut),
+                                                           name='ColResidualsRow_DUT%d' % (actual_dut),
                                                            title='Residual distribution in row direction as a function of the column position for DUT %d ' % (actual_dut),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_row_hist.dtype),
                                                            shape=hist_col_residual_row_hist.shape,
@@ -605,7 +605,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig
                 )
                 out_row_res_col = out_file_h5.createCArray(out_file_h5.root,
-                                                           name='RowResidualsColumn_DUT%d' % (actual_dut),
+                                                           name='RowResidualsCol_DUT%d' % (actual_dut),
                                                            title='Residual distribution in column direction as a function of the row position for DUT %d ' % (actual_dut),
                                                            atom=tb.Atom.from_dtype(hist_row_residual_col_hist.dtype),
                                                            shape=hist_row_residual_col_hist.shape,
