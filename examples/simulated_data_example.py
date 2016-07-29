@@ -151,7 +151,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
                                         output_residuals_file=os.path.join(output_folder, 'Residuals.h5'),
                                         max_chi2=500,  # The chi2 cut has a large influence on the residuals and number of tracks, since the resolution is dominated by multiple scattering
                                         n_pixels=simulate_data.dut_n_pixel,
-                                        pixel_size=pixel_size)
+                                        pixel_size=simulate_data.dut_pixel_size)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
