@@ -642,7 +642,7 @@ def simple_peak_detect(x, y):
     change_indices = np.where(greater[:-1] != greater[1:])[0]
     if np.all(greater == False) or greater[0] == True or greater[-1] == True:
         raise RuntimeError("Cannot determine peak")
-    fwhm_left_right = (x[change_indices[0]], x[change_indices[-1]])
+    fwhm_left_right = (x[change_indices[0]], x[change_indices[-1] + 1])
     fwhm_value = fwhm_left_right[-1] - fwhm_left_right[0]
     max_position = x[np.argmax(y)]
     center = (fwhm_left_right[0] + fwhm_left_right[-1]) / 2.0
