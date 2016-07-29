@@ -454,7 +454,7 @@ def find_closest(arr, values):
     return idx
 
 
-def line(x, c0, c1):
+def linear(x, c0, c1):
     return c0 + c1 * x
 
 
@@ -466,6 +466,21 @@ def gauss(x, *p):
 def gauss2(x, *p):
     mu, sigma = p
     return (sigma * np.sqrt(2.0 * np.pi))**-1.0 * np.exp(-0.5 * ((x - mu) / sigma)**2.0)
+
+
+def gauss_offset(x, *p):
+    A, mu, sigma, offset, slope = p
+    return gauss(x, A, mu, sigma) + offset + x * slope
+
+
+def double_gauss(x, *p):
+    A_1, mu_1, sigma_1, A_2, mu_2, sigma_2 = p
+    return gauss(x, A_1, mu_1, sigma_1) + gauss(x, A_2, mu_2, sigma_2)
+
+
+def double_gauss_offset(x, *p):
+    A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset = p
+    return gauss(x, A_1, mu_1, sigma_1) + gauss(x, A_2, mu_2, sigma_2) + offset
 
 
 def gauss_box(x, *p):
@@ -482,6 +497,10 @@ def gauss_box(x, *p):
 
 # Vetorize function to use with np.arrays
 gauss_box_vfunc = np.vectorize(gauss_box, excluded=["*p"])
+
+
+def get_chi2(y_data, y_fit):
+    return np.square(y_data - y_fit).sum()
 
 
 def get_mean_from_histogram(counts, bin_positions):
@@ -720,7 +739,7 @@ def fit_residuals(positions, residuals, n_bins):
     position_residual_fit_y = hist_position_residual[0][selection]
     position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
 
-    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(line, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
+    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(linear, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
 
     return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
 
@@ -757,7 +776,7 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
     x_sel = (y_sum >= n_hits_threshold) & np.isfinite(y_sum)
     y_rel_err = np.full_like(y_sum, np.nan, dtype=np.float)
     y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
-    fit, cov = curve_fit(line, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
+    fit, cov = curve_fit(linear, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
 
     if output_fig is not None:
         testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(

@@ -204,9 +204,6 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
 
     do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
 
-    def f(x, c0, c1):
-        return c0 + c1 * x
-
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
         global offset_limit
         offset_limit = offset_limit_new
@@ -322,7 +319,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
-    fit, _ = curve_fit(f, x[selected_data], mean_fitted[selected_data])  # Fit straight line
+    fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
     fit_fn = np.poly1d(fit[::-1])
     offset = np.empty_like(mean_fitted)
     offset.fill(np.nan)
@@ -657,7 +654,7 @@ def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=
     if fit is not None:
         axis = plt.gca()
         x_lim = np.array(axis.get_xlim(), dtype=np.float)
-        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.line(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
+        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.linear(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
     plt.legend(loc=0)
     if output_fig:
         output_fig.savefig()
@@ -681,7 +678,7 @@ def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=No
     if fit is not None:
         axis = plt.gca()
         x_lim = np.array(axis.get_xlim(), dtype=np.float)
-        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.line(x_lim, *fit), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0], fit[1]))
+        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.linear(x_lim, *fit), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0], fit[1]))
     plt.xlim([xedges[0], xedges[-1]])
     plt.ylim([yedges[0], yedges[-1]])
     plt.legend(loc=0)
