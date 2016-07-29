@@ -752,7 +752,10 @@ def fit_residuals(hist, edges, label="", title="", output_fig=None):
     bin_center = (edges[1:] + edges[:-1]) / 2.0
     hist_mean = get_mean_from_histogram(hist, bin_center)
     hist_std = get_rms_from_histogram(hist, bin_center)
-    fit, cov = curve_fit(gauss, bin_center, hist, p0=[np.amax(hist), hist_mean, hist_std])
+    try:
+        fit, cov = curve_fit(gauss, bin_center, hist, p0=[np.amax(hist), hist_mean, hist_std])
+    except RuntimeError:
+        fit, cov = [np.amax(hist), hist_mean, hist_std], np.full((3, 3), np.nan)
 
     if output_fig is not None:
         testbeam_analysis.tools.plot_utils.plot_residuals(
