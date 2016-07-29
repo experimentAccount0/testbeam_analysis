@@ -978,7 +978,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             m_xy = in_file_h5.get_node_attr('/XResidualsY_DUT%d' % dut_index, 'fit_coeff')[1]
             m_yx = in_file_h5.get_node_attr('/YResidualsX_DUT%d' % dut_index, 'fit_coeff')[1]
 
-            alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy)
+            alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx=m_xx, m_xy=m_xy, m_yx=m_yx, m_yy=m_yy)
 
             alignment_parameters[dut_index]['correlation_x'] = std_x
             alignment_parameters[dut_index]['translation_x'] = -mu_x
