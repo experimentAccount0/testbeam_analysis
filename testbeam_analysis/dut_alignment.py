@@ -1024,7 +1024,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
         basis_global = rotation_matrix.T.dot(np.eye(3))
         dut_plane_normal = basis_global[2]
         actual_dut_position = dut_position.copy()
-        actual_dut_position[2] = align[3] * 1e6  # z position in meter
+        actual_dut_position[2] = align[3] * 1e6  # convert z position from m to um
         intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
                                                                          line_directions=slopes,
                                                                          position_plane=actual_dut_position,
@@ -1083,7 +1083,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
             
             # Trick to have the same order of magnitue of variation for angles and position, otherwise scipy minimizers
             # do not converge if step size of parameters is very different
-            z_position_in_m = z_position * 1e-6
+            z_position_in_m = z_position / 1e6
 
             residual = _minimize_me(np.array([alpha, beta, gamma, z_position_in_m]), 
                                       dut_position, 
@@ -1132,7 +1132,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
             alignment_result[actual_dut]['alpha'] = alpha
             alignment_result[actual_dut]['beta'] = beta
             alignment_result[actual_dut]['gamma'] = gamma
-            alignment_result[actual_dut]['translation_z'] = z_position_in_m * 1e6
+            alignment_result[actual_dut]['translation_z'] = z_position_in_m * 1e6  # convert z position from m to um
 
     total_residuals_before = np.sqrt(np.sum(np.square(np.array(residuals_before))))
     total_residuals_after = np.sqrt(np.sum(np.square(np.array(residuals_after))))
