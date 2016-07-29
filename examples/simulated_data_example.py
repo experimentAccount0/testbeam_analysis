@@ -40,9 +40,9 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     simulate_data.dut_thickness = [200] * simulate_data.n_duts  # Sensor thickness for each device in um
     simulate_data.dut_threshold = [0] * simulate_data.n_duts  # Detection threshold for each device in electrons, influences efficiency!
     simulate_data.dut_noise = [50] * simulate_data.n_duts  # Noise for each device in electrons
-    simulate_data.dut_pixel_size = [(50, 50)] * simulate_data.n_duts  # Pixel size for each device in x / y in um
-    simulate_data.dut_n_pixel = [(400, 400)] * simulate_data.n_duts  # Number of pixel for each device in x / y
-    simulate_data.dut_efficiencies = [1.] * simulate_data.n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
+    simulate_data.dut_pixel_size = [(53, 97)] * simulate_data.n_duts  # Pixel size for each device in x / y in um
+    simulate_data.dut_n_pixel = [(307, 557)] * simulate_data.n_duts  # Number of pixel for each device in x / y
+    simulate_data.dut_efficiencies = [0.97] * simulate_data.n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
     simulate_data.dut_material_budget = [0 for i in range(simulate_data.n_duts)]  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering; std. setting is the sensor thickness made of silicon as material budget
     # Digitization settings
     simulate_data.digitization_charge_sharing = True
@@ -53,7 +53,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     output_folder = 'simulation'  # define a folder where all output data and plots are stored
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-#     simulate_data.create_data_and_store(os.path.join(output_folder, 'simulated_data'), n_events=1000000)
+    simulate_data.create_data_and_store(os.path.join(output_folder, 'simulated_data'), n_events=1000000)
 
     # The simulated data files, one file per DUT
     data_files = [os.path.join(output_folder, r'simulated_data_DUT%d.h5' % i) for i in range(simulate_data.n_duts)]
@@ -91,6 +91,7 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
+                                     n_pixels=simulate_data.dut_n_pixel,
                                      pixel_size=simulate_data.dut_pixel_size)
 
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
@@ -102,16 +103,14 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.find_tracks(input_tracklets_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
                                input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealigned.h5'),
-                               min_cluster_distance=False,
-                               force_prealignment=True)  # If there is already an alignment info in the alignment file this has to be set)
+                               min_cluster_distance=False)  # If there is already an alignment info in the alignment file this has to be set)
 
     # Fit the track candidates and create new track table
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealigned.h5'),
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
-                              output_pdf_file=os.path.join(output_folder, 'Tracks_prealigned.pdf'),
-                              force_prealignment=True,
-                              track_quality=0)
+                              exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
+                              force_prealignment=True)
 
     # Calculate the residuals to check the prealignment
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
@@ -126,7 +125,8 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     dut_alignment.alignment(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealigned.h5'),
                             input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                             n_pixels=simulate_data.dut_n_pixel,
-                            pixel_size=simulate_data.dut_pixel_size)
+                            pixel_size=simulate_data.dut_pixel_size,
+                            max_iterations=3)
 
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
@@ -142,16 +142,16 @@ if __name__ == '__main__':  # main entry point is needed for multiprocessing und
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-                              output_pdf_file=os.path.join(output_folder, 'Tracks.pdf'),
-                              track_quality=0)
+                              exclude_dut_hit=True,  # To get unconstrained residuals do not use DUT hit for track fit
+                              selection_track_quality=0)
 
     # Calculate the residuals to check the prealignment
     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                         output_residuals_file=os.path.join(output_folder, 'Residuals.h5'),
+                                        max_chi2=500,  # The chi2 cut has a large influence on the residuals and number of tracks, since the resolution is dominated by multiple scattering
                                         n_pixels=simulate_data.dut_n_pixel,
-                                        pixel_size=simulate_data.dut_pixel_size,
-                                        output_pdf=True)
+                                        pixel_size=pixel_size)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
