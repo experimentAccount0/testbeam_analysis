@@ -402,12 +402,12 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
     n_entries = np.sum(data, axis=1)
     A_background = np.mean(data, axis=1)  # noise / background halo
     mu_background = np.zeros_like(n_entries)
-    mu_background[n_entries > 0] = np.average(data, axis=1, weights=np.arange(data.shape[1]) + 0.5)[n_entries > 0] * sum(np.arange(data.shape[1]) + 0.5) / n_entries[n_entries > 0]  # +1 because col/row start at 1
+    mu_background[n_entries > 0] = np.average(data, axis=1, weights=np.arange(n_pixel_ref) + 0.5)[n_entries > 0] * sum(np.arange(n_pixel_ref) + 0.5) / n_entries[n_entries > 0]  # +1 because col/row start at 1
 
     coeff = None
     fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
 
-    for index in np.arange(data.shape[0]):  # Loop over x dimension of correlation histogram
+    for index in np.arange(n_pixel_dut):  # Loop over x dimension of correlation histogram
         # TODO: start fitting from the beam center to get a higher chance to pick up the correlation peak
 
         # omit correlation fit with no entries / correlation (e.g. sensor edges, masked columns)
@@ -418,7 +418,7 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
         # omit correlation fit if sum of correlation entries is < 1 % of total entries devided by number of indices
         # (e.g. columns not in the beam)
         n_cluster_curr_index = data[index, :].sum()
-        if fit_converged and n_cluster_curr_index < data.sum() / data.shape[0] * 0.01:
+        if fit_converged and n_cluster_curr_index < data.sum() / n_pixel_dut * 0.01:
             logging.warning('Very few correlation entries for index %d. Omit correlation fit.', index)
             continue
 
@@ -430,7 +430,7 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
                 bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
             else:  # No (last) successfull fit, try to dedeuce reasonable start values
                 p0 = [A_peak[index], mu_peak[index], A_peak.shape[0] / 30.0, A_background[index], mu_background[index], A_peak.shape[0] / 3.0, 0.0]
-                bounds = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [10.0 * A_peak[index], 2.0 * data.shape[1], data.shape[1], 10.0 * A_peak[index], 2.0 * data.shape[1], data.shape[1], data.shape[1]]]
+                bounds = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [10.0 * A_peak[index], 2.0 * n_pixel_ref, n_pixel_ref, 10.0 * A_peak[index], 2.0 * n_pixel_ref, n_pixel_ref, n_pixel_ref]]
 
             # Fit correlation
             if fit_background:  # Describe background with addidional gauss + offset
