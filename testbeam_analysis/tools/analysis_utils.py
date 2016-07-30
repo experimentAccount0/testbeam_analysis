@@ -775,12 +775,11 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
     xcenter = (xedges[1:] + xedges[:-1]) / 2.0
     ycenter = (yedges[1:] + yedges[:-1]) / 2.0
     y_sum = np.sum(hist, axis=1)
-    #sum_threshold = np.percentile(y_sum, 100 - 50)
     x_sel = (y_sum > 0.0) & np.isfinite(y_sum)
     y_mean = np.full_like(y_sum, np.nan, dtype=np.float)
     y_mean[x_sel] = np.average(hist, axis=1, weights=ycenter)[x_sel] * np.sum(ycenter) / y_sum[x_sel]
     n_hits_threshold = np.percentile(y_sum, 100-68)
-    x_sel = (y_sum >= n_hits_threshold) & np.isfinite(y_sum)
+    x_sel = (y_sum > n_hits_threshold) & np.isfinite(y_sum)
     y_rel_err = np.full_like(y_sum, np.nan, dtype=np.float)
     y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
     fit, cov = curve_fit(linear, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
