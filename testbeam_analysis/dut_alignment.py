@@ -285,7 +285,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 n_cluster.fill(0)
 
                 # fill the arrays from above with values
-                fit_data(x=x_ref, data=data, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, n_cluster=n_cluster, fit_background=fit_background)
+                fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, n_cluster=n_cluster, fit_background=fit_background)
 
                 # Convert fit results to metric units for alignment fit
                 # Origin is center of pixel matrix
