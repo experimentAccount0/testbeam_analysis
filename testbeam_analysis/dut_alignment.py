@@ -261,35 +261,37 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 logging.info('Aligning data from %s', node.name)
 
                 if "column" in node.name.lower():
-                    pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][0], pixel_size[ref_idx][0]
+                    pixel_size_dut, pixel_size_ref = pixel_size[dut_idx][0], pixel_size[ref_idx][0]
                 else:
-                    pixel_length_dut, pixel_length_ref = pixel_size[dut_idx][1], pixel_size[ref_idx][1]
+                    pixel_size_dut, pixel_size_ref = pixel_size[dut_idx][1], pixel_size[ref_idx][1]
 
                 data = node[:]
-                
+                n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
+
                 # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
-                # matrix index 0 is cluster index 1 ranging from 0.5 to 1.4999, which becomes position 0.0 to 0.999, etc.
-                x_ref = np.linspace(0.0, data.shape[1], num=data.shape[1], endpoint=False, dtype=np.float) + 0.5
-                x_dut = np.linspace(0.0, data.shape[0], num=data.shape[0], endpoint=False, dtype=np.float) + 0.5
-                coeff_fitted = [None] * data.shape[0]
-                mean_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Peak of the Gauss fit
+                # matrix index 0 is cluster index 1 ranging from 0.5 to 1.4999, which becomes position 0.0 to 0.999 with center at 0.5, etc.
+                x_ref = (np.linspace(0.0, n_pixel_ref, num=n_pixel_ref, endpoint=False, dtype=np.float) + 0.5)
+                x_dut = (np.linspace(0.0, n_pixel_dut, num=n_pixel_dut, endpoint=False, dtype=np.float) + 0.5)
+                coeff_fitted = [None] * n_pixel_dut
+                mean_fitted = np.empty(shape=(n_pixel_dut,), dtype=np.float)  # Peak of the Gauss fit
                 mean_fitted.fill(np.nan)
-                mean_error_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Error of the fit of the peak
+                mean_error_fitted = np.empty(shape=(n_pixel_dut,), dtype=np.float)  # Error of the fit of the peak
                 mean_error_fitted.fill(np.nan)
-                sigma_fitted = np.empty(shape=(data.shape[0],), dtype=np.float)  # Sigma of the Gauss fit
+                sigma_fitted = np.empty(shape=(n_pixel_dut,), dtype=np.float)  # Sigma of the Gauss fit
                 sigma_fitted.fill(np.nan)
-                chi2 = np.empty(shape=(data.shape[0],), dtype=np.float)  # Chi2 of the fit
+                chi2 = np.empty(shape=(n_pixel_dut,), dtype=np.float)  # Chi2 of the fit
                 chi2.fill(np.nan)
-                n_cluster = np.empty(shape=(data.shape[0],), dtype=np.int)  # Number of hits per bin
+                n_cluster = np.empty(shape=(n_pixel_dut,), dtype=np.int)  # Number of hits per bin
                 n_cluster.fill(0)
 
                 # fill the arrays from above with values
                 fit_data(x=x_ref, data=data, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, n_cluster=n_cluster, fit_background=fit_background)
 
                 # Convert fit results to metric units for alignment fit
-                x_dut_scaled = x_dut * pixel_length_dut
-                mean_fitted_scaled = mean_fitted * pixel_length_ref
-                mean_error_fitted_scaled = mean_error_fitted * pixel_length_ref
+                # Origin is center of pixel matrix
+                x_dut_scaled = x_dut * pixel_size_dut
+                mean_fitted_scaled = mean_fitted * pixel_size_ref
+                mean_error_fitted_scaled = mean_error_fitted * pixel_size_ref
 
                 # Selected data arrays
                 x_selected = x_dut.copy()
@@ -340,8 +342,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
                 # This error is needed for track finding and track quality determination
-                mean_sigma = pixel_length_ref * np.mean(np.array(sigma_fitted_selected))
-                mean_sigma_error = pixel_length_ref * np.std(np.array(sigma_fitted_selected)) / np.sqrt(np.array(sigma_fitted_selected).shape[0])
+                mean_sigma = pixel_size_ref * np.mean(np.array(sigma_fitted_selected))
+                mean_sigma_error = pixel_size_ref * np.std(np.array(sigma_fitted_selected)) / np.sqrt(np.array(sigma_fitted_selected).shape[0])
 
                 result[dut_idx][table_prefix + '_sigma'], result[dut_idx][table_prefix + '_sigma_error'] = mean_sigma, mean_sigma_error
 
