@@ -376,14 +376,25 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
 
-def fit_data(x, data, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, n_cluster, fit_background):
+def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, n_cluster, fit_background):
     # Start values for fitting
     
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
         return [[0.01 * coeff[0], 0.0, 0.1 * coeff[2], 0.01 * coeff[3], 0.0, 0.1 * coeff[5], 0.1 * coeff[6]],
             [1000.0 * coeff[0], np.inf, 10.0 * coeff[2], 1000.0 * coeff[3], np.inf, 10.0 * coeff[5], 10.0 * coeff[6]]]
-    
+
+    def signal_sanity_check(coeff, signal_noise, A_peak):
+        ''' Sanity check if signal was deducted correctly from background. 3 Conditions:
+            1. The given signal to noise value has to be fullfilled: S/N > Amplitude Signal / ( Amplidude background + Offset)
+            2. The signal + background has to be large enough: Amplidute 1 + Amplitude 2 + Offset > Data maximum / 2
+            3. The Signal Sigma has to be smaller than the background sigma, otherwise beam would be larger than one pixel pitch
+        '''
+        if coeff[0] < (coeff[3] + coeff[6]) * signal_noise or coeff[0] + coeff[3] + coeff[6] < A_peak / 2.0 or coeff[2] > coeff[5] / 2.0:
+            return False
+        return True
+
+    n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
     # Correlation peak
     mu_peak = np.argmax(data, axis=1) + 0.5  # +1 because col/row start at 1
     A_peak = np.max(data, axis=1)  # signal / correlation peak
