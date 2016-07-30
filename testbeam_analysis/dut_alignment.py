@@ -289,8 +289,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 # Convert fit results to metric units for alignment fit
                 # Origin is center of pixel matrix
-                x_dut_scaled = x_dut * pixel_size_dut
-                mean_fitted_scaled = mean_fitted * pixel_size_ref
+                x_dut_scaled = (x_dut - 0.5 * n_pixel_dut) * pixel_size_dut
+                mean_fitted_scaled = (mean_fitted - 0.5 * n_pixel_ref) * pixel_size_ref
                 mean_error_fitted_scaled = mean_error_fitted * pixel_size_ref
 
                 # Selected data arrays
