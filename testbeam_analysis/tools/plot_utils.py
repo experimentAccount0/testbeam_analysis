@@ -320,6 +320,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
+    ax2 = ax.twinx()
     fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
     fit_fn = np.poly1d(fit[::-1])
     offset = np.empty_like(mean_fitted)
@@ -332,21 +333,23 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
 
     mean_plot, = ax.plot(x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')  # Plot correlation
     ax.plot(x[selected_data], fit_fn(x[selected_data]), '-', label='Line fit')  # Plot line fit
-    ax.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 1000.0, 'ro-', label='Error x 1000')  # Plot gaussian fit error
-    ax.plot(x[selected_data], np.abs(offset[selected_data]) * 10.0, 'go-', label='Offset x 10')  # Plot line fit offset
-    ax.axvline()
-    offset_limit_plot = ax.axhline(offset_limit * 10.0, linestyle='--', color='g', linewidth=2)  # Plot offset cut as a line
-    error_limit_plot = ax.axhline(error_limit * 1000.0, linestyle='--', color='r', linewidth=2)  # Plot error cut as a line
-    left_limit_plot = ax.axvline(left_limit, linestyle='-', color='b', linewidth=2)  # Plot left cut as a vertical line
-    right_limit_plot = ax.axvline(right_limit, linestyle='-', color='b', linewidth=2)  # Plot right cut as a vertical line
-    plt.bar(x[selected_data], n_cluster[selected_data] / np.max(n_cluster[selected_data]).astype(np.float) * plt.ylim()[1], align='center', alpha=0.1, label='Number of hits [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
-
-    plt.ylim(ymin=0.0)
+    ax2.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 1000.0, 'ro-', label='Error x1000')  # Plot gaussian fit error
+    ax2.plot(x[selected_data], np.abs(offset[selected_data]) * 10.0, 'go-', label='Offset x10')  # Plot line fit offset
+    offset_limit_plot = ax2.axhline(offset_limit * 10.0, linestyle='--', color='g', linewidth=2)  # Plot offset cut as a line
+    error_limit_plot = ax2.axhline(error_limit * 1000.0, linestyle='--', color='r', linewidth=2)  # Plot error cut as a line
+    left_limit_plot = ax2.axvline(left_limit, linestyle='-', color='b', linewidth=2)  # Plot left cut as a vertical line
+    right_limit_plot = ax2.axvline(right_limit, linestyle='-', color='b', linewidth=2)  # Plot right cut as a vertical line
+    ax2.bar(x[selected_data], n_cluster[selected_data] / np.max(n_cluster[selected_data]).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
+    ax.set_ylim(ymin=np.min(mean_fitted[selected_data]), ymax=np.max(mean_fitted[selected_data]))
+    ax2.set_ylim(ymin=0.0)
     plt.xlim((np.nanmin(x), np.nanmax(x)))
     ax.set_title(title)
-    ax.set_xlabel(dut_name)
-    ax.set_ylabel(ref_name)
-    ax.legend(loc=0)
+    ax.set_xlabel("%s [um]" % dut_name)
+    ax.set_ylabel("%s [um]" % ref_name)
+    ax2.set_ylabel("Error / Offset")
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax2.legend(lines + lines2, labels + labels2, loc=0)
     ax.grid()
 
     def finish(event):  # Fit result is ok
@@ -391,33 +394,41 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, dut_name, ref_name, title, output_pdf):
+def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, title, output_pdf):
     plt.clf()
-    plt.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation')
-    plt.plot(x[mask], mean_error_fitted[mask] * 1000.0, linestyle='', color="red", marker='o', label='Error x1000')
-    plt.errorbar(x[mask], (fit_fn(x[mask]) - mean_fitted[mask]) * 10.0, mean_error_fitted[mask] * 10.0, linestyle='', color="lightgreen", marker='o', label='Offset x10')
+    fig = plt.gcf()
+    ax = fig.add_subplot(1, 1, 1)
+    ax2 = ax.twinx()
+    ax.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation')
+    ax2.plot(x[mask], mean_error_fitted[mask] * 1000.0, linestyle='', color="red", marker='o', label='Error x1000')
+    ax2.errorbar(x[mask], np.abs(fit_fn(x[mask]) - mean_fitted[mask]) * 10.0, mean_error_fitted[mask] * 10.0, linestyle='', color="lightgreen", marker='o', label='Offset x10')
+    ax2.plot(x, chi2 / 1e5, 'r--', label="Chi$^2$")
+    # plot masked data points, but they should not influence the ylimit
+    y_limits = ax2.get_ylim()
+    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
+    plt.plot(x[~mask], mean_error_fitted[~mask] * 1000.0, linestyle='', color="darkred", marker='o')
+    plt.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]) * 10.0, mean_error_fitted[~mask] * 10.0, linestyle='', color="darkgreen", marker='o')
+    ax2.set_ylim(y_limits)
+    ax2.set_ylim(ymin=0.0)
+    ax.set_ylim((-n_pixel_ref * pixel_size_ref / 2.0, n_pixel_ref * pixel_size_ref / 2.0))
+    plt.xlim((-n_pixel_dut * pixel_size_dut / 2.0, n_pixel_dut * pixel_size_dut / 2.0))
+    ax2.bar(x, n_cluster / np.max(n_cluster).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x)))  # Plot number of hits for each correlation point
+    # plot again to draw line above the markers
     if len(pcov) > 1:
         fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     else:
         fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
-    plt.plot(x, fit_fn(x), linestyle='-', color="darkorange")
-    plt.plot(x, chi2 / 1.e7, 'r--', label="Chi$^2$")
-    axes = plt.gca()
-    y_limits = axes.get_ylim()
-    # plot masked data points
-    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
-    plt.plot(x[~mask], mean_error_fitted[~mask] * 1000.0, linestyle='', color="darkred", marker='o')
-    plt.errorbar(x[~mask], (fit_fn(x[~mask]) - mean_fitted[~mask]) * 10.0, mean_error_fitted[~mask] * 10.0, linestyle='', color="darkgreen", marker='o')
-    axes.set_ylim(y_limits)
-    # plot again to draw line above the markers
-    plt.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+    ax.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
 
-    plt.legend(loc=0)
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax2.legend(lines + lines2, labels + labels2, loc=0)
     plt.title(title)
-    plt.xlabel('%s [um]' % dut_name)
-    plt.ylabel('%s [um]' % ref_name)
+    ax.set_xlabel("%s [um]" % dut_name)
+    ax.set_ylabel("%s [um]" % ref_name)
+    ax2.set_ylabel("Error [a.u.]")
 #     plt.xlim((0, x.shape[0]))
-    plt.grid()
+    ax.grid()
     if output_pdf:
         output_pdf.savefig()
     else:

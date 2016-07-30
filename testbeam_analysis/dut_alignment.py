@@ -367,7 +367,23 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 selected_indices = np.searchsorted(x_dut_scaled, x_dut_scaled_selected)
                 mask = np.zeros_like(x_dut_scaled, dtype=np.bool)
                 mask[selected_indices] = True
-                plot_utils.plot_alignment_fit(x=x_dut_scaled, mean_fitted=mean_fitted_scaled, mask=mask, fit_fn=fit_fn, fit=re_fit, pcov=re_fit_pcov, chi2=chi2, mean_error_fitted=mean_error_fitted_scaled, dut_name=dut_name, ref_name=ref_name, title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name), output_pdf=output_pdf)
+                plot_utils.plot_alignment_fit(
+                    x=x_dut_scaled,
+                    mean_fitted=mean_fitted_scaled,
+                    mask=mask, fit_fn=fit_fn,
+                    fit=re_fit,
+                    pcov=re_fit_pcov,
+                    chi2=chi2,
+                    mean_error_fitted=mean_error_fitted_scaled,
+                    n_cluster=n_cluster,
+                    n_pixel_ref=n_pixel_ref,
+                    n_pixel_dut=n_pixel_dut,
+                    pixel_size_ref=pixel_size_ref,
+                    pixel_size_dut=pixel_size_dut,
+                    ref_name=ref_name,
+                    dut_name=dut_name,
+                    title="Correlation of %s: %s vs. %s" % ("columns" if "column" in node.name.lower() else "rows", ref_name, dut_name),
+                    output_pdf=output_pdf)
 
             logging.info('Store pre alignment data in %s', output_alignment_file)
             with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
