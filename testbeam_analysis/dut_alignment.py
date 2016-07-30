@@ -425,6 +425,7 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
         # handle exception that might occur during fitting the data
         try:
             # Set start values and fit limits
+            # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
             if fit_converged:  # Set start values from last successfull fit, no large difference expected
                 p0 = coeff  # Set start values from last successfull fit
                 bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
