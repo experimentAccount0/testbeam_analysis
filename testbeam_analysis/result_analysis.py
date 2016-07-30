@@ -197,7 +197,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             width = max(plot_npixels * pixel_size[actual_dut][0], pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][0]))
                             if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
                                 width += pixel_size[actual_dut][0]
-                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][0]
+                            nbins = int(nbins_per_pixel * width / pixel_size[actual_dut][0])
                             x_range = (center_x - 0.5 * width, center_x + 0.5 * width)
                         else:
                             nbins = "auto"
@@ -216,7 +216,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             width = max(plot_npixels * pixel_size[actual_dut][1], pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][1]))
                             if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
                                 width += pixel_size[actual_dut][1]
-                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][1]
+                            nbins = int(nbins_per_pixel * width / pixel_size[actual_dut][1])
                             y_range = (center_y - 0.5 * width, center_y + 0.5 * width)
                         else:
                             nbins = "auto"
@@ -235,7 +235,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             width = max(plot_npixels * pixel_size[actual_dut][0], pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][0]))
                             if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
                                 width += pixel_size[actual_dut][0]
-                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][0]
+                            nbins = int(nbins_per_pixel * width / pixel_size[actual_dut][0])
                             col_range = (center_col - 0.5 * width, center_col + 0.5 * width)
                         else:
                             nbins = "auto"
@@ -254,7 +254,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             width = max(plot_npixels * pixel_size[actual_dut][1], pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][1]))
                             if np.mod(width / pixel_size[actual_dut][0], 2) != 0:
                                 width += pixel_size[actual_dut][1]
-                            nbins = nbins_per_pixel * width / pixel_size[actual_dut][1]
+                            nbins = int(nbins_per_pixel * width / pixel_size[actual_dut][1])
                             row_range = (center_row - 0.5 * width, center_row + 0.5 * width)
                         else:
                             nbins = "auto"
