@@ -132,6 +132,7 @@ def plot_correlation_fit(x, y, y_fit, xlabel, title, output_pdf):
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('#')
+    plt.xlim((np.min(x), np.max(x)))
     plt.grid()
     plt.legend(loc=0)
     if output_pdf:
