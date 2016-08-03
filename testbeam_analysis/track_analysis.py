@@ -292,7 +292,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
         # Remove tracks that are too close when extrapolated to the actual DUT
-        # All but one merged track are signaled by n_tracks = -1
+        # All but one merged track are signaled by n_tracks = -1       
         actual_min_track_distance = min_track_distance[fit_dut]
         if actual_min_track_distance > 0:
             _find_merged_tracks(tracks_array, actual_min_track_distance)
@@ -354,6 +354,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     min_track_distance = np.array([(200.)] * n_duts)
                 elif min_track_distance is False:
                     min_track_distance = np.zeros(n_duts)
+                elif isinstance(min_track_distance, (int, float)):
+                    min_track_distance = np.array([(min_track_distance)] * n_duts)
                 else:
                     min_track_distance = np.array(min_track_distance)
 
