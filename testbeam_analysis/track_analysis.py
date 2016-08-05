@@ -386,14 +386,14 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         if max_tracks:  # Option to neglect events with too many hits
                             good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] <= max_tracks)
                             n_tracks_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection) - n_track_cut - n_merged_cut
-                            logging.info('Removed %d tracks candidates due to cuts (%d quality, %d merged cluster, %d # tracks), %d percent ',
+                            logging.info('Removed %d tracks candidates (%d tracks due to quality, %d tracks due to merged cluster, %d # tracks), %.1f%% ',
                                          good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
                                          n_track_cut,
                                          n_merged_cut,
                                          n_tracks_cut,
                                          (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
                         else:
-                            logging.info('Removed %d tracks candidates due to cuts (%d quality, %d merged cluster), %d percent ',
+                            logging.info('Removed %d tracks candidates (%d tracks due to quality, %d tracks due to merged cluster), %.1f%% ',
                                          good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
                                          n_track_cut,
                                          n_merged_cut,
