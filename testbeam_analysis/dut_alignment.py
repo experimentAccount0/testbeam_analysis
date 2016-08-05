@@ -967,11 +967,11 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             # Add resdidual to total residual normalized to pixel pitch in x
             total_residual = np.sqrt(np.square(total_residual) + np.square(std_x / pixel_size[dut_index][0]))
 
-            if output_fig is not False:
-                plot_utils.plot_residuals(histogram=y,
+            if output_fig:
+                plot_utils.plot_residuals(histogram=hist_node[:],
                                           edges=hist_node._v_attrs.xedges,
-                                          fit=coeff_x,
-                                          fit_errors=cov_x,
+                                          fit=hist_node._v_attrs.fit_coeff,
+                                          fit_errors=hist_node._v_attrs.fit_cov,
                                           title='Residuals for DUT %d' % dut_index,
                                           x_label='X residual [um]',
                                           output_fig=output_fig)
@@ -985,11 +985,11 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
             if translation_only:
                 return alignment_parameters, total_residual
 
-            if output_fig is not False:
-                plot_utils.plot_residuals(histogram=y,
-                                          edges=hist_node._v_attrs.yedges,
-                                          fit=coeff_y,
-                                          fit_errors=cov_y,
+            if output_fig:
+                plot_utils.plot_residuals(histogram=hist_node[:],
+                                          edges=hist_node._v_attrs.xedges,
+                                          fit=hist_node._v_attrs.fit_coeff,
+                                          fit_errors=hist_node._v_attrs.fit_cov,
                                           title='Residuals for DUT %d' % dut_index,
                                           x_label='Y residual [um]',
                                           output_fig=output_fig)
