@@ -298,7 +298,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 n_cluster.fill(0)
 
                 # fill the arrays from above with values
-                fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, n_cluster=n_cluster, fit_background=fit_background)
+                fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, n_cluster=n_cluster, fit_background=fit_background, reduce_background=reduce_background)
 
                 # Convert fit results to metric units for alignment fit
                 # Origin is center of pixel matrix
@@ -407,7 +407,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
 
-def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, n_cluster, fit_background):
+def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, n_cluster, fit_background, reduce_background):
     
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
@@ -457,7 +457,7 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
 
         # Set start parameters and fit limits
         # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
-        if fit_converged:  # Set start values from last successfull fit, no large difference expected
+        if fit_converged and not reduce_background:  # Set start values from last successfull fit, no large difference expected
             p0 = coeff  # Set start values from last successfull fit
             bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
         else:  # No (last) successfull fit, try to dedeuce reasonable start values
