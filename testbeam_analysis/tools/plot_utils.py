@@ -642,7 +642,7 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
 
         plt.bar(x, histogram, log=plot_log, align='center')
         if np.any(fit):
-            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %d um' % (histogram.sum(), testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x)))
+            plt.plot([fit[1], fit[1]], [0, plt.ylim()[1]], color='red', label='Entries %d\nRMS %.1f um' % (histogram.sum(), testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x)))
             gauss_fit_legend_entry = 'Gauss fit: \nA=$%.1f\pm %.1f$\nmu=$%.1f\pm %.1f$\nsigma=$%.1f\pm %.1f$' % (fit[0], np.absolute(fit_errors[0][0] ** 0.5), fit[1], np.absolute(fit_errors[1][1] ** 0.5), np.absolute(fit[2]), np.absolute(fit_errors[2][2] ** 0.5))
             x_gauss = np.arange(np.floor(np.min(edges)), np.ceil(np.max(edges)), step=0.1)
             plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
