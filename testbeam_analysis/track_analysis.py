@@ -326,8 +326,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         if all_duts:
             logging.info('Fit tracks for all DUTs at the same time!')
 
-        logging.info('Use %d DUTs for track selection: %s', bin(dut_selection).count("1"), info_str_hit)
-        logging.info("Use %d DUTs for track fit: %s", bin(dut_fit_selection).count("1"), info_str_fit)
+        logging.info('Use %d DUTs for track selection: %s', bin(dut_selection)[2:].count("1"), info_str_hit)
+        logging.info("Use %d DUTs for track fit: %s", bin(dut_fit_selection)[2:].count("1"), info_str_fit)
 
         track_quality_mask = 0
         for index, dut in enumerate(selection_hit_duts[dut_index]):
@@ -363,7 +363,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     logging.info('Fit tracks for DUT %d', fit_dut)
 
                     dut_selection, dut_fit_selection, track_quality_mask, all_duts = select_data(fit_dut)
-                    n_fit_duts = bin(dut_fit_selection).count("1")
+                    n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
                         logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', fit_dut)
                         continue
