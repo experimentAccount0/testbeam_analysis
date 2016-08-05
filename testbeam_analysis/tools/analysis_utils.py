@@ -468,9 +468,14 @@ def gauss2(x, *p):
     return (sigma * np.sqrt(2.0 * np.pi))**-1.0 * np.exp(-0.5 * ((x - mu) / sigma)**2.0)
 
 
-def gauss_offset(x, *p):
+def gauss_offset_slope(x, *p):
     A, mu, sigma, offset, slope = p
     return gauss(x, A, mu, sigma) + offset + x * slope
+
+
+def gauss_offset(x, *p):
+    A, mu, sigma, offset = p
+    return gauss(x, A, mu, sigma) + offset
 
 
 def double_gauss(x, *p):

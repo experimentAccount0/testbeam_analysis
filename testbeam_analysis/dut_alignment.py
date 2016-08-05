@@ -210,7 +210,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
             progress_bar.finish()
 
 
-def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, dut_names=None, non_interactive=True, iterations=2):
+def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, non_interactive=True, iterations=2):
     '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
@@ -226,10 +226,12 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         The signal to noise ratio for peak signal over background peak. This should be specified when the background is fitted with a gaussian.
         Usually data with a lot if tracks per event have a gaussian background. The S/N can be guesses by looking at the correlation plot. The std.
         value is usually fine.
-    fit_background : boolean
+    fit_background : bool
         Data with a lot if tracks per event have a gaussian background from the beam profile. Also try to fit this background to determine the correlation
         peak correctly. If you see a clear 2D gaussian in the correlation plot this shoud be activated. If you have 1-2 tracks per event and large pixels
         this option should be off, because otherwise overfitting is possible.
+    reduce_background : bool
+        Reduce background (uncorrelated events) with the help of SVD.
     pixel_size: iterable
         Iterable of tuples with column and row pixel size in um
     dut_names: iterable
@@ -266,6 +268,17 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     pixel_size_dut, pixel_size_ref = pixel_size[dut_idx][1], pixel_size[ref_idx][1]
 
                 data = node[:]
+
+                if reduce_background:
+                    uu, dd, vv = np.linalg.svd(data)
+                    reconstimg = np.matrix(uu[:, :1]) * np.diag(dd[:1]) * np.matrix(vv[:1, :])
+                    reconstimg = np.array(reconstimg, dtype=np.int)
+                    data = (data - reconstimg).astype(np.int)
+                    data += np.abs(data.min())
+                    if fit_background:
+                        logging.warning("reduce_background is True, setting fit_background to False")
+                        fit_background = False
+
                 n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
 
                 # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
@@ -395,12 +408,13 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
 
 def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, n_cluster, fit_background):
-    # Start values for fitting
     
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
-        return [[0.01 * coeff[0], 0.0, 0.1 * coeff[2], 0.01 * coeff[3], 0.0, 0.1 * coeff[5], 0.1 * coeff[6]],
-            [1000.0 * coeff[0], np.inf, 10.0 * coeff[2], 1000.0 * coeff[3], np.inf, 10.0 * coeff[5], 10.0 * coeff[6]]]
+        return [
+            [0.1 * coeff[0], x.min(), 0.5 * coeff[2], 0.01 * coeff[3], x.min(), 0.5 * coeff[5], 0.5 * coeff[6]],
+            [10.0 * coeff[0], x.max(), 2.0 * coeff[2], 10.0 * coeff[3], x.max(), 2.0 * coeff[5], 2.0 * coeff[6]]
+        ]
 
     def signal_sanity_check(coeff, signal_noise, A_peak):
         ''' Sanity check if signal was deducted correctly from background. 3 Conditions:
@@ -413,14 +427,15 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
         return True
 
     n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
+    # Start values for fitting
     # Correlation peak
-    mu_peak = np.argmax(data, axis=1) + 0.5  # +1 because col/row start at 1
+    mu_peak = np.argmax(data, axis=1) + 0.5  # +0.5 because col/row index starts at 1
     A_peak = np.max(data, axis=1)  # signal / correlation peak
     # Background of uncorrelated data
     n_entries = np.sum(data, axis=1)
     A_background = np.mean(data, axis=1)  # noise / background halo
     mu_background = np.zeros_like(n_entries)
-    mu_background[n_entries > 0] = np.average(data, axis=1, weights=np.arange(n_pixel_ref) + 0.5)[n_entries > 0] * sum(np.arange(n_pixel_ref) + 0.5) / n_entries[n_entries > 0]  # +1 because col/row start at 1
+    mu_background[n_entries > 0] = np.average(data, axis=1, weights=np.arange(n_pixel_ref) + 0.5)[n_entries > 0] * sum(np.arange(n_pixel_ref) + 0.5) / n_entries[n_entries > 0]  # +0.5 because col/row index starts at 1
 
     coeff = None
     fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
@@ -440,73 +455,64 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
             logging.warning('Very few correlation entries for index %d. Omit correlation fit.', index)
             continue
 
-        # handle exception that might occur during fitting the data
-        try:
-            # Set start values and fit limits
-            # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
-            if fit_converged:  # Set start values from last successfull fit, no large difference expected
-                p0 = coeff  # Set start values from last successfull fit
-                bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
-            else:  # No (last) successfull fit, try to dedeuce reasonable start values
-                p0 = [A_peak[index], mu_peak[index], A_peak.shape[0] / 30.0, A_background[index], mu_background[index], A_peak.shape[0] / 3.0, 0.0]
-                bounds = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [10.0 * A_peak[index], 2.0 * n_pixel_ref, n_pixel_ref, 10.0 * A_peak[index], 2.0 * n_pixel_ref, n_pixel_ref, n_pixel_ref]]
+        # Set start parameters and fit limits
+        # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
+        if fit_converged:  # Set start values from last successfull fit, no large difference expected
+            p0 = coeff  # Set start values from last successfull fit
+            bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
+        else:  # No (last) successfull fit, try to dedeuce reasonable start values
+            p0 = [A_peak[index], mu_peak[index], 5.0, A_background[index], mu_background[index], analysis_utils.get_rms_from_histogram(data[index, :], x), 0.0]
+            bounds = [[0.0, x.min(), 0.0, 0.0, x.min(), 0.0, 0.0], [2.0 * A_peak[index], x.max(), x.max() - x.min(), 2.0 * A_peak[index], x.max(), np.inf, A_peak[index]]]
 
-            # Fit correlation
-            if fit_background:  # Describe background with addidional gauss + offset
+        # Fit correlation
+        if fit_background:  # Describe background with addidional gauss + offset
+            try:
                 coeff, var_matrix = curve_fit(analysis_utils.double_gauss_offset, x, data[index, :], p0=p0, bounds=bounds)
-
+            except RuntimeError:  # curve_fit failed
+                fit_converged = False
+            else:
                 fit_converged = True
-
+                # do some result checks
                 if not signal_sanity_check(coeff, s_n, A_peak[index]):
                     logging.debug('No correlation peak found. Try another fit...')
                     # Use parameters from last fit as start parameters for the refit
                     y_fit = analysis_utils.double_gauss_offset(x, *coeff)
-                    coeff, var_matrix = refit_advanced(x_data=x, y_data=data[index, :], y_fit=y_fit, p0=coeff)
-
-                    # Check result again:
-                    if not signal_sanity_check(coeff, s_n, A_peak[index]):
-                        logging.debug('No correlation peak found after refit!')
+                    try:
+                        coeff, var_matrix = refit_advanced(x_data=x, y_data=data[index, :], y_fit=y_fit, p0=coeff)
+                    except RuntimeError:  # curve_fit failed
                         fit_converged = False
+                    else:
+                        fit_converged = True
+                        # Check result again:
+                        if not signal_sanity_check(coeff, s_n, A_peak[index]):
+                            logging.debug('No correlation peak found after refit!')
+                            fit_converged = False
 
-            else:  # Describe background with offset only.
-                # Do not use the second gauss, thus fix values by redifining fit funtion
-                # http://stackoverflow.com/questions/12208634/fitting-only-one-paramter-of-a-function-with-many-parameters-in-python
-                # Change  start parameters and boundaries
-                p0 = [v for i, v in enumerate(p0) if i not in (3, 4, 5)]
-                bounds[0] = [v for i, v in enumerate(bounds[0]) if i not in (3, 4, 5)]
-                bounds[1] = [v for i, v in enumerate(bounds[1]) if i not in (3, 4, 5)]
+        else:  # Describe background with offset only.
+            # Change start parameters and boundaries
+            p0_gauss_offset = [p0_val for i, p0_val in enumerate(p0) if i in (0, 1, 2, 6)]
+            bounds_gauss_offset = [0, np.inf]
+            bounds_gauss_offset[0] = [bound_val for i, bound_val in enumerate(bounds[0]) if i in (0, 1, 2, 6)]
+            bounds_gauss_offset[1] = [bound_val for i, bound_val in enumerate(bounds[1]) if i in (0, 1, 2, 6)]
 
-                p0[0] = A_peak[index]
-                p0[1] = mu_peak[index]
-
-                # Sanity check if a bad fit still converged
-                if bounds[0][0] > p0[0]:
-                    bounds[0][0] = 0
-                if bounds[0][1] > mu_peak[index]:
-                    bounds[0][1] = 0
-
-                coeff, var_matrix = curve_fit(lambda x, A_1, mu_1, sigma_1, offset: analysis_utils.double_gauss_offset(x, A_1, mu_1, sigma_1, 0.0, 1.0, 1.0, offset), x, data[index, :], p0=p0, bounds=bounds)
-
+            try:
+                coeff_gauss_offset, var_matrix = curve_fit(analysis_utils.gauss_offset, x, data[index, :], p0=p0_gauss_offset, bounds=bounds_gauss_offset)
+            except RuntimeError:  # curve_fit failed
+                fit_converged = False
+            else:
                 fit_converged = True
-                # Change back start parameters and boundaries
-                coeff = np.insert(coeff, 3, 0.0)
-                coeff = np.insert(coeff, 4, 1.0)
-                coeff = np.insert(coeff, 5, 1.0)
-                p0.insert(3, 0.0)
-                p0.insert(4, 1.0)
-                p0.insert(5, 1.0)
 
-            # Set fit results for given index if successful
-            if fit_converged:
-                coeff_fitted[index] = coeff
-                mean_fitted[index] = coeff[1]
-                mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
-                sigma_fitted[index] = np.abs(coeff[2])
-                chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
-            n_cluster[index] = data[index, :].sum()
+            # Change back coefficents
+            coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)
 
-        except RuntimeError:  # curve_fit failed
-            fit_converged = False
+        # Set fit results for given index if successful
+        if fit_converged:
+            coeff_fitted[index] = coeff
+            mean_fitted[index] = coeff[1]
+            mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
+            sigma_fitted[index] = np.abs(coeff[2])
+            chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
+        n_cluster[index] = data[index, :].sum()
 
 
 def refit_advanced(x_data, y_data, y_fit, p0):
