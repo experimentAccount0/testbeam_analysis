@@ -228,9 +228,9 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
     # Special mode: use all DUTs in the fit and the selections are all the same --> the data does only have to be fitted once
     if not exclude_dut_hit and all(x == selection_hit_duts[0] for x in selection_hit_duts) and all(x == selection_fit_duts[0] for x in selection_fit_duts) and all(x == selection_track_quality[0] for x in selection_track_quality):
-        all_duts = True
+        same_tracks_for_all_duts = True
     else:
-        all_duts = False
+        same_tracks_for_all_duts = False
 
     def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
         # Define description
@@ -323,7 +323,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             dut_fit_selection |= ((1 << selected_fit_dut))
             info_str_fit += 'DUT%d ' % (selected_fit_dut)
 
-        if all_duts:
+        if same_tracks_for_all_duts:
             logging.info('Fit tracks for all DUTs at the same time!')
 
         logging.info('Use %d DUTs for track selection: %s', bin(dut_selection)[2:].count("1"), info_str_hit)
@@ -337,7 +337,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 if quality <= selection_track_quality[dut_index][index]:
                     track_quality_mask |= ((1 << dut) << quality * 8)
         logging.info("Use track quality: %s", str(selection_track_quality[dut_index])[1:-1])
-        return dut_selection, dut_fit_selection, track_quality_mask, all_duts
+        return dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts
 
     pool = Pool()
     with PdfPages(output_tracks_file[:-3] + '.pdf') as output_fig:
@@ -362,7 +362,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT %d', fit_dut)
 
-                    dut_selection, dut_fit_selection, track_quality_mask, all_duts = select_data(fit_dut)
+                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
                         logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', fit_dut)
@@ -427,7 +427,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
 
                         # Store the data
-                        if not all_duts:  # Check if all DUTs were fitted at once
+                        if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
                             store_track_data(fit_dut, min_track_distance)
                         else:
                             for fit_dut in fit_duts:
@@ -435,7 +435,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         progress_bar.update(index_candidates)
                     progress_bar.finish()
-                    if all_duts:  # Stop fit Dut loop since all DUTs were fitted at once
+                    if same_tracks_for_all_duts:  # Stop fit Dut loop since all DUTs were fitted at once
                         break
     pool.close()
     pool.join()
