@@ -410,7 +410,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         track_hits = np.zeros((n_tracks, n_fit_duts, 3))
 
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
-                            if (1 << dut_index) & dut_fit_selection == (1 << dut_index):  # True if DUT is used in fit
+                            if ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
                                 xyz = np.column_stack((good_track_candidates['x_dut_%s' % dut_index], good_track_candidates['y_dut_%s' % dut_index], good_track_candidates['z_dut_%s' % dut_index]))
                                 track_hits[:, index, :] = xyz
                                 index += 1
