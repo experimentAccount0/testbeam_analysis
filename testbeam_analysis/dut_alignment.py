@@ -243,6 +243,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
     '''
     logging.info('=== Pre-alignment ===')
 
+    if fit_background:
+        logging.warning("reduce_background is True, setting fit_background to False")
+        fit_background = False
+
     with PdfPages(os.path.join(os.path.dirname(os.path.abspath(output_alignment_file)), 'Prealignment.pdf')) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
             n_duts = len(in_file_h5.list_nodes("/")) // 2 + 1  # no correlation for reference DUT0
@@ -275,9 +279,6 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     reconstimg = np.array(reconstimg, dtype=np.int)
                     data = (data - reconstimg).astype(np.int)
                     data += np.abs(data.min())
-                    if fit_background:
-                        logging.warning("reduce_background is True, setting fit_background to False")
-                        fit_background = False
 
                 n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
 
