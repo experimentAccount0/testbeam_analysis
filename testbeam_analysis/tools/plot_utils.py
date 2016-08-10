@@ -299,7 +299,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
             n_hit_cut_index = np.r_[n_hit_cut_index, [right_index]]
 
         if np.any(n_hit_cut_index.shape):  # If data has no anomalies n_hit_cut_index is empty
-            def consecutive(data, max_stepsize=5):  # Returns group of consecutive increasing values
+            def consecutive(data, max_stepsize=10):  # Returns group of consecutive increasing values
                 return np.split(data, np.where(np.diff(data) > max_stepsize)[0] + 1)
             cons = consecutive(n_hit_cut_index)
             left_cut = left_index if cons[0].shape[0] == 1 else cons[0][-1] + 1
