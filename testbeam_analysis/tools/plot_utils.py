@@ -270,12 +270,12 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         mean_error_percentile = 95
         offset_percentile = 99
 
-        error_median = np.nanmedian(mean_error_fitted)
-        error_limit = max(error_median * 2, np.percentile(np.abs(mean_error_fitted[selected_data]), mean_error_percentile))
-        offset_median = np.nanmedian(offset)
-        offset_limit = max(offset_median * 2, np.percentile(np.abs(offset[selected_data]), offset_percentile))  # Do not cut too much on the offset, it depends on the fit that might be off
-        error_slider.set_val(error_limit)
-        offset_slider.set_val(offset_limit)
+        error_median = np.nanmedian(mean_error_fitted[selected_data])
+        error_std = np.nanstd(mean_error_fitted[selected_data])
+        error_limit = max(error_median + error_std * 2, np.percentile(np.abs(mean_error_fitted[selected_data]), mean_error_percentile))
+        offset_median = np.nanmedian(offset[selected_data])
+        offset_std = np.nanstd(offset[selected_data])
+        offset_limit = max(offset_median + offset_std * 2, np.percentile(np.abs(offset[selected_data]), offset_percentile))  # Do not cut too much on the offset, it depends on the fit that might be off
 
         n_hit_cut = np.percentile(n_cluster[selected_data], n_hit_percentile)  # Cut off low/high % of the hits
         n_hit_cut_index = np.zeros_like(n_cluster, dtype=np.bool)
@@ -285,9 +285,12 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         n_hit_cut_index[selected_data] |= (np.abs(mean_error_fitted[selected_data]) > error_limit)
         n_hit_cut_index[~np.isfinite(mean_error_fitted)] = 1
         n_hit_cut_index = np.where(n_hit_cut_index == 1)[0]
-#         print "n_hit_cut_index before left right cut", n_hit_cut_index
         left_index = np.where(x <= left_limit)[0][-1]
         right_index = np.where(x >= right_limit)[0][0]
+
+        # update plot and selected data
+        error_slider.set_val(error_limit)
+        offset_slider.set_val(offset_limit)
         n_hit_cut_index = n_hit_cut_index[n_hit_cut_index >= left_index]
         n_hit_cut_index = n_hit_cut_index[n_hit_cut_index <= right_index]
         if not np.any(n_hit_cut_index == left_index):
