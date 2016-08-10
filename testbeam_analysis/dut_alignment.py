@@ -273,13 +273,6 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 data = node[:]
 
-                if reduce_background:
-                    uu, dd, vv = np.linalg.svd(data)
-                    reconstimg = np.matrix(uu[:, :1]) * np.diag(dd[:1]) * np.matrix(vv[:1, :])
-                    reconstimg = np.array(reconstimg, dtype=np.int)
-                    data = (data - reconstimg).astype(np.int)
-                    data += np.abs(data.min())
-
                 n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
 
                 # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
@@ -295,11 +288,17 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 sigma_fitted.fill(np.nan)
                 chi2 = np.empty(shape=(n_pixel_dut,), dtype=np.float)  # Chi2 of the fit
                 chi2.fill(np.nan)
-                n_cluster = np.empty(shape=(n_pixel_dut,), dtype=np.int)  # Number of hits per bin
-                n_cluster.fill(0)
+                n_cluster = np.sum(data, axis=1)  # Number of hits per bin
+
+                if reduce_background:
+                    uu, dd, vv = np.linalg.svd(data)
+                    reconstimg = np.matrix(uu[:, :1]) * np.diag(dd[:1]) * np.matrix(vv[:1, :])
+                    reconstimg = np.array(reconstimg, dtype=np.int)
+                    data = (data - reconstimg).astype(np.int)
+                    data -= data.min()
 
                 # fill the arrays from above with values
-                fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, n_cluster=n_cluster, fit_background=fit_background, reduce_background=reduce_background)
+                fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, fit_background=fit_background, reduce_background=reduce_background)
 
                 # Convert fit results to metric units for alignment fit
                 # Origin is center of pixel matrix
@@ -408,7 +407,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
 
-def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, n_cluster, fit_background, reduce_background):
+def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):
     
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
@@ -513,7 +512,6 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
             sigma_fitted[index] = np.abs(coeff[2])
             chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
-        n_cluster[index] = data[index, :].sum()
 
 
 def refit_advanced(x_data, y_data, y_fit, p0):
