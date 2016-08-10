@@ -202,6 +202,8 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     global offset_limit
     global left_limit
     global right_limit
+    global x_diff
+    x_diff = np.diff(x)[0]
 
     do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
 
@@ -220,7 +222,12 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         update_plot()
 
     def update_left_limit(left_limit_new):  # Function called when left limit slider is moved
+        global right_limit
         global left_limit
+        global x_diff
+        if left_limit_new >= right_limit - 1.0 * x_diff:
+            left_limit_new = right_limit - 2.0 * x_diff
+            left_slider.set_val(left_limit_new)
         left_limit = left_limit_new
         left_limit_plot.set_xdata([left_limit, left_limit])
         update_selected_data()
@@ -228,6 +235,11 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
 
     def update_right_limit(right_limit_new):  # Function called when left limit slider is moved
         global right_limit
+        global left_limit
+        global x_diff
+        if right_limit_new <= left_limit + 1.0 * x_diff:
+            right_limit_new = left_limit + 2.0 * x_diff
+            right_slider.set_val(right_limit_new)
         right_limit = right_limit_new
         right_limit_plot.set_xdata([right_limit, right_limit])
         update_selected_data()
