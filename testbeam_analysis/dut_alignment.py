@@ -366,11 +366,17 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 idx = (np.abs(x_selected - 1 - plot_index)).argmin()
                 plot_index = np.array(x_selected - 1, dtype=np.int)[idx]
 
-                y_fit = analysis_utils.double_gauss_offset(x_ref, *coeff_fitted[plot_index])
+                if np.all(np.isnan(coeff_fitted[plot_index][3:6])):
+                    y_fit = analysis_utils.gauss_offset(x_ref, *coeff_fitted[plot_index][[0, 1, 2, 6]])
+                    fit_label = "Gauss-Offset"
+                else:
+                    y_fit = analysis_utils.double_gauss_offset(x_ref, *coeff_fitted[plot_index])
+                    fit_label = "Gauss-Gauss-Offset"
                 plot_utils.plot_correlation_fit(x=x_ref,
                                                 y=data[plot_index, :],
                                                 y_fit=y_fit,
                                                 xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
+                                                fit_label=fit_label,
                                                 title="Correlation of %s: %s vs. %s at %s %d" % ("columns" if "column" in node.name.lower() else "rows",
                                                                                                  ref_name, dut_name, "column" if "column" in node.name.lower() else "row", plot_index),
                                                 output_pdf=output_pdf)
@@ -503,7 +509,7 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
                 fit_converged = True
 
             # Change back coefficents
-            coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)
+            coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)  # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
 
         # Set fit results for given index if successful
         if fit_converged:
