@@ -203,6 +203,10 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     global left_limit
     global right_limit
     global x_diff
+    global offset
+    global fit
+    global fit_fn
+
     x_diff = np.diff(x)[0]
 
     do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
@@ -210,14 +214,14 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
         global offset_limit
         offset_limit = offset_limit_new
-        offset_limit_plot.set_ydata([offset_limit * 10., offset_limit * 10.])
+        #offset_limit_plot.set_ydata([offset_limit, offset_limit])
         update_selected_data()
         update_plot()
 
     def update_error(error_limit_new):  # Function called when error slider is moved
         global error_limit
-        error_limit = error_limit_new
-        error_limit_plot.set_ydata([error_limit * 1000., error_limit * 1000.])
+        error_limit = error_limit_new / 10.0
+        #error_limit_plot.set_ydata([error_limit * 10.0, error_limit * 10.0])
         update_selected_data()
         update_plot()
 
@@ -229,7 +233,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
             left_limit_new = right_limit - 2.0 * x_diff
             left_slider.set_val(left_limit_new)
         left_limit = left_limit_new
-        left_limit_plot.set_xdata([left_limit, left_limit])
+        #left_limit_plot.set_xdata([left_limit, left_limit])
         update_selected_data()
         update_plot()
 
@@ -241,7 +245,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
             right_limit_new = left_limit + 2.0 * x_diff
             right_slider.set_val(right_limit_new)
         right_limit = right_limit_new
-        right_limit_plot.set_xdata([right_limit, right_limit])
+        #right_limit_plot.set_xdata([right_limit, right_limit])
         update_selected_data()
         update_plot()
 
@@ -251,7 +255,8 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         global offset_limit
         global left_limit
         global right_limit
-        init_selected_data()
+        #init_selected_data()
+        selected_data = initial_select.copy()
 #         selected_data &= np.logical_and(np.logical_and(np.logical_and(np.abs(offset) <= offset_limit, np.abs(mean_error_fitted) <= error_limit), x >= left_limit), x <= right_limit)
         selected_data[selected_data] &= (np.abs(offset[selected_data]) <= offset_limit)
         selected_data[selected_data] &= (np.abs(mean_error_fitted[selected_data]) <= error_limit)
@@ -289,7 +294,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         right_index = np.where(x >= right_limit)[0][0]
 
         # update plot and selected data
-        error_slider.set_val(error_limit)
+        error_slider.set_val(error_limit * 10.0)
         offset_slider.set_val(offset_limit)
         n_hit_cut_index = n_hit_cut_index[n_hit_cut_index >= left_index]
         n_hit_cut_index = n_hit_cut_index[n_hit_cut_index <= right_index]
@@ -309,13 +314,24 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
             right_limit = x[right_cut]
             right_slider.set_val(right_limit)
 
+        fit_data()
         update_selected_data()
         update_plot()
 
     def update_plot():  # Replot correlation data with new selection
         global selected_data
+        global offset
         if np.count_nonzero(selected_data) > 1:
+            ax2.set_ylim(ymax=max(np.max(np.abs(mean_error_fitted[selected_data]) * 10.0), np.max(np.abs(offset[selected_data]))))
+            offset_limit_plot.set_ydata([offset_limit, offset_limit])
+            error_limit_plot.set_ydata([error_limit * 10.0, error_limit * 10.0])
+            left_limit_plot.set_xdata([left_limit, left_limit])
+            right_limit_plot.set_xdata([right_limit, right_limit])
+            offset_plot.set_data(x[initial_select], np.abs(offset[initial_select]))
+            offset_slider.valmax = np.max(np.abs(offset))
+            offset_slider.ax.set_xlim(xmax=np.max(np.abs(offset)))
             mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
+            line_plot.set_data(x, fit_fn(x))
         else:
             if non_interactive:
                 raise RuntimeError('Coarse alignment in non-interactive mode failed. Rerun with less iterations or in interactive mode!')
@@ -328,33 +344,53 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         selected_data &= np.isfinite(mean_fitted)
         selected_data &= np.isfinite(mean_error_fitted)
 
+    def finish(event):  # Fit result is ok
+        global do_refit
+        do_refit = False  # Set to signal that no refit is required anymore
+        plt.close()  # Close the plot to let the program continue (blocking)
+
+    def refit(event):
+        fit_data()
+        update_selected_data()
+        update_plot()
+        #plt.close()  # Close the plot to let the program continue (blocking)
+
+    def fit_data():
+        global offset
+        global fit
+        global fit_fn
+        fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
+        fit_fn = np.poly1d(fit[::-1])
+        offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
+#         offset = np.full_like(mean_fitted, np.nan)
+#         offset[selected_data] = fit_fn(x[selected_data]) - mean_fitted[selected_data]  # Calculate straight line fit offset
+
     # Require the gaussian fit error to be reasonable
 #     selected_data = (mean_error_fitted < 1e-2)
+    # Check for nan's and inf's
     init_selected_data()
+    initial_select = selected_data.copy()
     # Calculate and plot selected data + fit + fit offset and gauss fit error
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
     ax2 = ax.twinx()
-    fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
-    fit_fn = np.poly1d(fit[::-1])
-    offset = np.empty_like(mean_fitted)
-    offset.fill(np.nan)
-    offset[selected_data] = fit_fn(x[selected_data]) - mean_fitted[selected_data]  # Calculate straight line fit offset
+    # Calculate and plot selected data + fit + fit offset and gauss fit error
+    fit_data()
     offset_limit = np.max(np.abs(offset[selected_data]))  # Calculate starting offset cut
     error_limit = np.max(np.abs(mean_error_fitted[selected_data]))  # Calculate starting fit error cut
     left_limit = np.min(x[selected_data])  # Calculate starting left cut
     right_limit = np.max(x[selected_data])  # Calculate starting right cut
 
     mean_plot, = ax.plot(x[selected_data], mean_fitted[selected_data], 'o-', label='Data prefit')  # Plot correlation
-    ax.plot(x[selected_data], fit_fn(x[selected_data]), '-', label='Line fit')  # Plot line fit
-    ax2.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 1000.0, 'ro-', label='Error x1000')  # Plot gaussian fit error
-    ax2.plot(x[selected_data], np.abs(offset[selected_data]) * 10.0, 'go-', label='Offset x10')  # Plot line fit offset
-    offset_limit_plot = ax2.axhline(offset_limit * 10.0, linestyle='--', color='g', linewidth=2)  # Plot offset cut as a line
-    error_limit_plot = ax2.axhline(error_limit * 1000.0, linestyle='--', color='r', linewidth=2)  # Plot error cut as a line
+    line_plot, = ax.plot(x[selected_data], fit_fn(x[selected_data]), '-', label='Line fit')  # Plot line fit
+    error_plot, = ax2.plot(x[selected_data], np.abs(mean_error_fitted[selected_data]) * 10.0, 'ro-', label='Error x10')  # Plot gaussian fit error
+    offset_plot, = ax2.plot(x[selected_data], np.abs(offset[selected_data]), 'go-', label='Offset')  # Plot line fit offset
+    offset_limit_plot = ax2.axhline(offset_limit, linestyle='--', color='g', linewidth=2)  # Plot offset cut as a line
+    error_limit_plot = ax2.axhline(error_limit * 10.0, linestyle='--', color='r', linewidth=2)  # Plot error cut as a line
     left_limit_plot = ax2.axvline(left_limit, linestyle='-', color='b', linewidth=2)  # Plot left cut as a vertical line
     right_limit_plot = ax2.axvline(right_limit, linestyle='-', color='b', linewidth=2)  # Plot right cut as a vertical line
-    ax2.bar(x[selected_data], n_cluster[selected_data] / np.max(n_cluster[selected_data]).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
+    ncluster_plot = ax.bar(x[selected_data], n_cluster[selected_data] / np.max(n_cluster[selected_data]).astype(np.float) * abs(np.diff(ax.get_ylim())[0]), bottom=ax.get_ylim()[0], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
     ax.set_ylim(ymin=np.min(mean_fitted[selected_data]), ymax=np.max(mean_fitted[selected_data]))
     ax2.set_ylim(ymin=0.0)
     plt.xlim((np.nanmin(x), np.nanmax(x)))
@@ -367,14 +403,6 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     ax2.legend(lines + lines2, labels + labels2, loc=0)
     ax.grid()
 
-    def finish(event):  # Fit result is ok
-        global do_refit
-        do_refit = False  # Set to signal that no refit is required anymore
-        plt.close()  # Close the plot to let the program continue (blocking)
-
-    def refit(event):
-        plt.close()  # Close the plot to let the program continue (blocking)
-
     # Setup interactive sliders/buttons
     ax_offset = plt.axes([0.410, 0.04, 0.2, 0.02], axisbg='white')
     ax_error = plt.axes([0.410, 0.01, 0.2, 0.02], axisbg='white')
@@ -385,7 +413,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     ax_button_ok = plt.axes([0.82, 0.01, 0.08, 0.05], axisbg='black')
     # Create widgets
     offset_slider = Slider(ax_offset, 'Offset Cut', 0.0, offset_limit, valinit=offset_limit)
-    error_slider = Slider(ax_error, 'Error cut', 0.0, error_limit, valinit=error_limit)
+    error_slider = Slider(ax_error, 'Error cut', 0.0, error_limit * 10.0, valinit=error_limit * 10.0)
     left_slider = Slider(ax_left_limit, 'Left cut', left_limit, right_limit, valinit=left_limit)
     right_slider = Slider(ax_right_limit, 'Right cut', left_limit, right_limit, valinit=right_limit)
     auto_button = Button(ax_button_auto, 'Auto')
@@ -401,7 +429,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     ok_button.on_clicked(finish)
 
     if non_interactive:
-        update_auto(True)
+        update_auto(None)
     else:
         plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
         plt.show()
@@ -415,14 +443,14 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     ax = fig.add_subplot(1, 1, 1)
     ax2 = ax.twinx()
     ax.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation')
-    ax2.plot(x[mask], mean_error_fitted[mask] * 1000.0, linestyle='', color="red", marker='o', label='Error x1000')
-    ax2.errorbar(x[mask], np.abs(fit_fn(x[mask]) - mean_fitted[mask]) * 10.0, mean_error_fitted[mask] * 10.0, linestyle='', color="lightgreen", marker='o', label='Offset x10')
+    ax2.plot(x[mask], mean_error_fitted[mask] * 10.0, linestyle='', color="red", marker='o', label='Error x10')
+    ax2.errorbar(x[mask], np.abs(fit_fn(x[mask]) - mean_fitted[mask]), mean_error_fitted[mask], linestyle='', color="lightgreen", marker='o', label='Offset')
     ax2.plot(x, chi2 / 1e5, 'r--', label="Chi$^2$")
     # plot masked data points, but they should not influence the ylimit
     y_limits = ax2.get_ylim()
     plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
-    plt.plot(x[~mask], mean_error_fitted[~mask] * 1000.0, linestyle='', color="darkred", marker='o')
-    plt.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]) * 10.0, mean_error_fitted[~mask] * 10.0, linestyle='', color="darkgreen", marker='o')
+    plt.plot(x[~mask], mean_error_fitted[~mask] * 10.0, linestyle='', color="darkred", marker='o')
+    plt.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]), mean_error_fitted[~mask], linestyle='', color="darkgreen", marker='o')
     ax2.set_ylim(y_limits)
     ax2.set_ylim(ymin=0.0)
     ax.set_ylim((-n_pixel_ref * pixel_size_ref / 2.0, n_pixel_ref * pixel_size_ref / 2.0))
