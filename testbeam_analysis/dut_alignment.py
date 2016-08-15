@@ -243,9 +243,10 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
     '''
     logging.info('=== Pre-alignment ===')
 
-    if fit_background:
-        logging.warning("reduce_background is True, setting fit_background to False")
-        fit_background = False
+    if reduce_background:
+        if fit_background:
+            logging.warning("reduce_background is True, setting fit_background to False")
+            fit_background = False
 
     with PdfPages(os.path.join(os.path.dirname(os.path.abspath(output_alignment_file)), 'Prealignment.pdf')) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
