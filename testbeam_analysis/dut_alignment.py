@@ -210,7 +210,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
             progress_bar.finish()
 
 
-def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, non_interactive=True, iterations=2):
+def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=2):
     '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
@@ -232,6 +232,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         this option should be off, because otherwise overfitting is possible.
     reduce_background : bool
         Reduce background (uncorrelated events) with the help of SVD.
+    no_fit : bool
+        Use Hough transformation to calculate slope and offset.
     pixel_size: iterable
         Iterable of tuples with column and row pixel size in um
     dut_names: iterable
@@ -242,6 +244,11 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         Only used in non interactive mode. Sets how often automatic cuts are applied.
     '''
     logging.info('=== Pre-alignment ===')
+
+    if no_fit:
+        if not reduce_background:
+            logging.warning("no_fit is True, setting reduce_background to True")
+            reduce_background = True
 
     if reduce_background:
         if fit_background:
