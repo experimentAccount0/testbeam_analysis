@@ -559,8 +559,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                     aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
                 else:
                     aspect = "auto"
-                im = plt.imshow(data.T, cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
-                plt.gca().invert_yaxis()
+                im = plt.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
                 dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
                 ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
                 plt.title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", dut_name, ref_name))
