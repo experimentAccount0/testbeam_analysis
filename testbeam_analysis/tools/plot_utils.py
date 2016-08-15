@@ -174,7 +174,7 @@ def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y
     output_pdf.savefig()
 
 
-def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, title, non_interactive=False):
+def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, non_interactive=False):
     '''PLots the correlation and lets the user cut on the data in an interactive way.
 
     Parameters
@@ -394,7 +394,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     ax.set_ylim(ymin=np.min(mean_fitted[selected_data]), ymax=np.max(mean_fitted[selected_data]))
     ax2.set_ylim(ymin=0.0)
     plt.xlim((np.nanmin(x), np.nanmax(x)))
-    ax.set_title(title)
+    ax.set_title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
     ax.set_xlabel("%s [um]" % dut_name)
     ax.set_ylabel("%s [um]" % ref_name)
     ax2.set_ylabel("Error / Offset")
@@ -437,7 +437,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, title, output_pdf):
+def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
@@ -458,15 +458,15 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     ax2.bar(x, n_cluster / np.max(n_cluster).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x)))  # Plot number of hits for each correlation point
     # plot again to draw line above the markers
     if len(pcov) > 1:
-        fit_legend_entry = 'Fit: $c_0+c_1*x$\nc0=$%1.1e \pm %1.1e$\nc1=$%1.1e \pm %1.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
+        fit_legend_entry = 'Fit: $c_0+c_1*x$\n$c_0=%.1e \pm %.1e$\n$c_1=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     else:
-        fit_legend_entry = 'Fit: $c_0+1.0*x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
+        fit_legend_entry = 'Fit: $c_0+x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
     ax.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
 
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax2.legend(lines + lines2, labels + labels2, loc=0)
-    plt.title(title)
+    plt.title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
     ax.set_xlabel("%s [um]" % dut_name)
     ax.set_ylabel("%s [um]" % ref_name)
     ax2.set_ylabel("Error [a.u.]")
@@ -477,6 +477,47 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     else:
         plt.show()
 
+
+def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
+    capital_prefix = prefix
+    if prefix:
+        capital_prefix = prefix.title()
+    if pixel_size_dut and pixel_size_ref:
+        aspect = pixel_size_ref / pixel_size_dut
+    else:
+        aspect = "auto"
+
+    plt.clf()
+    fig = plt.gcf()
+    ax = fig.add_subplot(1, 1, 1)
+    cmap = cm.get_cmap('viridis')
+    plt.imshow(accumulator, interpolation="none", origin="lower", aspect="auto", cmap=cmap, extent=[np.rad2deg(theta_edges[0]), np.rad2deg(theta_edges[-1]), rho_edges[0], rho_edges[-1]])
+    plt.xticks([-90, -45, 0, 45, 90])
+    plt.title("Accumulator plot of %s correlations: %s vs. %s" % (prefix, ref_name, dut_name))
+    ax.set_xlabel(r'$\theta$ [degree]')
+    ax.set_ylabel(r'$\rho$ [um]')
+    if output_pdf:
+        output_pdf.savefig()
+    else:
+        plt.show()
+    plt.clf()
+    fig = plt.gcf()
+    ax = fig.add_subplot(1, 1, 1)
+    plt.imshow(data, interpolation="none", origin="lower", aspect=aspect, cmap='Greys')
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    fit_legend_entry = r'Fit: $c_0+c_1*x$\n$c_0=%.1e$\n$c_1=%.1e$' % (offset, slope)
+#     ax.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+    plt.plot(x, testbeam_analysis.tools.analysis_utils.linear(x, offset, slope), linestyle='-', color="darkorange", label=fit_legend_entry)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    plt.title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
+    ax.set_xlabel("%s %s" % (capital_prefix, dut_name))
+    ax.set_ylabel("%s %s" % (capital_prefix, ref_name))
+    if output_pdf:
+        output_pdf.savefig()
+    else:
+        plt.show()
 
 def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
     '''Takes the correlation histograms and plots them

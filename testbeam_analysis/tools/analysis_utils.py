@@ -806,3 +806,45 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
         )
 
     return fit, cov
+
+
+def hough_transform(img, theta_res=1.0, rho_res=1.0, return_edges=False):
+    thetas = np.linspace(-90.0, 0.0, np.ceil(90.0/theta_res) + 1)
+    thetas = np.concatenate((thetas, -thetas[len(thetas)-2::-1]))
+    thetas = np.deg2rad(thetas)
+    width, height = img.shape
+    diag_len = np.sqrt((width - 1)**2 + (height - 1)**2)
+    q = np.ceil(diag_len/rho_res)
+    nrhos = 2 * q + 1
+    rhos = np.linspace(-q * rho_res, q * rho_res, nrhos)
+
+    cos_t = np.cos(thetas)
+    sin_t = np.sin(thetas)
+
+    accumulator = np.zeros((rhos.size, thetas.size), dtype=np.int)
+    y_idxs, x_idxs = np.nonzero(img)
+
+    @njit
+    def loop(accumulator, x_idxs, y_idxs, thetas, rhos, sin_t, cos_t):
+
+        for i in range(len(x_idxs)):
+            x = x_idxs[i]
+            y = y_idxs[i]
+
+            for theta_idx in range(thetas.size):
+                #rho_idx = np.around(x * cos_t[theta_idx] + y * sin_t[theta_idx]) + diag_len
+                rhoVal = x * cos_t[theta_idx] + y * sin_t[theta_idx]
+                rho_idx = (np.abs(rhos - rhoVal)).argmin()
+                accumulator[rho_idx, theta_idx] += 1
+    loop(accumulator, x_idxs, y_idxs, thetas, rhos, sin_t, cos_t)
+
+    if return_edges:
+        thetas_diff = thetas[1] - thetas[0]
+        thetas_edges = (thetas[1:] + thetas[:-1]) / 2.0
+        theta_edges = np.r_[thetas_edges[0] - thetas_diff, thetas_edges, thetas_edges[-1] + thetas_diff]
+        rho_diff = rhos[1] - rhos[0]
+        rho_edges = (rhos[1:] + rhos[:-1]) / 2.0
+        rho_edges = np.r_[rho_edges[0] - rho_diff, rho_edges, rho_edges[-1] + rho_diff]
+        return accumulator, thetas, rhos, theta_edges, rho_edges  # return histogram, bin centers, edges
+    else:
+        return accumulator, thetas, rhos  # return histogram and bin centers
