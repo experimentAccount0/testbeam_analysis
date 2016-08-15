@@ -711,7 +711,7 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
         # Calculate bin centers
-        x = (edges[1:] + edges[:-1]) / 2
+        x = (edges[1:] + edges[:-1]) / 2.0
         plot_range = (testbeam_analysis.tools.analysis_utils.get_mean_from_histogram(histogram, x) - 5 * testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x),
                       testbeam_analysis.tools.analysis_utils.get_mean_from_histogram(histogram, x) + 5 * testbeam_analysis.tools.analysis_utils.get_rms_from_histogram(histogram, x))
         plt.xlim(plot_range)
