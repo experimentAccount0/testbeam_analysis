@@ -96,14 +96,10 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 tr_z = tracklets_data_chunk['z_dut_0']
                 tr_charge = tracklets_data_chunk['charge_dut_0']
                 for dut_index in range(1, n_duts):
-                    tr_x = np.vstack((tr_x, tracklets_data_chunk['x_dut_%d' % (dut_index)]))
-                    tr_y = np.vstack((tr_y, tracklets_data_chunk['y_dut_%d' % (dut_index)]))
-                    tr_z = np.vstack((tr_z, tracklets_data_chunk['z_dut_%d' % (dut_index)]))
-                    tr_charge = np.vstack((tr_charge, tracklets_data_chunk['charge_dut_%d' % (dut_index)]))
-                tr_x = np.transpose(tr_x)
-                tr_y = np.transpose(tr_y)
-                tr_z = np.transpose(tr_z)
-                tr_charge = np.transpose(tr_charge)
+                    tr_x = np.column_stack((tr_x, tracklets_data_chunk['x_dut_%d' % (dut_index)]))
+                    tr_y = np.column_stack((tr_y, tracklets_data_chunk['y_dut_%d' % (dut_index)]))
+                    tr_z = np.column_stack((tr_z, tracklets_data_chunk['z_dut_%d' % (dut_index)]))
+                    tr_charge = np.column_stack((tr_charge, tracklets_data_chunk['charge_dut_%d' % (dut_index)]))
 
                 tracklets_data_chunk['track_quality'] = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
