@@ -312,10 +312,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     hough_data = (data>((median + median_max) / 2)).T
                     accumulator, theta, rho, theta_edges, rho_edges = analysis_utils.hough_transform(hough_data, theta_res=0.1, rho_res=1.0, return_edges=True)
                     rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
-                    #print rho, theta
-                    #print rho_idx, th_idx
                     rho_val, theta_val = rho[rho_idx], theta[th_idx]
-                    #print rho_val, theta_val, np.rad2deg(theta_val)
                     slope_idx, offset_idx = -np.cos(theta_val)/np.sin(theta_val), rho_val/np.sin(theta_val)
                     offset = offset_idx * pixel_size_ref
                     slope = slope_idx * (pixel_size_ref / pixel_size_dut)
