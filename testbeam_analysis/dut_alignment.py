@@ -479,13 +479,13 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
     n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
     # Start values for fitting
     # Correlation peak
-    mu_peak = np.argmax(data, axis=1) + 0.5  # +0.5 because col/row index starts at 1
+    mu_peak = x[np.argmax(data, axis=1)]
     A_peak = np.max(data, axis=1)  # signal / correlation peak
     # Background of uncorrelated data
     n_entries = np.sum(data, axis=1)
     A_background = np.mean(data, axis=1)  # noise / background halo
     mu_background = np.zeros_like(n_entries)
-    mu_background[n_entries > 0] = np.average(data, axis=1, weights=np.arange(n_pixel_ref) + 0.5)[n_entries > 0] * sum(np.arange(n_pixel_ref) + 0.5) / n_entries[n_entries > 0]  # +0.5 because col/row index starts at 1
+    mu_background[n_entries > 0] = np.average(data, axis=1, weights=x)[n_entries > 0] * np.sum(x) / n_entries[n_entries > 0]
 
     coeff = None
     fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
