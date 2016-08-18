@@ -314,11 +314,12 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
                     rho_val, theta_val = rho[rho_idx], theta[th_idx]
                     slope_idx, offset_idx = -np.cos(theta_val)/np.sin(theta_val), rho_val/np.sin(theta_val)
-                    offset = offset_idx * pixel_size_ref
                     slope = slope_idx * (pixel_size_ref / pixel_size_dut)
+                    offset = offset_idx * pixel_size_ref
                     # offset in the center of the pixel matrix
-                    offset_center = (offset + slope * pixel_size_dut * n_pixel_dut * 0.5) - pixel_size_ref * n_pixel_ref * 0.5
-                    
+                    offset_center = offset + slope * pixel_size_dut * n_pixel_dut * 0.5 - pixel_size_ref * n_pixel_ref * 0.5
+                    offset_center += 0.5 * pixel_size_ref - slope * 0.5 * pixel_size_dut  # correct for half bin
+
                     result[dut_idx][table_prefix + '_c0'], result[dut_idx][table_prefix + '_c0_error'] = offset_center, 0.0
                     result[dut_idx][table_prefix + '_c1'], result[dut_idx][table_prefix + '_c1_error'] = slope, 0.0
                     result[dut_idx][table_prefix + '_sigma'], result[dut_idx][table_prefix + '_sigma_error'] = 0.0, 0.0
