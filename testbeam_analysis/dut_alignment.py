@@ -307,9 +307,18 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     data -= data.min()  # only positive values
  
                 if no_fit:
+                    # calculate half hight
                     median = np.median(data)
                     median_max = np.median(np.max(data, axis=1))
-                    hough_data = (data>((median + median_max) / 2)).T
+                    half_median_data = (data>((median + median_max) / 2))
+                    # calculate maximum per column
+                    max_select = np.argmax(data, axis=1)
+                    hough_data = np.zeros_like(data)
+                    hough_data[np.arange(data.shape[0]), max_select] = 1
+                    # select maximums if larger than half hight
+                    hough_data = hough_data & half_median_data
+                    # transpose for correct angle
+                    hough_data = hough_data.T
                     accumulator, theta, rho, theta_edges, rho_edges = analysis_utils.hough_transform(hough_data, theta_res=0.1, rho_res=1.0, return_edges=True)
                     rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
                     rho_val, theta_val = rho[rho_idx], theta[th_idx]
