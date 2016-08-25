@@ -685,12 +685,15 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
 
     # Deduce from reidual correlations the rotation matrix
     # gamma (rotation around z)
-    # TODO: adding some weighting factor based on fit error
+    # TODO: adding some weighting factor based on fit error, sometimes the factors have different signs, why?
     factor_xy = 1.0
     gamma = factor_xy * np.arctan2(m_xy, 1 - m_xx)
     factor_yx = 1.0
     gamma -= factor_yx * np.arctan2(m_yx, 1 - m_yy)
-    gamma /= (factor_xy + factor_yx)
+    # TODO: deduce gamma sign from slope signs
+    #gamma /= (factor_xy + factor_yx)
+    gamma /= np.sign(m_xx) * np.sign(m_yy) * np.sign(m_xy) * np.sign(m_yx) * (factor_xy + factor_yx)
+    #assert np.sign(-np.arctan2(m_yx, 1 - m_yy)) == np.sign(np.arctan2(m_xy, 1 - m_xx))
 
     # cos(gamma) = 1 - m_xx / cos(gamma) = (1 - m_xx) * sqrt(m_xy**2 / (1 - m_xx**2) + 1.) ?
     cosbeta = (1 - m_xx) * np.sqrt(np.square(m_xy) / np.square(1 - m_xx) + 1.)
