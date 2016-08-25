@@ -654,9 +654,11 @@ def _fit_tracks_loop(track_hits):
         # subtract mean for each component (x,y,z) for SVD calculation
         datamean = hits.mean(axis=0)
         offset, slope = datamean, np.linalg.svd(hits - datamean)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
+        slope_mag = np.sqrt(slope.dot(slope))
+        #slope_mag = np.sqrt(np.einsum('i,i', slope, slope))
         intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # Fitted line and DUT plane intersections (here: points)
         chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
-        return datamean, slope, chi2
+        return datamean, slope / slope_mag, chi2
 
     slope = np.zeros((track_hits.shape[0], 3,))
     offset = np.zeros((track_hits.shape[0], 3,))
