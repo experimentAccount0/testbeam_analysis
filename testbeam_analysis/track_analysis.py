@@ -648,7 +648,8 @@ def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several t
 
 
 def _fit_tracks_loop(track_hits):
-    ''' Do 3d line fit and calculate chi2 for each fit. '''
+    '''Do 3d line fit and calculate chi2 for each fit.'''
+    # TODO: calculate true residuals, plane usually not perpendicular to z axis
     def line_fit_3d(hits):
         # subtract mean for each component (x,y,z) for SVD calculation
         datamean = hits.mean(axis=0)
