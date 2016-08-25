@@ -62,7 +62,7 @@ def get_line_intersections_with_plane(line_origins, line_directions, position_pl
 
     # Precalculate to be able to avoid division by 0 (line is parallel to the plane or in the plane)
     normal_dot_offsets = np.dot(normal_plane, offsets.T)
-    normal_dot_directions = np.atleast_1d(np.dot(normal_plane, line_directions.T))  # Dot product is transformed to be at least 1D for special n = 1
+    normal_dot_directions = np.atleast_1d(np.dot(normal_plane, line_directions.T))  # Dot product is transformed to be at least 1D for special case, where n = 1
 
     # Initialize result to nan
     t = np.empty_like(normal_dot_offsets)
@@ -403,9 +403,8 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     If both are given alignment data is taken.
     The transformation can be inverted.
 
-    Paramter:
-    --------
-
+    Parameters
+    ----------
     hits_x, hits_y, hits_z : numpy arrays with corresponding hit positions
     dut_index : integer
         Needed to select the corrct alignment info
@@ -416,8 +415,8 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     inverse : boolean
         Apply inverse transformation if true
 
-    Returns:
-    --------
+    Returns
+    -------
     hits_x, hits_y, hits_z : numpy arrays
     '''
     if (alignment is None and prealignment is None) or (alignment is not None and prealignment is not None):
@@ -509,9 +508,8 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
     ''' Stores the alignment parameters (rotations, translations) into the alignment file.
     Absolute (overwriting) and relative mode (add angles, translations) is supported.
 
-    Paramter:
-    --------
-
+    Parameters
+    ----------
     alignment_file : pytables file
         The pytables file with the alignment
     alignment_parameters : numpy recarray
@@ -521,7 +519,6 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
     use_duts : iterable
         In relative mode only change specified DUTs
     '''
-
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:  # Open file with alignment data
         #FIXME: this does not make sence to be here: 
 #         alignment_parameters[:]['translation_z'] = out_file_h5.root.PreAlignment[:]['z']  # Set z from pre-alignment

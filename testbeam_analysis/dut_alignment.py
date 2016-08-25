@@ -1218,7 +1218,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
                                                                                                                      z_position_in_m * 1e6, 
                                                                                                                      residual))
 
-            #FIXME:
+            # FIXME:
             # Has to be heavily restricted otherwise converges to unphysical solutions since the scoring with residuals is not really working well
             bounds = [(alpha - 0.01, alpha + 0.01), (beta - 0.01, beta + 0.01), (gamma - 0.001, gamma + 0.001), (z_position_in_m - 10e-6, z_position_in_m + 10e-6)]
  
@@ -1256,7 +1256,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
     logging.info('Reduced the total residuals in the optimization steps from %1.2e to %1.2e', total_residuals_before, total_residuals_after)
     if total_residuals_before < total_residuals_after:
         raise RuntimeError('Alignment optimization did not converge!')
-    
+
     return alignment_result, total_residuals_after  # Return alignment result and total residual
 
 
