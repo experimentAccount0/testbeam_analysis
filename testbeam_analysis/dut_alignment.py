@@ -1162,9 +1162,9 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
         
         # Cross check if transformations are correct (z == 0 in the local coordinate system)
         if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
-            logging.error('Hit z position = %s and z intersection %s', 
-                          str(hit_z_local[~np.isclose(hit_z_local, 0)[:3]]), 
-                          str(intersection_z_local[~np.isclose(intersection_z_local, 0)[:3]]))
+            logging.error('Hit z position = %s and z intersection %s',
+                          str(hit_z_local[~np.isclose(hit_z_local, 0)][:3]),
+                          str(intersection_z_local[~np.isclose(intersection_z_local, 0)][:3]))
             raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
         return np.sum(np.abs(hit_x_local - intersection_x_local) / pixel_size[0]) + np.sum(np.abs(hit_y_local - intersection_y_local)) / pixel_size[1]
