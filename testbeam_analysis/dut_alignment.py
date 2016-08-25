@@ -1167,7 +1167,8 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
                           str(intersection_z_local[~np.isclose(intersection_z_local, 0)][:3]))
             raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
-        return np.sum(np.abs(hit_x_local - intersection_x_local) / pixel_size[0]) + np.sum(np.abs(hit_y_local - intersection_y_local)) / pixel_size[1]
+        # TDOD: what is a proper return value?
+        return np.sum(np.power(hit_x_local - intersection_x_local, 2) / np.power(pixel_size[0] / np.sqrt(12), 2)) + np.sum(np.power(hit_y_local - intersection_y_local, 2) / np.power(pixel_size[1] / np.sqrt(12), 2))
 #         return np.sqrt(np.square(np.std(hit_x_local - intersection_x_local) / pixel_size[0]) + np.square(np.std(hit_y_local - intersection_y_local)) / pixel_size[1])
 
     with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
