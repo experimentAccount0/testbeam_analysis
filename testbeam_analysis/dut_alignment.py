@@ -7,6 +7,7 @@ import os
 import progressbar
 import warnings
 from collections import Iterable
+import itertools
 
 import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
@@ -750,169 +751,6 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
     logging.info('=== Aligning DUTs ===')
 
-    def calculate_translation_alignment(track_candidates_file, fit_duts, n_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, max_iterations, output_pdf, plot_title_prefix=''):
-        ''' Main function that fits tracks, calculates the residuals, deduces rotation and translation values from the residuals
-        and applies the new alignment to the track hits. The alignment result is scored as a combined
-        residual value of all planes that are being aligned in x and y weighted by the pixel pitch in x and y. '''
-        with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-            alignment_last_iteration = in_file_h5.root.Alignment[:]
-
-        total_residual = None
-        for iteration in range(max_iterations):
-            if iteration >= max_iterations:
-                raise RuntimeError('Did not converge to good solution in %d iterations. Increase max_iterations', iteration)
-
-            apply_alignment(input_hit_file=track_candidates_file,  # Always apply alignment to starting file
-                            input_alignment=input_alignment_file,
-                            output_hit_aligned_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
-                            inverse=False,
-                            force_prealignment=False,
-                            chunk_size=chunk_size)
-
-            # Step 2: Fit tracks for all DUTs
-            logging.info('= Alignment step 2 / iteration %d: Fit tracks for all DUTs =', iteration)
-            fit_tracks(input_track_candidates_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
-                       input_alignment_file=input_alignment_file,
-                       output_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
-                       fit_duts=fit_duts,  # Only create residuals of selected DUTs
-                       selection_fit_duts=selection_fit_duts,   # Only use selected DUTs for track fit
-                       selection_hit_duts=selection_hit_duts,  # Only use selected duts
-                       exclude_dut_hit=False,  # For constrained residuals
-                       selection_track_quality=selection_track_quality,
-                       force_prealignment=False)
-
-            # Step 3: Calculate the residuals for each DUT
-            logging.info('= Alignment step 3 / iteration %d: Calculate the residuals for each selected DUT =', iteration)
-            calculate_residuals(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
-                                input_alignment_file=input_alignment_file,
-                                output_residuals_file=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
-                                n_pixels=n_pixels,
-                                pixel_size=pixel_size,
-                                output_pdf=False,
-                                chunk_size=chunk_size,
-                                npixels_per_bin=5 if (iteration in [0,1,2]) else None,  # use a coarse binning for the first steps
-                                nbins_per_pixel=1 if (iteration in [0,1,2]) else None)  # use a coarse binning for the first steps
-
-            # Step 4: Deduce rotations from the residuals
-            logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
-            alignment_parameters_change, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
-                                                                              output_fig=output_pdf,
-                                                                              fit_duts=fit_duts,
-                                                                              pixel_size=pixel_size,
-                                                                              n_duts=n_duts,
-                                                                              translation_only=False,
-                                                                              plot_title_prefix=plot_title_prefix,
-                                                                              relaxation_factor=1.0)
-
-            # Create actual alignment (old alignment + the actual relative change)
-            new_alignment_parameters = geometry_utils.merge_alignment_parameters(
-                alignment_last_iteration,
-                alignment_parameters_change,
-                mode='relative')
-
-            # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
-            logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
-            new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
-                                                                               alignment_last_iteration=alignment_last_iteration, 
-                                                                               new_alignment_parameters=new_alignment_parameters,
-                                                                               pixel_size=pixel_size)
-
-            # Delete not needed files
-            os.remove(track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration)
-            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration)
-            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.pdf' % iteration)
-            os.remove(track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration)
-            logging.info('Total residual %1.4e', new_total_residual)
-
-            if total_residual is not None and new_total_residual > total_residual:  # True if actual alignment is worse than the alignment from last iteration
-                logging.info('!! Best alignment found !!')
-                logging.info('= Alignment step 6 / iteration %d: Use rotation / translation information from previous iteration =', iteration)
-                geometry_utils.store_alignment_parameters(input_alignment_file,  # Store alignment from last iteration
-                                                          alignment_last_iteration,
-                                                          mode='absolute',
-                                                          select_duts=fit_duts)
-                return
-            else:
-                total_residual = new_total_residual
-
-#             with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-            alignment_last_iteration = new_alignment_parameters.copy() #in_file_h5.root.Alignment[:]
-
-            logging.info('= Alignment step 6 / iteration %d: Set new rotation / translation information in alignment file =', iteration)
-            geometry_utils.store_alignment_parameters(input_alignment_file,
-                                                      new_alignment_parameters,
-                                                      mode='absolute',
-                                                      select_duts=fit_duts)
-
-    def duts_alignment(align_duts, n_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, alignment_index):  # Called for each list of DUTs to align
-
-        # Step 0: Reduce the number of tracks to increase the calculation time
-        logging.info('= Alignment step 0: Reduce number of tracks to %d =', use_n_tracks)
-        track_quality_mask = 0
-        for index, dut in enumerate(selection_hit_duts):
-            for quality in range(3):
-                if quality <= selection_track_quality[index]:
-                    track_quality_mask |= ((1 << dut) << quality * 8)
-
-        logging.info('Use track with hits in DUTs %s', str(selection_hit_duts)[1:-1])
-        data_selection.select_hits(hit_file=input_track_candidates_file,
-                                   output_file=input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index,
-                                   max_hits=use_n_tracks,
-                                   track_quality=track_quality_mask,
-                                   track_quality_mask=track_quality_mask,
-                                   chunk_size=chunk_size)
-        input_track_candidates_reduced = input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index
- 
-        # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
-        logging.info('= Alignment step 1: Revert pre-alignment =')
-        apply_alignment(input_hit_file=input_track_candidates_reduced,
-                        input_alignment=input_alignment_file,  # Revert prealignent
-                        output_hit_aligned_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
-                        inverse=True,
-                        force_prealignment=True,
-                        chunk_size=chunk_size)
-
-        # Stage N: Repeat alignment with constrained residuals until total residual does not decrease anymore
-        calculate_translation_alignment(track_candidates_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
-                                        fit_duts=align_duts,  # Only use the actual DUTs to align
-                                        n_duts=n_duts,
-                                        selection_fit_duts=selection_fit_duts,
-                                        selection_hit_duts=selection_hit_duts,
-                                        selection_track_quality=selection_track_quality,
-                                        max_iterations=max_iterations,
-                                        output_pdf=False)
-
-        # Plot final result
-        if plot_result:
-            logging.info('= Alignment step 7: Plot final result =')
-            with PdfPages(os.path.join(os.path.dirname(os.path.realpath(input_track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
-                # Apply final alignment result
-                apply_alignment(input_hit_file=input_track_candidates_reduced[:-3] + '_not_aligned.h5',
-                                input_alignment=input_alignment_file,
-                                output_hit_aligned_file=input_track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
-                                chunk_size=chunk_size)
-                fit_tracks(input_track_candidates_file=input_track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
-                           input_alignment_file=input_alignment_file,
-                           output_tracks_file=input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
-                           fit_duts=align_duts,  # Only create residuals of selected DUTs
-                           selection_fit_duts=selection_fit_duts,  # Only use selected duts
-                           selection_hit_duts=selection_hit_duts,
-                           exclude_dut_hit=True,  # For unconstrained residuals
-                           selection_track_quality=selection_track_quality)
-                calculate_residuals(input_tracks_file=input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
-                                    input_alignment_file=input_alignment_file,
-                                    output_residuals_file=input_track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index,
-                                    n_pixels=n_pixels,
-                                    pixel_size=pixel_size,
-                                    output_pdf=output_pdf,
-                                    chunk_size=chunk_size)
-                os.remove(input_track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index)
-                os.remove(input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index)
-                os.remove(input_track_candidates_file[:-3] + '_tracks_final_tmp_%d.pdf' % alignment_index)
-                os.remove(input_track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index)
-        os.remove(input_track_candidates_reduced[:-3] + '_not_aligned.h5')
-        os.remove(input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index)
-
     # Open the pre-alignment and create empty alignment info (at the beginning only the z position is set)
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
         prealignment = in_file_h5.root.PreAlignment[:]
@@ -987,9 +825,217 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
 
         logging.info('Align DUTs %s', str(actual_align_duts)[1:-1])
 
-        duts_alignment(align_duts=actual_align_duts, n_duts=n_duts, selection_fit_duts=actual_selection_fit_duts, selection_hit_duts=actual_selection_hit_duts, selection_track_quality=actual_selection_track_quality, alignment_index=index)
+        duts_alignment(
+            track_candidates_file=input_track_candidates_file,
+            alignment_file=input_alignment_file,
+            n_pixels=n_pixels,
+            pixel_size=pixel_size,
+            use_n_tracks=use_n_tracks,
+            align_duts=actual_align_duts,
+            n_duts=n_duts,
+            selection_fit_duts=actual_selection_fit_duts,
+            selection_hit_duts=actual_selection_hit_duts,
+            selection_track_quality=actual_selection_track_quality,
+            alignment_index=index,
+            max_iterations=max_iterations,
+            plot_result=plot_result,
+            chunk_size=chunk_size)
 
     logging.info('Alignment finished successfully!')
+
+
+def duts_alignment(track_candidates_file, alignment_file, n_pixels, pixel_size, use_n_tracks, align_duts, n_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, alignment_index, max_iterations, plot_result, chunk_size):  # Called for each list of DUTs to align
+
+    # Step 0: Reduce the number of tracks to increase the calculation time
+    logging.info('= Alignment step 0: Reduce number of tracks to %d =', use_n_tracks)
+    track_quality_mask = 0
+    for index, dut in enumerate(selection_hit_duts):
+        for quality in range(3):
+            if quality <= selection_track_quality[index]:
+                track_quality_mask |= ((1 << dut) << quality * 8)
+
+    logging.info('Use track with hits in DUTs %s', str(selection_hit_duts)[1:-1])
+    data_selection.select_hits(hit_file=track_candidates_file,
+                               output_file=track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index,
+                               max_hits=use_n_tracks,
+                               track_quality=track_quality_mask,
+                               track_quality_mask=track_quality_mask,
+                               chunk_size=chunk_size)
+    track_candidates_reduced = track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index
+
+    # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
+    logging.info('= Alignment step 1: Revert pre-alignment =')
+    apply_alignment(input_hit_file=track_candidates_reduced,
+                    input_alignment=alignment_file,  # Revert prealignent
+                    output_hit_aligned_file=track_candidates_reduced[:-3] + '_not_aligned.h5',
+                    inverse=True,
+                    force_prealignment=True,
+                    chunk_size=chunk_size)
+
+    # Stage N: Repeat alignment with constrained residuals until total residual does not decrease anymore
+    calculate_translation_alignment(track_candidates_file=track_candidates_reduced[:-3] + '_not_aligned.h5',
+                                    alignment_file=alignment_file,
+                                    n_pixels=n_pixels,
+                                    pixel_size=pixel_size,
+                                    fit_duts=align_duts,  # Only use the actual DUTs to align
+                                    n_duts=n_duts,
+                                    selection_fit_duts=selection_fit_duts,
+                                    selection_hit_duts=selection_hit_duts,
+                                    selection_track_quality=selection_track_quality,
+                                    max_iterations=max_iterations,
+                                    output_pdf=False)
+
+    # Plot final result
+    if plot_result:
+        logging.info('= Alignment step 7: Plot final result =')
+        with PdfPages(os.path.join(os.path.dirname(os.path.realpath(track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
+            # Apply final alignment result
+            apply_alignment(input_hit_file=track_candidates_reduced[:-3] + '_not_aligned.h5',
+                            input_alignment=alignment_file,
+                            output_hit_aligned_file=track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
+                            chunk_size=chunk_size)
+            fit_tracks(input_track_candidates_file=track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
+                       input_alignment_file=alignment_file,
+                       output_tracks_file=track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
+                       fit_duts=align_duts,  # Only create residuals of selected DUTs
+                       selection_fit_duts=selection_fit_duts,  # Only use selected duts
+                       selection_hit_duts=selection_hit_duts,
+                       exclude_dut_hit=True,  # For unconstrained residuals
+                       selection_track_quality=selection_track_quality)
+            calculate_residuals(input_tracks_file=track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
+                                input_alignment_file=alignment_file,
+                                output_residuals_file=track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index,
+                                n_pixels=n_pixels,
+                                pixel_size=pixel_size,
+                                output_pdf=output_pdf,
+                                chunk_size=chunk_size)
+
+            # remove temporary files for plotting
+            os.remove(track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index)
+            os.remove(track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index)
+            os.remove(track_candidates_file[:-3] + '_tracks_final_tmp_%d.pdf' % alignment_index)
+            os.remove(track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index)
+
+    # remove temporary files
+    os.remove(track_candidates_reduced[:-3] + '_not_aligned.h5')
+    os.remove(track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index)
+
+
+def calculate_translation_alignment(track_candidates_file, alignment_file, n_pixels, pixel_size, fit_duts, n_duts, selection_fit_duts, selection_hit_duts, selection_track_quality, max_iterations=None, output_pdf=None, plot_title_prefix='', chunk_size=100000):
+    ''' Main function that fits tracks, calculates the residuals, deduces rotation and translation values from the residuals
+    and applies the new alignment to the track hits. The alignment result is scored as a combined
+    residual value of all planes that are being aligned in x and y weighted by the pixel pitch in x and y. '''
+    with tb.open_file(alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        alignment_last_iteration = in_file_h5.root.Alignment[:]
+
+    # TODO: set up alignment process, order and which parameters to adjust, add function parameter
+#     alignment_order = [["gamma"], ["translation_x", "translation_y", "translation_z"], ["alpha", "beta"], ["translation_x", "translation_y", "translation_z"]]
+    alignment_order = [["gamma"], ["translation_x", "translation_y", "translation_z"]]
+#    alignment_order = [["gamma", "translation_x", "translation_y", "translation_z"]]
+
+    total_residual = None
+    if max_iterations is None:
+        max_iterations = itertools.repeat()
+    else:
+        max_iterations = range(max_iterations)
+
+    for iteration in max_iterations:
+        iteration = iteration * len(alignment_order)
+        # TODO: should raise exception?
+#         if iteration >= max_iterations:
+#             raise RuntimeError('Did not converge to good solution in %d iterations. Increase max_iterations', iteration)
+
+        for alignment_index, alignment_parameters in enumerate(alignment_order):
+            apply_alignment(input_hit_file=track_candidates_file,  # Always apply alignment to starting file
+                            input_alignment=alignment_file,
+                            output_hit_aligned_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % (iteration + alignment_index),
+                            inverse=False,
+                            force_prealignment=False,
+                            chunk_size=chunk_size)
+
+            # Step 2: Fit tracks for all DUTs
+            logging.info('= Alignment step 2 / iteration %d: Fit tracks for all DUTs =', (iteration + alignment_index))
+            fit_tracks(input_track_candidates_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % (iteration + alignment_index),
+                       input_alignment_file=alignment_file,
+                       output_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % (iteration + alignment_index),
+                       fit_duts=None,  # fit tracks for all DUTs
+                       selection_fit_duts=selection_fit_duts,  # Only use selected DUTs for track fit
+                       selection_hit_duts=selection_hit_duts,  # Only use selected duts
+                       exclude_dut_hit=False,  # For constrained residuals
+                       selection_track_quality=selection_track_quality,
+                       force_prealignment=False)
+
+            # Step 3: Calculate the residuals for each DUT
+            logging.info('= Alignment step 3 / iteration %d: Calculate the residuals for each selected DUT =', (iteration + alignment_index))
+            calculate_residuals(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % (iteration + alignment_index),
+                                input_alignment_file=alignment_file,
+                                output_residuals_file=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % (iteration + alignment_index),
+                                n_pixels=n_pixels,
+                                pixel_size=pixel_size,
+                                output_pdf=False,
+                                chunk_size=chunk_size,
+                                npixels_per_bin=5 if (iteration in [0]) else None,  # use a coarse binning for the first steps
+                                nbins_per_pixel=1 if (iteration in [0]) else None)  # use a coarse binning for the first steps
+
+            # Step 4: Deduce rotations from the residuals
+            logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', (iteration + alignment_index))
+            alignment_parameters_changed, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % (iteration + alignment_index),
+                                                                              output_fig=output_pdf,
+                                                                              fit_duts=fit_duts,  # fit all duts currently beeing investigated
+                                                                              pixel_size=pixel_size,
+                                                                              n_duts=n_duts,
+                                                                              translation_only=False,
+                                                                              plot_title_prefix=plot_title_prefix,
+                                                                              relaxation_factor=1.0)
+
+            # Create actual alignment (old alignment + the actual relative change)
+            new_alignment_parameters = geometry_utils.merge_alignment_parameters(
+                old_alignment=alignment_last_iteration,
+                new_alignment=alignment_parameters_changed,
+                mode='relative',
+                parameters=alignment_parameters)
+
+            # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
+#             logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', (iteration + alignment_index))
+#             new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % (iteration + alignment_index),
+#                                                                                alignment_last_iteration=alignment_last_iteration,
+#                                                                                new_alignment_parameters=new_alignment_parameters,
+#                                                                                pixel_size=pixel_size)
+
+            # delete temporary files
+            os.remove(track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % (iteration + alignment_index))
+            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % (iteration + alignment_index))
+            os.remove(track_candidates_file[:-3] + '_tracks_%d_tmp.pdf' % (iteration + alignment_index))
+            os.remove(track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % (iteration + alignment_index))
+            logging.info('Total residual %1.4e', new_total_residual)
+
+            logging.info('= Alignment step 6 / iteration %d: Set new rotation / translation information in alignment file =', (iteration + alignment_index))
+            geometry_utils.store_alignment_parameters(alignment_file=alignment_file,
+                                                      alignment_parameters=new_alignment_parameters, # alignment_parameters_changed,
+                                                      mode='absolute',
+                                                      select_duts=fit_duts,
+                                                      parameters=["alpha", "beta", "gamma", "translation_x", "translation_y", "translation_z"])
+
+#             if total_residual is not None and new_total_residual > total_residual:  # True if actual alignment is worse than the alignment from last iteration
+#                 logging.info('!! Best alignment found !!')
+#                 logging.info('= Alignment step 6 / iteration %d: Use rotation / translation information from previous iteration =', (iteration + alignment_index))
+#                 geometry_utils.store_alignment_parameters(alignment_file,  # Store alignment from last iteration
+#                                                           alignment_last_iteration,
+#                                                           mode='absolute',
+#                                                           select_duts=fit_duts)
+#                 return
+#             else:
+#                 total_residual = new_total_residual
+
+#             with tb.open_file(alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+#                 alignment_last_iteration =  in_file_h5.root.Alignment[:]
+            alignment_last_iteration = new_alignment_parameters.copy()
+
+#             logging.info('= Alignment step 6 / iteration %d: Set new rotation / translation information in alignment file =', (iteration + alignment_index))
+#             geometry_utils.store_alignment_parameters(alignment_file,
+#                                                       new_alignment_parameters,
+#                                                       mode='absolute',
+#                                                       select_duts=fit_duts)
 
 
 # Helper functions for the alignment. Not to be used directly.

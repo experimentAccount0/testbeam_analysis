@@ -2,6 +2,8 @@ from __future__ import division
 
 import logging
 from math import sqrt
+from sets import Set
+from collections import Iterable
 
 import tables as tb
 import numpy as np
@@ -464,45 +466,46 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None, prealignm
     return hits_x, hits_y, hits_z
 
 
-def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', select_duts=None):
+def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', select_duts=None, parameters=None):
     if select_duts is None:  # select all DUTs
-        dut_selection = np.ones(old_alignment.shape[0], dtype=np.bool)
+        select_duts = range(old_alignment.shape[0])
     else:
-        dut_selection = np.zeros(old_alignment.shape[0], dtype=np.bool)
-        dut_selection[np.array(select_duts)] = True
+        if not isinstance(select_duts, Iterable):
+            select_duts = list(select_duts)
+
+    all_parameters = Set(["alpha", "beta", "gamma", "translation_x", "translation_y", "translation_z"])
+    if parameters is None:
+        parameters = all_parameters
+    else:
+        if not isinstance(parameters, Iterable):
+            parameters = list(parameters)
+        unknown_parameters = Set(parameters) - all_parameters
+        if unknown_parameters:
+            raise ValueError("Unknown parameter(s): %s" % ", ".join(unknown_parameters))
 
     alignment_parameters = old_alignment.copy()  # Do not change input parameters
 
-    if mode == 'absolute':
-        logging.info('Set alignment')
-        alignment_parameters[dut_selection] = new_alignment[dut_selection]
-        return alignment_parameters
-    elif mode == 'relative':
-        logging.info('Merge new alignment with old alignment')
+    for dut in select_duts:
+        for parameter in parameters:
+            if mode == 'absolute' or parameter in ["alpha", "beta"]:
+                alignment_parameters[dut][parameter] = new_alignment[dut][parameter]
+            elif mode == 'relative':
+                alignment_parameters[dut][parameter] += new_alignment[dut][parameter]
 
-        alignment_parameters['translation_x'][dut_selection] += new_alignment['translation_x'][dut_selection]
-        alignment_parameters['translation_y'][dut_selection] += new_alignment['translation_y'][dut_selection]
-        alignment_parameters['translation_z'][dut_selection] += new_alignment['translation_z'][dut_selection]
+                # TODO: Is this always a good idea? Usually works, but what if one heavily tilted device?
+                # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
+                # TODO: align at beam
+#                 if np.count_nonzero(dut_selection) > 1:
+#                     alignment_parameters['alpha'][dut_selection] -= np.mean(alignment_parameters['alpha'][dut_selection])
+#                     alignment_parameters['beta'][dut_selection] -= np.mean(alignment_parameters['beta'][dut_selection])
+#                     alignment_parameters['gamma'][dut_selection] -= np.mean(alignment_parameters['gamma'][dut_selection])
+#                     alignment_parameters['translation_x'][dut_selection] -= np.mean(alignment_parameters['translation_x'][dut_selection])
+#                     alignment_parameters['translation_y'][dut_selection] -= np.mean(alignment_parameters['translation_y'][dut_selection])
+            else:
+                raise RuntimeError('Unknown mode %s', str(mode))
+    return alignment_parameters
 
-        alignment_parameters['alpha'][dut_selection] += new_alignment['alpha'][dut_selection]
-        alignment_parameters['beta'][dut_selection] += new_alignment['beta'][dut_selection]
-        alignment_parameters['gamma'][dut_selection] += new_alignment['gamma'][dut_selection]
-
-        # TODO: Is this always a good idea? Usually works, but what if one heavily tilted device?
-        # All alignments are relative, thus center them around 0 by substracting the mean (exception: z position)
-        if np.count_nonzero(dut_selection) > 1:
-            alignment_parameters['alpha'][dut_selection] -= np.mean(alignment_parameters['alpha'][dut_selection])
-            alignment_parameters['beta'][dut_selection] -= np.mean(alignment_parameters['beta'][dut_selection])
-            alignment_parameters['gamma'][dut_selection] -= np.mean(alignment_parameters['gamma'][dut_selection])
-            alignment_parameters['translation_x'][dut_selection] -= np.mean(alignment_parameters['translation_x'][dut_selection])
-            alignment_parameters['translation_y'][dut_selection] -= np.mean(alignment_parameters['translation_y'][dut_selection])
-
-        return alignment_parameters
-    else:
-        raise RuntimeError('Unknown mode %s', str(mode))
-
-
-def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', select_duts=None):
+def store_alignment_parameters(alignment_file, alignment_parameters, mode='absolute', select_duts=None, parameters=None):
     ''' Stores the alignment parameters (rotations, translations) into the alignment file.
     Absolute (overwriting) and relative mode (add angles, translations) is supported.
 
@@ -529,7 +532,8 @@ def store_alignment_parameters(alignment_file, alignment_parameters, mode='absol
             alignment_parameters = merge_alignment_parameters(old_alignment=out_file_h5.root.Alignment[:],
                                                               new_alignment=alignment_parameters,
                                                               mode=mode,
-                                                              select_duts=select_duts)
+                                                              select_duts=select_duts,
+                                                              parameters=parameters)
 
             logging.info('Overwrite existing alignment!')
             out_file_h5.root.Alignment._f_remove()  # Remove old node, is there a better way?
