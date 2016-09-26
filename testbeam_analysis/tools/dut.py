@@ -98,14 +98,15 @@ class dut(object):
  
         with tb.open_file(alignment_file, mode="a") as in_alignment_file:
             try:
-                alignment_table = in_alignment_file.create_table(in_alignment_file.root, name="DUT%d" % self.id, title='Alignment parameters for DUT%d%s' % (self.id, (" (" + self.name + ")") if self.name else ""), description=self.alignment_array.dtype)
-            except tb.NodeError:  # node already exists
+                node = in_alignment_file.get_node("/DUT%d" % self.id)
+            except tb.NodeError:  # node does not exist
                 pass
+            else:
+                node.remove()
+
+            alignment_table = in_alignment_file.create_table(in_alignment_file.root, name="DUT%d" % self.id, title='Alignment parameters for DUT%d%s' % (self.id, (" (" + self.name + ")") if self.name else ""), description=self.alignment_array.dtype)
             node = in_alignment_file.get_node("/DUT%d" % self.id)
-            try:
-                node[0] = self.alignment_array[0]
-            except ValueError:  # node existing but empty
-                node.append(self.alignment_array)
+            node.append(self.alignment_array)
             self.write_attributes(node=node)
  
     def write_attributes(self, node):
