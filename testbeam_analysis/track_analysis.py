@@ -103,8 +103,83 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
 
                 tracklets_data_chunk['track_quality'] = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
 
+                #print tracklets_data_chunk
+                #print tr_x
                 # Perform the track finding with jitted loop
                 _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance)
+#                 x_bins = np.abs(np.ceil(tr_x.max()) - np.floor(tr_x.min())) + 1
+#                 print "min max x", tr_x.max(), tr_x.min()
+#                 print "min max y", tr_y.max(), tr_y.min()
+#                 print np.ceil(tr_x.max()), np.floor(tr_x.min())
+#                 #print "x_bins", x_bins
+#                 z_scale = 1000
+#                 x_scale = 100
+#                 start = None
+#                 stop = 30
+#                 tr_x_c = np.concatenate(tr_x[start:stop])
+#                 tr_z_c = np.concatenate(tr_z[start:stop])
+#                 #print tr_z_c
+#                 nonzero_idx = np.nonzero(tr_x_c)
+#                 tr_x_c = tr_x_c[nonzero_idx]
+#                 tr_z_c = tr_z_c[nonzero_idx]
+#                 img, xedges, yedges = np.histogram2d(tr_x_c, tr_z_c, bins=(x_bins / x_scale, (tr_z.max() + 1) / z_scale))
+#                 #print xedges, yedges
+#                 print img.shape, xedges, yedges
+# 
+#                 
+#                 import matplotlib.pyplot as plt
+#                 from matplotlib import colors, cm
+#                 from matplotlib.colors import LogNorm
+# 
+#                 tr_x_c = np.concatenate(tr_x)
+#                 tr_y_c = np.concatenate(tr_y)
+#                 nonzero_idx = np.nonzero(tr_x_c)
+#                 tr_x_c = tr_x_c[nonzero_idx]
+#                 tr_y_c = tr_y_c[nonzero_idx]
+#                 plt.clf()
+#                 fig = plt.gcf()
+#                 ax = fig.add_subplot(1, 1, 1)
+#                 cmap = cm.get_cmap('viridis')
+#                 plt.hist2d(tr_x_c, tr_y_c, bins=[200, 200], cmap=cmap, norm=LogNorm())
+#                 plt.title("x-z")
+#                 plt.show()
+# 
+#                 plt.clf()
+#                 fig = plt.gcf()
+#                 ax = fig.add_subplot(1, 1, 1)
+#                 cmap = cm.get_cmap('viridis')
+#                 plt.imshow(img.T, interpolation="none", origin="lower", aspect="auto", cmap=cmap)#, vmax=8)
+#                 plt.title("x-z")
+#                 plt.show()
+# 
+#                 accumulator, theta, rho, theta_edges, rho_edges = analysis_utils.hough_transform(img.T, theta_res=1., rho_res=1.0, return_edges=True)
+#                 accumulator[:,:20] = 0
+#                 accumulator[:,-20:] = 0
+#                 print accumulator.shape, accumulator.argmax(), np.unravel_index(accumulator.argmax(), accumulator.shape)
+#                 rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
+#                 #print rho, theta
+#                 #print rho_idx, th_idx
+#                 rho_val, theta_val = rho[rho_idx], theta[th_idx]
+#                 print rho_val, theta_val, np.rad2deg(theta_val)
+#                 slope_idx, offset_idx = np.sin(theta_val) / np.cos(theta_val), rho_val/np.cos(theta_val)
+#                 print "slope, offset", slope_idx, offset_idx
+#                 offset = offset_idx * x_scale - 0.5 * np.abs((np.ceil(tr_x.max()) - np.floor(tr_x.min())))
+#                 slope = slope_idx * (z_scale / x_scale)
+#                 print "slope, offset", slope, offset
+#                 
+# 
+# 
+#                 plt.clf()
+#                 fig = plt.gcf()
+#                 ax = fig.add_subplot(1, 1, 1)
+#                 cmap = cm.get_cmap('viridis')
+#                 greater = np.where(accumulator >= 6)
+#                 plt.plot(greater[1], greater[0], 'ro', mfc='none', mec='r', ms=10)
+#                 plt.imshow(accumulator, interpolation="none", origin="lower", aspect="auto", cmap=cmap)#, norm=LogNorm(vmax=6))#, vmax=8)
+#                 plt.title("Accumulator")
+#                 ax.set_xlabel(r'$\theta$ [degree]')
+#                 ax.set_ylabel(r'$\rho$ [um]')
+#                 plt.show()
 
                 # Merge result data from arrays into one recarray
                 combined = np.column_stack((tracklets_data_chunk['event_number'], tr_x, tr_y, tr_z, tr_charge, tracklets_data_chunk['track_quality'], tracklets_data_chunk['n_tracks']))
@@ -112,12 +187,13 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
 
                 track_candidates.append(combined)
                 progress_bar.update(index)
+                #break
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, use_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
     '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
-    The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
+    The fit is done for specified DUTs only (use_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
 
     Parameters
     ----------
@@ -127,7 +203,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         File name of the input aligment data
     output_tracks_file : string
         file name of the created track file having the track table
-    fit_duts : iterable
+    use_duts : iterable
         the duts to fit tracks for. If None all duts are used
     selection_hit_duts : iterable, or iterable of iterable
         The duts that are required to have a hit with the given track quality. Otherwise the track is omitted
@@ -181,6 +257,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 z_positions = in_file_h5.root.PreAlignment[:]['z']
                 use_prealignment = True
         n_duts = z_positions.shape[0]
+    use_duts = use_duts if use_duts is not None else range(n_duts)  # standard setting: fit tracks for all DUTs
+
 
     if use_prealignment:
         logging.info('Use pre-alignment data')
@@ -192,28 +270,28 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         selection_hit_duts = [i for i in range(n_duts)]
 
     if not isinstance(selection_track_quality, Iterable):
-        selection_track_quality = [selection_track_quality for _ in selection_hit_duts]
+        selection_track_quality = [selection_track_quality for _ in range(n_duts)]
 
     # Std. case: use all DUTs that are required to have a hit for track fitting
     if not selection_fit_duts:
         selection_fit_duts = selection_hit_duts
 
     if not isinstance(selection_fit_duts, Iterable):
-        selection_fit_duts = [selection_hit_duts for _ in range(n_duts)]
+        selection_fit_duts = [selection_hit_duts for _ in range(len(use_duts))]
 
     # Convert potential selection valid for all duts to required selection for each DUT
     try:
         iter(selection_hit_duts[0])
     except TypeError:  # not iterable
-        selection_hit_duts = [selection_hit_duts for _ in range(n_duts)]
+        selection_hit_duts = [selection_hit_duts for _ in range(len(use_duts))]
     try:
         iter(selection_fit_duts[0])
     except:
-        selection_fit_duts = [selection_fit_duts for _ in range(n_duts)]
+        selection_fit_duts = [selection_fit_duts for _ in range(len(use_duts))]
     try:
         iter(selection_track_quality[0])
     except:
-        selection_track_quality = [selection_track_quality for _ in range(n_duts)]
+        selection_track_quality = [selection_track_quality for _ in range(len(use_duts))]
 
     if len(selection_hit_duts) != len(selection_track_quality):
         raise ValueError('The length of the hit dut selection has to be equal to the quality selection!')
@@ -343,9 +421,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             except OSError:
                 pass
             with tb.open_file(output_tracks_file, mode='a') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
-                n_duts = sum(['charge' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
-                fit_duts = fit_duts if fit_duts is not None else range(n_duts)  # Std. setting: fit tracks for all DUTs
-
                 if min_track_distance is True:
                     min_track_distance = np.array([(200.)] * n_duts)
                 elif min_track_distance is False:
@@ -355,13 +430,13 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 else:
                     min_track_distance = np.array(min_track_distance)
 
-                for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
-                    logging.info('Fit tracks for DUT %d', fit_dut)
-
-                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut)
+                for actual_dut in use_duts:  # Loop over the DUTs where tracks shall be fitted for
+                    logging.info('Fit tracks for DUT %d', actual_dut)
+                    dut_index = np.where(np.array(use_duts) == actual_dut)[0][0]
+                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
-                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', fit_dut)
+                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', actual_dut)
                         continue
 
                     progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.TrackCandidates.shape[0], term_width=80)
@@ -403,8 +478,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Prepare track hits array to be fitted
                         index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
-                        track_hits = np.zeros((n_tracks, n_fit_duts, 3))
-
+                        track_hits = np.full((n_tracks, n_fit_duts, 3), np.nan)
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
                             if ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
                                 xyz = np.column_stack((good_track_candidates['x_dut_%s' % dut_index], good_track_candidates['y_dut_%s' % dut_index], good_track_candidates['z_dut_%s' % dut_index]))
@@ -424,10 +498,10 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Store the data
                         if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
-                            store_track_data(fit_dut, min_track_distance)
+                            store_track_data(actual_dut, min_track_distance)
                         else:
-                            for fit_dut in fit_duts:
-                                store_track_data(fit_dut, min_track_distance)
+                            for all_dut_index in use_duts:
+                                store_track_data(all_dut_index, min_track_distance)
 
                         progress_bar.update(index_candidates)
                     progress_bar.finish()
@@ -442,7 +516,11 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
     # Set track quality of actual DUT from actual DUT hit
     column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
-    if row != 0:  # row = 0 is no hit
+    # TODO: check for nan
+    #print row
+    #print "end"
+    if not np.isnan(row):
+    #if row != 0:  # row = 0 is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
         if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
@@ -463,8 +541,11 @@ def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_inde
     column, row = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index]
 
     actual_track['track_quality'] &= ~(65793 << dut_index)  # Reset track quality to zero
-
-    if row != 0:  # row = 0 is no hit
+    # TODO: check for nan
+    #print row
+    #print "end"
+    if not np.isnan(row):
+    #if row != 0:  # row = 0 is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
         if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
@@ -478,7 +559,11 @@ def _get_first_dut_index(tr_column, index):
     ''' Returns the first DUT that has a hit for the track at index '''
     dut_index = 0
     for dut_index in range(tr_column.shape[1]):  # Loop over duts, to get first DUT hit of track
-        if tr_column[index][dut_index] != 0:
+        #TODO: check for nan
+        #print tr_column[index][dut_index]
+        #print "end"
+        if not np.isnan(tr_column[index][dut_index]):
+        #if tr_column[index][dut_index] != 0:
             break
     return dut_index
 
@@ -498,10 +583,18 @@ def _set_n_tracks(start_index, stop_index, tracklets, n_actual_tracks, tr_column
 
     if n_actual_tracks > 1:  # Only if the event has more than one track check the min_cluster_distance
         for dut_index in range(n_duts):
+            #TODO: check for nan, probably was OK
+            #print min_cluster_distance[dut_index]
+            #print "end"
+            #if not np.isnan(min_cluster_distance[dut_index]):
             if min_cluster_distance[dut_index] != 0:  # Check if minimum track distance evaluation is set, 0 is no mimimum track distance cut
                 for i in range(start_index, stop_index):  # Loop over all event hits
                     actual_column, actual_row = tr_column[i][dut_index], tr_row[i][dut_index]
-                    if actual_column == 0:  # Omit virtual hit
+                    #TODO: check for nan, print not tested
+                    #print actual_column
+                    #print "end"
+                    if np.isnan(actual_column):
+                    #if actual_column == 0:  # Omit virtual hit
                         continue
                     for j in range(i + 1, stop_index):  # Loop over other event hits
                         if sqrt((actual_column - tr_column[j][dut_index]) * (actual_column - tr_column[j][dut_index]) + (actual_row - tr_row[j][dut_index]) * (actual_row - tr_row[j][dut_index])) < min_cluster_distance[dut_index]:
@@ -561,12 +654,19 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
             # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
             current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
             current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
-            if tr_column[track_index][dut_index] == 0:  # No hit at the actual position
+            # TODO: check for nan
+            #print tr_column[track_index][dut_index]
+            #print "end"
+            if np.isnan(tr_column[track_index][dut_index]):
+            #if tr_column[track_index][dut_index] == 0:  # No hit at the actual position
                 current_hit_distance = -1  # Signal no hit
 
 #             print '== ACTUAL DUT  ==', dut_index
-
-            if not reference_hit_set and tr_row[track_index][dut_index] != 0:  # Search for first DUT that registered a hit (row != 0)
+            # TODO: check for nan
+            #print tr_row[track_index][dut_index]
+            #print "end"
+            if not reference_hit_set and not np.isnan(tr_row[track_index][dut_index]):
+            #if not reference_hit_set and tr_row[track_index][dut_index] != 0:  # Search for first DUT that registered a hit (row != 0)
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
                 reference_hit_set = True
                 tracklets[track_index]['track_quality'] |= (65793 << dut_index)  # First track hit has best quality by definition
@@ -578,7 +678,11 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                     if tracklets[hit_index]['event_number'] != actual_event_number:  # Abort condition
                         break
                     column, row, z, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index]
-                    if row != 0:  # Check for hit (row != 0)
+                    # TODO: check for nan
+                    #print row
+                    #print "end"
+                    if not np.isnan(row):
+                    #if row != 0:  # Check for hit (row != 0)
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
                         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
                         hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)

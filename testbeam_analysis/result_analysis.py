@@ -4,6 +4,7 @@ from __future__ import division
 import logging
 import re
 from collections import Iterable
+import os.path
 
 import tables as tb
 import numpy as np
@@ -101,7 +102,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                     if actual_max_chi2:
                         tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= actual_max_chi2]
-                    tracks_chunk = tracks_chunk[np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] != 0.0, tracks_chunk['y_dut_%d' % actual_dut] != 0.0)]  # Take only tracks where actual dut has a hit, otherwise residual wrong
+                    selection = np.logical_and(~np.isnan(tracks_chunk['x_dut_%d' % actual_dut]), ~np.isnan(tracks_chunk['y_dut_%d' % actual_dut]))
+                    tracks_chunk = tracks_chunk[selection]  # Take only tracks where actual dut has a hit, otherwise residual wrong
 
                     # Coordinates in global coordinate system (x, y, z)
                     hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
@@ -127,7 +129,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                                                                                           alignment=alignment,
                                                                                                                           inverse=True)
 
-                    if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
+                    if not np.allclose(hit_z_local, 0.0) or not np.allclose(intersection_z_local, 0.0):
                         logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
@@ -620,7 +622,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         output_fig.close()
 
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, sensor_size, minimum_track_density=1, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, chunk_size=1000000):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficiency_file, bin_size, pixel_size, n_pixels, dut_names=None, sensor_sizes=None, minimum_track_density=1, minimum_tracks_per_bin=0, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, max_distance=1000, charge_bins=None, dut_masks=None, col_range=None, row_range=None, show_inefficient_events=False, chunk_size=1000000):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -628,10 +630,10 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
         file name with the tracks table
     input_alignment_file : pytables file
         File name of the input aligment data
-    output_pdf : pdf file name object
+    output_efficiency_file : outout file name
     bin_size : iterable
         sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
-    sensor_size : Tuple or list of tuples
+    sensor_sizes : Tuple or list of tuples
         Describes the sensor size for each DUT. If one tuple is given it is (size x, size y)
         If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...]
     minimum_track_density : int
@@ -654,6 +656,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
     logging.info('=== Calculate efficiency ===')
 
     use_prealignment = True if force_prealignment else False
+    sensor_sizes = [sensor_sizes, ] if not isinstance(sensor_sizes, Iterable) else sensor_size  # Sensor dimensions for each DUT
 
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
         prealignment = in_file_h5.root.PreAlignment[:]
@@ -665,179 +668,328 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
             except tb.exceptions.NodeError:
                 use_prealignment = True
                 logging.info('Use prealignment data')
+    use_duts = use_duts if use_duts is not None else range(n_duts)  # standard setting: fit tracks for all DUTs
 
     if not isinstance(max_chi2, Iterable):
-        max_chi2 = [max_chi2] * n_duts
+        max_chi2 = [max_chi2] * len(use_duts)
 
-    with PdfPages(output_pdf) as output_fig:
+    if not isinstance(cut_distance, Iterable):
+        cut_distance = [cut_distance] * len(use_duts)
+
+    if not isinstance(max_distance, Iterable):
+        max_distance = [max_distance] * len(use_duts)
+
+    if not isinstance(charge_bins, Iterable):
+        charge_bins = [charge_bins] * len(use_duts)
+
+    if not isinstance(dut_masks, Iterable):
+        dut_masks = [dut_masks] * len(use_duts)
+
+    output_pdf_file = os.path.splitext(output_efficiency_file)[0] + '.pdf'
+
+    with PdfPages(output_pdf_file) as output_fig:
         efficiencies = []
         pass_tracks = []
         total_tracks = []
-        with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
-            for index, node in enumerate(in_file_h5.root):
-                actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                if use_duts and actual_dut not in use_duts:
-                    continue
-                logging.info('Calculate efficiency for DUT %d', actual_dut)
-
-                # Calculate histogram properties (bins size and number of bins)
-                bin_size = [bin_size, ] if not isinstance(bin_size, Iterable) else bin_size
-                if len(bin_size) != 1:
-                    actual_bin_size_x = bin_size[index][0]
-                    actual_bin_size_y = bin_size[index][1]
-                else:
-                    actual_bin_size_x = bin_size[0][0]
-                    actual_bin_size_y = bin_size[0][1]
-                dimensions = [sensor_size, ] if not isinstance(sensor_size, Iterable) else sensor_size  # Sensor dimensions for each DUT
-                if len(dimensions) == 1:
-                    dimensions = dimensions[0]
-                else:
-                    dimensions = dimensions[index]
-                n_bin_x = dimensions[0] / actual_bin_size_x
-                n_bin_y = dimensions[1] / actual_bin_size_y
-
-                # Define result histograms, these are filled for each hit chunk
-#                 total_distance_array = np.zeros(shape=(n_bin_x, n_bin_y, max_distance))
-                total_hit_hist = np.zeros(shape=(n_bin_x, n_bin_y), dtype=np.uint32)
-                total_track_density = np.zeros(shape=(n_bin_x, n_bin_y))
-                total_track_density_with_DUT_hit = np.zeros(shape=(n_bin_x, n_bin_y))
-
-                actual_max_chi2 = max_chi2[index]
-
-                for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
-                    # Cut in Chi 2 of the track fit
-                    if actual_max_chi2:
-                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
-
-                    # Transform the hits and track intersections into the local coordinate system
-                    # Coordinates in global coordinate system (x, y, z)
-                    hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
-                    intersection_x, intersection_y, intersection_z = tracks_chunk['offset_0'], tracks_chunk['offset_1'], tracks_chunk['offset_2']
-
-                    # Transform to local coordinate system
-                    if use_prealignment:
-                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
-                                                                                               dut_index=actual_dut,
-                                                                                               prealignment=prealignment,
-                                                                                               inverse=True)
-                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
-                                                                                                                          dut_index=actual_dut,
-                                                                                                                          prealignment=prealignment,
-                                                                                                                          inverse=True)
-                    else:  # Apply transformation from fine alignment information
-                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
-                                                                                               dut_index=actual_dut,
-                                                                                               alignment=alignment,
-                                                                                               inverse=True)
-                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
-                                                                                                                          dut_index=actual_dut,
-                                                                                                                          alignment=alignment,
-                                                                                                                          inverse=True)
-
-                    intersections_local = np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
-                    hits_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local))
-
-                    # Only transform real hits, thus reset them to x/y/z = 0/0/0
-                    selection = np.logical_or(tracks_chunk['x_dut_%d' % actual_dut] == 0., tracks_chunk['y_dut_%d' % actual_dut] == 0.)
-                    hits_local[selection, :] = 0.0
-
-                    if not np.allclose(hits_local[0][2], 0.0) or not np.allclose(intersection_z_local, 0.0):
-                        raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
-
-                    # Usefull for debugging, print some inefficient events that can be cross checked
-                    if show_inefficient_events:
-                        logging.info('These events are inefficient: %s', str(tracks_chunk['event_number'][selection]))
-
-                    # Select hits from column, row range (e.g. to supress edge pixels)
-                    col_range = [col_range, ] if not isinstance(col_range, Iterable) else col_range
-                    row_range = [row_range, ] if not isinstance(row_range, Iterable) else row_range
-                    if len(col_range) == 1:
-                        index = 0
-                    if len(row_range) == 1:
-                        index = 0
-                    if col_range[index] is not None:
-                        selection = np.logical_and(intersections_local[:, 0] >= col_range[index][0], intersections_local[:, 0] <= col_range[index][1])  # Select real hits
-                        hits_local, intersections_local = hits_local[selection], intersections_local[selection]
-                    if row_range[index] is not None:
-                        selection = np.logical_and(intersections_local[:, 1] >= row_range[index][0], intersections_local[:, 1] <= row_range[index][1])  # Select real hits
-                        hits_local, intersections_local = hits_local[selection], intersections_local[selection]
-
-                    # Calculate distance between track hit and DUT hit
-                    scale = np.square(np.array((1, 1, 0)))  # Regard pixel size for calculating distances
-                    distance = np.sqrt(np.dot(np.square(intersections_local - hits_local), scale))  # Array with distances between DUT hit and track hit for each event. Values in um
-
-                    col_row_distance = np.column_stack((hits_local[:, 0], hits_local[:, 1], distance))
-
-#                     total_distance_array += np.histogramdd(col_row_distance, bins=(n_bin_x, n_bin_y, max_distance), range=[[0, dimensions[0]], [0, dimensions[1]], [0, max_distance]])[0]
-                    total_hit_hist += (np.histogram2d(hits_local[:, 0], hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]).astype(np.uint32)
-
-                    # Calculate efficiency
-                    if cut_distance:  # Select intersections where hit is in given distance around track intersection
-                        intersection_valid_hit = intersections_local[np.logical_and(np.logical_and(hits_local[:, 0] != 0, hits_local[:, 1] != 0), distance < cut_distance)]
-                    else:
-                        intersection_valid_hit = intersections_local[np.logical_and(hits_local[:, 0] != 0, hits_local[:, 1] != 0)]
-
-                    total_track_density += np.histogram2d(intersections_local[:, 0], intersections_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
-                    total_track_density_with_DUT_hit += np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
-
-                    if np.all(total_track_density == 0):
-                        logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
+        with tb.open_file(output_efficiency_file, 'w') as out_file_h5:
+            with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
+                for node in in_file_h5.root:
+                    actual_dut = int(re.findall(r'\d+', node.name)[-1])
+    
+                    if use_duts and actual_dut not in use_duts:
                         continue
+                    dut_index = np.where(np.array(use_duts) == actual_dut)[0][0]
+                    print "actual_dut", actual_dut
+                    print "dut_index", dut_index
+                    dut_name = dut_names[actual_dut] if dut_names else ("DUT " + str(actual_dut))
+                    logging.info('Calculate efficiency for DUT %d', actual_dut)
+    
+                    # Calculate histogram properties (bins size and number of bins)
+                    bin_size = [bin_size, ] if not isinstance(bin_size, Iterable) else bin_size
+                    if len(bin_size) != 1:
+                        actual_bin_size_x = bin_size[dut_index][0]
+                        actual_bin_size_y = bin_size[dut_index][1]
+                    else:
+                        actual_bin_size_x = bin_size[0][0]
+                        actual_bin_size_y = bin_size[0][1]
+    
+                    if len(sensor_sizes) == 1:
+                        sensor_size = sensor_sizes[0]
+                    else:
+                        sensor_size = sensor_sizes[actual_dut]
+                    if sensor_size is None:
+                        sensor_size = np.array(pixel_size[actual_dut]) * n_pixels[actual_dut]
+                    print "sensor_size", sensor_size
+    
+                    sensor_range_corr = [[-0.5 * pixel_size[actual_dut][0] * n_pixels[actual_dut][0], 0.5 * pixel_size[actual_dut][0] * n_pixels[actual_dut][0]], [- 0.5 * pixel_size[actual_dut][1] * n_pixels[actual_dut][1], 0.5 * pixel_size[actual_dut][1] * n_pixels[actual_dut][1]]]
+                    print "sensor_range_corr", sensor_range_corr
+    
+                    sensor_range_corr_with_distance = sensor_range_corr[:]
+                    sensor_range_corr_with_distance.append([0, max_distance[dut_index]])
+    
+                    sensor_range_corr_with_charge = sensor_range_corr[:]
+                    sensor_range_corr_with_charge.append([0, charge_bins[dut_index]])
+    
+                    print sensor_size[0], actual_bin_size_x, sensor_size[1], actual_bin_size_y
+                    n_bin_x = sensor_size[0] / actual_bin_size_x
+                    n_bin_y = sensor_size[1] / actual_bin_size_y
+                    if not n_bin_x.is_integer() or not n_bin_y.is_integer():
+                        raise ValueError("change bin_size: %f, %f" % (n_bin_x, n_bin_x))
+                    n_bin_x = int(n_bin_x)
+                    n_bin_y = int(n_bin_y)
+                    # has to be even
+                    print "bins", n_bin_x, n_bin_y
+    
+    
+                    # Define result histograms, these are filled for each hit chunk
+    #                 total_distance_array = np.zeros(shape=(n_bin_x, n_bin_y, max_distance))
+                    total_hit_hist = None
+                    total_track_density = None
+                    total_track_density_with_dut_hit = None
+                    distance_array = None
+                    hit_hist = None
+                    charge_array = None
+    
+                    actual_max_chi2 = max_chi2[dut_index]
+    
+                    for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
+                        # Cut in Chi 2 of the track fit
+                        if actual_max_chi2:
+                            tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= actual_max_chi2]
+    
+                        # Transform the hits and track intersections into the local coordinate system
+                        # Coordinates in global coordinate system (x, y, z)
+                        hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
+                        charge = tracks_chunk['charge_dut_%d' % actual_dut]
+                        # track intersection at DUT
+                        
+                        intersection_x, intersection_y, intersection_z = tracks_chunk['offset_0'], tracks_chunk['offset_1'], tracks_chunk['offset_2']
 
-                efficiency = np.zeros_like(total_track_density_with_DUT_hit)
-                efficiency[total_track_density != 0] = total_track_density_with_DUT_hit[total_track_density != 0].astype(np.float) / total_track_density[total_track_density != 0].astype(np.float) * 100.
+                        # Transform to local coordinate system
+                        if use_prealignment:
+                            hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                                   dut_index=actual_dut,
+                                                                                                   prealignment=prealignment,
+                                                                                                   inverse=True)
+                            intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                              dut_index=actual_dut,
+                                                                                                                              prealignment=prealignment,
+                                                                                                                              inverse=True)
+                        else:  # Apply transformation from fine alignment information
+                            hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                                   dut_index=actual_dut,
+                                                                                                   alignment=alignment,
+                                                                                                   inverse=True)
+                            intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                              dut_index=actual_dut,
+                                                                                                                              alignment=alignment,
+                                                                                                                              inverse=True)
+    
+                        intersections_local = np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
+                        hits_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local))
+    
+                        # Only transform real hits, thus reset them to x/y/z = 0/0/0
+                        # TODO: change for nan
+                        #selection = np.logical_and(tracks_chunk['x_dut_%d' % actual_dut] == 0.0, tracks_chunk['y_dut_%d' % actual_dut] == 0.0)
+                        selection = np.logical_and(~np.isnan(hit_x), ~np.isnan(hit_y))
+                        # TODO: This is bad, do not modify
+                        #hits_local[selection, :] = 0.0
+    
+                        # TODO: is this correct?
+                        if not np.allclose(hit_z_local[selection], 0.0) or not np.allclose(intersection_z_local[selection], 0.0):
+                            raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
+    
+                        # Usefull for debugging, print some inefficient events that can be cross checked
+                        if show_inefficient_events:
+                            logging.info('These events are inefficient: %s', str(tracks_chunk['event_number'][selection]))
+    
+                        # Select hits from column, row range (e.g. to supress edge pixels)
+                        # TODO: commented because not needed
+    #                     col_range = [col_range, ] if not isinstance(col_range, Iterable) else col_range
+    #                     row_range = [row_range, ] if not isinstance(row_range, Iterable) else row_range
+    #                     if len(col_range) == 1:
+    #                         index = 0
+    #                     if len(row_range) == 1:
+    #                         index = 0
+    #                     if col_range[index] is not None:
+    #                         selection = np.logical_and(intersections_local[:, 0] >= col_range[index][0], intersections_local[:, 0] <= col_range[index][1])  # Select real hits
+    #                         hits_local, intersections_local = hits_local[selection], intersections_local[selection]
+    #                     if row_range[index] is not None:
+    #                         selection = np.logical_and(intersections_local[:, 1] >= row_range[index][0], intersections_local[:, 1] <= row_range[index][1])  # Select real hits
+    #                         hits_local, intersections_local = hits_local[selection], intersections_local[selection]
+    
+                        # Calculate distance between track hit and DUT hit
+                        # TODO: scale correct? USE np.square(np.array((1, 1, 1)))
+                        scale = np.square(np.array((1, 1, 1)))  # Regard pixel size for calculating distances
+                        distance = np.sqrt(np.dot(np.square(intersections_local - hits_local), scale))  # Array with distances between DUT hit and track hit for each event. Values in um
+    
+                        total_hit_hist_tmp = np.histogram2d(hits_local[:, 0], hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=sensor_range_corr)[0]
+                        if total_hit_hist is None:
+                            total_hit_hist = total_hit_hist_tmp
+                        else:
+                            total_hit_hist += total_hit_hist_tmp
+    
+                        total_track_density_tmp = np.histogram2d(intersections_local[:, 0], intersections_local[:, 1], bins=(n_bin_x, n_bin_y), range=sensor_range_corr)[0]
+                        if total_track_density is None:
+                            total_track_density = total_track_density_tmp
+                        else:
+                            total_track_density += total_track_density_tmp
+    
+                        # Calculate efficiency
+                        if cut_distance[dut_index] is not None:  # Select intersections where hit is in given distance around track intersection
+                            selection = np.logical_and(selection, distance < cut_distance[dut_index])
+                        intersections_local_valid_hit = intersections_local[selection]
+                        hits_local_valid_hit = hits_local[selection]
+                        charge_valid_hit = charge[selection]
+    
+                        total_track_density_with_dut_hit_tmp = np.histogram2d(intersections_local_valid_hit[:, 0], intersections_local_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=sensor_range_corr)[0]
+                        if total_track_density_with_dut_hit is None:
+                            total_track_density_with_dut_hit = total_track_density_with_dut_hit_tmp
+                        else:
+                            total_track_density_with_dut_hit += total_track_density_with_dut_hit_tmp
+    
+                        intersections_distance = np.column_stack((intersections_local[:, 0], intersections_local[:, 1], distance))
+    
+                        distance_array_tmp = np.histogramdd(intersections_distance, bins=(n_bin_x, n_bin_y, 100), range=sensor_range_corr_with_distance)[0]
+                        if distance_array is None:
+                            distance_array = distance_array_tmp
+                        else:
+                            distance_array += distance_array_tmp
+    
+                        hit_hist_tmp = np.histogram2d(hits_local[:, 0], hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=sensor_range_corr)[0]
+                        if hit_hist is None:
+                            hit_hist = hit_hist_tmp
+                        else:
+                            hit_hist += hit_hist_tmp
+    
+                        if charge_bins[dut_index] is not None:
+                            intersection_charge_valid_hit = np.column_stack((intersections_local_valid_hit[:, 0], intersections_local_valid_hit[:, 1], charge_valid_hit[:]))
+                            charge_array_tmp = np.histogramdd(intersection_charge_valid_hit, bins=(n_bin_x, n_bin_y, charge_bins[dut_index]), range=sensor_range_corr_with_charge)[0]
+                            if charge_array is None:
+                                charge_array = charge_array_tmp
+                            else:
+                                charge_array += charge_array_tmp
+    
+                        if np.all(total_track_density == 0):
+                            logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
+                            continue
+    
+                    # efficiency
+                    efficiency = np.full_like(total_track_density_with_dut_hit, fill_value=np.nan, dtype=np.float)
+                    efficiency[total_track_density != 0] = total_track_density_with_dut_hit[total_track_density != 0].astype(np.float) / total_track_density[total_track_density != 0].astype(np.float) * 100.0
+                    efficiency = np.ma.masked_invalid(efficiency)
+                    efficiency = np.ma.masked_where(total_track_density < minimum_tracks_per_bin, efficiency)
+    
+                    distance_mean_array = np.average(distance_array, axis=2, weights=range(0, 100)) * sum(range(0, 100)) / np.sum(distance_array, axis=2)
+    #                         distance_mean_array = np.average(distance_array, axis=2, weights=range(0, 100)) * sum(range(0, 100)) / hit_hist.astype(np.float)
+    
+                    distance_mean_array = np.ma.masked_invalid(distance_mean_array)
+    #                         distance_max_array = np.amax(distance_array, axis=2) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
+    #                         distance_min_array = np.amin(distance_array, axis=2) * sum(range(0, max_distance)) / hit_hist.astype(np.float)
+    #                         distance_max_array = np.ma.masked_invalid(distance_max_array)
+    #                         distance_min_array = np.ma.masked_invalid(distance_min_array)
+    
+                    print "bins with tracks", np.ma.count(efficiency), "of", efficiency.shape[0] * efficiency.shape[1]
+                    print "tracks outside left / right", np.where(intersections_local_valid_hit[:, 0] < sensor_range_corr[0][0])[0].shape[0], np.where(intersections_local_valid_hit[:, 0] > sensor_range_corr[0][1])[0].shape[0]
+                    print "tracks outside below / above", np.where(intersections_local_valid_hit[:, 1] < sensor_range_corr[1][0])[0].shape[0], np.where(intersections_local_valid_hit[:, 1] > sensor_range_corr[1][1])[0].shape[0]
+    
+                    if pixel_size:
+                        aspect = pixel_size[actual_dut][1] / pixel_size[actual_dut][0]
+                    else:
+                        aspect = "auto"
+    
+                    plot_utils.efficiency_plots(
+                        distance_mean_array=distance_mean_array,
+                        hit_hist=hit_hist,
+                        track_density=total_track_density,
+                        track_density_with_hit=total_track_density_with_dut_hit,
+                        efficiency=efficiency,
+                        charge_array=charge_array,
+                        dut_name=dut_name,
+                        minimum_track_density=minimum_tracks_per_bin,
+                        plot_range=sensor_range_corr,
+                        n_pixels=n_pixels[actual_dut],
+                        charge_bins=charge_bins[dut_index],
+                        dut_mask=dut_masks[dut_index],
+                        cut_distance=cut_distance,
+                        output_fig=output_fig,
+                        aspect=aspect)
+                    logging.info('Efficiency =  %.4f', np.ma.mean(efficiency))
+    
+                    actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+                    out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency per bin of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out_tracks_per_bin = out_file_h5.createCArray(actual_dut_folder, name='Tracks_per_bin', title='Tracks per bin of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density.dtype), shape=total_track_density.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    # Store parameters used for efficiency calculation
+                    out_efficiency.attrs.bin_size = bin_size
+                    out_efficiency.attrs.minimum_tracks_per_bin = minimum_tracks_per_bin
+                    out_efficiency.attrs.sensor_size = sensor_size
+                    out_efficiency.attrs.use_duts = use_duts
+                    out_efficiency.attrs.max_chi2 = max_chi2
+                    out_efficiency.attrs.cut_distance = cut_distance
+                    out_efficiency.attrs.max_distance = max_distance
+    #                     out_efficiency.attrs.col_range = col_range
+    #                     out_efficiency.attrs.row_range = row_range
+                    out_efficiency[:] = efficiency.T
+                    out_tracks_per_bin[:] = total_track_density.T
+    
 
-                efficiency = np.ma.array(efficiency, mask=total_track_density < minimum_track_density)
 
-                if not np.any(efficiency):
-                    raise RuntimeError('All efficiencies for DUT%d are zero, consider changing cut values!', actual_dut)
+# ****************** old part
 
-                # Calculate distances between hit and intersection
-#                 distance_mean_array = np.average(total_distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
-#                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
-#                 distance_max_array = np.amax(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
-#                 distance_min_array = np.amin(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
-#                 distance_max_array = np.ma.masked_invalid(distance_max_array)
-#                 distance_min_array = np.ma.masked_invalid(distance_min_array)
-
-#                 plot_utils.plot_track_distances(distance_min_array, distance_max_array, distance_mean_array)
-                plot_utils.efficiency_plots(total_hit_hist, total_track_density, total_track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_fig=output_fig)
-
-                logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
-                efficiencies.append(np.ma.mean(efficiency))
-
-                if output_file:
-                    with tb.open_file(output_file, 'a') as out_file_h5:
-                        try:
-                            actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
-                        except tb.NodeError:
-                            logging.warning('Data for DUT%d exists already and will be overwritten', actual_dut)
-                            out_file_h5.remove_node('/DUT_%d' % actual_dut, recursive=True)
-                            actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
-
-                        out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                        out_efficiency_mask = out_file_h5.createCArray(actual_dut_folder, name='Efficiency_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.mask.dtype), shape=efficiency.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-
-                        # For correct statistical error calculation the number of detected tracks over total tracks is needed
-                        out_pass = out_file_h5.createCArray(actual_dut_folder, name='Passing_tracks', title='Passing events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density_with_DUT_hit.dtype), shape=total_track_density_with_DUT_hit.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                        out_total = out_file_h5.createCArray(actual_dut_folder, name='Total_tracks', title='Total events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density.dtype), shape=total_track_density.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-
-                        pass_tracks.append(total_track_density_with_DUT_hit.sum())
-                        total_tracks.append(total_track_density.sum())
-                        logging.info('Passing / total tracks: %d / %d', total_track_density_with_DUT_hit.sum(), total_track_density.sum())
-
-                        # Store parameters used for efficiency calculation
-                        out_efficiency.attrs.bin_size = bin_size
-                        out_efficiency.attrs.minimum_track_density = minimum_track_density
-                        out_efficiency.attrs.sensor_size = sensor_size
-                        out_efficiency.attrs.use_duts = use_duts
-                        out_efficiency.attrs.max_chi2 = max_chi2
-                        out_efficiency.attrs.cut_distance = cut_distance
-                        out_efficiency.attrs.max_distance = max_distance
-                        out_efficiency.attrs.col_range = col_range
-                        out_efficiency.attrs.row_range = row_range
-                        out_efficiency[:] = efficiency.T
-                        out_efficiency_mask[:] = efficiency.mask.T
-                        out_pass[:] = total_track_density_with_DUT_hit.T
-                        out_total[:] = total_track_density.T
-    return efficiencies, pass_tracks, total_tracks
+#                 efficiency = np.zeros_like(total_track_density_with_dut_hit)
+#                 efficiency[total_track_density != 0] = total_track_density_with_dut_hit[total_track_density != 0].astype(np.float) / total_track_density[total_track_density != 0].astype(np.float) * 100.0
+# 
+#                 efficiency = np.ma.array(efficiency, mask=total_track_density < minimum_track_density)
+# 
+#                 if not np.any(efficiency):
+#                     raise RuntimeError('All efficiencies for DUT%d are zero, consider changing cut values!', actual_dut)
+# 
+#                 # Calculate distances between hit and intersection
+# #                 distance_mean_array = np.average(total_distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+# #                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
+# #                 distance_max_array = np.amax(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+# #                 distance_min_array = np.amin(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+# #                 distance_max_array = np.ma.masked_invalid(distance_max_array)
+# #                 distance_min_array = np.ma.masked_invalid(distance_min_array)
+# 
+# #                 plot_utils.plot_track_distances(distance_min_array, distance_max_array, distance_mean_array)
+#                 plot_utils.efficiency_plots(total_hit_hist, total_track_density, total_track_density_with_dut_hit, efficiency, actual_dut, minimum_track_density, plot_range=sensor_range_corr, cut_distance=cut_distance, output_fig=output_fig)
+# 
+#                 logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
+#                 efficiencies.append(np.ma.mean(efficiency))
+# 
+#                 if output_file:
+#                     with tb.open_file(output_file, 'a') as out_file_h5:
+#                         try:
+#                             actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+#                         except tb.NodeError:
+#                             logging.warning('Data for DUT%d exists already and will be overwritten', actual_dut)
+#                             out_file_h5.remove_node('/DUT_%d' % actual_dut, recursive=True)
+#                             actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+# 
+#                         out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+#                         out_efficiency_mask = out_file_h5.createCArray(actual_dut_folder, name='Efficiency_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.mask.dtype), shape=efficiency.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+# 
+#                         # For correct statistical error calculation the number of detected tracks over total tracks is needed
+#                         out_pass = out_file_h5.createCArray(actual_dut_folder, name='Passing_tracks', title='Passing events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density_with_dut_hit.dtype), shape=total_track_density_with_dut_hit.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+#                         out_total = out_file_h5.createCArray(actual_dut_folder, name='Total_tracks', title='Total events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density.dtype), shape=total_track_density.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+# 
+#                         pass_tracks.append(total_track_density_with_dut_hit.sum())
+#                         total_tracks.append(total_track_density.sum())
+#                         logging.info('Passing / total tracks: %d / %d', total_track_density_with_dut_hit.sum(), total_track_density.sum())
+# 
+#                         # Store parameters used for efficiency calculation
+#                         out_efficiency.attrs.bin_size = bin_size
+#                         out_efficiency.attrs.minimum_track_density = minimum_track_density
+#                         out_efficiency.attrs.sensor_size = sensor_size
+#                         out_efficiency.attrs.use_duts = use_duts
+#                         out_efficiency.attrs.max_chi2 = max_chi2
+#                         out_efficiency.attrs.cut_distance = cut_distance
+#                         out_efficiency.attrs.max_distance = max_distance
+#                         out_efficiency.attrs.col_range = col_range
+#                         out_efficiency.attrs.row_range = row_range
+#                         out_efficiency[:] = efficiency.T
+#                         out_efficiency_mask[:] = efficiency.mask.T
+#                         out_pass[:] = total_track_density_with_dut_hit.T
+#                         out_total[:] = total_track_density.T
+#     return efficiencies, pass_tracks, total_tracks
