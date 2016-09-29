@@ -16,7 +16,7 @@ from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, output_pdf=True, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, output_pdf=True, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
@@ -374,17 +374,18 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                 logging.debug('Storing residual histograms...')
 
+                dut_name = dut_names[actual_dut] if dut_names else ("DUT " + str(actual_dut))
                 # Global residuals
                 fit_residual_x, cov_residual_x = analysis_utils.fit_residuals(
                     hist=hist_residual_x_hist,
                     edges=hist_residual_x_xedges,
                     label='X residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_res_x = out_file_h5.createCArray(out_file_h5.root,
                                                      name='ResidualsX_DUT%d' % (actual_dut),
-                                                     title='Residual distribution in x direction for DUT %d ' % (actual_dut),
+                                                     title='Residual distribution in x direction for %s' % (dut_name),
                                                      atom=tb.Atom.from_dtype(hist_residual_x_hist.dtype),
                                                      shape=hist_residual_x_hist.shape,
                                                      filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -397,12 +398,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     hist=hist_residual_y_hist,
                     edges=hist_residual_y_yedges,
                     label='Y residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_res_y = out_file_h5.createCArray(out_file_h5.root,
                                                      name='ResidualsY_DUT%d' % (actual_dut),
-                                                     title='Residual distribution in y direction for DUT %d ' % (actual_dut),
+                                                     title='Residual distribution in y direction for %s' % (dut_name),
                                                      atom=tb.Atom.from_dtype(hist_residual_y_hist.dtype),
                                                      shape=hist_residual_y_hist.shape,
                                                      filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -417,13 +418,13 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_x_residual_x_yedges,
                     xlabel='X position [um]',
                     ylabel='X residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 
                 out_x_res_x = out_file_h5.createCArray(out_file_h5.root,
                                                        name='XResidualsX_DUT%d' % (actual_dut),
-                                                       title='Residual distribution in x direction as a function of the x position for DUT %d ' % (actual_dut),
+                                                       title='Residual distribution in x direction as a function of the x position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_x_residual_x_hist.dtype),
                                                        shape=hist_x_residual_x_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -439,12 +440,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_y_residual_y_yedges,
                     xlabel='Y position [um]',
                     ylabel='Y residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_y_res_y = out_file_h5.createCArray(out_file_h5.root,
                                                        name='YResidualsY_DUT%d' % (actual_dut),
-                                                       title='Residual distribution in y direction as a function of the y position for DUT %d ' % (actual_dut),
+                                                       title='Residual distribution in y direction as a function of the y position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_y_residual_y_hist.dtype),
                                                        shape=hist_y_residual_y_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -460,12 +461,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_x_residual_y_yedges,
                     xlabel='X position [um]',
                     ylabel='Y residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_x_res_y = out_file_h5.createCArray(out_file_h5.root,
                                                        name='XResidualsY_DUT%d' % (actual_dut),
-                                                       title='Residual distribution in y direction as a function of the x position for DUT %d ' % (actual_dut),
+                                                       title='Residual distribution in y direction as a function of the x position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_x_residual_y_hist.dtype),
                                                        shape=hist_x_residual_y_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -481,12 +482,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_y_residual_x_yedges,
                     xlabel='Y position [um]',
                     ylabel='X residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_y_res_x = out_file_h5.createCArray(out_file_h5.root,
                                                        name='YResidualsX_DUT%d' % (actual_dut),
-                                                       title='Residual distribution in x direction as a function of the y position for DUT %d ' % (actual_dut),
+                                                       title='Residual distribution in x direction as a function of the y position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_y_residual_x_hist.dtype),
                                                        shape=hist_y_residual_x_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -501,12 +502,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     hist=hist_residual_col_hist,
                     edges=hist_residual_col_xedges,
                     label='Column residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_res_col = out_file_h5.createCArray(out_file_h5.root,
                                                        name='ResidualsCol_DUT%d' % (actual_dut),
-                                                       title='Residual distribution in column direction for DUT %d ' % (actual_dut),
+                                                       title='Residual distribution in column direction for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_residual_col_hist.dtype),
                                                        shape=hist_residual_col_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -519,12 +520,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     hist=hist_residual_row_hist,
                     edges=hist_residual_row_yedges,
                     label='Row residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_res_row = out_file_h5.createCArray(out_file_h5.root,
                                                        name='ResidualsRow_DUT%d' % (actual_dut),
-                                                       title='Residual distribution in row direction for DUT %d ' % (actual_dut),
+                                                       title='Residual distribution in row direction for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_residual_row_hist.dtype),
                                                        shape=hist_residual_row_hist.shape,
                                                        filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -539,12 +540,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_col_residual_col_yedges,
                     xlabel='Column position [um]',
                     ylabel='Column residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_col_res_col = out_file_h5.createCArray(out_file_h5.root,
                                                            name='ColResidualsCol_DUT%d' % (actual_dut),
-                                                           title='Residual distribution in column direction as a function of the column position for DUT %d ' % (actual_dut),
+                                                           title='Residual distribution in column direction as a function of the column position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_col_hist.dtype),
                                                            shape=hist_col_residual_col_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -560,12 +561,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_row_residual_row_yedges,
                     xlabel='Row position [um]',
                     ylabel='Row residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_row_res_row = out_file_h5.createCArray(out_file_h5.root,
                                                            name='RowResidualsRow_DUT%d' % (actual_dut),
-                                                           title='Residual distribution in row direction as a function of the row position for DUT %d ' % (actual_dut),
+                                                           title='Residual distribution in row direction as a function of the row position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_row_residual_row_hist.dtype),
                                                            shape=hist_row_residual_row_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -581,12 +582,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_col_residual_row_yedges,
                     xlabel='Column position [um]',
                     ylabel='Row residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_col_res_row = out_file_h5.createCArray(out_file_h5.root,
                                                            name='ColResidualsRow_DUT%d' % (actual_dut),
-                                                           title='Residual distribution in row direction as a function of the column position for DUT %d ' % (actual_dut),
+                                                           title='Residual distribution in row direction as a function of the column position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_row_hist.dtype),
                                                            shape=hist_col_residual_row_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -602,12 +603,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_row_residual_col_yedges,
                     xlabel='Row position [um]',
                     ylabel='Column residual [um]',
-                    title='Residuals for DUT %d' % actual_dut,
+                    title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
                 out_row_res_col = out_file_h5.createCArray(out_file_h5.root,
                                                            name='RowResidualsCol_DUT%d' % (actual_dut),
-                                                           title='Residual distribution in column direction as a function of the row position for DUT %d ' % (actual_dut),
+                                                           title='Residual distribution in column direction as a function of the row position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_row_residual_col_hist.dtype),
                                                            shape=hist_row_residual_col_hist.shape,
                                                            filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
