@@ -962,7 +962,7 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     output_fig.savefig(fig)
 
 
-def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density_with_hit, efficiency, charge_array, dut_name, minimum_track_density, plot_range, n_pixels, charge_bins, dut_mask, cut_distance, output_fig, mask_zero=True, aspect="auto"):
+def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density_with_hit, efficiency, charge_array, dut_name, plot_range, n_pixels, charge_bins, dut_mask, output_fig, mask_zero=True, aspect="auto"):
     # get number of entries for every histogram
 #     n_hits_distance_min_array = distance_min_array.count()
 #     z_max_distance_min_array = np.ma.max(distance_min_array[distance_min_array.nonzero()])
@@ -1095,65 +1095,3 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
 def plot_2d_pixel_hist_with_masked_pixels(fig, ax, hist2d, extend, title, x_axis_title, y_axis_title, z_min, z_max, masked_positions, aspect="auto"):
     ax.plot(masked_positions[1], masked_positions[0], 'ro', mfc='none', mec='r', ms=10)
     plot_2d_pixel_hist(fig, ax, hist2d, extend, title=title, x_axis_title=x_axis_title, y_axis_title=y_axis_title, z_min=z_min, z_max=z_max, aspect=aspect)
-
-
-# **************** old part
-
-# def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
-#     # get number of entries for every histogram
-#     n_hits_hit_hist = np.count_nonzero(hit_hist)
-#     n_tracks_track_density = np.count_nonzero(track_density)
-#     n_tracks_track_density_with_DUT_hit = np.count_nonzero(track_density_with_DUT_hit)
-#     n_hits_efficiency = np.count_nonzero(efficiency)
-#  
-#     # for better readability allow masking of entries that are zero
-#     if mask_zero:
-#         hit_hist = np.ma.array(hit_hist, mask=(hit_hist == 0))
-#         track_density = np.ma.array(track_density, mask=(track_density == 0))
-#         track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
-#  
-#     extent = np.array(plot_range).flatten()
-#  
-#     fig = Figure()
-#     fig.patch.set_facecolor('white')
-#     ax = fig.add_subplot(111)
-#     plot_2d_pixel_hist(fig, ax, hit_hist.T, extent=extent, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
-#     fig.tight_layout()
-#     output_fig.savefig(fig)
-#  
-#     fig = Figure()
-#     fig.patch.set_facecolor('white')
-#     ax = fig.add_subplot(111)
-#     plot_2d_pixel_hist(fig, ax, track_density.T, extent=extent, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
-#     fig.tight_layout()
-#     output_fig.savefig(fig)
-#  
-#     fig = Figure()
-#     fig.patch.set_facecolor('white')
-#     ax = fig.add_subplot(111)
-#     plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, extent=extent, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
-#     fig.tight_layout()
-#     output_fig.savefig(fig)
-#  
-#     if np.any(~efficiency.mask):
-#         fig = Figure()
-#         fig.patch.set_facecolor('white')
-#         ax = fig.add_subplot(111)
-#         z_min = np.ma.min(efficiency)
-#         if z_min == 100.:  # One cannot plot with 0 z axis range
-#             z_min = 90.
-#         plot_2d_pixel_hist(fig, ax, efficiency.T, extent=extent, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
-#         fig.tight_layout()
-#         output_fig.savefig(fig)
-#  
-#         plt.clf()
-#         plt.grid()
-#         plt.title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
-#         plt.xlabel('Efficiency [%]')
-#         plt.ylabel('#')
-#         plt.yscale('log')
-#         plt.xlim([-0.5, 101.5])
-#         plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
-#         output_fig.savefig()
-#     else:
-#         logging.warning('Cannot create efficiency plots, since all pixels are masked')
