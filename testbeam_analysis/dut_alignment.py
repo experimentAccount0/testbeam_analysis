@@ -1003,6 +1003,7 @@ def calculate_translation_alignment(track_candidates_file, alignment_file, n_pix
             # Step 4: Deduce rotations from the residuals
             logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', (iteration + alignment_index))
             alignment_parameters_changed, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % (iteration + alignment_index),
+                                                                              alignment_file=alignment_file,
                                                                               output_fig=output_pdf,
                                                                               use_duts=use_duts,  # fit all duts currently beeing investigated
                                                                               pixel_size=pixel_size,
@@ -1079,14 +1080,19 @@ def _create_alignment_array(n_duts):
     return array
 
 
-def _analyze_residuals(residuals_file_h5, output_fig, use_duts, pixel_size, n_duts, translation_only=False, relaxation_factor=1.0, plot_title_prefix=''):
+def _analyze_residuals(residuals_file_h5, alignment_file, output_fig, use_duts, pixel_size, n_duts, translation_only=False, relaxation_factor=1.0, plot_title_prefix=''):
     ''' Take the residual plots and deduce rotation and translation angles from them '''
+    with tb.open_file(alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        alignment = in_file_h5.root.Alignment[:]
+
     alignment_parameters = _create_alignment_array(n_duts)
 
     total_residual = 0  # Sum of all residuals to judge the overall alignment
 
     with tb.open_file(residuals_file_h5) as in_file_h5:
         for dut_index in use_duts:
+            mirror_x_or_y = np.sign(np.cos(alignment[dut_index]["alpha"]) * np.cos(alignment[dut_index]["beta"]))
+
             alignment_parameters[dut_index]['DUT'] = dut_index
             # Global residuals
             hist_node = in_file_h5.get_node('/ResidualsX_DUT%d' % dut_index)
@@ -1133,7 +1139,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, use_duts, pixel_size, n_du
             m_xy = in_file_h5.get_node_attr('/XResidualsY_DUT%d' % dut_index, 'fit_coeff')[1]
             m_yx = in_file_h5.get_node_attr('/YResidualsX_DUT%d' % dut_index, 'fit_coeff')[1]
 
-            alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx=m_xx, m_xy=m_xy, m_yx=m_yx, m_yy=m_yy)
+            alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx=m_xx, m_xy=m_xy, m_yx=m_yx, m_yy=m_yy, mirror_x_or_y=mirror_x_or_y)
 
             alignment_parameters[dut_index]['correlation_x'] = std_x
             alignment_parameters[dut_index]['translation_x'] = -mu_x
