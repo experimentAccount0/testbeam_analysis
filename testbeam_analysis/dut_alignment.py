@@ -662,38 +662,22 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
 #         selection = np.logical_and(hits_chunk['x_dut_%d' % dut_index] >= 0.5, hits_chunk['x_dut_%d' % dut_index] < n_pixels[dut_index][0] + 0.5)
         # TODO: unse nan for virtual hits
 #         selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change virtual hits
-# 
-#         if use_prealignment: # Apply transformation from pre-alignment information
-#             hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
-#                                                                                                                                                  hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
-#                                                                                                                                                  hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
-#                                                                                                                                                  dut_index=dut_index,
-#                                                                                                                                                  prealignment=alignment,
-#                                                                                                                                                  inverse=inverse)
-#         else:  # Apply transformation from fine alignment information
-#             hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
-#                                                                                                                                                  hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
-#                                                                                                                                                  hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
-#                                                                                                                                                  dut_index=dut_index,
-#                                                                                                                                                  alignment=alignment,
-#                                                                                                                                                  inverse=inverse)
-#         if not no_z:
-#             hits_chunk['z_dut_%d' % dut_index][selection] = hit_z
-
         if use_prealignment: # Apply transformation from pre-alignment information
-            hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index],
-                                                                                                                                                 hits_y=hits_chunk['y_dut_%d' % dut_index],
-                                                                                                                                                 hits_z=hits_chunk['z_dut_%d' % dut_index],
-                                                                                                                                                 dut_index=dut_index,
-                                                                                                                                                 prealignment=alignment,
-                                                                                                                                                 inverse=inverse)
+            hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
+                hits_x=hits_chunk['x_dut_%d' % dut_index],
+                hits_y=hits_chunk['y_dut_%d' % dut_index],
+                hits_z=hits_chunk['z_dut_%d' % dut_index],
+                dut_index=dut_index,
+                prealignment=alignment,
+                inverse=inverse)
         else:  # Apply transformation from fine alignment information
-            hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index],
-                                                                                                                                                 hits_y=hits_chunk['y_dut_%d' % dut_index],
-                                                                                                                                                 hits_z=hits_chunk['z_dut_%d' % dut_index],
-                                                                                                                                                 dut_index=dut_index,
-                                                                                                                                                 alignment=alignment,
-                                                                                                                                                 inverse=inverse)
+            hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
+                hits_x=hits_chunk['x_dut_%d' % dut_index],
+                hits_y=hits_chunk['y_dut_%d' % dut_index],
+                hits_z=hits_chunk['z_dut_%d' % dut_index],
+                dut_index=dut_index,
+                alignment=alignment,
+                inverse=inverse)
         if not no_z:
             hits_chunk['z_dut_%d' % dut_index] = hit_z
 
