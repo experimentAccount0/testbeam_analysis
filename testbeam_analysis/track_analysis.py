@@ -462,13 +462,13 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                                          n_track_cut,
                                          n_merged_cut,
                                          n_tracks_cut,
-                                         (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
+                                         (1.0 - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.0)
                         else:
                             logging.info('Removed %d tracks candidates (%d tracks due to quality, %d tracks due to merged cluster), %.1f%% ',
                                          good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
                                          n_track_cut,
                                          n_merged_cut,
-                                         (1. - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.)
+                                         (1.0 - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.0)
 
                         if use_correlated:  # Reduce track selection to correlated DUTs only
                             good_track_selection &= (track_candidates_chunk['track_quality'] & (dut_selection << 24) == (dut_selection << 24))
