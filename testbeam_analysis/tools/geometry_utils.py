@@ -485,7 +485,7 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative', se
 
     for dut in select_duts:
         for parameter in parameters:
-            if mode == 'absolute' or parameter in ["alpha", "beta"]:
+            if mode == 'absolute':
                 alignment_parameters[dut][parameter] = new_alignment[dut][parameter]
             elif mode == 'relative':
                 alignment_parameters[dut][parameter] += new_alignment[dut][parameter]
