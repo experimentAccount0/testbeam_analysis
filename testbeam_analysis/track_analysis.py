@@ -523,9 +523,9 @@ def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_tra
     #if row != 0:  # row = 0 is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
+        if column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # High quality track hits
             actual_track['track_quality'] |= (65793 << dut_index)
-        elif column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # Low quality track hits
+        elif column_distance < 10 * actual_column_sigma and row_distance < 10 * actual_row_sigma:  # Low quality track hits
             actual_track['track_quality'] |= (257 << dut_index)
     else:
         actual_track['track_quality'] &= (~(65793 << dut_index))  # Unset track quality
@@ -548,9 +548,9 @@ def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_inde
     #if row != 0:  # row = 0 is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
+        if column_distance < 5 * actual_column_sigma and row_distance < 5 * actual_row_sigma:  # High quality track hits
             actual_track['track_quality'] |= (65793 << dut_index)
-        elif column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # Low quality track hits
+        elif column_distance < 10 * actual_column_sigma and row_distance < 10 * actual_row_sigma:  # Low quality track hits
             actual_track['track_quality'] |= (257 << dut_index)
 
 
