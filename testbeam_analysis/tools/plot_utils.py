@@ -768,7 +768,7 @@ def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=
         plt.show()
 
 
-def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, output_fig=None, fit=None, cov=None):  # Plot the residuals as a function of the position
+def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_mean_err=None, res_pos=None, selection=None, title=None, output_fig=None, fit=None, cov=None, fit_limit=None):  # Plot the residuals as a function of the position
     plt.clf()
     plt.grid()
     if title:
@@ -781,10 +781,14 @@ def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=No
             selection = np.full_like(res_pos, True, dtype=np.bool)
         plt.plot(res_pos[selection], res_mean[selection], linestyle='', color="blue", marker='o',  label='Mean residual')
         plt.plot(res_pos[~selection], res_mean[~selection], linestyle='', color="darkblue", marker='o')
+#         plt.errorbar(res_pos[selection], res_mean, yerr=res_mean_err, linestyle='', color="blue", marker='o',  label='Mean residual')
     if fit is not None:
         axis = plt.gca()
         x_lim = np.array(axis.get_xlim(), dtype=np.float)
         plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.linear(x_lim, *fit), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0], fit[1]))
+    if fit_limit is not None:
+        plt.axvline(x=fit_limit[0], linewidth=2, color='r')
+        plt.axvline(x=fit_limit[1], linewidth=2, color='r')
     plt.xlim([xedges[0], xedges[-1]])
     plt.ylim([yedges[0], yedges[-1]])
     plt.legend(loc=0)

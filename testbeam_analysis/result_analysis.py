@@ -17,7 +17,7 @@ from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, output_pdf=True, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=False, output_pdf=True, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
     Parameters
     ----------
@@ -61,6 +61,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
         prealignment = in_file_h5.root.PreAlignment[:]
+        try:
+            fit_limits = in_file_h5.root.PreAlignment.attrs.fit_limits
+        except AttributeError:
+            # TODO: use propre exception
+            logging.warning("Cannot find fit_limits attribute, set use_fit_limits to False")
+            use_fit_limits = False
         n_duts = prealignment.shape[0]
         if not use_prealignment:
             try:
@@ -97,6 +103,35 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     continue
                 logging.debug('Calculate residuals for DUT %d', actual_dut)
 
+                if use_fit_limits:
+                    fit_limit_x_local, fit_limit_y_local = fit_limits[actual_dut][0], fit_limits[actual_dut][1]
+                    if use_prealignment:
+                        fit_limit_x, fit_limit_y, _ = geometry_utils.apply_alignment(
+                            fit_limit_x_local,
+                            fit_limit_y_local,
+                            [0.0, 0.0],
+                            dut_index=actual_dut,
+                            prealignment=prealignment,
+                            inverse=False)
+                    else:  # Apply transformation from fine alignment information
+                        fit_limit_x, fit_limit_y, _ = geometry_utils.apply_alignment(
+                            fit_limit_x_local,
+                            fit_limit_y_local,
+                            [0.0, 0.0],
+                            dut_index=actual_dut,
+                            alignment=alignment,
+                            inverse=False)
+                else:
+                    fit_limit_x_local = None
+                    fit_limit_y_local = None
+                    fit_limit_x = None
+                    fit_limit_y = None
+
+                print "fit_limit_x_local", fit_limit_x_local
+                print "fit_limit_y_local", fit_limit_y_local
+                print "fit_limit_x", fit_limit_x
+                print "fit_limit_y", fit_limit_y
+
                 initialize = True  # initialize the histograms
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
 
@@ -132,6 +167,97 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     if not np.allclose(hit_z_local, 0.0) or not np.allclose(intersection_z_local, 0.0):
                         logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
+
+                    limit_x_selection = np.ones_like(hit_x_local, dtype=np.bool)
+                    if fit_limit_x_local is not None and np.isfinite(fit_limit_x_local.min()):
+                        limit_x_selection &= hit_x_local >= fit_limit_x_local.min()
+                    if fit_limit_x_local is not None and np.isfinite(fit_limit_x_local.max()):
+                        limit_x_selection &= hit_x_local <= fit_limit_x_local.max()
+                    if fit_limit_x is not None and np.isfinite(fit_limit_x.min()):
+                        limit_x_selection &= hit_x >= fit_limit_x.min()
+                    if fit_limit_x is not None and np.isfinite(fit_limit_x.max()):
+                        limit_x_selection &= hit_x <= fit_limit_x.max()
+
+                    limit_y_selection = np.ones_like(hit_x_local, dtype=np.bool)
+                    if fit_limit_y_local is not None and np.isfinite(fit_limit_y_local.min()):
+                        limit_y_selection &= hit_y_local >= fit_limit_y_local.min()
+                    if fit_limit_y_local is not None and np.isfinite(fit_limit_y_local.max()):
+                        limit_y_selection &= hit_y_local <= fit_limit_y_local.max()
+                    if fit_limit_y is not None and np.isfinite(fit_limit_y.min()):
+                        limit_y_selection &= hit_y >= fit_limit_y.min()
+                    if fit_limit_y is not None and np.isfinite(fit_limit_y.max()):
+                        limit_y_selection &= hit_y <= fit_limit_y.max()
+
+                    limit_xy_selection = np.ones_like(hit_x_local, dtype=np.bool)
+                    if fit_limit_x_local is not None and np.isfinite(fit_limit_x_local.min()):
+                        limit_xy_selection &= hit_x_local >= fit_limit_x_local.min()
+                    if fit_limit_x_local is not None and np.isfinite(fit_limit_x_local.max()):
+                        limit_xy_selection &= hit_x_local <= fit_limit_x_local.max()
+                    if fit_limit_x is not None and np.isfinite(fit_limit_x.min()):
+                        limit_xy_selection &= hit_x >= fit_limit_x.min()
+                    if fit_limit_x is not None and np.isfinite(fit_limit_x.max()):
+                        limit_xy_selection &= hit_x <= fit_limit_x.max()
+                    if fit_limit_y_local is not None and np.isfinite(fit_limit_y_local.min()):
+                        limit_xy_selection &= hit_y_local >= fit_limit_y_local.min()
+                    if fit_limit_y_local is not None and np.isfinite(fit_limit_y_local.max()):
+                        limit_xy_selection &= hit_y_local <= fit_limit_y_local.max()
+                    if fit_limit_y is not None and np.isfinite(fit_limit_y.min()):
+                        limit_xy_selection &= hit_y >= fit_limit_y.min()
+                    if fit_limit_y is not None and np.isfinite(fit_limit_y.max()):
+                        limit_xy_selection &= hit_y <= fit_limit_y.max()
+
+                    print "remaning hits", np.count_nonzero(selection), "of", selection.shape[0]
+                    assert np.count_nonzero(selection) != 0
+                    #print "limit x local", fit_limit_x_local
+                    #print "hit x local", hit_x_local
+
+                    hit_x_local_limit_x = hit_x_local[limit_x_selection]
+                    hit_y_local_limit_x = hit_y_local[limit_x_selection]
+                    hit_z_local_limit_x = hit_z_local[limit_x_selection]
+                    intersection_x_local_limit_x = intersection_x_local[limit_x_selection]
+                    intersection_y_local_limit_x = intersection_y_local[limit_x_selection]
+                    intersection_z_local_limit_x = intersection_z_local[limit_x_selection]
+                    hit_x_limit_x = hit_x[limit_x_selection]
+                    hit_y_limit_x = hit_y[limit_x_selection]
+                    hit_z_limit_x = hit_z[limit_x_selection]
+                    intersection_x_limit_x = intersection_x[limit_x_selection]
+                    intersection_y_limit_x = intersection_y[limit_x_selection]
+                    intersection_z_limit_x = intersection_z[limit_x_selection]
+
+                    hit_x_local_limit_y = hit_x_local[limit_y_selection]
+                    hit_y_local_limit_y = hit_y_local[limit_y_selection]
+                    hit_z_local_limit_y = hit_z_local[limit_y_selection]
+                    intersection_x_local_limit_y = intersection_x_local[limit_y_selection]
+                    intersection_y_local_limit_y = intersection_y_local[limit_y_selection]
+                    intersection_z_local_limit_y = intersection_z_local[limit_y_selection]
+                    hit_x_limit_y = hit_x[limit_y_selection]
+                    hit_y_limit_y = hit_y[limit_y_selection]
+                    hit_z_limit_y = hit_z[limit_y_selection]
+                    intersection_x_limit_y = intersection_x[limit_y_selection]
+                    intersection_y_limit_y = intersection_y[limit_y_selection]
+                    intersection_z_limit_y = intersection_z[limit_y_selection]
+
+                    hit_x_local_limit_xy = hit_x_local[limit_xy_selection]
+                    hit_y_local_limit_xy = hit_y_local[limit_xy_selection]
+                    hit_z_local_limit_xy = hit_z_local[limit_xy_selection]
+                    intersection_x_local_limit_xy = intersection_x_local[limit_xy_selection]
+                    intersection_y_local_limit_xy = intersection_y_local[limit_xy_selection]
+                    intersection_z_local_limit_xy = intersection_z_local[limit_xy_selection]
+                    hit_x_limit_xy = hit_x[limit_xy_selection]
+                    hit_y_limit_xy = hit_y[limit_xy_selection]
+                    hit_z_limit_xy = hit_z[limit_xy_selection]
+                    intersection_x_limit_xy = intersection_x[limit_xy_selection]
+                    intersection_y_limit_xy = intersection_y[limit_xy_selection]
+                    intersection_z_limit_xy = intersection_z[limit_xy_selection]
+
+                    difference_limit_x = np.column_stack((hit_x_limit_x, hit_y_limit_x, hit_z_limit_x)) - np.column_stack((intersection_x_limit_x, intersection_y_limit_x, intersection_z_limit_x))
+                    difference_local_limit_x = np.column_stack((hit_x_local_limit_x, hit_y_local_limit_x, hit_z_local_limit_x)) - np.column_stack((intersection_x_local_limit_x, intersection_y_local_limit_x, intersection_z_local_limit_x))
+
+                    difference_limit_y = np.column_stack((hit_x_limit_y, hit_y_limit_y, hit_z_limit_y)) - np.column_stack((intersection_x_limit_y, intersection_y_limit_y, intersection_z_limit_y))
+                    difference_local_limit_y = np.column_stack((hit_x_local_limit_y, hit_y_local_limit_y, hit_z_local_limit_y)) - np.column_stack((intersection_x_local_limit_y, intersection_y_local_limit_y, intersection_z_local_limit_y))
+
+                    difference_limit_xy = np.column_stack((hit_x_limit_xy, hit_y_limit_xy, hit_z_limit_xy)) - np.column_stack((intersection_x_limit_xy, intersection_y_limit_xy, intersection_z_limit_xy))
+                    difference_local_limit_xy = np.column_stack((hit_x_local_limit_xy, hit_y_local_limit_xy, hit_z_local_limit_xy)) - np.column_stack((intersection_x_local_limit_xy, intersection_y_local_limit_xy, intersection_z_local_limit_xy))
 
                     difference = np.column_stack((hit_x, hit_y, hit_z)) - np.column_stack((intersection_x, intersection_y, intersection_z))
                     difference_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local)) - np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
@@ -205,7 +331,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             nbins = "auto"
                             width = pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_x / pixel_size[actual_dut][0])
                             x_range = (center_x - width, center_x + width)
-                        hist_residual_x_hist, hist_residual_x_xedges = np.histogram(difference[:, 0], range=x_range, bins=nbins)
+                        hist_residual_x_hist, hist_residual_x_xedges = np.histogram(difference_limit_xy[:, 0], range=x_range, bins=nbins)
 
                         if npixels_per_bin is not None:
                             min_intersection, max_intersection = np.min(intersection_x), np.max(intersection_x)
@@ -224,7 +350,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             nbins = "auto"
                             width = pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_y / pixel_size[actual_dut][1])
                             y_range = (center_y - width, center_y + width)
-                        hist_residual_y_hist, hist_residual_y_yedges = np.histogram(difference[:, 1], range=y_range, bins=nbins)
+                        hist_residual_y_hist, hist_residual_y_yedges = np.histogram(difference_limit_xy[:, 1], range=y_range, bins=nbins)
 
                         if npixels_per_bin is not None:
                             min_intersection, max_intersection = np.min(intersection_y), np.max(intersection_y)
@@ -243,7 +369,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             nbins = "auto"
                             width = pixel_size[actual_dut][0] * np.ceil(plot_npixels * fwhm_col / pixel_size[actual_dut][0])
                             col_range = (center_col - width, center_col + width)
-                        hist_residual_col_hist, hist_residual_col_xedges = np.histogram(difference_local[:, 0], range=col_range, bins=nbins)
+                        hist_residual_col_hist, hist_residual_col_xedges = np.histogram(difference_local_limit_xy[:, 0], range=col_range, bins=nbins)
 
                         if npixels_per_bin is not None:
                             min_intersection, max_intersection = np.min(intersection_x_local), np.max(intersection_x_local)
@@ -262,7 +388,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                             nbins = "auto"
                             width = pixel_size[actual_dut][1] * np.ceil(plot_npixels * fwhm_row / pixel_size[actual_dut][1])
                             row_range = (center_row - width, center_row + width)
-                        hist_residual_row_hist, hist_residual_row_yedges = np.histogram(difference_local[:, 1], range=row_range, bins=nbins)
+                        hist_residual_row_hist, hist_residual_row_yedges = np.histogram(difference_local_limit_xy[:, 1], range=row_range, bins=nbins)
 
                         if npixels_per_bin is not None:
                             min_intersection, max_intersection = np.min(intersection_y_local), np.max(intersection_y_local)
@@ -285,14 +411,14 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         # global y residual against x position
                         hist_x_residual_y_hist, hist_x_residual_y_xedges, hist_x_residual_y_yedges = np.histogram2d(
-                            intersection_x,
-                            difference[:, 1],
+                            intersection_x_limit_y,
+                            difference_limit_y[:, 1],
                             bins=(hist_residual_x_yedges, hist_residual_y_yedges))
 
                         # global x residual against y position
                         hist_y_residual_x_hist, hist_y_residual_x_xedges, hist_y_residual_x_yedges = np.histogram2d(
-                            intersection_y,
-                            difference[:, 0],
+                            intersection_y_limit_x,
+                            difference_limit_x[:, 0],
                             bins=(hist_residual_y_xedges, hist_residual_x_xedges))
 
                         # local column residual against column position
@@ -309,21 +435,21 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         # local row residual against column position
                         hist_col_residual_row_hist, hist_col_residual_row_xedges, hist_col_residual_row_yedges = np.histogram2d(
-                            intersection_x_local,
-                            difference_local[:, 1],
+                            intersection_x_local_limit_y,
+                            difference_local_limit_y[:, 1],
                             bins=(hist_residual_col_yedges, hist_residual_row_yedges))
 
                         # local column residual against row position
                         hist_row_residual_col_hist, hist_row_residual_col_xedges, hist_row_residual_col_yedges = np.histogram2d(
-                            intersection_y_local,
-                            difference_local[:, 0],
+                            intersection_y_local_limit_x,
+                            difference_local_limit_x[:, 0],
                             bins=(hist_residual_row_xedges, hist_residual_col_xedges))
 
                     else:  # adding data to existing histograms
-                        hist_residual_x_hist += np.histogram(difference[:, 0], bins=hist_residual_x_xedges)[0]
-                        hist_residual_y_hist += np.histogram(difference[:, 1], bins=hist_residual_y_yedges)[0]
-                        hist_residual_col_hist += np.histogram(difference_local[:, 0], bins=hist_residual_col_xedges)[0]
-                        hist_residual_row_hist += np.histogram(difference_local[:, 1], bins=hist_residual_row_yedges)[0]
+                        hist_residual_x_hist += np.histogram(difference_limit_xy[:, 0], bins=hist_residual_x_xedges)[0]
+                        hist_residual_y_hist += np.histogram(difference_limit_xy[:, 1], bins=hist_residual_y_yedges)[0]
+                        hist_residual_col_hist += np.histogram(difference_local_limit_xy[:, 0], bins=hist_residual_col_xedges)[0]
+                        hist_residual_row_hist += np.histogram(difference_local_limit_xy[:, 1], bins=hist_residual_row_yedges)[0]
 
                         # global x residual against x position
                         hist_x_residual_x_hist += np.histogram2d(
@@ -339,14 +465,14 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         # global y residual against x position
                         hist_x_residual_y_hist += np.histogram2d(
-                            intersection_x,
-                            difference[:, 1],
+                            intersection_x_limit_y,
+                            difference_limit_y[:, 1],
                             bins=(hist_x_residual_y_xedges, hist_x_residual_y_yedges))[0]
 
                         # global x residual against y position
                         hist_y_residual_x_hist += np.histogram2d(
-                            intersection_y,
-                            difference[:, 0],
+                            intersection_y_limit_x,
+                            difference_limit_x[:, 0],
                             bins=(hist_y_residual_x_xedges, hist_y_residual_x_yedges))[0]
 
                         # local column residual against column position
@@ -363,14 +489,14 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
                         # local row residual against column position
                         hist_col_residual_row_hist += np.histogram2d(
-                            intersection_x_local,
-                            difference_local[:, 1],
+                            intersection_x_local_limit_y,
+                            difference_local_limit_y[:, 1],
                             bins=(hist_col_residual_row_xedges, hist_col_residual_row_yedges))[0]
 
                         # local column residual against row position
                         hist_row_residual_col_hist += np.histogram2d(
-                            intersection_y_local,
-                            difference_local[:, 0],
+                            intersection_y_local_limit_x,
+                            difference_local_limit_x[:, 0],
                             bins=(hist_row_residual_col_xedges, hist_row_residual_col_yedges))[0]
 
                 logging.debug('Storing residual histograms...')
@@ -420,7 +546,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='X position [um]',
                     ylabel='X residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_x
                 )
                 
                 out_x_res_x = out_file_h5.createCArray(out_file_h5.root,
@@ -442,7 +569,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='Y position [um]',
                     ylabel='Y residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_y
                 )
                 out_y_res_y = out_file_h5.createCArray(out_file_h5.root,
                                                        name='YResidualsY_DUT%d' % (actual_dut),
@@ -463,7 +591,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='X position [um]',
                     ylabel='Y residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_x
                 )
                 out_x_res_y = out_file_h5.createCArray(out_file_h5.root,
                                                        name='XResidualsY_DUT%d' % (actual_dut),
@@ -484,7 +613,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='Y position [um]',
                     ylabel='X residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_y
                 )
                 out_y_res_x = out_file_h5.createCArray(out_file_h5.root,
                                                        name='YResidualsX_DUT%d' % (actual_dut),
@@ -542,7 +672,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='Column position [um]',
                     ylabel='Column residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_x_local
                 )
                 out_col_res_col = out_file_h5.createCArray(out_file_h5.root,
                                                            name='ColResidualsCol_DUT%d' % (actual_dut),
@@ -563,7 +694,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='Row position [um]',
                     ylabel='Row residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_y_local
                 )
                 out_row_res_row = out_file_h5.createCArray(out_file_h5.root,
                                                            name='RowResidualsRow_DUT%d' % (actual_dut),
@@ -584,7 +716,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='Column position [um]',
                     ylabel='Row residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_x_local
                 )
                 out_col_res_row = out_file_h5.createCArray(out_file_h5.root,
                                                            name='ColResidualsRow_DUT%d' % (actual_dut),
@@ -605,7 +738,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     xlabel='Row position [um]',
                     ylabel='Column residual [um]',
                     title='Residuals for %s' % (dut_name),
-                    output_fig=output_fig
+                    output_fig=output_fig,
+                    fit_limit=fit_limit_y_local
                 )
                 out_row_res_col = out_file_h5.createCArray(out_file_h5.root,
                                                            name='RowResidualsCol_DUT%d' % (actual_dut),

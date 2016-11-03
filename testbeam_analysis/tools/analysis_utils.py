@@ -655,25 +655,27 @@ def simple_peak_detect(x, y):
     return max_position, center, fwhm_value, fwhm_left_right
 
 
-def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, mirror_x_or_y=1.0):
+def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, mirror_x=1.0, mirror_y=1.0):
     # Deduce from reidual correlations the rotation matrix
     # gamma (rotation around z)
     # TODO: adding some weighting factor based on fit error, sometimes the factors have different signs, why?
     factor_xy = 1.0
     #gamma = factor_xy * np.arctan2(m_xy, 1 - m_xx)
     gamma = factor_xy * np.arctan(m_xy)
+    print "gamma xy", factor_xy * np.arctan(m_xy)
     factor_yx = 1.0
     #gamma -= factor_yx * np.arctan2(m_yx, 1 - m_yy)
-    gamma -= factor_yx * np.arctan(m_yx)
+    gamma = factor_yx * np.arctan(m_yx)
+    print "gamma yx", factor_yx * np.arctan(m_yx)
     # TODO: deduce gamma sign from slope signs
-    gamma /= mirror_x_or_y * (factor_xy + factor_yx)
+    gamma /= mirror_x * mirror_y * (factor_xy + factor_yx)
     #gamma /= np.sign(m_xx) * np.sign(m_yy) * np.sign(m_xy) * np.sign(m_yx) * (factor_xy + factor_yx)
     #assert np.sign(-np.arctan2(m_yx, 1 - m_yy)) == np.sign(np.arctan2(m_xy, 1 - m_xx))
 
     # cos(gamma) = 1 - m_xx / cos(gamma) = (1 - m_xx) * sqrt(m_xy**2 / (1 - m_xx**2) + 1.) ?
     cosbeta = (1 - m_xx) * np.sqrt(np.square(m_xy) / np.square(1 - m_xx) + 1.)
 
-    # TODO: Why is this needed? Most likely stability reasons
+    # Arccos limited to [-1:1]
     if np.abs(cosbeta) > 1:
         cosbeta = 1 - (cosbeta - 1)
     beta = np.arccos(cosbeta)
@@ -681,29 +683,12 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, mirror_x_or_y=1.0):
     # cos(alpha) = - myy - tan(gamma) * myx + 1 / (cos(gamma) + sin(gamma) * tan(gamma)) = - myy - m_xy / (1 - m_xx) * myx + 1 / (cos(gamma) + sin(gamma) * tan(gamma)) ?
     cosalpha = (-m_yy - m_xy / (1 - m_xx) * m_yx + 1) / (np.cos(gamma) + np.sin(gamma) * np.tan(gamma))
 
-    # TODO: Why is this needed? Most likely stability reasons
+    # Arccos limited to [-1:1]
     if np.abs(cosalpha) > 1:
         cosalpha = 1 - (cosalpha - 1)
     alpha = np.arccos(cosalpha)
 
     return alpha, beta, gamma
-
-
-def fit_residuals(positions, residuals, n_bins):
-    ''' Takes unhistogrammed residuals as a function of the position, histograms and fits these with errors'''
-    # calculating the data points
-    hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
-    # selecting data points to be included into fit
-    hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins)
-    n_hits_threshold = np.percentile(hist_position_residual_count[0], 100 - 68.3)  # Simple threshold, take bins with 1 sigma of the data
-    selection = np.logical_and(hist_position_residual_count[0] >= n_hits_threshold, np.isfinite(hist_position_residual[0]))
-    position_residual_fit_x = hist_position_residual[1][:-1][selection]
-    position_residual_fit_y = hist_position_residual[0][selection]
-    position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
-
-    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(linear, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
-
-    return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
 
 
 def fit_residuals(hist, edges, label="", title="", output_fig=None):
@@ -729,15 +714,62 @@ def fit_residuals(hist, edges, label="", title="", output_fig=None):
     return fit, cov
 
 
-def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_fig=None):
+def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", fit_limit=None, output_fig=None):
     xcenter = (xedges[1:] + xedges[:-1]) / 2.0
     ycenter = (yedges[1:] + yedges[:-1]) / 2.0
     y_sum = np.sum(hist, axis=1)
-    x_sel = (y_sum > 0.0) & np.isfinite(y_sum)
+    x_sel = np.logical_and(y_sum > 0.0, np.isfinite(y_sum))
     y_mean = np.full_like(y_sum, np.nan, dtype=np.float)
     y_mean[x_sel] = np.average(hist, axis=1, weights=ycenter)[x_sel] * np.sum(ycenter) / y_sum[x_sel]
-    n_hits_threshold = np.percentile(y_sum, 100-68)
-    x_sel = (y_sum > n_hits_threshold) & np.isfinite(y_sum)
+    # ************************************************
+    # uncomment to suse Gauss fit
+#     #print "before", y_mean[x_sel]
+#     mu_peak = ycenter[np.argmax(hist, axis=1)]
+#     A_peak = np.max(hist, axis=1)  # signal / correlation peak
+#     # Background of uncorrelated data
+#     for index, val in np.ndenumerate(x_sel):  # Loop over x dimension of correlation histogram
+#         if not val:
+#             continue
+#         #print index, val
+#         #print hist[index, :][0], ycenter, hist[index, :][0].shape, ycenter.shape
+#         p0_gauss = [A_peak[index], mu_peak[index], get_rms_from_histogram(hist[index, :][0].astype(np.int), ycenter)]  # A, mu, sigma
+#         #print p0_gauss
+#         try:
+#             coeff_gauss_offset, var_matrix = curve_fit(gauss, ycenter, hist[index, :][0], p0=p0_gauss)#, bounds=bounds_gauss_offset)
+#             y_mean[index] = coeff_gauss_offset[1]
+#         except RuntimeError:  # curve_fit failed
+#             y_mean[index] = np.nan
+#     #print "after", y_mean[x_sel]
+    # **********************************************
+    n_hits_threshold = np.percentile(y_sum[np.isfinite(y_mean)], 100-68)
+    if fit_limit is None or not np.all(np.isfinite(fit_limit)):
+        x_sel = np.logical_and(y_sum > n_hits_threshold, np.isfinite(y_mean))
+        #x_sel = np.isfinite(y_mean)
+        # generate a contigous area
+        x_sel_left = np.where(x_sel == True)[0][0]
+        x_sel_right = np.where(x_sel == True)[0][-1] + 1
+    else:
+        fit_limit_left = fit_limit.min()
+        fit_limit_right = fit_limit.max()
+        x_sel = np.isfinite(y_mean)
+        if fit_limit_left is not None and np.isfinite(fit_limit_left):
+            try:
+                x_sel_left = np.where(xcenter >= fit_limit_left)[0][0]
+            except IndexError:
+                x_sel_left = 0
+        else:
+            x_sel_left = 0
+        if fit_limit_right is not None and np.isfinite(fit_limit_right):
+            try:
+                x_sel_right = np.where(xcenter <= fit_limit_right)[0][-1]
+            except IndexError:
+                x_sel_right = x_sel.shape[0]
+        else:
+            x_sel_right = x_sel.shape[0]
+    range_sel = np.zeros_like(x_sel)
+    range_sel[x_sel_left:x_sel_right] = 1
+    x_sel = np.isfinite(y_mean)
+    x_sel = np.logical_and(x_sel, range_sel)
     y_rel_err = np.full_like(y_sum, np.nan, dtype=np.float)
     y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
     fit, cov = curve_fit(linear, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
@@ -750,12 +782,14 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
             xlabel=xlabel,
             ylabel=ylabel,
             res_mean=y_mean,
+            res_mean_err=y_rel_err,
             res_pos=xcenter,
             selection=x_sel,
             fit=fit,
             cov=cov,
             title=title,
-            output_fig=output_fig
+            output_fig=output_fig,
+            fit_limit=fit_limit
         )
 
     return fit, cov
