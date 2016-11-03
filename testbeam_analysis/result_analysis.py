@@ -10,6 +10,7 @@ import tables as tb
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
+from scipy.stats import binned_statistic_2d
 
 from testbeam_analysis.tools import plot_utils
 from testbeam_analysis.tools import geometry_utils
@@ -622,7 +623,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         output_fig.close()
 
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficiency_file, bin_size, pixel_size, n_pixels, dut_names=None, sensor_sizes=None, minimum_tracks_per_bin=0, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, max_distance=1000, charge_bins=None, dut_masks=None, col_range=None, row_range=None, show_inefficient_events=False, chunk_size=1000000):
+def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficiency_file, bin_size, pixel_size, n_pixels, dut_names=None, sensor_sizes=None, minimum_tracks_per_bin=0, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, max_distance=1000, charge_bins=None, dut_masks=None, col_range=None, row_range=None, efficiency_range=None, show_inefficient_events=False, chunk_size=1000000):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
     Parameters
     ----------
@@ -685,6 +686,9 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
     if not isinstance(dut_masks, Iterable):
         dut_masks = [dut_masks] * len(use_duts)
 
+    if not isinstance(efficiency_range, Iterable):
+        efficiency_range = [efficiency_range] * len(use_duts)
+
     output_pdf_file = os.path.splitext(output_efficiency_file)[0] + '.pdf'
 
     with PdfPages(output_pdf_file) as output_fig:
@@ -720,8 +724,9 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                     if sensor_size is None:
                         sensor_size = np.array(pixel_size[actual_dut]) * n_pixels[actual_dut]
                     print "sensor_size", sensor_size
-    
-                    sensor_range_corr = [[-0.5 * pixel_size[actual_dut][0] * n_pixels[actual_dut][0], 0.5 * pixel_size[actual_dut][0] * n_pixels[actual_dut][0]], [- 0.5 * pixel_size[actual_dut][1] * n_pixels[actual_dut][1], 0.5 * pixel_size[actual_dut][1] * n_pixels[actual_dut][1]]]
+
+                    extend_bins = 0
+                    sensor_range_corr = [[-0.5 * pixel_size[actual_dut][0] * n_pixels[actual_dut][0] - extend_bins * actual_bin_size_x, 0.5 * pixel_size[actual_dut][0] * n_pixels[actual_dut][0] + extend_bins * actual_bin_size_x], [- 0.5 * pixel_size[actual_dut][1] * n_pixels[actual_dut][1] - extend_bins * actual_bin_size_y, 0.5 * pixel_size[actual_dut][1] * n_pixels[actual_dut][1] + extend_bins * actual_bin_size_y]]
                     print "sensor_range_corr", sensor_range_corr
     
                     sensor_range_corr_with_distance = sensor_range_corr[:]
@@ -749,6 +754,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                     distance_array = None
                     hit_hist = None
                     charge_array = None
+                    average_charge_valid_hit = None
     
                     for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                         # Cut in Chi 2 of the track fit
@@ -835,7 +841,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                         hits_local_valid_hit = hits_local[selection]
                         charge_valid_hit = charge[selection]
     
-                        total_track_density_with_dut_hit_tmp = np.histogram2d(intersections_local_valid_hit[:, 0], intersections_local_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=sensor_range_corr)[0]
+                        total_track_density_with_dut_hit_tmp, xedges, yedges = np.histogram2d(intersections_local_valid_hit[:, 0], intersections_local_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=sensor_range_corr)
                         if total_track_density_with_dut_hit is None:
                             total_track_density_with_dut_hit = total_track_density_with_dut_hit_tmp
                         else:
@@ -856,6 +862,14 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                             hit_hist += hit_hist_tmp
     
                         if charge_bins[dut_index] is not None:
+                            average_charge_valid_hit_tmp, _, _, _ = binned_statistic_2d(intersections_local_valid_hit[:, 0], intersections_local_valid_hit[:, 1], charge_valid_hit[:], statistic="mean", bins=(n_bin_x, n_bin_y), range=sensor_range_corr)
+                            average_charge_valid_hit_tmp = np.nan_to_num(average_charge_valid_hit_tmp)
+                            if average_charge_valid_hit is None:
+                                average_charge_valid_hit = average_charge_valid_hit_tmp
+                            else:
+                                average_charge_valid_hit[total_track_density_with_dut_hit != 0] = (((average_charge_valid_hit * total_track_density_with_dut_hit_previous) + (average_charge_valid_hit_tmp * total_track_density_with_dut_hit_tmp)) / total_track_density_with_dut_hit)[total_track_density_with_dut_hit != 0]
+                            total_track_density_with_dut_hit_previous = total_track_density_with_dut_hit.copy()
+
                             intersection_charge_valid_hit = np.column_stack((intersections_local_valid_hit[:, 0], intersections_local_valid_hit[:, 1], charge_valid_hit[:]))
                             charge_array_tmp = np.histogramdd(intersection_charge_valid_hit, bins=(n_bin_x, n_bin_y, charge_bins[dut_index]), range=sensor_range_corr_with_charge)[0]
                             if charge_array is None:
@@ -867,6 +881,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                             logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
                             continue
     
+                    if charge_bins[dut_index] is not None:
+                        average_charge_valid_hit = np.ma.masked_where(total_track_density_with_dut_hit == 0, average_charge_valid_hit)
                     # efficiency
                     efficiency = np.full_like(total_track_density_with_dut_hit, fill_value=np.nan, dtype=np.float)
                     efficiency[total_track_density != 0] = total_track_density_with_dut_hit[total_track_density != 0].astype(np.float) / total_track_density[total_track_density != 0].astype(np.float) * 100.0
@@ -897,8 +913,13 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                         track_density_with_hit=total_track_density_with_dut_hit,
                         efficiency=efficiency,
                         charge_array=charge_array,
+                        average_charge=average_charge_valid_hit,
                         dut_name=dut_name,
                         plot_range=sensor_range_corr,
+                        efficiency_range=efficiency_range[dut_index],
+                        bin_size=bin_size[dut_index],
+                        xedges=xedges,
+                        yedges=yedges,
                         n_pixels=n_pixels[actual_dut],
                         charge_bins=charge_bins[dut_index],
                         dut_mask=dut_masks[dut_index],

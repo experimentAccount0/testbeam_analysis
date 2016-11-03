@@ -12,6 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import colors, cm
+from matplotlib.patches import Rectangle
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting although it is shown as not used
@@ -934,6 +935,7 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
+
 def plot_track_distances(distance_min_array, distance_max_array, distance_mean_array, actual_dut, plot_range, cut_distance, output_fig):
     # get number of entries for every histogram
     n_hits_distance_min_array = distance_min_array.count()
@@ -946,7 +948,7 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_fig.savefig(fig)
-    
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
@@ -962,7 +964,7 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     output_fig.savefig(fig)
 
 
-def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density_with_hit, efficiency, charge_array, dut_name, plot_range, n_pixels, charge_bins, dut_mask, output_fig, mask_zero=True, aspect="auto"):
+def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density_with_hit, efficiency, charge_array, average_charge, dut_name, plot_range, efficiency_range, bin_size, xedges, yedges, n_pixels, charge_bins, dut_mask, output_fig, mask_zero=True, aspect="auto"):
     # get number of entries for every histogram
 #     n_hits_distance_min_array = distance_min_array.count()
 #     z_max_distance_min_array = np.ma.max(distance_min_array[distance_min_array.nonzero()])
@@ -982,7 +984,6 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
         track_density_with_hit = np.ma.array(track_density_with_hit, mask=(track_density_with_hit == 0))
  
     extend = np.array(plot_range).flatten()
-    n_pixels_extend = [0.5, n_pixels[0] + 0.5, n_pixels[1] + 0.5, 0.5]
 #
 #     fig = Figure()
 #     fig.patch.set_facecolor('white')
@@ -1012,7 +1013,7 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
         mean_charge = testbeam_analysis.tools.analysis_utils.get_mean_from_histogram(charge_hist, range(charge_bins))
         ax.set_xlim(-0.5, charge_bins - 0.5)
         ax.bar(range(charge_bins), charge_hist, align='center')  # Histogram not masked pixel efficiency
-        
+
         text = '$\mathrm{Mean:\ } %.2f$' % (mean_charge)
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
         ax.text(0.85, 0.9, text, transform=ax.transAxes, fontsize=8, verticalalignment='top', bbox=props)
@@ -1024,31 +1025,38 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
         fig = Figure()
         fig.patch.set_facecolor('white')
         ax = fig.add_subplot(111)
-        plot_2d_pixel_hist(fig, ax, mean_charge_array.T, extend, title='Mean charge for %s (%d Hits)' % (dut_name, n_hits_distance_mean_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_mean_charge_array, aspect=aspect)
+        plot_2d_pixel_hist(fig, ax, mean_charge_array.T, extend, title='Histogram mean charge for %s (%d Hits)' % (dut_name, n_hits_distance_mean_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_mean_charge_array, aspect=aspect)
         fig.tight_layout()
         output_fig.savefig(fig)
- 
+
+        fig = Figure()
+        fig.patch.set_facecolor('white')
+        ax = fig.add_subplot(111)
+        plot_2d_pixel_hist(fig, ax, average_charge.T, extend, title='Mean charge for %s (%d Hits)' % (dut_name, n_hits_distance_mean_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_mean_charge_array, aspect=aspect)
+        fig.tight_layout()
+        output_fig.savefig(fig)
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_mean_array.T, extend, title='Mean distance for %s (%d Hits)' % (dut_name, n_hits_distance_mean_array), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0, z_max=z_max_distance_mean_array, aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
- 
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, hit_hist.T, extend, title='Density of hits for %s (%d Hits)' % (dut_name, n_hits_hit_hist), x_axis_title="Column [um]", y_axis_title="Row [um]", aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
- 
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density.T, extend, title='Density of tracks for %s (%d Tracks)' % (dut_name, n_tracks_track_density), x_axis_title="Column [um]", y_axis_title="Row [um]", aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
- 
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
@@ -1062,8 +1070,14 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
     plot_2d_pixel_hist(fig, ax, efficiency.T, extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0.0, z_max=100.0, aspect=aspect)
     fig.tight_layout()
     output_fig.savefig(fig)
- 
- 
+
+    fig = Figure()
+    fig.patch.set_facecolor('white')
+    ax = fig.add_subplot(111)
+    plot_2d_pixel_hist(fig, ax, efficiency.T, extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0.0, z_max=100.0, aspect=aspect)
+    fig.tight_layout()
+    output_fig.savefig(fig)
+
     if dut_mask is not None:
         masked_pixels_row, masked_pixels_col = np.where(dut_mask > 0)
         masked_positions = (masked_pixels_row + 1, masked_pixels_col + 1)
@@ -1071,17 +1085,16 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
         fig = Figure()
         fig.patch.set_facecolor('white')
         ax = fig.add_subplot(111)
-        plot_2d_pixel_hist_with_masked_pixels(fig, ax, hist2d=efficiency.T, extend=n_pixels_extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0.0, z_max=100.0, masked_positions=masked_positions, aspect=aspect)
+        plot_2d_pixel_hist_with_masked_pixels(fig, ax, hist2d=efficiency.T, extend=n_pixels_extend, title='Efficiency for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column", y_axis_title="Row", z_min=0.0, z_max=100.0, masked_positions=masked_positions, aspect=aspect)
         fig.tight_layout()
         output_fig.savefig(fig)
- 
- 
+
     fig = Figure()
     FigureCanvas(fig)
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     ax.grid()
-    ax.set_title('Efficiency per bin for %s: %.2f' % (dut_name, np.ma.mean(efficiency)))
+    ax.set_title('Efficiency per bin for %s: %.2f%%' % (dut_name, np.ma.mean(efficiency)))
     ax.set_xlabel('Efficiency [%]')
     ax.set_ylabel('#')
     ax.set_yscale('log')
@@ -1090,8 +1103,46 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
     output_fig.savefig(fig)
     if (efficiency > 100.0).any():
         raise Exception("Efficiency greater than 100%")
- 
- 
+
+    if efficiency_range is not None:
+        col_start, col_stop = efficiency_range[0]
+        row_start, row_stop = efficiency_range[1]
+        efficiency_selected = efficiency.copy()
+        efficiency_selected[:col_start, :] = np.ma.masked
+        efficiency_selected[col_stop:, :] = np.ma.masked
+        efficiency_selected[:, :row_start] = np.ma.masked
+        efficiency_selected[:, row_stop:] = np.ma.masked
+        fig = Figure()
+        fig.patch.set_facecolor('white')
+        ax = fig.add_subplot(111)
+        plot_2d_pixel_hist(fig, ax, efficiency.T, extend, title='Efficiency of selected area for %s (%d Entries)' % (dut_name, n_hits_efficiency), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0.0, z_max=100.0, aspect=aspect)
+        ax.add_patch(
+            Rectangle(
+                (xedges[col_start], -yedges[row_start]),
+                xedges[col_stop] - xedges[col_start],
+                -(xedges[row_stop] - xedges[row_start]),
+                fill=False      # remove background
+            )
+        )
+        fig.tight_layout()
+        output_fig.savefig(fig)
+
+        fig = Figure()
+        FigureCanvas(fig)
+        fig.patch.set_facecolor('white')
+        ax = fig.add_subplot(111)
+        ax.grid()
+        ax.set_title('Efficiency of selected area per bin for %s: %.2f%%' % (dut_name, np.ma.mean(efficiency_selected)))
+        ax.set_xlabel('Efficiency [%]')
+        ax.set_ylabel('#')
+        ax.set_yscale('log')
+        ax.set_xlim(0, 101)
+        ax.hist(efficiency_selected.compressed(), bins=101, range=(0, 101))  # Histogram not masked pixel efficiency
+        output_fig.savefig(fig)
+        if (efficiency > 100.0).any():
+            raise Exception("Efficiency of selected area greater than 100%")
+
+
 def plot_2d_pixel_hist_with_masked_pixels(fig, ax, hist2d, extend, title, x_axis_title, y_axis_title, z_min, z_max, masked_positions, aspect="auto"):
     ax.plot(masked_positions[1], masked_positions[0], 'ro', mfc='none', mec='r', ms=10)
     plot_2d_pixel_hist(fig, ax, hist2d, extend, title=title, x_axis_title=x_axis_title, y_axis_title=y_axis_title, z_min=z_min, z_max=z_max, aspect=aspect)
