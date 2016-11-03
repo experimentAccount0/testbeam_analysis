@@ -576,7 +576,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 im = plt.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
                 dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
                 ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
-                plt.title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", dut_name, ref_name))
+                plt.title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", ref_name, dut_name))
                 plt.xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
                 plt.ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
                 # do not append to axis to preserve aspect ratio
@@ -711,8 +711,9 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
 def plot_track_chi2(chi2s, fit_dut, output_fig):
     # Plot track chi2 and angular distribution
     plt.clf()
-    limit_x = np.percentile(chi2s, q=68.3)  # Plot up to 1 sigma of the chi2 range
-    plt.hist(chi2s, bins=200, range=(0, limit_x))
+    limit_x = int(np.percentile(chi2s, q=99.73))  # Plot up to 3 sigma of the chi2 range
+    plt.hist(chi2s, bins=100, range=(0, limit_x))
+    plt.xlim(0, limit_x)
     plt.grid()
     plt.xlabel('Track Chi2 [um*um]')
     plt.ylabel('#')
