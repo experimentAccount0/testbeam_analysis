@@ -452,7 +452,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
+def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, fit_limit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
     plt.clf()
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
@@ -463,9 +463,10 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     ax2.plot(x, chi2 / 1e5, 'r--', label="Chi$^2$")
     # plot masked data points, but they should not influence the ylimit
     y_limits = ax2.get_ylim()
-    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
-    plt.plot(x[~mask], mean_error_fitted[~mask] * 10.0, linestyle='', color="darkred", marker='o')
-    plt.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]), mean_error_fitted[~mask], linestyle='', color="darkgreen", marker='o')
+    #plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
+    ax.plot(x[~mask], mean_fitted[~mask], linestyle='', color="darkblue", marker='.')
+    ax2.plot(x[~mask], mean_error_fitted[~mask] * 10.0, linestyle='', color="darkred", marker='o')
+    ax2.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]), mean_error_fitted[~mask], linestyle='', color="darkgreen", marker='o')
     ax2.set_ylim(y_limits)
     ax2.set_ylim(ymin=0.0)
     ax.set_ylim((-n_pixel_ref * pixel_size_ref / 2.0, n_pixel_ref * pixel_size_ref / 2.0))
@@ -477,6 +478,8 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     else:
         fit_legend_entry = 'Fit: $c_0+x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
     ax.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+    ax.axvline(x=fit_limit[0], linewidth=2, color='r')
+    ax.axvline(x=fit_limit[1], linewidth=2, color='r')
 
     lines, labels = ax.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
@@ -484,7 +487,7 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     plt.title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
     ax.set_xlabel("%s [um]" % dut_name)
     ax.set_ylabel("%s [um]" % ref_name)
-    ax2.set_ylabel("Error [a.u.]")
+    ax2.set_ylabel("Error / Offset [a.u.]")
 #     plt.xlim((0, x.shape[0]))
     ax.grid()
     if output_pdf:
