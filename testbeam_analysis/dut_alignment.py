@@ -264,6 +264,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             result[0]['column_c1'], result[0]['column_c1_error'] = 1.0, 0.0
             result[0]['row_c0'], result[0]['row_c0_error'] = 0.0, 0.0
             result[0]['row_c1'], result[0]['row_c1_error'] = 1.0, 0.0
+
+            fit_limits = np.full((n_duts, 2, 2), fill_value=np.nan, dtype=np.float)  # col lft, right, row left, right
+
             result[0]['z'] = z_positions[0]
             for node in in_file_h5.root:
                 table_prefix = 'column' if 'column' in node.name.lower() else 'row'
@@ -306,33 +309,37 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     data = (data - background).astype(np.int)  # remove background
                     data -= data.min()  # only positive values
  
-                if no_fit:
-                    # calculate half hight
-                    median = np.median(data)
-                    median_max = np.median(np.max(data, axis=1))
-                    half_median_data = (data>((median + median_max) / 2))
-                    # calculate maximum per column
-                    max_select = np.argmax(data, axis=1)
-                    hough_data = np.zeros_like(data)
-                    hough_data[np.arange(data.shape[0]), max_select] = 1
-                    # select maximums if larger than half hight
-                    hough_data = hough_data & half_median_data
-                    # transpose for correct angle
-                    hough_data = hough_data.T
-                    accumulator, theta, rho, theta_edges, rho_edges = analysis_utils.hough_transform(hough_data, theta_res=0.1, rho_res=1.0, return_edges=True)
-                    rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
-                    rho_val, theta_val = rho[rho_idx], theta[th_idx]
-                    slope_idx, offset_idx = -np.cos(theta_val)/np.sin(theta_val), rho_val/np.sin(theta_val)
-                    slope = slope_idx * (pixel_size_ref / pixel_size_dut)
-                    offset = offset_idx * pixel_size_ref
-                    # offset in the center of the pixel matrix
-                    offset_center = offset + slope * pixel_size_dut * n_pixel_dut * 0.5 - pixel_size_ref * n_pixel_ref * 0.5
-                    offset_center += 0.5 * pixel_size_ref - slope * 0.5 * pixel_size_dut  # correct for half bin
+#                 if no_fit:
+                # calculate half hight
+                median = np.median(data)
+                median_max = np.median(np.max(data, axis=1))
+                half_median_data = (data>((median + median_max) / 2))
+                # calculate maximum per column
+                max_select = np.argmax(data, axis=1)
+                hough_data = np.zeros_like(data)
+                hough_data[np.arange(data.shape[0]), max_select] = 1
+                # select maximums if larger than half hight
+                hough_data = hough_data & half_median_data
+                # transpose for correct angle
+                hough_data = hough_data.T
+                accumulator, theta, rho, theta_edges, rho_edges = analysis_utils.hough_transform(hough_data, theta_res=0.1, rho_res=1.0, return_edges=True)
+                rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
+                rho_val, theta_val = rho[rho_idx], theta[th_idx]
+                slope_idx, offset_idx = -np.cos(theta_val)/np.sin(theta_val), rho_val/np.sin(theta_val)
+                slope = slope_idx * (pixel_size_ref / pixel_size_dut)
+                offset = offset_idx * pixel_size_ref
+                # offset in the center of the pixel matrix
+                offset_center = offset + slope * pixel_size_dut * n_pixel_dut * 0.5 - pixel_size_ref * n_pixel_ref * 0.5
+                offset_center += 0.5 * pixel_size_ref - slope * 0.5 * pixel_size_dut  # correct for half bin
 
+                if no_fit:
                     result[dut_idx][table_prefix + '_c0'], result[dut_idx][table_prefix + '_c0_error'] = offset_center, 0.0
                     result[dut_idx][table_prefix + '_c1'], result[dut_idx][table_prefix + '_c1_error'] = slope, 0.0
                     result[dut_idx][table_prefix + '_sigma'], result[dut_idx][table_prefix + '_sigma_error'] = 0.0, 0.0
                     result[dut_idx]['z'] = z_positions[dut_idx]
+
+                    fit_limits[dut_idx][0 if table_prefix == "column" else 1] = [(x_dut.min() - 0.5 * n_pixel_dut) * pixel_size_dut, (x_dut.max() - 0.5 * n_pixel_dut) * pixel_size_dut]
+                    print "dut %s limit" % dut_idx, fit_limits[dut_idx]
 
                     plot_utils.plot_hough(
                         x=x_dut,
@@ -383,7 +390,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                                                                ref_name=ref_name,
                                                                                dut_name=dut_name,
                                                                                prefix=table_prefix,
-                                                                               non_interactive=non_interactive)
+                                                                               non_interactive=non_interactive,
+                                                                               pre_fit=[offset_center, slope])
                         x_selected = x_selected[selected_data]
                         x_dut_scaled_selected = x_dut_scaled_selected[selected_data]
                         mean_fitted_scaled_selected = mean_fitted_scaled_selected[selected_data]
@@ -396,16 +404,19 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                             actual_iteration += 1
                             if actual_iteration > iterations:
                                 break
-    
+
                     # Linear fit, usually describes correlation very well, slope is close to 1.
                     # With low energy beam and / or beam with diverse agular distribution, the correlation will not be perfectly straight
                     # Use results from straight line fit as start values for this final fit
                     re_fit, re_fit_pcov = curve_fit(analysis_utils.linear, x_dut_scaled_selected, mean_fitted_scaled_selected, sigma=mean_error_fitted_scaled_selected, absolute_sigma=True, p0=[fit[0], fit[1]])
-    
+
                     # Write fit results to array
                     result[dut_idx][table_prefix + '_c0'], result[dut_idx][table_prefix + '_c0_error'] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
                     result[dut_idx][table_prefix + '_c1'], result[dut_idx][table_prefix + '_c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
                     result[dut_idx]['z'] = z_positions[dut_idx]
+
+                    fit_limits[dut_idx][0 if table_prefix == "column" else 1] = [x_dut_scaled_selected.min(), x_dut_scaled_selected.max()]
+#                     print "dut %s limit" % dut_idx, fit_limits[dut_idx]
     
                     # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
                     # This error is needed for track finding and track quality determination
@@ -445,6 +456,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                         mask=mask,
                         fit_fn=fit_fn,
                         fit=re_fit,
+                        fit_limit=fit_limits[dut_idx][0 if table_prefix == "column" else 1],
                         pcov=re_fit_pcov,
                         chi2=chi2,
                         mean_error_fitted=mean_error_fitted_scaled,
@@ -463,6 +475,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 try:
                     result_table = out_file_h5.create_table(out_file_h5.root, name='PreAlignment', description=result.dtype, title='Prealignment alignment from correlation', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     result_table.append(result)
+                    result_table.attrs.fit_limits = fit_limits
                 except tb.exceptions.NodeError:
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 

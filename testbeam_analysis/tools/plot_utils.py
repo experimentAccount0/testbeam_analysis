@@ -177,7 +177,7 @@ def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y
     output_pdf.savefig()
 
 
-def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, non_interactive=False):
+def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, pre_fit=None, non_interactive=False):
     '''PLots the correlation and lets the user cut on the data in an interactive way.
 
     Parameters
@@ -359,14 +359,23 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         #plt.close()  # Close the plot to let the program continue (blocking)
 
     def fit_data():
+        global selected_data
         global offset
         global fit
         global fit_fn
         fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
+        print "fit", fit
         fit_fn = np.poly1d(fit[::-1])
         offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
 #         offset = np.full_like(mean_fitted, np.nan)
 #         offset[selected_data] = fit_fn(x[selected_data]) - mean_fitted[selected_data]  # Calculate straight line fit offset
+
+    def pre_fit_data():
+        global offset
+        global fit_fn
+        print "pre-fit", pre_fit
+        fit_fn = np.poly1d(pre_fit[::-1])
+        offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
 
     # Require the gaussian fit error to be reasonable
 #     selected_data = (mean_error_fitted < 1e-2)
@@ -379,7 +388,10 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     ax = fig.add_subplot(1, 1, 1)
     ax2 = ax.twinx()
     # Calculate and plot selected data + fit + fit offset and gauss fit error
-    fit_data()
+    if pre_fit is None:
+        fit_data()
+    else:
+        pre_fit_data()
     offset_limit = np.max(np.abs(offset[selected_data]))  # Calculate starting offset cut
     error_limit = np.max(np.abs(mean_error_fitted[selected_data]))  # Calculate starting fit error cut
     left_limit = np.min(x[selected_data])  # Calculate starting left cut
