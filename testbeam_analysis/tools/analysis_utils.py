@@ -665,8 +665,8 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, mirror_x=1.0, mirror_
     print "gamma xy", factor_xy * np.arctan(m_xy)
     factor_yx = 1.0
     #gamma -= factor_yx * np.arctan2(m_yx, 1 - m_yy)
-    gamma = factor_yx * np.arctan(m_yx)
-    print "gamma yx", factor_yx * np.arctan(m_yx)
+    gamma -= factor_yx * np.arctan(m_yx)
+    print "gamma yx", -factor_yx * np.arctan(m_yx)
     # TODO: deduce gamma sign from slope signs
     gamma /= mirror_x * mirror_y * (factor_xy + factor_yx)
     #gamma /= np.sign(m_xx) * np.sign(m_yy) * np.sign(m_xy) * np.sign(m_yx) * (factor_xy + factor_yx)
