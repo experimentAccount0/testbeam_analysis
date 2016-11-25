@@ -804,7 +804,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         geometry_utils.store_alignment_parameters(
             input_alignment_file,
             alignment_parameters=alignment_parameters,
-            select_duts=np.unique(np.array(align_duts)),
+            select_duts=np.unique(np.hstack(np.array(align_duts))),
             mode='absolute')
     else:
         pass  # do nothing here
