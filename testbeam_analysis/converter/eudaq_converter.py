@@ -23,7 +23,7 @@ def convert_eudaq_raw_data(input_file):
     with tb.open_file(input_file[:-4] + '.h5', 'w') as out_file_h5:
         for readout_type, hit_data in eudaq_data.iteritems():
             logging.info('Create hit table for %s' % readout_type)
-            hit_table_out = out_file_h5.createTable(out_file_h5.root, name=readout_type, description=hit_data.dtype, title='Hits for %s readout from EUDAQ raw data' % readout_type, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            hit_table_out = out_file_h5.create_table(out_file_h5.root, name=readout_type, description=hit_data.dtype, title='Hits for %s readout from EUDAQ raw data' % readout_type, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             hit_table_out.append(hit_data)
 
 
@@ -56,7 +56,7 @@ def format_hit_table(input_file):
                 with tb.open_file(input_file[:-3] + '_DUT%d.h5' % dut_index, 'w') as out_file_h5:
                     hits_actual_dut = hits[hits['plane'] == dut_index]
                     hits_formatted = np.zeros((hits_actual_dut.shape[0], ), dtype=[('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)])
-                    hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hits_formatted.dtype, title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=hits_formatted.dtype, title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     hits_formatted['event_number'] = hits_actual_dut['timestamp'] - min_timestamp  # we take the time stamp as a event number, this uses the EUDAQ event building wich was most reliable so far
                     hits_formatted['frame'] = hits_actual_dut['frame']
                     hits_formatted['column'] = hits_actual_dut['x'] + 1

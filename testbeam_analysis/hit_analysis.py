@@ -75,7 +75,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_hits_file, 'w') as out_file_h5:
             # creating new hit table without noisy pixels
-            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
                 # Select not noisy pixel
                 hits_1d = hits['column'].astype(np.uint32) * n_pixel[1] + hits['row']  # change dtype to fit new number
@@ -86,11 +86,11 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
             logging.info('Reducing data by a factor of %.2f in file %s', input_file_h5.root.Hits.nrows / hit_table_out.nrows, out_file_h5.filename)
 
             # creating occupancy table without masking noisy pixels
-            occupancy_array_table = out_file_h5.createCArray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            occupancy_array_table = out_file_h5.create_carray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             occupancy_array_table[:] = np.ma.getdata(occupancy)
 
             # creating noisy pixels table
-            noisy_pixels_table = out_file_h5.createCArray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            noisy_pixels_table = out_file_h5.create_carray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             noisy_pixels_table[:] = noisy_pixels_mask
 
     if plot:
@@ -144,7 +144,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, ma
                                                   ('seed_row', '<u2'),
                                                   ('mean_column', 'f4'),
                                                   ('mean_row', 'f4')])
-            cluster_table_out = output_file_h5.createTable(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            cluster_table_out = output_file_h5.create_table(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size, try_speedup=False):
                 if not np.all(np.diff(hits['event_number']) >= 0):

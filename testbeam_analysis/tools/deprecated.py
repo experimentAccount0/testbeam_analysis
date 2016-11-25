@@ -193,7 +193,7 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
 
     with tb.open_file(input_alignment_file, mode='r+') as out_file_h5:
         try:
-            z_table_out = out_file_h5.createTable(out_file_h5.root, name='Zposition', description=results.dtype, title='Relative z positions of the DUTs without references', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            z_table_out = out_file_h5.create_table(out_file_h5.root, name='Zposition', description=results.dtype, title='Relative z positions of the DUTs without references', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             z_table_out.append(results)
         except tb.NodeError:
             logging.warning('Z position are do already exist. Do not overwrite.')

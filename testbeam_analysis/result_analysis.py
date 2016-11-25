@@ -510,7 +510,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
-                out_res_x = out_file_h5.createCArray(out_file_h5.root,
+                out_res_x = out_file_h5.create_carray(out_file_h5.root,
                                                      name='ResidualsX_DUT%d' % (actual_dut),
                                                      title='Residual distribution in x direction for %s' % (dut_name),
                                                      atom=tb.Atom.from_dtype(hist_residual_x_hist.dtype),
@@ -528,7 +528,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
-                out_res_y = out_file_h5.createCArray(out_file_h5.root,
+                out_res_y = out_file_h5.create_carray(out_file_h5.root,
                                                      name='ResidualsY_DUT%d' % (actual_dut),
                                                      title='Residual distribution in y direction for %s' % (dut_name),
                                                      atom=tb.Atom.from_dtype(hist_residual_y_hist.dtype),
@@ -550,7 +550,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     fit_limit=fit_limit_x
                 )
                 
-                out_x_res_x = out_file_h5.createCArray(out_file_h5.root,
+                out_x_res_x = out_file_h5.create_carray(out_file_h5.root,
                                                        name='XResidualsX_DUT%d' % (actual_dut),
                                                        title='Residual distribution in x direction as a function of the x position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_x_residual_x_hist.dtype),
@@ -572,7 +572,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_y
                 )
-                out_y_res_y = out_file_h5.createCArray(out_file_h5.root,
+                out_y_res_y = out_file_h5.create_carray(out_file_h5.root,
                                                        name='YResidualsY_DUT%d' % (actual_dut),
                                                        title='Residual distribution in y direction as a function of the y position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_y_residual_y_hist.dtype),
@@ -594,7 +594,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_x
                 )
-                out_x_res_y = out_file_h5.createCArray(out_file_h5.root,
+                out_x_res_y = out_file_h5.create_carray(out_file_h5.root,
                                                        name='XResidualsY_DUT%d' % (actual_dut),
                                                        title='Residual distribution in y direction as a function of the x position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_x_residual_y_hist.dtype),
@@ -616,7 +616,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_y
                 )
-                out_y_res_x = out_file_h5.createCArray(out_file_h5.root,
+                out_y_res_x = out_file_h5.create_carray(out_file_h5.root,
                                                        name='YResidualsX_DUT%d' % (actual_dut),
                                                        title='Residual distribution in x direction as a function of the y position for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_y_residual_x_hist.dtype),
@@ -636,7 +636,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
-                out_res_col = out_file_h5.createCArray(out_file_h5.root,
+                out_res_col = out_file_h5.create_carray(out_file_h5.root,
                                                        name='ResidualsCol_DUT%d' % (actual_dut),
                                                        title='Residual distribution in column direction for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_residual_col_hist.dtype),
@@ -654,7 +654,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     title='Residuals for %s' % (dut_name),
                     output_fig=output_fig
                 )
-                out_res_row = out_file_h5.createCArray(out_file_h5.root,
+                out_res_row = out_file_h5.create_carray(out_file_h5.root,
                                                        name='ResidualsRow_DUT%d' % (actual_dut),
                                                        title='Residual distribution in row direction for %s' % (dut_name),
                                                        atom=tb.Atom.from_dtype(hist_residual_row_hist.dtype),
@@ -675,7 +675,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_x_local
                 )
-                out_col_res_col = out_file_h5.createCArray(out_file_h5.root,
+                out_col_res_col = out_file_h5.create_carray(out_file_h5.root,
                                                            name='ColResidualsCol_DUT%d' % (actual_dut),
                                                            title='Residual distribution in column direction as a function of the column position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_col_hist.dtype),
@@ -697,7 +697,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_y_local
                 )
-                out_row_res_row = out_file_h5.createCArray(out_file_h5.root,
+                out_row_res_row = out_file_h5.create_carray(out_file_h5.root,
                                                            name='RowResidualsRow_DUT%d' % (actual_dut),
                                                            title='Residual distribution in row direction as a function of the row position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_row_residual_row_hist.dtype),
@@ -719,7 +719,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_x_local
                 )
-                out_col_res_row = out_file_h5.createCArray(out_file_h5.root,
+                out_col_res_row = out_file_h5.create_carray(out_file_h5.root,
                                                            name='ColResidualsRow_DUT%d' % (actual_dut),
                                                            title='Residual distribution in row direction as a function of the column position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_col_residual_row_hist.dtype),
@@ -741,7 +741,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     output_fig=output_fig,
                     fit_limit=fit_limit_y_local
                 )
-                out_row_res_col = out_file_h5.createCArray(out_file_h5.root,
+                out_row_res_col = out_file_h5.create_carray(out_file_h5.root,
                                                            name='RowResidualsCol_DUT%d' % (actual_dut),
                                                            title='Residual distribution in column direction as a function of the row position for %s' % (dut_name),
                                                            atom=tb.Atom.from_dtype(hist_row_residual_col_hist.dtype),
@@ -1062,8 +1062,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_efficie
                     logging.info('Efficiency =  %.4f', np.ma.mean(efficiency))
     
                     actual_dut_folder = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
-                    out_efficiency = out_file_h5.createCArray(actual_dut_folder, name='Efficiency', title='Efficiency per bin of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                    out_tracks_per_bin = out_file_h5.createCArray(actual_dut_folder, name='Tracks_per_bin', title='Tracks per bin of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density.dtype), shape=total_track_density.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out_efficiency = out_file_h5.create_carray(actual_dut_folder, name='Efficiency', title='Efficiency per bin of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(efficiency.dtype), shape=efficiency.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                    out_tracks_per_bin = out_file_h5.create_carray(actual_dut_folder, name='Tracks_per_bin', title='Tracks per bin of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_track_density.dtype), shape=total_track_density.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     # Store parameters used for efficiency calculation
                     # TODO: add attributes to DUT group
                     # TODO: adding all attributes and histograms
