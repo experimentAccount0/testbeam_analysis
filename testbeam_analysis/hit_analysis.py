@@ -130,7 +130,6 @@ def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, ma
             clusterizer.set_max_hit_charge(max_hit_charge)
 
             # Set clusterzier settings
-            clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
             clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
             clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
             clusterizer.set_frame_cluster_distance(max_time_distance)  # cluster distance in time frames
