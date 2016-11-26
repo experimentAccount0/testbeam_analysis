@@ -1169,9 +1169,11 @@ def _analyze_residuals(residuals_file_h5, alignment_file, output_fig, use_duts, 
             alpha, beta, gamma = analysis_utils.get_rotation_from_residual_fit(m_xx=m_xx, m_xy=m_xy, m_yx=m_yx, m_yy=m_yy, mirror_x=mirror_x, mirror_y=mirror_y)
 
             alignment_parameters[dut_index]['correlation_x'] = std_x
-            alignment_parameters[dut_index]['translation_x'] = -1 * mirror_x * mu_x
+#             alignment_parameters[dut_index]['translation_x'] = -1 * mu_x  # global
+            alignment_parameters[dut_index]['translation_x'] = -1 * mirror_x * mu_x  # local
             alignment_parameters[dut_index]['correlation_y'] = std_y
-            alignment_parameters[dut_index]['translation_y'] = -1 * mirror_y * mu_y
+#             alignment_parameters[dut_index]['translation_y'] = -1 * mu_y  # global
+            alignment_parameters[dut_index]['translation_y'] = -1 * mirror_y * mu_y  # local
             alignment_parameters[dut_index]['alpha'] = alpha * relaxation_factor
             alignment_parameters[dut_index]['beta'] = beta * relaxation_factor
             alignment_parameters[dut_index]['gamma'] = gamma * relaxation_factor
