@@ -99,7 +99,7 @@ def align_events(input_file, output_file, fix_event_number=True, fix_trigger_num
     
         with tb.open_file(output_file, 'w') as out_file_h5:
             hit_table_description = data_struct.HitInfoTable().columns.copy()
-            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hit_table_description, title='Selected hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False), chunkshape=(chunk_size,))
+            hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=hit_table_description, title='Selected hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False), chunkshape=(chunk_size,))
  
             # Correct hit event number
             for hits, _ in analysis_utils.data_aligned_at_events(hit_table, chunk_size=chunk_size):
@@ -171,7 +171,7 @@ def format_hit_table(input_file, output_file):
         hits = in_file_h5.root.Hits[:]
         hits_formatted = np.zeros((hits.shape[0], ), dtype=[('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)])
         with tb.open_file(output_file, 'w') as out_file_h5:
-            hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=hits_formatted.dtype, title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=hits_formatted.dtype, title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             hits_formatted['event_number'] = hits['event_number']
             hits_formatted['frame'] = hits['relative_BCID']
             hits_formatted['column'] = hits['column']
