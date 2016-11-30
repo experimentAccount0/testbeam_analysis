@@ -210,7 +210,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
             progress_bar.finish()
 
 
-def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=2):
+def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=3):
     '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
