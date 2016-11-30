@@ -574,11 +574,11 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
                 fit_converged = False
             else:
                 fit_converged = True
+                coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)  # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
 
         # Set fit results for given index if successful
         if fit_converged:
             # Change back coefficents
-            coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)  # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
             coeff_fitted[index] = coeff
             mean_fitted[index] = coeff[1]
             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
