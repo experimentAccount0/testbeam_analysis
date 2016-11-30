@@ -148,8 +148,12 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     # Do an alignment step with the track candidates, corrects rotations and is therefore much more precise than simple prealignment
     dut_alignment.alignment(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealignment.h5'),
                             input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                            align_duts=[0, 1, 2, 3, 4, 5],
+                            selection_fit_duts=[0, 1, 2, 3, 4, 5],
+                            selection_hit_duts=[0, 1, 2, 3, 4, 5],
                             n_pixels=n_pixels,
-                            pixel_size=pixel_size)
+                            pixel_size=pixel_size,
+                            max_iterations=3)
 
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
