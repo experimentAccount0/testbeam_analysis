@@ -1132,6 +1132,7 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
         efficiency_selected[col_stop:, :] = np.ma.masked
         efficiency_selected[:, :row_start] = np.ma.masked
         efficiency_selected[:, row_stop:] = np.ma.masked
+        n_hits_efficiency_selected = np.ma.count(efficiency_selected)
         fig = Figure()
         fig.patch.set_facecolor('white')
         ax = fig.add_subplot(111)
@@ -1148,11 +1149,18 @@ def efficiency_plots(distance_mean_array, hit_hist, track_density, track_density
         output_fig.savefig(fig)
 
         fig = Figure()
+        fig.patch.set_facecolor('white')
+        ax = fig.add_subplot(111)
+        plot_2d_pixel_hist(fig, ax, efficiency_selected.T, extend, title='Efficiency of selected area for %s (%d Entries)' % (dut_name, n_hits_efficiency_selected), x_axis_title="Column [um]", y_axis_title="Row [um]", z_min=0.0, z_max=100.0, aspect=aspect)
+        fig.tight_layout()
+        output_fig.savefig(fig)
+
+        fig = Figure()
         FigureCanvas(fig)
         fig.patch.set_facecolor('white')
         ax = fig.add_subplot(111)
         ax.grid()
-        ax.set_title('Efficiency of selected area per bin for %s: %.2f%%' % (dut_name, np.ma.mean(efficiency_selected)))
+        ax.set_title('Efficiency per bin of selected area for %s: %.2f%%' % (dut_name, np.ma.mean(efficiency_selected)))
         ax.set_xlabel('Efficiency [%]')
         ax.set_ylabel('#')
         ax.set_yscale('log')
