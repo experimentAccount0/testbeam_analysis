@@ -59,6 +59,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+                                     n_pixels=n_pixels,
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=pixel_size)
 
@@ -85,12 +86,11 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                               output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                               fit_duts=[0, 1, 2, 3],
-                              include_duts=[-3, -2, -1, 1, 2, 3],
-                              track_quality=1,
+                              selection_track_quality=1,
                               force_prealignment=True)
 
     # Optional: plot some tracks (or track candidates) of a selected event range
-    plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
+    plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                            output_pdf=None,  # os.path.join(output_folder, 'Event.pdf'),
                            event_range=(0, 40),
                            dut=1)
@@ -108,7 +108,8 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                          output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
-                                         bin_size=(250, 50),
+                                         bin_size=[(250, 50)],
+                                         sensor_size=[(250. * 336, 50. * 80)],
                                          minimum_track_density=2,
                                          use_duts=None,
                                          cut_distance=500,
@@ -118,23 +119,23 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                          force_prealignment=True)
 
 # A fine alignment by rotating the devices does not help here, due to data with bad resolution
-#     # Do an alignment step using the prealigned track candidates, corrects rotations and is therefore much more precise than prealignment
+# Do an alignment step using the prealigned track candidates, corrects rotations and is therefore much more precise than prealignment
 #     dut_alignment.alignment(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealigned.h5'),
 #                             input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
 #                             n_pixels=n_pixels,
 #                             pixel_size=pixel_size)
 #
-#     # Apply the new alignment to the merged cluster table to create tracklets
+# Apply the new alignment to the merged cluster table to create tracklets
 #     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
 #                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
 #                                   output_hit_aligned_file=os.path.join(output_folder, 'Tracklets.h5'))
 #
-#     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
+# Find tracks from the tracklets and stores the with quality indicator into track candidates table
 #     track_analysis.find_tracks(input_tracklets_file=os.path.join(output_folder, 'Tracklets.h5'),
 #                                input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
 #                                output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 #
-#     # Fit the track candidates and create new track table
+# Fit the track candidates and create new track table
 #     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
 #                               input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
 #                               output_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
@@ -142,22 +143,22 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
 #                               include_duts=[-3, -2, -1, 1, 2, 3],
 #                               track_quality=1)
 #
-#     # Optional: plot some tracks (or track candidates) of a selected event range
+# Optional: plot some tracks (or track candidates) of a selected event range
 #     plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
-#                            output_pdf=None,  # os.path.join(output_folder, 'Event.pdf'),
+# output_pdf=None,  # os.path.join(output_folder, 'Event.pdf'),
 #                            event_range=(0, 40),
 #                            dut=1)
 #
-#     # Calculate the unconstrained residuals to check the alignment
+# Calculate the unconstrained residuals to check the alignment
 #     result_analysis.calculate_residuals(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
 #                                         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
 #                                         output_residuals_file=os.path.join(output_folder, 'Residuals.h5'),
-#                                         #max_chi2=10000,
+# max_chi2=10000,
 #                                         n_pixels=n_pixels,
 #                                         pixel_size=pixel_size)
 #
-#     # Calculate the efficiency and mean hit/track hit distance
-#     # When needed, set included column and row range for each DUT as list of tuples
+# Calculate the efficiency and mean hit/track hit distance
+# When needed, set included column and row range for each DUT as list of tuples
 #     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
 #                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
 #                                          output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
