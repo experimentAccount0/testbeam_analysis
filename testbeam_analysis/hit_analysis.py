@@ -86,11 +86,11 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
             logging.info('Reducing data by a factor of %.2f in file %s', input_file_h5.root.Hits.nrows / hit_table_out.nrows, out_file_h5.filename)
 
             # creating occupancy table without masking noisy pixels
-            occupancy_array_table = out_file_h5.createCArray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            occupancy_array_table = out_file_h5.create_carray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             occupancy_array_table[:] = np.ma.getdata(occupancy)
 
             # creating noisy pixels table
-            noisy_pixels_table = out_file_h5.createCArray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            noisy_pixels_table = out_file_h5.create_carray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             noisy_pixels_table[:] = noisy_pixels_mask
 
     if plot:
