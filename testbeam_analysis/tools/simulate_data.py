@@ -303,7 +303,7 @@ class SimulateData(object):
         hit_tables = []
         for dut_index in range(self._n_duts):
             output_files.append(tb.open_file(base_file_name + '_DUT%d.h5' % dut_index, 'w'))
-            hit_tables.append(output_files[dut_index].createTable(output_files[dut_index].root, name='Hits', description=self._hit_dtype, title='Simulated hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)))
+            hit_tables.append(output_files[dut_index].create_table(output_files[dut_index].root, name='Hits', description=self._hit_dtype, title='Simulated hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)))
 
         progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=len(range(0, n_events, chunk_size)), term_width=80)
         progress_bar.start()

@@ -25,7 +25,7 @@ def combine_hit_files(hit_files, combined_file, event_number_offsets=None, chunk
 
     used_event_number_offsets = []
     with tb.open_file(combined_file, mode="w") as out_file_h5:
-        hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)]), title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+        hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)]), title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         event_number_offset = 0
         for index, hit_file in enumerate(hit_files):
             with tb.open_file(hit_file, mode='r') as in_file_h5:
@@ -69,7 +69,7 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
     for hit_file in hit_files:
         with tb.open_file(hit_file, mode='r') as in_file_h5:
             with tb.open_file(hit_file[:-3] + '_reduced.h5', mode="w") as out_file_h5:
-                hit_table_out = out_file_h5.createTable(out_file_h5.root, name='Hits', description=np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)]), title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)]), title='Selected FE-I4 hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 for hits, _ in analysis_utils.data_aligned_at_events(in_file_h5.root.Hits, chunk_size=chunk_size):
                     hit_table_out.append(_delete_events(hits, fraction))
 
@@ -102,7 +102,7 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None, tra
                 total_hits = node.shape[0]
                 progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=total_hits, term_width=80)
                 progress_bar.start()
-                hit_table_out = out_file_h5.createTable(out_file_h5.root, name=node.name, description=node.dtype, title=node.title, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                hit_table_out = out_file_h5.create_table(out_file_h5.root, name=node.name, description=node.dtype, title=node.title, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 for hits, index in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                     n_hits = hits.shape[0]
                     if condition:
