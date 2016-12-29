@@ -403,7 +403,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Prepare track hits array to be fitted
                         index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
-                        track_hits = np.zeros((n_tracks, n_fit_duts, 3))
+                        track_hits = np.empty((n_tracks, n_fit_duts, 3))
+                        track_hits[:] = np.nan
 
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
                             if ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
@@ -442,7 +443,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
     # Set track quality of actual DUT from actual DUT hit
     column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
-    if row != 0:  # row = 0 is no hit
+    if not np.isnan(row):  # row = nan is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
         if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
@@ -464,7 +465,7 @@ def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_inde
 
     actual_track['track_quality'] &= ~(65793 << dut_index)  # Reset track quality to zero
 
-    if row != 0:  # row = 0 is no hit
+    if not np.isnan(row):  # row = nan is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
         if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
@@ -478,7 +479,7 @@ def _get_first_dut_index(tr_column, index):
     ''' Returns the first DUT that has a hit for the track at index '''
     dut_index = 0
     for dut_index in range(tr_column.shape[1]):  # Loop over duts, to get first DUT hit of track
-        if tr_column[index][dut_index] != 0:
+        if not np.isnan(tr_column[index][dut_index]):
             break
     return dut_index
 
@@ -501,7 +502,7 @@ def _set_n_tracks(start_index, stop_index, tracklets, n_actual_tracks, tr_column
             if min_cluster_distance[dut_index] != 0:  # Check if minimum track distance evaluation is set, 0 is no mimimum track distance cut
                 for i in range(start_index, stop_index):  # Loop over all event hits
                     actual_column, actual_row = tr_column[i][dut_index], tr_row[i][dut_index]
-                    if actual_column == 0:  # Omit virtual hit
+                    if np.isnan(actual_column):  # Omit virtual hit
                         continue
                     for j in range(i + 1, stop_index):  # Loop over other event hits
                         if sqrt((actual_column - tr_column[j][dut_index]) * (actual_column - tr_column[j][dut_index]) + (actual_row - tr_row[j][dut_index]) * (actual_row - tr_row[j][dut_index])) < min_cluster_distance[dut_index]:
@@ -527,7 +528,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
     # Numba uses c scopes, thus define all used variables here
     n_actual_tracks = 0
     track_index, actual_hit_track_index = 0, 0  # Track index of table and first track index of actual event
-    column, row = 0., 0.
+    column, row = np.nan, np.nan
     actual_track_column, actual_track_row = 0., 0.
     column_distance, row_distance = 0., 0.
     hit_distance = 0.
@@ -552,7 +553,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
             actual_hit_track_index = track_index
 
         n_actual_tracks += 1
-        reference_hit_set = False  # The first real hit (column, row != 0) is the reference hit of the actual track
+        reference_hit_set = False  # The first real hit (column, row != nan) is the reference hit of the actual track
         n_track_hits = 0
 
         for dut_index in range(n_duts):  # loop over all DUTs in the actual track
@@ -561,12 +562,12 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
             # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
             current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
             current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
-            if tr_column[track_index][dut_index] == 0:  # No hit at the actual position
+            if np.isnan(tr_column[track_index][dut_index]):  # No hit at the actual position
                 current_hit_distance = -1  # Signal no hit
 
 #             print '== ACTUAL DUT  ==', dut_index
 
-            if not reference_hit_set and tr_row[track_index][dut_index] != 0:  # Search for first DUT that registered a hit (row != 0)
+            if not reference_hit_set and not np.isnan(tr_row[track_index][dut_index]):  # Search for first DUT that registered a hit
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
                 reference_hit_set = True
                 tracklets[track_index]['track_quality'] |= (65793 << dut_index)  # First track hit has best quality by definition
@@ -578,7 +579,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                     if tracklets[hit_index]['event_number'] != actual_event_number:  # Abort condition
                         break
                     column, row, z, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index]
-                    if row != 0:  # Check for hit (row != 0)
+                    if not np.isnan(row):  # Check for hit
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
                         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
                         hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
@@ -656,9 +657,13 @@ def _fit_tracks_loop(track_hits):
         chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
         return datamean, slope, chi2
 
-    slope = np.zeros((track_hits.shape[0], 3,))
-    offset = np.zeros((track_hits.shape[0], 3,))
-    chi2 = np.zeros((track_hits.shape[0],))
+    slope = np.empty((track_hits.shape[0], 3,))
+    offset = np.empty((track_hits.shape[0], 3,))
+    chi2 = np.empty((track_hits.shape[0],))
+
+    slope[:] = np.nan
+    offset[:] = np.nan
+    chi2[:] = np.nan
 
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
         try:

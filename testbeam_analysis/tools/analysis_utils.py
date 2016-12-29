@@ -167,7 +167,7 @@ def map_cluster(events, cluster):
     event = [ 0  1  1  2  3  3 ]
     cluster.event_number = [ 0  1  2  2  3  4 ]
 
-    gives mapped_cluster.event_number = [ 0  1  0  2  3  0 ]
+    gives mapped_cluster.event_number = [ 0  1  1  2  2  3  3  4]
 
     Returns
     -------
@@ -176,7 +176,8 @@ def map_cluster(events, cluster):
     """
     cluster = np.ascontiguousarray(cluster)
     events = np.ascontiguousarray(events)
-    mapped_cluster = np.zeros((events.shape[0],), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
+    mapped_cluster = np.empty((events.shape[0],), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
+    mapped_cluster[:] = np.nan
     mapped_cluster = np.ascontiguousarray(mapped_cluster)
     analysis_functions.map_cluster(events, cluster, mapped_cluster)
     return mapped_cluster
@@ -787,13 +788,13 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
     x_sel = (y_sum > 0.0) & np.isfinite(y_sum)
     y_mean = np.full_like(y_sum, np.nan, dtype=np.float)
     y_mean[x_sel] = np.average(hist, axis=1, weights=ycenter)[x_sel] * np.sum(ycenter) / y_sum[x_sel]
-    n_hits_threshold = np.percentile(y_sum, 100-68)
+    n_hits_threshold = np.percentile(y_sum, 100 - 68)
     x_sel = (y_sum > n_hits_threshold) & np.isfinite(y_sum)
     y_rel_err = np.full_like(y_sum, np.nan, dtype=np.float)
     y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
     fit, cov = curve_fit(linear, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
 
-    if output_fig is not None:
+    if output_fig is not False:
         testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(
             hist,
             xedges=xedges,

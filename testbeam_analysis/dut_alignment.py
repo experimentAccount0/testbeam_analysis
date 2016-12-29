@@ -114,7 +114,8 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
 
 def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_size, chunk_size=4999999):
     '''Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.
-    Empty entries are signaled with column = row = charge = 0.
+    Empty entries are signaled with column = row = charge = nan. Position is translated from indices to um. The
+    local coordinate system rigin (0, 0) is defined in the sensor center, to decouple translation and rotation.
 
     Alignment information from the alignment file is used to correct the column/row positions. Use alignment data if
     available (translation/rotation for each plane), otherwise pre-alignment data (offset, slope of correlation)
@@ -168,16 +169,17 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
                         for actual_cluster, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
-                merged_cluster_array = np.zeros((common_event_numbers.shape[0],), dtype=description)  # Result array to be filled. For no hit: column = row = 0
+                merged_cluster_array = np.empty((common_event_numbers.shape[0],), dtype=description)  # Result array to be filled. For no hit: column = row = NaN
+                merged_cluster_array[:] = np.nan
 
                 # Set the event number
                 merged_cluster_array['event_number'] = common_event_numbers[:]
 
                 # Fill result array with DUT 0 data
                 actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
-                # Add only real hits, 0.0 is a virtual hit
-                selection = actual_cluster['mean_column'] != 0.0
-                # Convert indices to positions, origin in the center of the sensor
+                # Add only real hits, nan is a virtual hit
+                selection = ~np.isnan(actual_cluster['mean_column'])
+                # Convert indices to positions, origin defined in the center of the sensor
                 merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[0][0]))
                 merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[0][1]))
                 merged_cluster_array['z_dut_0'][selection] = 0.0
@@ -189,8 +191,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
                         for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
-                            # Add only real hits, 0.0 is a virtual hit
-                            selection = actual_cluster['mean_column'] != 0.0
+                            # Add only real hits, nan is a virtual hit
+                            selection = actual_cluster['mean_column'] != np.nan
                             # Convert indices to positions, origin in the center of the sensor
                             actual_mean_column = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
                             actual_mean_row = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
@@ -201,7 +203,6 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
 
                             merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
 
-                np.nan_to_num(merged_cluster_array)
                 merged_cluster_table.append(merged_cluster_array)
                 actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read
                 progress_bar.update(index)
@@ -500,19 +501,22 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
     coeff = None
     fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
 
+    no_correlation_indeces = []
+    few_correlation_indeces = []
+
     for index in np.arange(n_pixel_dut):  # Loop over x dimension of correlation histogram
         # TODO: start fitting from the beam center to get a higher chance to pick up the correlation peak
 
         # omit correlation fit with no entries / correlation (e.g. sensor edges, masked columns)
         if np.all(data[index, :] == 0):
-            logging.warning('No correlation entries for index %d. Omit correlation fit.', index)
+            no_correlation_indeces.append(index)
             continue
 
         # omit correlation fit if sum of correlation entries is < 1 % of total entries devided by number of indices
         # (e.g. columns not in the beam)
         n_cluster_curr_index = data[index, :].sum()
         if fit_converged and n_cluster_curr_index < data.sum() / n_pixel_dut * 0.01:
-            logging.warning('Very few correlation entries for index %d. Omit correlation fit.', index)
+            few_correlation_indeces.append(index)
             continue
 
         # Set start parameters and fit limits
@@ -572,6 +576,12 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
             sigma_fitted[index] = np.abs(coeff[2])
             chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
 
+    if no_correlation_indeces:
+        logging.info('No correlation entries for indeces %s. Omit correlation fit.', str(no_correlation_indeces)[1:-1])
+
+    if few_correlation_indeces:
+        logging.info('Very few correlation entries for index %s. Omit correlation fit.', str(few_correlation_indeces)[1:-1])
+
 
 def refit_advanced(x_data, y_data, y_fit, p0):
     ''' Substract the fit from the data, thus only the small signal peak should be left.
@@ -583,7 +593,7 @@ def refit_advanced(x_data, y_data, y_fit, p0):
     peak_sigma = (fwhm_2 - fwhm_1) / 2.35  # Determine start value for sigma
 
     # Fit a Gauss + Offset to the background substracted data
-    coeff_peak, _ = curve_fit(analysis_utils.gauss_offset, x_data, y_peak, p0=[peak_A, peak_mu, peak_sigma, 0.0, 0.0], bounds=([0.0, 0.0, 0.0, -10000.0, -10.0], [1.1 * peak_A, np.inf, np.inf, 10000.0, 10.0]))
+    coeff_peak, _ = curve_fit(analysis_utils.gauss_offset_slope, x_data, y_peak, p0=[peak_A, peak_mu, peak_sigma, 0.0, 0.0], bounds=([0.0, 0.0, 0.0, -10000.0, -10.0], [1.1 * peak_A, np.inf, np.inf, 10000.0, 10.0]))
 
     # Refit orignial double Gauss function with proper start values for the small signal peak
     coeff, var_matrix = curve_fit(analysis_utils.double_gauss_offset, x_data, y_data, p0=[coeff_peak[0], coeff_peak[1], coeff_peak[2], p0[3], p0[4], p0[5], p0[6]], bounds=[0.0, np.inf])
@@ -645,7 +655,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     n_duts = alignment.shape[0]
 
     def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
-        selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change virtual hits
+        selection = hits_chunk['x_dut_%d' % dut_index] != np.nan  # Do not change virtual hits
 
         if use_prealignment:  # Apply transformation from pre-alignment information
             hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
@@ -722,12 +732,21 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     pixel_size : iterable of tuples
         The pixel sizer per DUT in (column, row) in um.
         E.g.: two DUTS: [(50, 250), (50, 250)]
-    ignore_duts : iterable
-        the duts that are not taken in a fit and for track selection. Needed to exclude small planes / very bad working planes from the fit
-        to make a good alignment possible
-    ignore_fit_duts : iterable
-        the duts that are not taken in the track fit. Needed to exclude small planes / very bad working planes from the fit
-        to make a good alignment possible
+    align_duts : iterable or iterable of iterable
+        The combination of duts that are algined at once. One should always align the high resolution planes first.
+        E.g. for a telesope (first and last 3 planes) with 2 devices in the center (3, 4):
+        align_duts=[[0, 1, 2, 5, 6, 7],  # align the telescope planes first
+                    [4],  # Align first DUT
+                    [3]],  # Align second DUT
+    selection_fit_duts : iterable or iterable of iterable
+        Defines for each align_duts combination wich devices to use in the track fit.
+        E.g. To use only the telescope planes (first and last 3 planes) but not the 2 center devices
+        selection_fit_duts=[0, 1, 2, 5, 6, 7]
+    selection_hit_duts : iterable or iterable of iterable
+        Defines for each align_duts combination wich devices must have a hit to use the track for fitting. The hit
+        does not have to be used in the fit itself! This is useful for time reference planes.
+        E.g.  To use telescope planes (first and last 3 planes) + time reference plane (3)
+        selection_hit_duts = [0, 1, 2, 4, 5, 6, 7]
     max_iterations : int
         Maximum number of iterations of calc residuals, apply rotation refit loop until constant result is expected.
         Usually the procedure converges rather fast (< 5 iterations)
@@ -789,8 +808,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                 pixel_size=pixel_size,
                                 output_pdf=False,
                                 chunk_size=chunk_size,
-                                npixels_per_bin=5 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps
-                                nbins_per_pixel=1 if (iteration in [0, 1, 2]) else None)  # use a coarse binning for the first steps
+                                npixels_per_bin=5 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
+                                nbins_per_pixel=1 if (iteration in [0, 1, 2]) else None)  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
 
             # Step 4: Deduce rotations from the residuals
             logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
@@ -801,7 +820,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                                                                  n_duts=n_duts,
                                                                                  translation_only=False,
                                                                                  plot_title_prefix=plot_title_prefix,
-                                                                                 relaxation_factor=1.0)
+                                                                                 relaxation_factor=1.0)  # FIXME: good code practice: nothing hardcoded
 
             # Create actual alignment (old alignment + the actual relative change)
             new_alignment_parameters = geometry_utils.merge_alignment_parameters(
@@ -809,12 +828,13 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                 alignment_parameters_change,
                 mode='relative')
 
-            # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
-            logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
-            new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
-                                                                               alignment_last_iteration=alignment_last_iteration,
-                                                                               new_alignment_parameters=new_alignment_parameters,
-                                                                               pixel_size=pixel_size)
+# FIXME: This step does not work well
+#             # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
+#             logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
+#             new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
+#                                                                                alignment_last_iteration=alignment_last_iteration,
+#                                                                                new_alignment_parameters=new_alignment_parameters,
+#                                                                                pixel_size=pixel_size)
 
             # Delete not needed files
             os.remove(track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration)
@@ -1091,7 +1111,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
         basis_global = rotation_matrix.T.dot(np.eye(3))
         dut_plane_normal = basis_global[2]
         actual_dut_position = dut_position.copy()
-        actual_dut_position[2] = align[3] * 1e6  # convert z position from m to um
+        actual_dut_position[2] = align[3] * 1e6  # Convert z position from m to um
         intersections = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
                                                                          line_directions=slopes,
                                                                          position_plane=actual_dut_position,
@@ -1113,8 +1133,8 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
         # Cross check if transformations are correct (z == 0 in the local coordinate system)
         if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
             logging.error('Hit z position = %s and z intersection %s',
-                          str(hit_z_local[~np.isclose(hit_z_local, 0)[:3]]),
-                          str(intersection_z_local[~np.isclose(intersection_z_local, 0)[:3]]))
+                          str(hit_z_local[~np.isclose(hit_z_local, 0)][:3]),
+                          str(intersection_z_local[~np.isclose(intersection_z_local, 0)][:3]))
             raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
         return np.sum(np.abs(hit_x_local - intersection_x_local) / pixel_size[0]) + np.sum(np.abs(hit_y_local - intersection_y_local)) / pixel_size[1]
