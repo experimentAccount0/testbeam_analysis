@@ -693,8 +693,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                     dimensions = dimensions[0]
                 else:
                     dimensions = dimensions[index]
-                n_bin_x = dimensions[0] / actual_bin_size_x
-                n_bin_y = dimensions[1] / actual_bin_size_y
+                n_bin_x = int(dimensions[0] / actual_bin_size_x)
+                n_bin_y = int(dimensions[1] / actual_bin_size_y)
 
                 # Define result histograms, these are filled for each hit chunk
 #                 total_distance_array = np.zeros(shape=(n_bin_x, n_bin_y, max_distance))
