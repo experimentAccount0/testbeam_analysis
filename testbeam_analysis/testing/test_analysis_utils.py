@@ -8,7 +8,7 @@ import tables as tb
 import numpy as np
 
 from testbeam_analysis.cpp import data_struct
-from testbeam_analysis.tools import analysis_utils
+from testbeam_analysis.tools import analysis_utils, test_tools
 
 # Get package path
 testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
@@ -63,8 +63,13 @@ class TestAnalysisUtils(unittest.TestCase):
     def test_map_cluster(self):  # check the compiled function against result
         clusters = np.zeros((20, ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
         result = np.zeros((20, ), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
+        result["mean_column"] = np.nan
+        result["mean_row"] = np.nan
+        result["charge"] = np.nan
         result[1]["event_number"], result[3]["event_number"], result[7]["event_number"], result[8]["event_number"], result[9]["event_number"] = 1, 2, 4, 4, 19
         result[0]["mean_column"], result[1]["mean_column"], result[3]["mean_column"], result[7]["mean_column"], result[8]["mean_column"], result[9]["mean_column"] = 1, 2, 3, 5, 6, 20
+        result[0]["mean_row"], result[1]["mean_row"], result[3]["mean_row"], result[7]["mean_row"], result[8]["mean_row"], result[9]["mean_row"] = 0, 0, 0, 0, 0, 0
+        result[0]["charge"], result[1]["charge"], result[3]["charge"], result[7]["charge"], result[8]["charge"], result[9]["charge"] = 0, 0, 0, 0, 0, 0
 
         for index, cluster in enumerate(clusters):
             cluster['mean_column'] = index + 1
@@ -73,7 +78,9 @@ class TestAnalysisUtils(unittest.TestCase):
         clusters[5]["event_number"] = 4
 
         common_event_number = np.array([0, 1, 1, 2, 3, 3, 3, 4, 4], dtype=np.int64)
-        self.assertTrue(np.all(analysis_utils.map_cluster(common_event_number, clusters) == result[:common_event_number.shape[0]]))
+
+        self.assertTrue(np.all(test_tools.nan_to_num(analysis_utils.map_cluster(common_event_number, clusters)) ==
+                               test_tools.nan_to_num(result[:common_event_number.shape[0]])))
 
     def test_analysis_utils_in1d_events(self):  # check compiled get_in1d_sorted function
         event_numbers = np.array([[0, 0, 2, 2, 2, 4, 5, 5, 6, 7, 7, 7, 8], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=np.int64)
