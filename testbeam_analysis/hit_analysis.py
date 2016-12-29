@@ -41,7 +41,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
         output_hits_file = os.path.splitext(input_hits_file)[0] + '_noisy_pixels.h5'
 
     occupancy = None
-    # calculating occupancy array
+    # Calculating occupancy array
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
             col, row = hits['column'], hits['row']
@@ -51,8 +51,9 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
             else:
                 occupancy = occupancy + chunk_occ
 
-    # run median filter across data, assuming 0 filling past the edges
+    # Run median filter across data, assuming 0 filling past the edges to get expected occupancy
     blurred = median_filter(occupancy.astype(np.int32), size=filter_size, mode='constant', cval=0.0)
+    # Spot noisy pixels maxima by substracting expected occupancy
     difference = np.ma.masked_array(occupancy - blurred)
 
     std = np.ma.std(difference)
@@ -60,21 +61,21 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
     logging.info('Removed %d hot pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
 
-    # generate tuple col / row array of hot pixels, do not use getmask()
+    # Generate tuple col / row array of hot pixels, do not use getmask()
     noisy_pixels_mask = np.ma.getmaskarray(occupancy)
-    # generate pair of col / row arrays
+    # Generate pair of col / row arrays
     noisy_pixels = np.nonzero(noisy_pixels_mask)
-    # check for any noisy pixels
+    # Check for any noisy pixels
     if noisy_pixels[0].shape[0] != 0:
         # map 2d array (col, row) to 1d array to increase selection speed
         noisy_pixels_1d = (noisy_pixels[0] + 1) * n_pixel[1] + (noisy_pixels[1] + 1)
     else:
         noisy_pixels_1d = []
 
-    # storing putput files
+    # Storing putput files
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_hits_file, 'w') as out_file_h5:
-            # creating new hit table without noisy pixels
+            # Creating new hit table without noisy pixels
             hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
                 # Select not noisy pixel
@@ -85,11 +86,11 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
 
             logging.info('Reducing data by a factor of %.2f in file %s', input_file_h5.root.Hits.nrows / hit_table_out.nrows, out_file_h5.filename)
 
-            # creating occupancy table without masking noisy pixels
+            # Creating occupancy table without masking noisy pixels
             occupancy_array_table = out_file_h5.create_carray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             occupancy_array_table[:] = np.ma.getdata(occupancy)
 
-            # creating noisy pixels table
+            # Creating noisy pixels table
             noisy_pixels_table = out_file_h5.create_carray(out_file_h5.root, name='NoisyPixelsMask', title='Noisy Pixels Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             noisy_pixels_table[:] = noisy_pixels_mask
 
