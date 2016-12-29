@@ -192,7 +192,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                         for actual_cluster, start_indices_2[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_2[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
                             # Add only real hits, nan is a virtual hit
-                            selection = actual_cluster['mean_column'] != np.nan
+                            selection = ~np.isnan(actual_cluster['mean_column'])
                             # Convert indices to positions, origin in the center of the sensor
                             actual_mean_column = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
                             actual_mean_row = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
