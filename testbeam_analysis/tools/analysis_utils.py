@@ -152,8 +152,8 @@ def get_max_events_in_both_arrays(events_one, events_two):
 
 def map_cluster(events, cluster):
     """
-    Maps the cluster hits on events. Not existing cluster in events have all values set to 0. Too many cluster per event for the event number are omitted
-    and lost!
+    Maps the cluster hits on events. Not existing cluster in events have all values set to 0 and column/row/charge set to nan.
+    Too many cluster per event for the event number are omitted and lost!
 
     Parameters
     ----------
@@ -167,7 +167,7 @@ def map_cluster(events, cluster):
     event = [ 0  1  1  2  3  3 ]
     cluster.event_number = [ 0  1  2  2  3  4 ]
 
-    gives mapped_cluster.event_number = [ 0  1  1  2  2  3  3  4]
+    gives mapped_cluster.event_number = [ 0  1  0  2  3  0 ]
 
     Returns
     -------
@@ -176,8 +176,10 @@ def map_cluster(events, cluster):
     """
     cluster = np.ascontiguousarray(cluster)
     events = np.ascontiguousarray(events)
-    mapped_cluster = np.empty((events.shape[0],), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
-    mapped_cluster[:] = np.nan
+    mapped_cluster = np.zeros((events.shape[0],), dtype=tb.dtype_from_descr(data_struct.ClusterInfoTable))
+    mapped_cluster['mean_column'] = np.nan
+    mapped_cluster['mean_row'] = np.nan
+    mapped_cluster['charge'] = np.nan
     mapped_cluster = np.ascontiguousarray(mapped_cluster)
     analysis_functions.map_cluster(events, cluster, mapped_cluster)
     return mapped_cluster
