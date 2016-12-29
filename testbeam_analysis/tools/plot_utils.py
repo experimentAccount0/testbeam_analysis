@@ -637,7 +637,7 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
         try:  # data has track candidates
             table = in_file_h5.root.TrackCandidates
         except tb.NoSuchNodeError:  # data has fitted tracks
-            table = in_file_h5.getNode(in_file_h5.root, name='Tracks_DUT_%d' % dut)
+            table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % dut)
             fitted_tracks = True
 
         n_duts = sum(['charge' in col for col in table.dtype.names])
