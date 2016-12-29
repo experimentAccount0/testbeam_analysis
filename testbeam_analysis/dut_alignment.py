@@ -23,14 +23,14 @@ from testbeam_analysis.tools import data_selection
 # Imports for track based alignment
 from testbeam_analysis.track_analysis import fit_tracks
 from testbeam_analysis.result_analysis import calculate_residuals
-from testbeam_analysis import track_analysis
 
 warnings.simplefilter("ignore", OptimizeWarning)  # Fit errors are handled internally, turn of warnings
 
 
-def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, output_pdf_file=None, chunk_size=4999999):
-    '''Histograms the cluster mean column (row) of two different devices on an event basis. If the cluster means are correlated a line should be seen.
-    The cluster means are round to 1 um precision to increase the histogramming speed.
+def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, chunk_size=4999999):
+    '''Histograms the cluster column (row) of two different devices on an event basis.
+
+    If the cluster positions are correlated a line should be seen. The cluster positions are round to 1 um precision to increase the histogramming speed.
     All permutations are considered (all cluster of the first device are correlated with all cluster of the second device).
 
     Parameters
@@ -47,8 +47,6 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
         e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
     dut_names : iterable of strings
         To show the DUT names in the plot
-    output_pdf_file : string
-        File name for the output plots.
     chunk_size: int
         Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
     '''
@@ -305,12 +303,12 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     background = np.array(background, dtype=np.int)  # make Numpy array
                     data = (data - background).astype(np.int)  # remove background
                     data -= data.min()  # only positive values
- 
+
                 if no_fit:
                     # calculate half hight
                     median = np.median(data)
                     median_max = np.median(np.max(data, axis=1))
-                    half_median_data = (data>((median + median_max) / 2))
+                    half_median_data = (data > ((median + median_max) / 2))
                     # calculate maximum per column
                     max_select = np.argmax(data, axis=1)
                     hough_data = np.zeros_like(data)
@@ -322,7 +320,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     accumulator, theta, rho, theta_edges, rho_edges = analysis_utils.hough_transform(hough_data, theta_res=0.1, rho_res=1.0, return_edges=True)
                     rho_idx, th_idx = np.unravel_index(accumulator.argmax(), accumulator.shape)
                     rho_val, theta_val = rho[rho_idx], theta[th_idx]
-                    slope_idx, offset_idx = -np.cos(theta_val)/np.sin(theta_val), rho_val/np.sin(theta_val)
+                    slope_idx, offset_idx = -np.cos(theta_val) / np.sin(theta_val), rho_val / np.sin(theta_val)
                     slope = slope_idx * (pixel_size_ref / pixel_size_dut)
                     offset = offset_idx * pixel_size_ref
                     # offset in the center of the pixel matrix
@@ -354,13 +352,13 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 else:
                     # fill the arrays from above with values
                     fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, fit_background=fit_background, reduce_background=reduce_background)
-    
+
                     # Convert fit results to metric units for alignment fit
                     # Origin is center of pixel matrix
                     x_dut_scaled = (x_dut - 0.5 * n_pixel_dut) * pixel_size_dut
                     mean_fitted_scaled = (mean_fitted - 0.5 * n_pixel_ref) * pixel_size_ref
                     mean_error_fitted_scaled = mean_error_fitted * pixel_size_ref
-    
+
                     # Selected data arrays
                     x_selected = x_dut.copy()
                     x_dut_scaled_selected = x_dut_scaled.copy()
@@ -369,7 +367,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     sigma_fitted_selected = sigma_fitted.copy()
                     chi2_selected = chi2.copy()
                     n_cluster_selected = n_cluster.copy()
-    
+
                     # Show the straigt line correlation fit including fit errors and offsets from the fit
                     # Let the user change the cuts (error limit, offset limit) and refit until result looks good
                     refit = True
@@ -396,30 +394,30 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                             actual_iteration += 1
                             if actual_iteration > iterations:
                                 break
-    
+
                     # Linear fit, usually describes correlation very well, slope is close to 1.
                     # With low energy beam and / or beam with diverse agular distribution, the correlation will not be perfectly straight
                     # Use results from straight line fit as start values for this final fit
                     re_fit, re_fit_pcov = curve_fit(analysis_utils.linear, x_dut_scaled_selected, mean_fitted_scaled_selected, sigma=mean_error_fitted_scaled_selected, absolute_sigma=True, p0=[fit[0], fit[1]])
-    
+
                     # Write fit results to array
                     result[dut_idx][table_prefix + '_c0'], result[dut_idx][table_prefix + '_c0_error'] = re_fit[0], np.absolute(re_fit_pcov[0][0]) ** 0.5
                     result[dut_idx][table_prefix + '_c1'], result[dut_idx][table_prefix + '_c1_error'] = re_fit[1], np.absolute(re_fit_pcov[1][1]) ** 0.5
                     result[dut_idx]['z'] = z_positions[dut_idx]
-    
+
                     # Calculate mean sigma (is a residual when assuming straight tracks) and its error and store the actual data in result array
                     # This error is needed for track finding and track quality determination
                     mean_sigma = pixel_size_ref * np.mean(np.array(sigma_fitted_selected))
                     mean_sigma_error = pixel_size_ref * np.std(np.array(sigma_fitted_selected)) / np.sqrt(np.array(sigma_fitted_selected).shape[0])
-    
+
                     result[dut_idx][table_prefix + '_sigma'], result[dut_idx][table_prefix + '_sigma_error'] = mean_sigma, mean_sigma_error
-    
+
                     # Calculate the index of the beam center based on valid indices
                     plot_index = np.average(x_selected - 1, weights=np.sum(data, axis=1)[np.array(x_selected - 1, dtype=np.int)])
                     # Find nearest valid index to the calculated index
                     idx = (np.abs(x_selected - 1 - plot_index)).argmin()
                     plot_index = np.array(x_selected - 1, dtype=np.int)[idx]
-    
+
                     if np.all(np.isnan(coeff_fitted[plot_index][3:6])):
                         y_fit = analysis_utils.gauss_offset(x_ref, *coeff_fitted[plot_index][[0, 1, 2, 6]])
                         fit_label = "Gauss-Offset"
@@ -433,7 +431,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                                     fit_label=fit_label,
                                                     title="Correlation of %s: %s vs. %s at %s %d" % (table_prefix + "s", ref_name, dut_name, table_prefix, plot_index),
                                                     output_pdf=output_pdf)
-    
+
                     # Plot selected data with fit
                     fit_fn = np.poly1d(re_fit[::-1])
                     selected_indices = np.searchsorted(x_dut_scaled, x_dut_scaled_selected)
@@ -468,7 +466,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
 
 def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):
-    
+
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
         return [
@@ -477,7 +475,9 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
         ]
 
     def signal_sanity_check(coeff, signal_noise, A_peak):
-        ''' Sanity check if signal was deducted correctly from background. 3 Conditions:
+        ''' Sanity check if signal was deducted correctly from background.
+
+            3 Conditions:
             1. The given signal to noise value has to be fullfilled: S/N > Amplitude Signal / ( Amplidude background + Offset)
             2. The signal + background has to be large enough: Amplidute 1 + Amplitude 2 + Offset > Data maximum / 2
             3. The Signal Sigma has to be smaller than the background sigma, otherwise beam would be larger than one pixel pitch
@@ -647,7 +647,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
         selection = hits_chunk['x_dut_%d' % dut_index] != 0  # Do not change virtual hits
 
-        if use_prealignment: # Apply transformation from pre-alignment information
+        if use_prealignment:  # Apply transformation from pre-alignment information
             hits_chunk['x_dut_%d' % dut_index][selection], hits_chunk['y_dut_%d' % dut_index][selection], hit_z = geometry_utils.apply_alignment(hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
                                                                                                                                                  hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
                                                                                                                                                  hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
@@ -789,19 +789,19 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                 pixel_size=pixel_size,
                                 output_pdf=False,
                                 chunk_size=chunk_size,
-                                npixels_per_bin=5 if (iteration in [0,1,2]) else None,  # use a coarse binning for the first steps
-                                nbins_per_pixel=1 if (iteration in [0,1,2]) else None)  # use a coarse binning for the first steps
+                                npixels_per_bin=5 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps
+                                nbins_per_pixel=1 if (iteration in [0, 1, 2]) else None)  # use a coarse binning for the first steps
 
             # Step 4: Deduce rotations from the residuals
             logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
             alignment_parameters_change, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
-                                                                              output_fig=output_pdf,
-                                                                              fit_duts=fit_duts,
-                                                                              pixel_size=pixel_size,
-                                                                              n_duts=n_duts,
-                                                                              translation_only=False,
-                                                                              plot_title_prefix=plot_title_prefix,
-                                                                              relaxation_factor=1.0)
+                                                                                 output_fig=output_pdf,
+                                                                                 fit_duts=fit_duts,
+                                                                                 pixel_size=pixel_size,
+                                                                                 n_duts=n_duts,
+                                                                                 translation_only=False,
+                                                                                 plot_title_prefix=plot_title_prefix,
+                                                                                 relaxation_factor=1.0)
 
             # Create actual alignment (old alignment + the actual relative change)
             new_alignment_parameters = geometry_utils.merge_alignment_parameters(
@@ -812,7 +812,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
             logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
             new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
-                                                                               alignment_last_iteration=alignment_last_iteration, 
+                                                                               alignment_last_iteration=alignment_last_iteration,
                                                                                new_alignment_parameters=new_alignment_parameters,
                                                                                pixel_size=pixel_size)
 
@@ -834,8 +834,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
             else:
                 total_residual = new_total_residual
 
-#             with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-            alignment_last_iteration = new_alignment_parameters.copy() #in_file_h5.root.Alignment[:]
+# with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+            alignment_last_iteration = new_alignment_parameters.copy()  # in_file_h5.root.Alignment[:]
 
             logging.info('= Alignment step 6 / iteration %d: Set new rotation / translation information in alignment file =', iteration)
             geometry_utils.store_alignment_parameters(input_alignment_file,
@@ -861,7 +861,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
                                    track_quality_mask=track_quality_mask,
                                    chunk_size=chunk_size)
         input_track_candidates_reduced = input_track_candidates_file[:-3] + '_reduced_%d.h5' % alignment_index
- 
+
         # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
         logging.info('= Alignment step 1: Revert pre-alignment =')
         apply_alignment(input_hit_file=input_track_candidates_reduced,
@@ -1082,7 +1082,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
     this leads to better results (most likely heavily scattered tracks / beam angle spread at the edges are weighted less).'''
     # Create new absolute alignment
     alignment_result = new_alignment_parameters
-    
+
     def _minimize_me(align, dut_position, hit_x_local, hit_y_local, hit_z_local, pixel_size, offsets, slopes):
         # Calculate intersections with a dut plane given by alpha, beta, gamma at the dut_position in the global coordinate system
         rotation_matrix = geometry_utils.rotation_matrix(alpha=align[0],
@@ -1099,21 +1099,21 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
 
         # Transform to the local coordinate system to compare with measured hits
         transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=actual_dut_position[0],
-                                                                                      y=actual_dut_position[1],
-                                                                                      z=actual_dut_position[2],
-                                                                                      alpha=align[0],
-                                                                                      beta=align[1],
-                                                                                      gamma=align[2])
+                                                                                     y=actual_dut_position[1],
+                                                                                     z=actual_dut_position[2],
+                                                                                     alpha=align[0],
+                                                                                     beta=align[1],
+                                                                                     gamma=align[2])
 
-        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_transformation_matrix(x=intersections[:, 0], 
-                                                                                                                      y=intersections[:, 1], 
-                                                                                                                      z=intersections[:, 2], 
+        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_transformation_matrix(x=intersections[:, 0],
+                                                                                                                      y=intersections[:, 1],
+                                                                                                                      z=intersections[:, 2],
                                                                                                                       transformation_matrix=transformation_matrix)
-        
+
         # Cross check if transformations are correct (z == 0 in the local coordinate system)
         if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
-            logging.error('Hit z position = %s and z intersection %s', 
-                          str(hit_z_local[~np.isclose(hit_z_local, 0)[:3]]), 
+            logging.error('Hit z position = %s and z intersection %s',
+                          str(hit_z_local[~np.isclose(hit_z_local, 0)[:3]]),
                           str(intersection_z_local[~np.isclose(intersection_z_local, 0)[:3]]))
             raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
@@ -1126,75 +1126,75 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
         for node in in_file_h5.root:
             actual_dut = int(re.findall(r'\d+', node.name)[-1])
             dut_position = np.array([alignment_last_iteration[actual_dut]['translation_x'], alignment_last_iteration[actual_dut]['translation_y'], alignment_last_iteration[actual_dut]['translation_z']])
-            
+
             # Hits with the actual alignment
             hits = np.vstack((node[:]['x_dut_%d' % actual_dut], node[:]['y_dut_%d' % actual_dut], node[:]['z_dut_%d' % actual_dut])).T
-            
+
             # Transform hits to the local coordinate system
-            hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hits_x=hits[:, 0], 
-                                                                                   hits_y=hits[:, 1], 
-                                                                                   hits_z=hits[:, 2], 
+            hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hits_x=hits[:, 0],
+                                                                                   hits_y=hits[:, 1],
+                                                                                   hits_z=hits[:, 2],
                                                                                    dut_index=actual_dut,
                                                                                    alignment=alignment_last_iteration,
                                                                                    inverse=True)
-            
+
             # Track infos
             offsets = np.vstack((node[:]['offset_0'], node[:]['offset_1'], node[:]['offset_2'])).T
             slopes = np.vstack((node[:]['slope_0'], node[:]['slope_1'], node[:]['slope_2'])).T
-            
+
             # Rotation start values of minimizer
             alpha = alignment_result[actual_dut]['alpha']
             beta = alignment_result[actual_dut]['beta']
             gamma = alignment_result[actual_dut]['gamma']
             z_position = alignment_result[actual_dut]['translation_z']
-            
+
             # Trick to have the same order of magnitue of variation for angles and position, otherwise scipy minimizers
             # do not converge if step size of parameters is very different
             z_position_in_m = z_position / 1e6
 
-            residual = _minimize_me(np.array([alpha, beta, gamma, z_position_in_m]), 
-                                      dut_position, 
-                                      hit_x_local, 
-                                      hit_y_local, 
-                                      hit_z_local, 
-                                      pixel_size[actual_dut], 
-                                      offsets, 
-                                      slopes)
+            residual = _minimize_me(np.array([alpha, beta, gamma, z_position_in_m]),
+                                    dut_position,
+                                    hit_x_local,
+                                    hit_y_local,
+                                    hit_z_local,
+                                    pixel_size[actual_dut],
+                                    offsets,
+                                    slopes)
             residuals_before.append(residual)
-            logging.info('Optimize angles / z of DUT %d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' %(actual_dut, 
-                                                                                                                     alpha, 
-                                                                                                                     beta, 
-                                                                                                                     gamma,
-                                                                                                                     z_position_in_m * 1e6, 
-                                                                                                                     residual))
+            logging.info('Optimize angles / z of DUT %d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
+                                                                                                                                             alpha,
+                                                                                                                                             beta,
+                                                                                                                                             gamma,
+                                                                                                                                             z_position_in_m * 1e6,
+                                                                                                                                             residual))
 
-            #FIXME:
+            # FIXME:
             # Has to be heavily restricted otherwise converges to unphysical solutions since the scoring with residuals is not really working well
             bounds = [(alpha - 0.01, alpha + 0.01), (beta - 0.01, beta + 0.01), (gamma - 0.001, gamma + 0.001), (z_position_in_m - 10e-6, z_position_in_m + 10e-6)]
- 
+
             result = minimize(fun=_minimize_me,
-                    x0=np.array([alpha, beta, gamma, z_position_in_m]),  # Start values from residual fit
-                    args=(dut_position, hit_x_local, hit_y_local, hit_z_local, pixel_size[actual_dut], offsets, slopes),
-                    bounds=bounds,
-                    method='SLSQP')
-             
+                              x0=np.array([alpha, beta, gamma, z_position_in_m]),  # Start values from residual fit
+                              args=(dut_position, hit_x_local, hit_y_local, hit_z_local, pixel_size[actual_dut], offsets, slopes),
+                              bounds=bounds,
+                              method='SLSQP')
+
             alpha, beta, gamma, z_position_in_m = result.x
-            residual = _minimize_me(result.x, 
-                                          dut_position, 
-                                          hit_x_local, 
-                                          hit_y_local, 
-                                          hit_z_local, 
-                                          pixel_size[actual_dut], 
-                                          offsets, 
-                                          slopes)
+            residual = _minimize_me(result.x,
+                                    dut_position,
+                                    hit_x_local,
+                                    hit_y_local,
+                                    hit_z_local,
+                                    pixel_size[actual_dut],
+                                    offsets,
+                                    slopes)
             residuals_after.append(residual)
- 
-            logging.info('Found angles of DUT %d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' %(actual_dut, 
-                                                                                                                     alpha, 
-                                                                                                                     beta, 
-                                                                                                                     gamma,
-                                                                                                                     z_position_in_m * 1e6, 
-                                                                                                                     residual))
+
+            logging.info('Found angles of DUT %d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
+                                                                                                                                 alpha,
+                                                                                                                                 beta,
+                                                                                                                                 gamma,
+                                                                                                                                 z_position_in_m * 1e6,
+                                                                                                                                 residual))
             # Rotation start values of minimizer
             alignment_result[actual_dut]['alpha'] = alpha
             alignment_result[actual_dut]['beta'] = beta
@@ -1206,7 +1206,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
     logging.info('Reduced the total residuals in the optimization steps from %1.2e to %1.2e', total_residuals_before, total_residuals_after)
     if total_residuals_before < total_residuals_after:
         raise RuntimeError('Alignment optimization did not converge!')
-    
+
     return alignment_result, total_residuals_after  # Return alignment result and total residual
 
 
