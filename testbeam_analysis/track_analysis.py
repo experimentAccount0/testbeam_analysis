@@ -131,7 +131,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         the duts to fit tracks for. If None all duts are used
     selection_hit_duts : iterable, or iterable of iterable
         The duts that are required to have a hit with the given track quality. Otherwise the track is omitted
-        If None: require all DUTs to have a hit, but if require_dut_hit = False do not use actual fit_dut.
+        If None: require all DUTs to have a hit, but if exclude_dut_hit = True do not use actual fit_dut.
         If iterable: use selection for all devices, e.g.: Require hit in DUT 0, and 3: selection_hit_duts = (0, 3)
         If iterable of iterable: define dut with hits for all devices seperately.
         E.g: for 3 devices: selection_hit_duts = ((1, 2), (0, 1, 2), (0, 1))
@@ -160,7 +160,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
     min_track_distance : iterable, boolean
         A minimum distance all track intersection at the DUT have to be apart, otherwise these tracks are deleted.
-        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is not implemented and error prone.
+        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone and will not be implemented.
         If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
         e.g.: For two devices: min_track_distance = (50, 250)
         If false the track distance is not considered.
@@ -288,7 +288,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
         # Remove tracks that are too close when extrapolated to the actual DUT
-        # All but one merged track are signaled by n_tracks = -1       
+        # All merged track are signaled by n_tracks = -1
         actual_min_track_distance = min_track_distance[fit_dut]
         if actual_min_track_distance > 0:
             _find_merged_tracks(tracks_array, actual_min_track_distance)
