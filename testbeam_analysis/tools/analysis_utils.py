@@ -96,8 +96,10 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
 
     Parameters
     ----------
-    data_1, data_2: np.recarray with event_number column
-    column_corr_hist, row_corr_hist: np.arrays to be filled with correlation data
+    data_1, data_2: np.recarray
+        Has to have event_number / mean_column / mean_row columns
+    column_corr_hist, row_corr_hist: np.arrays
+        Holds correlation data. Has to be of sufficient size
 
     """
     index_data_2 = 0
@@ -110,11 +112,13 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
 
         for event_index_data_2 in range(index_data_2, data_2.shape[0]):
             if data_1[index_data_1]['event_number'] == data_2[event_index_data_2]['event_number']:
-                # assuming value is an index, cluster index 1 from 0.5 to 1.4999, index 2 from 1.5 to 2.4999, etc.
+                # Assuming value is an index, cluster index 1 from 0.5 to 1.4999, index 2 from 1.5 to 2.4999, etc.
                 column_index_dut_1 = int(np.floor(data_1[index_data_1]['mean_column'] - 0.5))
                 row_index_dut_1 = int(np.floor(data_1[index_data_1]['mean_row'] - 0.5))
                 column_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_column'] - 0.5))
                 row_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_row'] - 0.5))
+
+                assert column_index_dut_1 >= 0 and row_index_dut_1 >= 0 and column_index_dut_2 >= 0 and row_index_dut_2 >= 0
 
                 # Add correlation to histogram
                 column_corr_hist[column_index_dut_2, column_index_dut_1] += 1
