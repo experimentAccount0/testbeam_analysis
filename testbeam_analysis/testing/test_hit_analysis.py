@@ -39,11 +39,11 @@ class TestHitAnalysis(unittest.TestCase):
 
     def test_noisy_pixel_remover(self):
         # Test 1:
-        hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=1.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4))
+        hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=10.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4))
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'HotPixel_result.h5'), os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
         self.assertTrue(data_equal, msg=error_msg)
         # Test 2: smaller chunks
-        hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=1.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4), chunk_size=4999)
+        hit_analysis.remove_noisy_pixels(self.noisy_data_file, threshold=10.0, n_pixel=(1152, 576), pixel_size=(18.4, 18.4), chunk_size=4999)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'HotPixel_result.h5'), os.path.join(self.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
         self.assertTrue(data_equal, msg=error_msg)
 
