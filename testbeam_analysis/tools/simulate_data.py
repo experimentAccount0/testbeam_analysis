@@ -267,7 +267,7 @@ class SimulateData(object):
         self.beam_direction = (0, 2. * np.pi)  # The range of directions of the beam (phi in spherical coordinates) at z = 0 in Rad
         self.beam_momentum = 3200  # Beam momentum in MeV
         self.tracks_per_event = 1  # Average number of tracks per event
-        self.tracks_per_event_sigma = 1  # Deviation from the average number of tracks, makes no track pe event possible!
+        self.tracks_per_event_sigma = 1  # Deviation from the average number of tracks, makes no track per event possible!
 
         # Device settings
         self.dut_bias = [50] * self._n_duts  # Sensor bias voltage for each device in volt

@@ -26,7 +26,7 @@ class TestTrackAnalysis(unittest.TestCase):
         cls.pixel_size = (250, 50)  # in um
 
     @classmethod
-    def tearDownClass(cls):  # remove created files
+    def tearDownClass(cls):  # Remove created files
         os.remove(os.path.join(cls.output_folder, 'TrackCandidates.h5'))
         os.remove(os.path.join(cls.output_folder, 'TrackCandidates_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracks.h5'))
