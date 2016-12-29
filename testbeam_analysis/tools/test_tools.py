@@ -5,6 +5,16 @@ import numpy as np
 import tables as tb
 
 
+def nan_to_num(array):
+    ''' Like np.nan_to_num but also works on recarray
+    '''
+    if array.dtype.names is None:  # normal nd.array
+        array = np.nan_to_num(array)
+    else:
+        for column_name in array.dtype.names:
+            array[column_name] = np.nan_to_num(array[column_name])
+
+
 def get_array_differences(first_array, second_array):
     '''Takes two numpy.ndarrays and compares them on a column basis.
     Different column data types, missing columns and columns with different values are returned in a string.
@@ -24,8 +34,10 @@ def get_array_differences(first_array, second_array):
         return_str = ''
         for column_name in first_array.dtype.names:
             first_column = first_array[column_name]
+            nan_to_num(first_column)  # Otherwise check with nan fails
             try:
                 second_column = second_array[column_name]
+                nan_to_num(second_column)  # Otherwise check with nan fails
             except ValueError:
                 return_str += 'No ' + column_name + ' column found. '
                 continue
@@ -34,7 +46,7 @@ def get_array_differences(first_array, second_array):
             if (first_column.shape != second_column.shape):
                 return_str += 'The array length is different: %s != %s' % (str(first_column.shape), str(second_column.shape))
                 return ': ' + return_str
-            if not np.all(first_column == second_column):  # check if the data of the column is equal
+            if not np.all(first_column == second_column):  # Check if the data of the column is equal
                 return_str += 'Column ' + column_name + ' not equal. '
         for column_name in second_array.dtype.names:
             try:
@@ -99,8 +111,12 @@ def compare_h5_files(first_file, second_file, expected_nodes=None, detailed_comp
                 try:
                     expected_data = first_h5_file.get_node(first_h5_file.root, node.name)[:]
                     data = second_h5_file.get_node(second_h5_file.root, node.name)[:]
+                    # Convert nan to number otherwise check fails
+                    nan_to_num(data)
+                    nan_to_num(expected_data)
                     if exact:
-                        if not np.array_equal(expected_data, data):  # compare the arrays for each element
+                        # Use close without error to allow equal nan
+                        if not np.array_equal(expected_data, data):
                             checks_passed = False
                             error_msg += node.name
                             if detailed_comparison:
