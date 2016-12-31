@@ -1,7 +1,7 @@
-'''Example script to run a full analysis high resolution telescope data with a small device under tests and a fast time reference plane.
+'''Example script to run a full analysis with high resolution telescope data + a fast time reference plane + a small device under tests.
 
 The telescope consists of 6 Mimosa26 planes and one FE-I4 with a full size planar n-in-n sensor as a timing reference.
-The device under tests is a small passive CMOS sensor from LFoundry.
+The device under tests is a small passive sensor in LFoundry 150 nm CMOS process.
 
 The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
 The total size of the chip is 21.5mm x 13.7mm x 0.036mm (radiation length 9.3660734)
@@ -121,19 +121,19 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                             align_duts=[[0, 1, 2, 5, 6, 7],  # align the telescope planes first
                                         [4],  # align the time reference after the telescope alignment
                                         [3]],  # align the DUT last and not with the reference since it is rather small and would make the time reference alinmnt worse
-                            # The DUTs to be used in the fit, always just the high resolution Mimosa26 planes
+                            # The DUTs to be used in the fit, always just the high resolution Mimosa26 planes used
                             selection_fit_duts=[0, 1, 2, 5, 6, 7],
                             # The DUTs to be required to have a hit for the alignment
-                            selection_hit_duts=[[0, 1, 2, 4, 5, 6, 7],
-                                                [0, 1, 2, 4, 5, 6, 7],
-                                                [0, 1, 2, 3, 4, 5, 6, 7]],  # Require hit in the small DUT
-                            # The reuqired track quality per alignment step and DUT
+                            selection_hit_duts=[[0, 1, 2, 4, 5, 6, 7],  # Take tracks with time reference hit
+                                                [0, 1, 2, 4, 5, 6, 7],  # Take tracks with time reference hit
+                                                [0, 1, 2, 3, 4, 5, 6, 7]],  # Also require hit in the small DUT
+                            # The required track quality per alignment step and DUT
                             selection_track_quality=[[1, 1, 1, 0, 1, 1, 1],  # Do not require a good hit in the time refernce
                                                      [1, 1, 1, 1, 1, 1, 1],
                                                      [1, 1, 1, 1, 0, 1, 1, 1]],  # Do not require a good hit in the small DUT
-                            initial_rotation=[[0., 0, 0.],
-                                              [0., 0, 0.],
-                                              [0, 0, 0.],
+                            initial_rotation=[[0., 0., 0.],
+                                              [0., 0., 0.],
+                                              [0., 0., 0.],
                                               # Devices 3, 4 are heavily rotated (inverted), this is not implemented now
                                               # Thus one has to set the correct rotation angles here manually
                                               [np.pi - 0.05, -0.05, -0.005],
@@ -152,7 +152,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                                  [0., 0, 0.],
                                                  [0., 0, 0.]],
                             n_pixels=n_pixels,
-                            use_n_tracks=200000,  # Do he alignment only on a subset of data, needed for reasonable run time
+                            use_n_tracks=200000,  # Do the alignment only on a subset of data, needed for reasonable run time
                             pixel_size=pixel_size)
 
     # Apply new alignment to data
