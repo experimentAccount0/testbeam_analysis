@@ -581,16 +581,16 @@ class SimulateData(object):
         hits_digitized = self._digitize_hits(event_number, hits)
         return hits_digitized
 
-    def _get_charge_deposited(self, dut_index, n_entries, eta=0.2):
+    def _get_charge_deposited(self, dut_index, n_entries, eta=1.):
         ''' Calculates the charge distribution wich is approximated by a Landau and returns n_entries random samples from this
         distribution. The device thickness defines the MPV.
 
         '''
-        x = np.arange(0, 10, 0.1)
+        x = np.arange(0., 100., 1.)
         y = pylandau.landau(x, mpv=1., eta=eta)  # eta is different according to the device thickness; this is neglected here
         p = y / np.sum(y)  # Propability by normalization to integral
-        mpv = 77 * self.dut_thickness[dut_index]
-        charge = x * mpv
+        mpv = 71 * self.dut_thickness[dut_index]
+        charge = x * mpv / 10.
 
         return np.random.choice(charge, n_entries, p=p)
 
