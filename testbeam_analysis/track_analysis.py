@@ -293,7 +293,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         if actual_min_track_distance > 0:
             _find_merged_tracks(tracks_array, actual_min_track_distance)
             selection = tracks_array['n_tracks'] > 0
-            logging.info('Removed %d merged tracks', np.count_nonzero(~selection))
+            logging.info('Removed %d merged tracks (%1.1f%%)', np.count_nonzero(~selection), float(np.count_nonzero(~selection)) / selection.shape[0] * 100.)
             tracks_array = tracks_array[selection]
 
         tracklets_table.append(tracks_array)
