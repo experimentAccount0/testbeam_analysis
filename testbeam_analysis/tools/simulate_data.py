@@ -308,8 +308,9 @@ class SimulateData(object):
             output_files.append(tb.open_file(base_file_name + '_DUT%d.h5' % dut_index, 'w'))
             hit_tables.append(output_files[dut_index].create_table(output_files[dut_index].root, name='Hits', description=self._hit_dtype, title='Simulated hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)))
 
-        progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=len(range(0, n_events, chunk_size)), term_width=80)
-        progress_bar.start()
+        if n_events * self.tracks_per_event > 100000:
+            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=len(range(0, n_events, chunk_size)), term_width=80)
+            progress_bar.start()
         # Fill output files in chunks
         for chunk_index, _ in enumerate(range(0, n_events, chunk_size)):
             actual_events, actual_digitized_hits = self._create_data(start_event_number=chunk_index * chunk_size, n_events=chunk_size)
@@ -321,8 +322,10 @@ class SimulateData(object):
                 actual_hits['row'] = actual_dut_hits.T[1]
                 actual_hits['charge'] = actual_dut_hits.T[2] / 10.  # One charge LSB corresponds to 10 electrons
                 hit_tables[dut_index].append(actual_hits)
-            progress_bar.update(chunk_index)
-        progress_bar.finish()
+            if n_events * self.tracks_per_event > 100000:
+                progress_bar.update(chunk_index)
+        if n_events * self.tracks_per_event > 100000:
+            progress_bar.finish()
 
         for output_file in output_files:
             output_file.close()
