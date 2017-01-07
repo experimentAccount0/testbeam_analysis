@@ -116,12 +116,11 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
     n_hits = 0  # Total Number of hits created
 
     position_z = thickness / 2  # FIXME: Charges are distributed along a track and not in the center z
-
-    for actual_column in range(column, max_column):  # Calc charge in pixels in + column direction
+    for actual_column in range(int(column), max_column):  # Calc charge in pixels in + column direction
         if total_fraction >= 1. - min_fraction or _calc_charge_fraction(relative_position, position_z, actual_column - column, 0, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc) < min_fraction:  # Omit row loop if charge fraction is already too low for seed row (=0)
             break
 
-        for actual_row in range(row, max_row):  # Calc charge in pixels in + row direction
+        for actual_row in range(int(row), max_row):  # Calc charge in pixels in + row direction
             fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
             total_fraction += fraction
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
@@ -133,7 +132,7 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if total_fraction >= 1. - min_fraction:
                 break
 
-        for actual_row in range(row - 1, 0, -1):  # Calc charge in pixels in - row direction
+        for actual_row in range(int(row - 1), 0, -1):  # Calc charge in pixels in - row direction
             fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
             total_fraction += fraction
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
@@ -145,11 +144,11 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if total_fraction >= 1. - min_fraction:
                 break
 
-    for actual_column in range(column - 1, 0, -1):  # Calc charge in pixels in + column direction
+    for actual_column in range(int(column - 1), 0, -1):  # Calc charge in pixels in + column direction
         if total_fraction >= 1. - min_fraction or _calc_charge_fraction(relative_position, position_z, actual_column - column, 0, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc) < min_fraction:  # Omit row loop if charge fraction is already too low for seed row (=0)
             break
 
-        for actual_row in range(row, max_row):  # Calc charge in pixels in + row direction
+        for actual_row in range(int(row), max_row):  # Calc charge in pixels in + row direction
             fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
             total_fraction += fraction
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
@@ -161,7 +160,7 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if total_fraction >= 1. - min_fraction:
                 break
 
-        for actual_row in range(row - 1, 0, -1):  # Calc charge in pixels in - row direction
+        for actual_row in range(int(row - 1), 0, -1):  # Calc charge in pixels in - row direction
             fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
             total_fraction += fraction
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
@@ -236,10 +235,11 @@ def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
 class SimulateData(object):
 
     def __init__(self, random_seed=None):
-        self.random_seed = random_seed
-        np.random.seed(self.random_seed)  # Set the random number seed to be able to rerun with same data
-        self._n_duts = 6  # Std. setting fot the number of DUTs
         self.reset()
+
+    def set_random_seed(self, value):
+        self.random_seed = value
+        np.random.seed(self.random_seed)  # Set the random number seed to be able to rerun with same results
 
     @property
     def n_duts(self):
@@ -248,7 +248,7 @@ class SimulateData(object):
     @n_duts.setter
     def n_duts(self, value):
         if value > self._n_duts:
-            logging.warning('Number of DUTs increased, reset settings!')
+            logging.warning('Number of DUTs increased, reset to standard settings!')
             self.set_std_settings()
         self._n_duts = value
 
@@ -289,6 +289,9 @@ class SimulateData(object):
         self._hit_dtype = np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)])
 
     def reset(self):
+        ''' Reset to init configuration '''
+        self._n_duts = 6  # Std. settinng for the number of DUTs
+        self.set_random_seed(0)
         self.set_std_settings()
         self._hit_files = None
 
@@ -500,7 +503,7 @@ class SimulateData(object):
                 # Create cluster from seed hits dut to charge sharing
                 if self.digitization_charge_sharing:
                     relative_position = dut_hits[:, :2] - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
-                    dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position.T,  # This function takes 75 % of the time
+                    dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position,  # This function takes 75 % of the time
                                                                                  hits_digits=dut_hits_digits,
                                                                                  max_column=self.dut_n_pixel[dut_index][0],
                                                                                  max_row=self.dut_n_pixel[dut_index][1],
@@ -586,11 +589,16 @@ class SimulateData(object):
         distribution. The device thickness defines the MPV.
 
         '''
-        x = np.arange(0., 100., 1.)
-        y = pylandau.landau(x, mpv=1., eta=eta)  # eta is different according to the device thickness; this is neglected here
+
+        x = np.linspace(0., 100., 10000)
+        y = pylandau.landau(x, mpv=10., eta=eta)  # eta is different depending on the device thickness; this is neglected here
         p = y / np.sum(y)  # Propability by normalization to integral
+
         mpv = 71 * self.dut_thickness[dut_index]
         charge = x * mpv / 10.
+#         from matplotlib import pyplot as plt
+#         plt.plot(charge, p)
+#         plt.show()
 
         return np.random.choice(charge, n_entries, p=p)
 
