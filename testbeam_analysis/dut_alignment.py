@@ -283,7 +283,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 n_pixel_dut, n_pixel_ref = data.shape[0], data.shape[1]
 
-                # initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
+                # Initialize arrays with np.nan (invalid), adding 0.5 to change from index to position
                 # matrix index 0 is cluster index 1 ranging from 0.5 to 1.4999, which becomes position 0.0 to 0.999 with center at 0.5, etc.
                 x_ref = (np.linspace(0.0, n_pixel_ref, num=n_pixel_ref, endpoint=False, dtype=np.float) + 0.5)
                 x_dut = (np.linspace(0.0, n_pixel_dut, num=n_pixel_dut, endpoint=False, dtype=np.float) + 0.5)
@@ -352,7 +352,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
                 else:
                     # fill the arrays from above with values
-                    fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, fit_background=fit_background, reduce_background=reduce_background)
+                    _fit_data(x=x_ref, data=data, s_n=s_n, coeff_fitted=coeff_fitted, mean_fitted=mean_fitted, mean_error_fitted=mean_error_fitted, sigma_fitted=sigma_fitted, chi2=chi2, fit_background=fit_background, reduce_background=reduce_background)
 
                     # Convert fit results to metric units for alignment fit
                     # Origin is center of pixel matrix
@@ -466,14 +466,18 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
 
-def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):
+def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):
 
     def calc_limits_from_fit(coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
-        return [
+        limits = [
             [0.1 * coeff[0], x.min(), 0.5 * coeff[2], 0.01 * coeff[3], x.min(), 0.5 * coeff[5], 0.5 * coeff[6]],
             [10.0 * coeff[0], x.max(), 2.0 * coeff[2], 10.0 * coeff[3], x.max(), 2.0 * coeff[5], 2.0 * coeff[6]]
         ]
+        # Fix too small sigma, sigma < 1 is unphysical
+        if limits[1][2] < 1.:
+            limits[1][2] = 10.
+        return limits
 
     def signal_sanity_check(coeff, signal_noise, A_peak):
         ''' Sanity check if signal was deducted correctly from background.
@@ -558,16 +562,30 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
             bounds_gauss_offset = [0, np.inf]
             bounds_gauss_offset[0] = [bound_val for i, bound_val in enumerate(bounds[0]) if i in (0, 1, 2, 6)]
             bounds_gauss_offset[1] = [bound_val for i, bound_val in enumerate(bounds[1]) if i in (0, 1, 2, 6)]
+            
+#             print index
+#             print bounds_gauss_offset
+#             plt.bar(x, data[index, :], label='Data')
+
+#             xx = np.linspace(x[0], x[-1], num=10000, endpoint=True)
+#             plt.plot(xx, analysis_utils.gauss_offset(xx, *p0_gauss_offset), label='Start Values')
 
             try:
                 coeff_gauss_offset, var_matrix = curve_fit(analysis_utils.gauss_offset, x, data[index, :], p0=p0_gauss_offset, bounds=bounds_gauss_offset)
+#                 plt.plot(xx, analysis_utils.gauss_offset(xx, *coeff_gauss_offset), label='Fit')
             except RuntimeError:  # curve_fit failed
                 fit_converged = False
             else:
-                fit_converged = True
-                # Change back coefficents
-                coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)  # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
-
+                # Correlation should have at least 2 entries to avoid random fluctuation peaks to be selected
+                if coeff_gauss_offset[0] > 2:
+                    fit_converged = True
+                    # Change back coefficents
+                    coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)  # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
+                else:
+                    fit_converged = False
+#             plt.grid(True)
+#             plt.legend(loc=0)
+#             plt.show()
         # Set fit results for given index if successful
         if fit_converged:
             coeff_fitted[index] = coeff
@@ -575,6 +593,7 @@ def fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_f
             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
             sigma_fitted[index] = np.abs(coeff[2])
             chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
+
 
     if no_correlation_indeces:
         logging.info('No correlation entries for indeces %s. Omit correlation fit.', str(no_correlation_indeces)[1:-1])
@@ -1131,7 +1150,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
                                                                                                                       transformation_matrix=transformation_matrix)
 
         # Cross check if transformations are correct (z == 0 in the local coordinate system)
-        if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
+        if not np.allclose(hit_z_local[np.isfinite(hit_z_local)], 0) or not np.allclose(intersection_z_local, 0):
             logging.error('Hit z position = %s and z intersection %s',
                           str(hit_z_local[~np.isclose(hit_z_local, 0)][:3]),
                           str(intersection_z_local[~np.isclose(intersection_z_local, 0)][:3]))
