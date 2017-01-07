@@ -140,8 +140,6 @@ class TestHitAnalysis(unittest.TestCase):
                 with tb.open_file('simulated_data_DUT%d.h5' % dut_index, 'r') as in_file_h5:
                     mean_column.append((in_file_h5.root.Hits[:]['column'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][0])
                     mean_row.append((in_file_h5.root.Hits[:]['row'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][1])
-                    print 'in_file_h5.root.Hits[:][column].mean()', in_file_h5.root.Hits[:]['column'].mean()
-                    print np.std((in_file_h5.root.Hits[:]['column'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][0])
 
             # Check for similarity, on pixel width error expected (binning error)
             self.assertTrue(np.allclose(expected_offsets_x, mean_column, rtol=0.001, atol=self.simulate_data.dut_pixel_size[0][0]))
