@@ -129,7 +129,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                                                                                           alignment=alignment,
                                                                                                                           inverse=True)
 
-                    if not np.allclose(hit_z_local, 0) or not np.allclose(intersection_z_local, 0):
+                    if not np.allclose(hit_z_local[np.isfinite(hit_z_local)], 0) or not np.allclose(intersection_z_local, 0):
                         logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
@@ -714,7 +714,6 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
 
                     # Transform the hits and track intersections into the local coordinate system
                     # Coordinates in global coordinate system (x, y, z)
-#                     hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
                     hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
                     intersection_x, intersection_y, intersection_z = tracks_chunk['offset_0'], tracks_chunk['offset_1'], tracks_chunk['offset_2']
 
@@ -745,16 +744,14 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                     intersections_local = np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
                     hits_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local))
 
-                    # Only transform real hits, thus reset them to nan, TODO: is this needed?
-                    selection = np.isnan(tracks_chunk['x_dut_%d' % actual_dut])
-                    hits_local[selection, :] = np.nan
-
-                    if not np.allclose(hits_local[0][2], 0.0) or not np.allclose(intersection_z_local, 0.0):
+                    if not np.allclose(hits_local[np.isfinite(hits_local[:, 2]), 2], 0.0) or not np.allclose(intersection_z_local, 0.0):
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
                     # Usefull for debugging, print some inefficient events that can be cross checked
+                    # Select virtual hits
+                    sel_virtual = np.isnan(tracks_chunk['x_dut_%d' % actual_dut])
                     if show_inefficient_events:
-                        logging.info('These events are inefficient: %s', str(tracks_chunk['event_number'][selection]))
+                        logging.info('These events are inefficient: %s', str(tracks_chunk['event_number'][sel_virtual]))
 
                     # Select hits from column, row range (e.g. to supress edge pixels)
                     col_range = [col_range, ] if not isinstance(col_range, Iterable) else col_range
