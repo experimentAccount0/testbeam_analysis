@@ -314,7 +314,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
             right_limit = x[right_cut]
             right_slider.set_val(right_limit)
 
-        fit_data()
+        _fit_data()
         update_selected_data()
         update_plot()
 
@@ -350,15 +350,16 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
         plt.close()  # Close the plot to let the program continue (blocking)
 
     def refit(event):
-        fit_data()
+        _fit_data()
         update_selected_data()
         update_plot()
         #plt.close()  # Close the plot to let the program continue (blocking)
 
-    def fit_data():
+    def _fit_data():
         global offset
         global fit
         global fit_fn
+
         fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
         fit_fn = np.poly1d(fit[::-1])
         offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
@@ -376,7 +377,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     ax = fig.add_subplot(1, 1, 1)
     ax2 = ax.twinx()
     # Calculate and plot selected data + fit + fit offset and gauss fit error
-    fit_data()
+    _fit_data()
     offset_limit = np.max(np.abs(offset[selected_data]))  # Calculate starting offset cut
     error_limit = np.max(np.abs(mean_error_fitted[selected_data]))  # Calculate starting fit error cut
     left_limit = np.min(x[selected_data])  # Calculate starting left cut
@@ -442,11 +443,11 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
     ax2 = ax.twinx()
-    ax.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation')
+    ax.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation', zorder=10)
     ax2.plot(x[mask], mean_error_fitted[mask] * 10.0, linestyle='', color="red", marker='o', label='Error x10')
     ax2.errorbar(x[mask], np.abs(fit_fn(x[mask]) - mean_fitted[mask]), mean_error_fitted[mask], linestyle='', color="lightgreen", marker='o', label='Offset')
     ax2.plot(x, chi2 / 1e5, 'r--', label="Chi$^2$")
-    # plot masked data points, but they should not influence the ylimit
+    # Plot masked data points, but they should not influence the ylimit
     y_limits = ax2.get_ylim()
     plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
     plt.plot(x[~mask], mean_error_fitted[~mask] * 10.0, linestyle='', color="darkred", marker='o')
@@ -456,7 +457,7 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     ax.set_ylim((-n_pixel_ref * pixel_size_ref / 2.0, n_pixel_ref * pixel_size_ref / 2.0))
     plt.xlim((-n_pixel_dut * pixel_size_dut / 2.0, n_pixel_dut * pixel_size_dut / 2.0))
     ax2.bar(x, n_cluster / np.max(n_cluster).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x)))  # Plot number of hits for each correlation point
-    # plot again to draw line above the markers
+    # Plot again to draw line above the markers
     if len(pcov) > 1:
         fit_legend_entry = 'Fit: $c_0+c_1*x$\n$c_0=%.1e \pm %.1e$\n$c_1=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     else:
