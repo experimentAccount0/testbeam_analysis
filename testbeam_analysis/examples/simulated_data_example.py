@@ -131,4 +131,4 @@ def run_analysis(n_events):
                                          show_inefficient_events=True)
 
 if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
-    run_analysis(n_events=1000)
+    run_analysis(n_events=1000000)
