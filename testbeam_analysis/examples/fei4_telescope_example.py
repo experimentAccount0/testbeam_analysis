@@ -127,4 +127,4 @@ def run_analysis():
                                          force_prealignment=True)
 
 if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
-    full_analysis()
+    run_analysis()

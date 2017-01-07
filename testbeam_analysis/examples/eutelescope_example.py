@@ -41,8 +41,7 @@ from testbeam_analysis import result_analysis
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
-if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
-
+def run_analysis():
     # Get the absolute path of example data
     tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
 
@@ -196,3 +195,6 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                         output_residuals_file=os.path.join(output_folder, 'Residuals_some.h5'),
                                         n_pixels=n_pixels,
                                         pixel_size=pixel_size)
+
+if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
+    run_analysis()

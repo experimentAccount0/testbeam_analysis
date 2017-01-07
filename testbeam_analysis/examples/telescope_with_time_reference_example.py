@@ -25,7 +25,7 @@ from testbeam_analysis.tools import data_selection
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
-if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
+def run_analysis():
     # The location of the example data files, one file per DUT
     data_files = [r'H:\Testbeam_05052016_LFCMOS\Telescope_data\kartel-converted-synchronized_plane0.h5',
                   r'H:\Testbeam_05052016_LFCMOS\Telescope_data\kartel-converted-synchronized_plane1.h5',
@@ -229,3 +229,6 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                                                       (20000, 10000),
                                                       (20000, 10000),
                                                       (20000, 10000)])
+
+if __name__ == '__main__':  # Main entry point is needed for multiprocessing under windows
+    run_analysis()
