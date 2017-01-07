@@ -72,26 +72,38 @@ class TestHitAnalysis(unittest.TestCase):
 
         def check_charge():  # Helper function to be called with different charge parameter data
             for dut_index in range(self.simulate_data.n_duts):  # Loop over DUTs
-                mpv_charge = 77 * self.simulate_data.dut_thickness[dut_index]  # 77 electrons per um in silicon
-                x = np.arange(0, 10, 0.1) * mpv_charge
-                if self.simulate_data.dut_noise[dut_index]:
-                    y = pylandau.langau(x, mpv=mpv_charge, eta=0.2 * mpv_charge, sigma=self.simulate_data.dut_noise[dut_index])
-                else:
-                    y = pylandau.landau(x, mpv=mpv_charge, eta=0.2 * mpv_charge)
+                mpv_charge = 71. * self.simulate_data.dut_thickness[dut_index]  # 71 electrons per um in silicon
+
+                def _calc_landau(x):
+                    if self.simulate_data.dut_noise[dut_index]:
+                        # PyLandau Langau MPV parameter is the MPV of the Langau not the Landau only!
+                        y = pylandau.langau(x, mpv=mpv_charge, eta=mpv_charge / 10., sigma=self.simulate_data.dut_noise[dut_index], scale_langau=False)
+                    else:
+                        y = pylandau.landau(x, mpv=mpv_charge, eta=mpv_charge / 10)
+                    return y
+
+                # Check result with calculated expectation
                 with tb.open_file('simulated_data_DUT%d.h5' % dut_index, 'r') as in_file_h5:
                     charge = in_file_h5.root.Hits[:]['charge'] * 10.  # 1 LSB corresponds to 10 electrons
-                    charge_hist, edges = np.histogram(charge, bins=100, range=(x[0], x[-1]))
+                    charge_hist, edges = np.histogram(charge, bins=100, range=(0., 5. * mpv_charge))
+                    charge_hist = charge_hist.astype(np.float)
+                    x = (edges[:-1] + edges[1:]) / 2
+                    y = _calc_landau(x)
+
 #                     import matplotlib.pyplot as plt
-#                     plt.plot(edges[:-1], charge_hist)
-#                     plt.plot(x, y / np.amax(y) * np.amax(charge_hist))
-#                     plt.xlim((0, 100000))
+#                     plt.plot(x, charge_hist, label='Result')
+#                     plt.plot(x, y / y.sum() * charge_hist.sum(), label='Expected')
+#                     print x[y == np.amax(y)]
+#                     print x[charge_hist == np.amax(charge_hist)]
+#                     plt.legend(loc=0)
 #                     plt.show()
-                    self.assertTrue(np.allclose(y / np.amax(y) * np.amax(charge_hist), charge_hist, rtol=1, atol=10))
+
+                    self.assertTrue(np.allclose(y / y.sum() * charge_hist.sum(), charge_hist, rtol=0.05, atol=50.))
 
         # Check Landau for different device thickness
         self.simulate_data.dut_thickness = [(i + 1) * 100 for i in range(self.simulate_data.n_duts)]  # Create charge distribution in different device thicknesses, thus Landau MPW should change
         self.simulate_data.digitization_charge_sharing = False  # To judge deposited charge, charge sharing has to be off
-        self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+        self.simulate_data.create_data_and_store('simulated_data', n_events=100000)
         check_charge()
 
         # Check Landau for different device noiose
@@ -99,9 +111,10 @@ class TestHitAnalysis(unittest.TestCase):
         self.simulate_data.dut_thickness = [200 for i in range(self.simulate_data.n_duts)]  # Fix device thickness
         self.simulate_data.dut_noise = [i * 1000 for i in range(self.simulate_data.n_duts)]  # Create charge distribution in different device noise, thus Langau sigma should change
         self.simulate_data.digitization_charge_sharing = False  # To judge deposited charge, charge sharing has to be off
-        self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+        self.simulate_data.create_data_and_store('simulated_data', n_events=100000)
         check_charge()
-    @unittest.SkipTest #FIXME: crashes
+
+    @unittest.SkipTest  # FIXME: FAILS
     def test_beam_angle(self):
         self.simulate_data.reset()
 
@@ -125,6 +138,8 @@ class TestHitAnalysis(unittest.TestCase):
                 with tb.open_file('simulated_data_DUT%d.h5' % dut_index, 'r') as in_file_h5:
                     mean_column.append((in_file_h5.root.Hits[:]['column'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][0])
                     mean_row.append((in_file_h5.root.Hits[:]['row'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][1])
+                    print 'in_file_h5.root.Hits[:][column].mean()', in_file_h5.root.Hits[:]['column'].mean()
+                    print np.std((in_file_h5.root.Hits[:]['column'].mean() - 1) * self.simulate_data.dut_pixel_size[dut_index][0])
 
             # Check for similarity, on pixel width error expected (binning error)
             self.assertTrue(np.allclose(expected_offsets_x, mean_column, rtol=0.001, atol=self.simulate_data.dut_pixel_size[0][0]))
@@ -240,7 +255,7 @@ class TestHitAnalysis(unittest.TestCase):
             self.simulate_data.dut_material_budget = [self.simulate_data.dut_thickness[i] * 1e-4 / 9.370 for i in range(self.simulate_data.n_duts)]
             self.simulate_data.create_data_and_store('simulated_data', n_events=100000)
             check_scattering_angle()
-    @unittest.SkipTest #FIXME: crashes
+
     def test_dut_rotation(self):
         self.simulate_data.reset()
 
@@ -251,7 +266,7 @@ class TestHitAnalysis(unittest.TestCase):
         self.simulate_data.beam_angle = 0
         self.simulate_data.beam_angle_sigma = 0
         self.simulate_data.dut_pixel_size = [(1, 1)] * self.simulate_data.n_duts  # If the pixel size is too big this tests fails due to pixel discretisation error
-        self.simulate_data.dut_n_pixel = [(10000, 10000)] * self.simulate_data.n_duts
+        self.simulate_data.dut_n_pixel = [(100000, 100000)] * self.simulate_data.n_duts
         self.simulate_data.z_positions = [i * 1000000. + 1000. for i in range(self.simulate_data.n_duts)]  # 1m distance to avoid intersecting DUT planes
         self.simulate_data.tracks_per_event = 1
         self.simulate_data.tracks_per_event_sigma = 0
@@ -280,12 +295,17 @@ class TestHitAnalysis(unittest.TestCase):
                     coeff_column, _ = curve_fit(line, hits_1_column_global, hits_0['column'], p0=[0, 1.])
                     coeff_row, _ = curve_fit(line, hits_1_row_global, hits_0['row'], p0=[0, 1.])
 
-                    # Check column / row relative offsets from line fit offsets with 1 mu precision
-                    self.assertAlmostEqual(coeff_column[0], 0., delta=1.)  # Check with 10 mRad precision
-                    self.assertAlmostEqual(coeff_row[0], 0., delta=1.)  # Check with 10 mRad precision
-                    # Check alpha / beta angles with from line fit slopes with 10 mRad precision
-                    self.assertAlmostEqual(coeff_column[1], 1., delta=0.01)  # Check with 10 mRad precision
-                    self.assertAlmostEqual(coeff_row[1], 1., delta=0.01)  # Check with 10 mRad precision
+                    # Check column / row relative offsets are from line fit offsets with 1 mu precision
+                    self.assertAlmostEqual(coeff_column[0], 0., delta=1)
+                    self.assertAlmostEqual(coeff_row[0], 0., delta=1)
+                    # Check alpha / beta angles with from line fit slopes with 0.1 % precision
+                    self.assertAlmostEqual(coeff_column[1], 1., delta=0.001)
+                    self.assertAlmostEqual(coeff_row[1], 1., delta=0.001)
+
+#                     plt.plot(hits_1_column_global, hits_0['column'], 'o', label='Data')
+#                     plt.plot(hits_1_column_global, line(hits_1_column_global, *coeff_column), '--', label='Fit')
+#                     plt.legend(loc=0)
+#                     plt.show()
 
         # Test: Check correlation for different alpha, beta, gamma angles (x/y/z-axis rotation) and different relative offsets in x/y between the planes
         for alpha in [0, np.pi / 8., np.pi / 6., np.pi / 4., np.pi / 3.]:
