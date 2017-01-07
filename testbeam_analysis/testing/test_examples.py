@@ -3,12 +3,15 @@
 import os
 import subprocess
 import unittest
+import tables as tb
 
 import testbeam_analysis
 from testbeam_analysis.tools import data_selection
+from testbeam_analysis.examples import (eutelescope_example, fei4_telescope_example,
+                                        simulated_data_example, telescope_with_time_reference_example)
 
 package_path = os.path.dirname(testbeam_analysis.__file__)  # Get the absoulte path of the online_monitor installation
-script_folder = os.path.abspath(os.path.join(package_path, r'../examples/'))
+script_folder = os.path.abspath(os.path.join(package_path, r'examples/'))
 tests_data_folder = os.path.abspath(os.path.join(os.path.realpath(script_folder), r'data/'))
 
 
@@ -46,17 +49,23 @@ class TestExamples(unittest.TestCase):
             os.rename(file_name[:-3] + '_reduced.h5', file_name)
     @unittest.SkipTest # FIXME:
     def test_mimosa_example(self):
-        return_value = run_script_in_process(os.path.join(script_folder, r'eutelescope_example.py'))
-        self.assertEqual(return_value, 0)
+        eutelescope_example.run_analysis()
+
     @unittest.SkipTest # FIXME:
     def test_fei4_example(self):
-        return_value = run_script_in_process(os.path.join(script_folder, r'fei4_telescope_example.py'))
-        self.assertEqual(return_value, 0)
-    @unittest.SkipTest # FIXME:
-    def test_simulated_data_example(self):
-        return_value = run_script_in_process(os.path.join(script_folder, r'simulated_data_example.py'))
-        self.assertEqual(return_value, 0)
+        fei4_telescope_example.run_analysis()
 
+    def test_simulated_data_example(self):
+        ''' Check the example and the overall analysis that a efficiency of about 100% is reached.
+            Not a perfect 100% is expected due to the finite propability that tracks are merged
+            since > 2 tracks per event are simulated
+        '''
+        simulated_data_example.run_analysis(1000)
+        with tb.open_file('simulation/Efficiency.h5') as in_file_h5:
+            for dut_index in range(5):
+                efficiency = in_file_h5.get_node('/DUT_%d/Efficiency' % dut_index)[:]
+                efficiency_mask = in_file_h5.get_node('/DUT_%d/Efficiency_mask' % dut_index)[:]
+                self.assertAlmostEqual(efficiency[~efficiency_mask].mean(), 100., delta=0.0001) 
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestExamples)
