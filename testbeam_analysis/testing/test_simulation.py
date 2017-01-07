@@ -9,10 +9,13 @@ from scipy.optimize import curve_fit
 
 import matplotlib.pyplot as plt
 
-from testbeam_analysis.tools import simulate_data
-from testbeam_analysis.tools import geometry_utils
+from testbeam_analysis.tools import simulate_data, geometry_utils, analysis_utils, test_tools
 
-from testbeam_analysis.tools import analysis_utils
+# Get package path
+testing_path = os.path.dirname(__file__)  # Get the absoulte path of the testbeam analysis installation
+
+# Set the converter script path
+tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/test_simulation/'))
 
 
 class TestHitAnalysis(unittest.TestCase):
@@ -24,8 +27,7 @@ class TestHitAnalysis(unittest.TestCase):
             self.vdisplay = Xvfb()
             self.vdisplay.start()
 
-        self.simulate_data = simulate_data.SimulateData(0)
-        self.simulate_data.n_duts = 6
+        self.simulate_data = simulate_data.SimulateData(random_seed=0)
 
     @classmethod
     def tearDownClass(self):  # remove created files
@@ -33,7 +35,8 @@ class TestHitAnalysis(unittest.TestCase):
             os.remove('simulated_data_DUT%d.h5' % dut_index)
 
     def test_position(self):  # Test beam position with respect to devices positions
-        self.simulate_data.reset()
+        self.simulate_data.n_duts = 2
+        self.simulate_data.set_std_settings()
 
         def check_position():  # Helper function to be called with different position parameter data
             # Calculate expectation
@@ -281,7 +284,7 @@ class TestHitAnalysis(unittest.TestCase):
                     # Merge data on event basis for correlation, since one cannot assume that every plane is always hit
                     hits_0, hits_1 = analysis_utils.merge_on_event_number(in_file_1_h5.root.Hits[:], in_file_2_h5.root.Hits[:])
 
-                    # Get transformation matrix (translation + rotatio) from simulation settting
+                    # Get transformation matrix (translation + rotation) from simulation settting
                     transformation_matrix = geometry_utils.local_to_global_transformation_matrix(x=self.simulate_data.offsets[1][0] - self.simulate_data.offsets[0][0],
                                                                                                  y=self.simulate_data.offsets[1][1] - self.simulate_data.offsets[0][1],
                                                                                                  z=self.simulate_data.z_positions[1] - self.simulate_data.z_positions[0],
@@ -317,6 +320,18 @@ class TestHitAnalysis(unittest.TestCase):
                             self.simulate_data.offsets[1] = (self.simulate_data.offsets[0][0] + offset_x, self.simulate_data.offsets[0][1] + offset_y)  # Set x/y shift with respect to DUT 0
                             self.simulate_data.create_data_and_store('simulated_data', n_events=1000)
                             check_rotations()
+
+    def test_simulation(self):
+        ''' Check the full simulation '''
+        self.simulate_data.reset()
+        self.simulate_data.set_std_settings()
+        self.assertEqual(self.simulate_data.n_duts, 6)
+
+        self.simulate_data.create_data_and_store('simulated_data', n_events=10000)
+
+        for dut_index in range(self.simulate_data.n_duts):
+            data_equal, error_msg = test_tools.compare_h5_files('simulated_data_DUT%d.h5' % dut_index, os.path.join(tests_data_folder, 'simulated_data_DUT%d.h5' % dut_index), exact=False)
+            self.assertTrue(data_equal, msg=error_msg)
 
 
 if __name__ == '__main__':
