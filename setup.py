@@ -5,7 +5,7 @@ from distutils.command.build_ext import build_ext
 from Cython.Build import cythonize
 import os
 
-version = 0.1
+version = 0.0.1
 
 copt = {'msvc': ['-Itestbeam_analysis/cpp/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
 lopt = {}
@@ -51,7 +51,7 @@ setup(
     install_requires=install_requires,
     packages=find_packages(),  # exclude=['*.tests', '*.test']),
     include_package_data=True,  # accept all data files and directories matched by MANIFEST.in or found in source control
-    package_data={'': ['*.txt', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
+    package_data={'': ['*.txt', 'VERSION'], 'docs': ['*']},
     ext_modules=cpp_extension,
     include_dirs=[np.get_include()],
     cmdclass={'build_ext': build_ext_opt},
