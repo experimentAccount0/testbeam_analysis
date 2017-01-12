@@ -1,0 +1,13 @@
+sphinx>=1.3.5
+sphinx_rtd_theme
+sphinxcontrib-napoleon
+sphinx-git
+numpy
+scipy
+pygmsh
+meshio
+matplotlib
+
+# Does not install since there is no way to set a installation order 
+# with pip install requirenments (https://github.com/pypa/pip/issues/2362)
+# fipy
