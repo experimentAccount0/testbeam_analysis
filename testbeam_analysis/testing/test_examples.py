@@ -24,13 +24,14 @@ tests_data_folder = os.path.abspath(
     os.path.join(os.path.realpath(script_folder), r'data/'))
 
 
-def copy_alignment(path, **kwarg):
+def copy_alignment(path, out_folder, **kwarg):
     try:
-        os.mkdir(os.path.join(tests_data_folder, 'output'))
+        os.mkdir(os.path.join(tests_data_folder, out_folder))
     except OSError:
         pass
     copyfile(os.path.join(fixture_folder, path),
-             os.path.join(tests_data_folder, 'output/Alignment.h5'))
+             os.path.join(tests_data_folder,
+                          os.path.join(out_folder, 'Alignment.h5')))
 
 
 class TestExamples(unittest.TestCase):
@@ -80,7 +81,8 @@ class TestExamples(unittest.TestCase):
     # Thus mock out the alignment steps
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
                 side_effect=copy_alignment(
-                    path=r'eutelescope/Alignment.h5')
+                    path=r'eutelescope/Alignment.h5',
+                    out_folder=r'output_eutel')
                 )
     @mock.patch('testbeam_analysis.dut_alignment.alignment')
     # TODO: Analysis fails, to be checked why
@@ -92,7 +94,8 @@ class TestExamples(unittest.TestCase):
     # Thus mock out the prealignment
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
                 side_effect=copy_alignment(
-                    path=r'fei4_telescope/Alignment.h5')
+                    path=r'fei4_telescope/Alignment.h5',
+                    out_folder=r'output_fei4'),
                 )
     def test_fei4_example(self, mock):
         fei4_telescope.run_analysis()
