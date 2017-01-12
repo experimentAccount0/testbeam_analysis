@@ -10,4 +10,7 @@ exclude_lines =
 omit = 
     */__init__.py
     testbeam_analysis/testing/*
-    converter/*
+    testbeam_analysis/converter/*
+    testbeam_analysis/tools/residuals.py
+    testbeam_analysis/tools/test_tools
+    testbeam_analysis/tools/deprecated
