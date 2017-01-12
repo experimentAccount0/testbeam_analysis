@@ -5,9 +5,9 @@ from distutils.command.build_ext import build_ext
 from Cython.Build import cythonize
 import os
 
-version = 0.1
+version = '0.0.1'
 
-copt = {'msvc': ['-Itestbeam_analysis/clusterizer/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
+copt = {'msvc': ['-Itestbeam_analysis/cpp/external', '/EHsc']}  # set additional include path and EHsc exception handling for VS
 lopt = {}
 
 
@@ -27,12 +27,11 @@ class build_ext_opt(build_ext):
         build_ext.build_extensions(self)
 
 cpp_extension = cythonize([
-    Extension('testbeam_analysis.hit_clusterizer', ['testbeam_analysis/clusterizer/hit_clusterizer.pyx', 'testbeam_analysis/clusterizer/Clusterizer.cpp', 'testbeam_analysis/clusterizer/Basis.cpp']),
-    Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/clusterizer/analysis_functions.pyx'])
+    Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/cpp/analysis_functions.pyx'])
 ])
 
-author = 'Christian Bespin, David-Leon Pohl'
-author_email = 'christian.bespin@uni-bonn.de, pohl@physik.uni-bonn.de'
+author = 'David-Leon Pohl, Christian Bespin, Jens Janssen, Luigi Vigani'
+author_email = 'pohl@physik.uni-bonn.de'
 
 # requirements for core functionality from requirements.txt
 with open('requirements.txt') as f:
@@ -44,7 +43,7 @@ setup(
     description='A light weight test beam analysis in Python and C++.',
     url='https://github.com/SiLab-Bonn/testbeam_analysis',
     license='BSD 3-Clause ("BSD New" or "BSD Simplified") License',
-    long_description='A light weight analysis of pixel-sensor data from testbeams. All steps of a full analysis are included. If you you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. EUTelescope. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code. The not yet achieved goal is to have understandable, simple and well tested code that can be easily used.',
+    long_description='A simple analysis of pixel-sensor data from testbeams. All steps of a full analysis are included in one file in < 1500 lines of Python code. If you you want to do simple straight line fits without a Kalman filter or you want to understand the basics of telescope reconstruction this code might help. If you want to have something fancy to account for thick devices in combination with low energetic beams use e.g. EUTelescope. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code. For a quick first impression check the example plots in the wiki and run the examples.',
     author=author,
     maintainer=author,
     author_email=author_email,
@@ -52,7 +51,7 @@ setup(
     install_requires=install_requires,
     packages=find_packages(),  # exclude=['*.tests', '*.test']),
     include_package_data=True,  # accept all data files and directories matched by MANIFEST.in or found in source control
-    package_data={'': ['*.txt', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
+    package_data={'': ['README.*', 'VERSION'], 'docs': ['*'], 'examples': ['*']},
     ext_modules=cpp_extension,
     include_dirs=[np.get_include()],
     cmdclass={'build_ext': build_ext_opt},

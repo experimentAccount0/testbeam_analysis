@@ -1,13 +1,14 @@
 language: python
 python:
   - 2.7
-  - 3.4
+  - 3.5
  
 sudo: false
 
-branches:
-  only:
-    - master
+addons:
+  apt:
+    packages:
+    - gfortran
 
 notifications:
   email:
@@ -29,8 +30,8 @@ before_install:
   - export PATH="$HOME/miniconda/bin:$PATH"
   - conda update --yes conda
   - conda info -a
-  - conda install --yes numpy cython pytables scipy matplotlib pandas nose
-  - pip install progressbar-latest xvfbwrapper coverage coveralls
+  - conda install --yes numpy cython pytables scipy matplotlib nose numba mock
+  - pip install progressbar-latest xvfbwrapper coverage coveralls pixel_clusterizer pykalman pylandau
   - python setup.py develop
 
 # Run test
@@ -40,7 +41,7 @@ script:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
       touch $HOME/miniconda/lib/python2.7/site-packages/converage.pth && printf "import coverage; coverage.process_startup()" > $HOME/miniconda/lib/python2.7/site-packages/converage.pth;
     else
-      touch $HOME/miniconda/lib/python3.4/site-packages/converage.pth && printf "import coverage; coverage.process_startup()" > $HOME/miniconda/lib/python3.4/site-packages/converage.pth;
+      touch $HOME/miniconda/lib/python3.5/site-packages/converage.pth && printf "import coverage; coverage.process_startup()" > $HOME/miniconda/lib/python3.5/site-packages/converage.pth;
     fi
   - nosetests --with-coverage --cover-package=testbeam_analysis
   
