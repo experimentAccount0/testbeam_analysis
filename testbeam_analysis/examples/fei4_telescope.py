@@ -1,9 +1,14 @@
-''' Example script to run a full analysis on FE-I4 telescope data.
+''' The FE-I4 telescope data example shows how to run a full analysis on data
+    taken with a FE-I4 telescope.
 
-Only prealignment is done here, since the telescope data is to coarse to profit from an aligment step.
-The data was recorded at DESY with pyBar. The telescope consists of 6 DUTs with ~ 2 cm distance between the planes.
-Only the first two and last two planes were taken here. The first and last plane were IBL n-in-n planar sensors and
-the 2 devices in the middle 3D CNM/FBK sensors.
+    .. NOTE::
+       Only prealignment is done here, since the telescope data is too coarse
+       to profit from an aligment step. The data was recorded at DESY with
+       pyBar. The telescope consists of 6 DUTs with ~ 2 cm distance between the
+       planes. Only the first two and last two planes were taken here. The
+       first and last plane were IBL n-in-n planar sensors and the 2 devices in
+       the center 3D CNM/FBK sensors.
+
 '''
 
 import os
