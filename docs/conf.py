@@ -30,7 +30,7 @@ class Mock(mock.MagicMock):
     def __getattr__(cls, name):
             return mock.MagicMock()
 
-MOCK_MODULES = ['pybar_fei4_converter', 'pybar_mimosa26_converter', 'numba']
+MOCK_MODULES = ['pybar_fei4_converter', 'pybar_mimosa26_converter', 'numba', 'pixel_clusterizer']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # -- General configuration ------------------------------------------------
