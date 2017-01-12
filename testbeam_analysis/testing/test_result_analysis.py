@@ -10,7 +10,7 @@ from testbeam_analysis import result_analysis
 testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
 
 # Set the converter script path
-tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/test_result_analysis/'))
+tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/fixtures/result_analysis/'))
 
 
 class TestResultAnalysis(unittest.TestCase):

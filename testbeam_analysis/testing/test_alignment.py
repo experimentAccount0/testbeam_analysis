@@ -15,7 +15,7 @@ from testbeam_analysis.tools import analysis_utils
 testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
 
 # Set the converter script path
-tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/test_dut_alignment/'))
+tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/fixtures/dut_alignment/'))
 
 
 class TestAlignmentAnalysis(unittest.TestCase):
