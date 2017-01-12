@@ -24,9 +24,14 @@ import sphinx_rtd_theme
 import mock
 import sys
 
+
+class Mock(mock.MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+            return mock.MagicMock()
+
 MOCK_MODULES = ['pybar_fei4_converter', 'pybar_mimosa26_converter', 'numba']
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # -- General configuration ------------------------------------------------
 
