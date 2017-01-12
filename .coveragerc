@@ -9,6 +9,5 @@ exclude_lines =
 
 omit = 
     */__init__.py
-    testing/*
+    testbeam_analysis/testing/*
     converter/*
-    tools/*
