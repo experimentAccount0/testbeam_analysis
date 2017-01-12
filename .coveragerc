@@ -12,5 +12,6 @@ omit =
     testbeam_analysis/testing/*
     testbeam_analysis/converter/*
     testbeam_analysis/tools/residuals.py
-    testbeam_analysis/tools/test_tools
-    testbeam_analysis/tools/deprecated
+    testbeam_analysis/tools/test_tools.py
+    testbeam_analysis/tools/deprecated.py
+    testbeam_analysis/tools/data_selection.py
