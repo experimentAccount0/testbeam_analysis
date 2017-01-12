@@ -6,6 +6,7 @@ parallel = True
 exclude_lines =
     pragma: no cover 
     raise
+    if __name__ == .__main__.:
 
 omit = 
     */__init__.py
