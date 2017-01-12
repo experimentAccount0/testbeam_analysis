@@ -68,7 +68,7 @@ def run_analysis():
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
 
     # Create output subfolder where all output data and plots are stored
-    output_folder = os.path.join(os.path.split(data_files[0])[0], 'output')
+    output_folder = os.path.join(os.path.split(data_files[0])[0], 'output_eutel')
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 

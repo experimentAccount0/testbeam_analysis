@@ -33,7 +33,10 @@ def run_analysis():
     z_positions = [0., 19500, 108800, 128300]  # in um
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3")
 
-    output_folder = os.path.split(data_files[0])[0]  # Define a folder where all output data and plots are stored
+    # Create output subfolder where all output data and plots are stored
+    output_folder = os.path.join(os.path.split(data_files[0])[0], 'output_fei4')
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
