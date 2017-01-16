@@ -112,7 +112,7 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
     '''
 
     total_fraction = 0.  # Charge fraction summed up for all pixels used; should be 1. if all pixels are considered
-    min_fraction = 1e-3
+    min_fraction = 1e-2  # Distribute total charge with maximum 1% loss.
     n_hits = 0  # Total Number of hits created
 
     position_z = thickness / 2  # FIXME: Charges are distributed along a track and not in the center z
@@ -126,7 +126,10 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError('Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
@@ -138,7 +141,10 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError('Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
@@ -154,7 +160,10 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError('Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
@@ -166,7 +175,10 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
             if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError('Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
@@ -181,7 +193,7 @@ def _add_charge_sharing_hits(relative_position, hits_digits, max_column, max_row
     parameters are needed.
     '''
     n_hits_per_seed_hit = np.zeros(hits_digits.shape[0], dtype=np.int16)
-    result_hits = np.zeros(shape=(5 * hits_digits.shape[0], 3), dtype=np.float32)  # Result array to be filled; up to 5 hits per seed hit is expected
+    result_hits = np.zeros(shape=(5 * hits_digits.shape[0], 3), dtype=np.float32)  # Result array to be filled; up to 10 hits per seed hit is possible
     result_index = 0
     for actual_index in range(hits_digits.shape[0]):
         actual_hit_digit = hits_digits[actual_index]
@@ -435,7 +447,8 @@ class SimulateData(object):
                                                                                         position_plane=dut_position,
                                                                                         normal_plane=normal_plane)
 
-            if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
+            # Scatter at actual plane, omit virtual planes (material_budget = 0) and last plane
+            if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:
                 # Calculated the change of the direction vector due to multiple scattering, TODO: needs cross check
                 # Vector addition in spherical coordinates needs transformation into cartesian space: http://math.stackexchange.com/questions/790057/how-to-sum-2-vectors-in-spherical-coordinate-system
                 x, y, z = geometry_utils.spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=1.)  # r does not define a direction in spherical coordinates, any r > 0 can be used
@@ -457,7 +470,7 @@ class SimulateData(object):
 #         import matplotlib.pyplot as plt
 #         plt.hist(intersections[0][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[0][:, 1], bins=100, alpha=0.2)
-# #         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
+#         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 1], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 2], bins=100, alpha=0.2)
