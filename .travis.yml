@@ -30,7 +30,7 @@ before_install:
   - export PATH="$HOME/miniconda/bin:$PATH"
   - conda update --yes conda
   - conda info -a
-  - conda install --yes numpy cython pytables scipy matplotlib nose numba mock
+  - conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov
   - pip install progressbar-latest xvfbwrapper coverage coveralls pixel_clusterizer pykalman pylandau pytest
   - python setup.py develop
 
