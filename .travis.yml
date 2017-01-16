@@ -46,4 +46,4 @@ script:
   - py.test --cov=testbeam_analysis
   
 after_success:
-- coveralls
+- coveralls --data_file .coverage.*
