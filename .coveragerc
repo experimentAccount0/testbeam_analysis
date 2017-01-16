@@ -1,7 +1,7 @@
 [run]
 concurrency = multiprocessing
 parallel = True
-data_file = /tmp/.coverage
+data_file = .coverage
 
 [report]
 exclude_lines =
