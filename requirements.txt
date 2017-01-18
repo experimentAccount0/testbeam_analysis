@@ -5,7 +5,7 @@ numpy   # for a C array object and fast algorithms
 matplotlib  # for plotting
 numba>=0.24   # for speedup of python loops (python just in time compiler)
 future  # Python 2/3 compatibility
-pixel_clusterizer>=2.3  # to cluster pixel hits
+pixel_clusterizer==2.3  # to cluster pixel hits
 pykalman  # for track fitting
 pylandau>2.0.0  # for charge deposition simulation
 progressbar-latest  # to show a progress bar
