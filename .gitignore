@@ -51,20 +51,9 @@ data_clusterizer.cpp
 .pydevproject
 # Examples output data
 examples/data/output*
-# Example data
-TestBeamData_FEI4_DUT0_cluster.h5
-TestBeamData_FEI4_DUT1_cluster.h5
-TestBeamData_FEI4_DUT4_cluster.h5
-TestBeamData_FEI4_DUT5_cluster.h5
-TestBeamData_Mimosa26_DUT0_hot_pixel.h5
-TestBeamData_Mimosa26_DUT0_hot_pixel_cluster.h5
-TestBeamData_Mimosa26_DUT1_hot_pixel.h5
-TestBeamData_Mimosa26_DUT1_hot_pixel_cluster.h5
-TestBeamData_Mimosa26_DUT2_hot_pixel.h5
-TestBeamData_Mimosa26_DUT2_hot_pixel_cluster.h5
-TestBeamData_Mimosa26_DUT0_hot_pixel.pdf
-TestBeamData_Mimosa26_DUT1_hot_pixel.pdf
-TestBeamData_Mimosa26_DUT2_hot_pixel.pdf
+# Example output data
+TestBeamData_FEI4_DUT*_cluster.*
+TestBeamData_Mimosa26_DUT*_noisy_pixels*.*
 hit_clusterizer.cpp
 Alignment.h5
 Correlation.h5
