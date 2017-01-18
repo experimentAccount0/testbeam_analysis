@@ -672,7 +672,3 @@ def _fit_tracks_loop(track_hits):
             chi2[index] = 1e9
 
     return offset, slope, chi2
-
-
-def _function_wrapper_find_tracks_loop(args):  # Needed for multiprocessing call with arguments
-    return _find_tracks_loop(*args)

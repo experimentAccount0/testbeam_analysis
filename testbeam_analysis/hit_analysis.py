@@ -99,14 +99,6 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     return output_hits_file
 
 
-def remove_noisy_pixels_wrapper(args):
-    return remove_noisy_pixels(**args)
-
-
-def cluster_hits_wrapper(args):
-    return cluster_hits(**args)
-
-
 def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, max_y_distance=3, max_time_distance=2, dut_name=None, plot=True, max_cluster_hits=1000, max_hit_charge=13, chunk_size=1000000):
     '''Clusters the hits in the data file containing the hit table.
 
