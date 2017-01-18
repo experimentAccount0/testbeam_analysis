@@ -50,7 +50,7 @@ data_clusterizer.cpp
 .project
 .pydevproject
 # Examples output data
-examples/data/output*
+testbeam_analysis/examples/data/output*
 # Example output data
 TestBeamData_FEI4_DUT*_cluster.*
 TestBeamData_Mimosa26_DUT*_noisy_pixels*.*
