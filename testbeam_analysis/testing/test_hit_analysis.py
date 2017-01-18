@@ -34,6 +34,7 @@ class TestHitAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_FEI4_DUT0_small_cluster.h5'))
+        os.remove(os.path.join(cls.output_folder, 'TestBeamData_FEI4_DUT0_small_cluster.pdf'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.h5'))
         os.remove(os.path.join(cls.output_folder, 'TestBeamData_Mimosa26_DUT0_small_noisy_pixels.pdf'))
 
