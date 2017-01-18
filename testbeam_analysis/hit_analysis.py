@@ -68,7 +68,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     # Check for any noisy pixels
     if noisy_pixels[0].shape[0] != 0:
         # map 2d array (col, row) to 1d array to increase selection speed
-        noisy_pixels_1d = (noisy_pixels[0] + 1) * n_pixel[1] + (noisy_pixels[1] + 1)
+        noisy_pixels_1d = np.ravel_multi_index(noisy_pixels, dims=n_pixel)
     else:
         noisy_pixels_1d = []
 
@@ -79,9 +79,8 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
             hit_table_out = out_file_h5.create_table(out_file_h5.root, name='Hits', description=input_file_h5.root.Hits.dtype, title='Selected not noisy hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
                 # Select not noisy pixel
-                hits_1d = hits['column'].astype(np.uint32) * n_pixel[1] + hits['row']  # change dtype to fit new number
+                hits_1d = np.ravel_multi_index((hits['column'] - 1, hits['row'] - 1), dims=n_pixel)
                 hits = hits[np.in1d(hits_1d, noisy_pixels_1d, invert=True)]
-
                 hit_table_out.append(hits)
 
             logging.info('Reducing data by a factor of %.2f in file %s', input_file_h5.root.Hits.nrows / hit_table_out.nrows, out_file_h5.filename)
