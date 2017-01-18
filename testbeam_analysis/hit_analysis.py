@@ -13,11 +13,14 @@ from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools.plot_utils import plot_noisy_pixels, plot_cluster_size
 
 
-def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
+def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None,
+                        pixel_size=None, threshold=10.0, filter_size=3,
+                        dut_name=None, plot=True, chunk_size=1000000):
     '''Removes noisy pixel from the data file containing the hit table.
-    The hit table is read in chunks and for each chunk the noisy pixel are determined and removed.
 
-    To call this function on 8 cores in parallel with chunk_size=1000000 the following RAM is needed:
+    The hit table is read in chunks and for each chunk the noisy pixel are
+    determined and removed. To call this function on 8 cores in parallel with
+    chunk_size=1000000 the following RAM is needed:
     11 byte * 8 * 1000000 = 88 Mb
 
     Parameters
@@ -29,9 +32,13 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     pixel_size : tuple
         Pixel dimension for column and row. If None, assuming square pixels.
     threshold : float
-        The threshold for pixel masking. The threshold is given in units of sigma of the pixel noise (background subtracted). The lower the value the more pixels are masked.
+        The threshold for pixel masking. The threshold is given in units of
+        sigma of the pixel noise (background subtracted). The lower the value
+        the more pixels are masked.
     filter_size : scalar or tuple
-        Adjust the median filter size by giving the number of columns and rows. The higher the value the more the background is smoothed and more pixels are masked.
+        Adjust the median filter size by giving the number of columns and rows.
+        The higher the value the more the background is smoothed and more
+        pixels are masked.
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
@@ -117,14 +124,11 @@ def cluster_hits(input_hits_file, output_cluster_file=None, max_x_distance=3, ma
         with tb.open_file(output_cluster_file, 'w') as output_file_h5:
             # create clusterizer object
             clusterizer = HitClusterizer()
-            clusterizer.set_max_hits(chunk_size)
-            clusterizer.set_max_cluster_hits(max_cluster_hits)
             clusterizer.set_max_hit_charge(max_hit_charge)
 
             # Set clusterzier settings
-            clusterizer.create_cluster_hit_info_array(False)  # do not create cluster infos for hits
-            clusterizer.set_x_cluster_distance(max_x_distance)  # cluster distance in columns
-            clusterizer.set_y_cluster_distance(max_y_distance)  # cluster distance in rows
+            clusterizer.set_column_cluster_distance(max_x_distance)  # cluster distance in columns
+            clusterizer.set_row_cluster_distance(max_y_distance)  # cluster distance in rows
             clusterizer.set_frame_cluster_distance(max_time_distance)  # cluster distance in time frames
 
             # Output data
