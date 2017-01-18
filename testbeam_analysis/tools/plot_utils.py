@@ -48,7 +48,7 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
 
 def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, dut_name=None):
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
-        occupancy = np.ma.masked_array(input_file_h5.root.HistOcc[:], mask=input_file_h5.root.NoisyPixelsMask[:])
+        occupancy = np.ma.masked_array(input_file_h5.root.HistOcc[:], mask=input_file_h5.root.NoisyPixelsMask[:]).T
 
     if pixel_size:
         aspect = pixel_size[0] / pixel_size[1]
@@ -79,7 +79,8 @@ def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, du
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
-
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
         output_pdf.savefig()
 
         plt.figure()
@@ -90,8 +91,10 @@ def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, du
     #     np.ma.filled(occupancy, fill_value=0)
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
-
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
         output_pdf.savefig()
+
         plt.close()
 
 
