@@ -403,8 +403,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Prepare track hits array to be fitted
                         index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
-                        track_hits = np.empty((n_tracks, n_fit_duts, 3))
-                        track_hits[:] = np.nan
+                        track_hits = np.full((n_tracks, n_fit_duts, 3), np.nan)
 
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
                             if ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
