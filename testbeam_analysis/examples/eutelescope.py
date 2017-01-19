@@ -1,5 +1,5 @@
 '''Example script to run a full analysis on telescope data. The original data
-can be found in the example folder of the EuTelescope framework.
+can be found in the example folder of the EUTelescope framework.
 
 The residuals are calculated with different cuts on prealigned and aligned data
 for demonstration purpose:
