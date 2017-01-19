@@ -47,29 +47,36 @@ def run_analysis():
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-    # Remove hot pixel, only needed for devices with noisy pixels (here: Mimosa 26)
-    # A pool of workers to remove the noisy pixels in all files in parallel
-    threshold = (2, 2, 2, 10, 10, 2, 2, 2)
+    # Generate noisy pixel mask
+    # A pool of workers to remove the noisy pixels for all files in parallel
+    threshold = [2, 2, 2, 10, 10, 2, 2, 2]
     kwargs = [{
         'input_hits_file': data_files[i],
         'n_pixel': n_pixels[i],
+        'pixel_mask_name': "NoisyPixelMask",
         'pixel_size': pixel_size[i],
         'threshold': threshold[i],
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
-        hit_analysis.remove_noisy_pixels(**kwarg)
+        pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
     pool.close()
     pool.join()
 
-    # Cluster hits off all DUTs
-    # A pool of workers to cluster hits in all files in parallel
+    # Cluster hits from all DUTs
+    # A pool of workers to cluster hits for all files in parallel
+    column_cluster_distance = [3, 3, 3, 2, 2, 3, 3, 3]
+    row_cluster_distance = [3, 3, 3, 3, 3, 3, 3, 3]
+    # events built with Judith analysis software, no frame information available
+    frame_cluster_distance = [0, 0, 0, 0, 0, 0, 0, 0]
     kwargs = [{
-        'input_hits_file': data_files[i][:-3] + '_noisy_pixels.h5',
-        'max_x_distance': 3,
-        'max_y_distance': 3,
-        'max_time_distance': 2,
-        'max_cluster_hits': 5000,
+        'input_hits_file': data_files[i],
+        'input_noisy_pixel_mask_file': data_files[i][:-3] + '_noisy_pixel_mask.h5',
+        'min_hit_charge': 0,
+        'max_hit_charge': 13,
+        'column_cluster_distance': column_cluster_distance[i],
+        'row_cluster_distance': row_cluster_distance[i],
+        'frame_cluster_distance': frame_cluster_distance[i],
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
@@ -78,7 +85,7 @@ def run_analysis():
     pool.join()
 
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
                                     output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                     n_pixels=n_pixels,
                                     pixel_size=pixel_size,
@@ -94,7 +101,7 @@ def run_analysis():
                                non_interactive=False)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Merge the cluster tables to one merged table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=pixel_size)
 

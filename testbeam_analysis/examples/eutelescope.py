@@ -75,28 +75,31 @@ def run_analysis():
     # The following shows a complete test beam analysis by calling the
     # seperate function in correct order
 
-    # Remove hot pixels, only needed for devices wih noisy pixel like Mimosa 26
-    # A pool of workers to remove the noisy pixels in all files in parallel
+    # Generate noisy pixel mask
+    # A pool of workers to remove the noisy pixels for all files in parallel
     kwargs = [{
         'input_hits_file': data_files[i],
         'n_pixel': n_pixels[i],
+        'pixel_mask_name': "NoisyPixelMask",
         'pixel_size': pixel_size[i],
         'threshold': 0.5,
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
-        pool.apply_async(hit_analysis.remove_noisy_pixels, kwds=kwarg)
+        pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
     pool.close()
     pool.join()
 
-    # Cluster hits off all DUTs
-    # A pool of workers to cluster hits in all files in parallel
+    # Cluster hits from all DUTs
+    # A pool of workers to cluster hits for all files in parallel
     kwargs = [{
-        'input_hits_file': data_files[i][:-3] + '_noisy_pixels.h5',
-        'max_x_distance': 3,
-        'max_y_distance': 3,
-        'max_time_distance': 2,
-        'max_cluster_hits': 1000000,
+        'input_hits_file': data_files[i],
+        'input_noisy_pixel_mask_file': data_files[i][:-3] + '_noisy_pixel_mask.h5',
+        'min_hit_charge': 0,
+        'max_hit_charge': 1,
+        'column_cluster_distance': 3,
+        'row_cluster_distance': 3,
+        'frame_cluster_distance': 1,  # recoreded by the EUTelescope 
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
@@ -105,7 +108,7 @@ def run_analysis():
     pool.join()
 
     # Correlate the row / column of each DUT
-    input_cluster_files = [data_file[:-3] + '_noisy_pixels_cluster.h5'
+    input_cluster_files = [data_file[:-3] + '_cluster.h5'
                            for data_file in data_files]
     dut_alignment.correlate_cluster(input_cluster_files=input_cluster_files,
                                     output_correlation_file=os.path.join(
@@ -130,7 +133,7 @@ def run_analysis():
                                non_interactive=True)
 
     # Merge the cluster tables to one merged table aligned at the event number
-    input_cluster_files = [data_file[:-3] + '_noisy_pixels_cluster.h5'
+    input_cluster_files = [data_file[:-3] + '_cluster.h5'
                            for data_file in data_files]
     dut_alignment.merge_cluster_data(input_cluster_files=input_cluster_files,
                                      output_merged_file=os.path.join(
