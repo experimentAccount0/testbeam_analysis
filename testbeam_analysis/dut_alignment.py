@@ -114,12 +114,9 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
 
 def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_size, chunk_size=4999999):
     '''Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.
+    
     Empty entries are signaled with column = row = charge = nan. Position is translated from indices to um. The
-    local coordinate system rigin (0, 0) is defined in the sensor center, to decouple translation and rotation.
-
-    Alignment information from the alignment file is used to correct the column/row positions. Use alignment data if
-    available (translation/rotation for each plane), otherwise pre-alignment data (offset, slope of correlation)
-    will be used.
+    local coordinate system origin (0, 0) is defined in the sensor center, to decouple translation and rotation.
 
     Parameters
     ----------
@@ -169,8 +166,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
                         for actual_cluster, start_indices[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
                             common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
-                merged_cluster_array = np.empty((common_event_numbers.shape[0],), dtype=description)  # Result array to be filled. For no hit: column = row = NaN
-                merged_cluster_array[:] = np.nan
+                merged_cluster_array = np.full((common_event_numbers.shape[0],), fill_value=np.nan, dtype=description)  # Result array to be filled. For no hit: column = row = NaN
 
                 # Set the event number
                 merged_cluster_array['event_number'] = common_event_numbers[:]
@@ -209,7 +205,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
             progress_bar.finish()
 
 
-def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=2):
+def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=3):
     '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
