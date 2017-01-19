@@ -10,7 +10,8 @@ from scipy.ndimage import median_filter
 
 from pixel_clusterizer.clusterizer import HitClusterizer
 from testbeam_analysis.tools import analysis_utils
-from testbeam_analysis.tools.plot_utils import plot_noisy_pixels, plot_cluster_size
+from testbeam_analysis.tools.plot_utils import (plot_noisy_pixels,
+                                                plot_cluster_size)
 
 
 def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None,
