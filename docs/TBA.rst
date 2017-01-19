@@ -1,6 +1,6 @@
 .. include:: ../README.rst
 
-Latest comits
-=============
+Latest commits
+==============
 
 .. git_changelog::
