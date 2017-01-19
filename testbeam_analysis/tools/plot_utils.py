@@ -46,36 +46,47 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), cax=cax)
 
 
-def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, dut_name=None):
-    with tb.open_file(input_hits_file, 'r') as input_file_h5:
-        occupancy = np.ma.masked_array(input_file_h5.root.HistOcc[:], mask=input_file_h5.root.NoisyPixelsMask[:]).T
+def plot_noisy_pixels(input_mask_file, pixel_size=None, output_pdf_file=None, dut_name=None):
+    with tb.open_file(input_mask_file, 'r') as input_file_h5:
+        try:
+            noisy_pixels = np.dstack(np.nonzero(input_file_h5.root.NoisyPixelMask[:].T))[0]
+        except tb.NodeError:
+            noisy_pixels = None
+        try:
+            disabled_pixels = np.dstack(np.nonzero(input_file_h5.root.DisabledPixelMask[:].T))[0]
+        except tb.NodeError:
+            disabled_pixels = None
+        occupancy = input_file_h5.root.HistOcc[:].T
 
     if pixel_size:
         aspect = pixel_size[0] / pixel_size[1]
     else:
         aspect = "auto"
 
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_hits_file)[0] + '.pdf'
+    if output_pdf_file is None:
+        output_pdf_file = os.path.splitext(input_mask_file)[0] + '.pdf'
 
-    if not dut_name:
-        dut_name = os.path.split(input_hits_file)[1]
+    if dut_name is None:
+        dut_name = os.path.split(input_mask_file)[1]
 
     with PdfPages(output_pdf_file) as output_pdf:
-        plt.figure()
-        ax = plt.subplot(111)
-
         cmap = cm.get_cmap('viridis')
     #     cmap.set_bad('w')
     #     norm = colors.LogNorm()
         norm = None
         c_max = np.percentile(occupancy, 99)
 
-        noisy_pixels = np.nonzero(np.ma.getmaskarray(occupancy))
-        # check for any noisy pixels
-        if noisy_pixels[0].shape[0] != 0:
-            ax.plot(noisy_pixels[1], noisy_pixels[0], 'ro', mfc='none', mec='r', ms=10)
-        ax.set_title('%s with %d noisy pixel' % (dut_name, np.ma.count_masked(occupancy)))
+        plt.figure()
+        ax = plt.subplot(111)
+        ax.set_title('%s' % (dut_name, ))
+        # plot noisy pixels
+        if noisy_pixels is not None:
+            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10)
+            ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (np.count_nonzero(noisy_pixels), ))
+        # plot disabled pixels
+        if disabled_pixels is not None:
+            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
+            ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (np.count_nonzero(disabled_pixels), ))
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
@@ -85,8 +96,7 @@ def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, du
 
         plt.figure()
         ax = plt.subplot(111)
-
-        ax.set_title('%s with %d noisy pixel removed' % (dut_name, np.ma.count_masked(occupancy)))
+        ax.set_title('%s' % (dut_name, ))
         ax.imshow(occupancy, aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
     #     np.ma.filled(occupancy, fill_value=0)
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
