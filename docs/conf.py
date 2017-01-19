@@ -25,7 +25,7 @@ import mock
 import sys
 
 MOCK_MODULES = ['pybar_fei4_converter', 'pybar_mimosa26_converter', 'numba',
-                'pixel_clusterizer', 'tables']
+                'pixel_clusterizer.clusterizer', 'tables']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
