@@ -41,6 +41,8 @@ class TestAlignmentAnalysis(unittest.TestCase):
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder, 'Correlation.h5'))
         os.remove(os.path.join(cls.output_folder, 'Correlation.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Correlation_2.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Correlation_2.pdf'))
         os.remove(os.path.join(cls.output_folder, 'Merged.h5'))
         os.remove(os.path.join(cls.output_folder, 'Merged_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
