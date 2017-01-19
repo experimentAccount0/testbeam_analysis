@@ -501,22 +501,22 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
     coeff = None
     fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
 
-    no_correlation_indeces = []
-    few_correlation_indeces = []
+    no_correlation_indices = []
+    few_correlation_indices = []
 
     for index in np.arange(n_pixel_dut):  # Loop over x dimension of correlation histogram
         # TODO: start fitting from the beam center to get a higher chance to pick up the correlation peak
 
         # omit correlation fit with no entries / correlation (e.g. sensor edges, masked columns)
         if np.all(data[index, :] == 0):
-            no_correlation_indeces.append(index)
+            no_correlation_indices.append(index)
             continue
 
         # omit correlation fit if sum of correlation entries is < 1 % of total entries devided by number of indices
         # (e.g. columns not in the beam)
         n_cluster_curr_index = data[index, :].sum()
         if fit_converged and n_cluster_curr_index < data.sum() / n_pixel_dut * 0.01:
-            few_correlation_indeces.append(index)
+            few_correlation_indices.append(index)
             continue
 
         # Set start parameters and fit limits
@@ -591,11 +591,11 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
             chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
 
 
-    if no_correlation_indeces:
-        logging.info('No correlation entries for indeces %s. Omit correlation fit.', str(no_correlation_indeces)[1:-1])
+    if no_correlation_indices:
+        logging.info('No correlation entries for indices %s. Omit correlation fit.', str(no_correlation_indices)[1:-1])
 
-    if few_correlation_indeces:
-        logging.info('Very few correlation entries for index %s. Omit correlation fit.', str(few_correlation_indeces)[1:-1])
+    if few_correlation_indices:
+        logging.info('Very few correlation entries for indices %s. Omit correlation fit.', str(few_correlation_indices)[1:-1])
 
 
 def refit_advanced(x_data, y_data, y_fit, p0):

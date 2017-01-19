@@ -308,7 +308,7 @@ def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
     index = 0
     # Hack to allow np.shuffle on a multidimesnional array,
     # http://numba.pydata.org/numba-doc/dev/reference/numpysupported.html#simple-random-data
-    indeces = np.arange(hits.shape[0])
+    indices = np.arange(hits.shape[0])
 
     np.random.seed(seed)
 
@@ -318,7 +318,7 @@ def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
             continue
 
         # Happens inplace
-        np.random.shuffle(indeces[index:index + n_tracks_per_event[index]])
+        np.random.shuffle(indices[index:index + n_tracks_per_event[index]])
 
         # Actual event is shuffled, increase index until new event
         while index < hits.shape[0] - 1:
@@ -329,7 +329,7 @@ def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
         index += 1
 
     # copy instruction, inplace not possible due to numba limitations
-    return hits[indeces]
+    return hits[indices]
 
 
 class SimulateData(object):
