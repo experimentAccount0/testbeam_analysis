@@ -209,25 +209,23 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_cluster_file, 'w') as output_file_h5:
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
-
-            # Output data
-            cluster_table_description = np.dtype([('event_number', '<i8'),
-                                                  ('ID', '<u2'),
-                                                  ('n_hits', '<u2'),
-                                                  ('charge', 'f4'),
-                                                  ('seed_column', '<u2'),
-                                                  ('seed_row', '<u2'),
-                                                  ('mean_column', 'f4'),
-                                                  ('mean_row', 'f4')])
-            cluster_table_out = output_file_h5.create_table(output_file_h5.root, name='Cluster', description=cluster_table_description, title='Clustered hits', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-
+            cluster_hits_table = None
+            cluster_table = None
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size, try_speedup=False):
                 if not np.all(np.diff(hits['event_number']) >= 0):
                     raise RuntimeError('The event number does not always increase. The hits cannot be used like this!')
-                cluster_hits, cluster = clusterizer.cluster_hits(hits, noisy_pixels=noisy_pixels, disabled_pixels=disabled_pixels)  # Cluster hits
-                if not np.all(np.diff(cluster['event_number']) >= 0):
+                cluster_hits, clusters = clusterizer.cluster_hits(hits, noisy_pixels=noisy_pixels, disabled_pixels=disabled_pixels)  # Cluster hits
+                if not np.all(np.diff(clusters['event_number']) >= 0):
                     raise RuntimeError('The event number does not always increase. The cluster cannot be used like this!')
-                cluster_table_out.append(cluster)
+                # create cluster hits table dynamically
+                if cluster_hits_table is None:
+                    cluster_hits_table = output_file_h5.create_table(output_file_h5.root, name='ClusterHits', description=cluster_hits.dtype, title='Cluster hits table', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                # create cluster table dynamically
+                if cluster_table is None:
+                    cluster_table = output_file_h5.create_table(output_file_h5.root, name='Cluster', description=clusters.dtype, title='Cluster table', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+                cluster_hits_table.append(cluster_hits)
+                cluster_table.append(clusters)
 
     if plot:
         plot_cluster_size(input_cluster_file=output_cluster_file, dut_name=dut_name)
