@@ -72,7 +72,7 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
     occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
     logging.info('Removed %d hot pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
     # Generate tuple col / row array of hot pixels, do not use getmask()
-    noisy_pixels_mask = np.ma.getmaskarray(occupancy)
+    pixel_mask = np.ma.getmaskarray(occupancy)
 
     with tb.open_file(output_mask_file, 'w') as out_file_h5:
         # Creating occupancy table without masking noisy pixels
@@ -80,8 +80,8 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
         occupancy_array_table[:] = np.ma.getdata(occupancy)
 
         # Creating noisy pixels table
-        noisy_pixels_table = out_file_h5.create_carray(out_file_h5.root, name=pixel_mask_name, title='Pixel Mask', atom=tb.Atom.from_dtype(noisy_pixels_mask.dtype), shape=noisy_pixels_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-        noisy_pixels_table[:] = noisy_pixels_mask
+        pixel_table = out_file_h5.create_carray(out_file_h5.root, name=pixel_mask_name, title='Pixel Mask', atom=tb.Atom.from_dtype(pixel_mask.dtype), shape=pixel_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+        pixel_table[:] = pixel_mask
 
     if plot:
         plot_noisy_pixels(input_mask_file=output_mask_file, pixel_size=pixel_size, dut_name=dut_name)
