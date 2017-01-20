@@ -167,10 +167,16 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
 
     Parameters
     ----------
-    input_hits_file : pytables file
-    output_cluster_file : pytables file
-    input_disabled_pixel_mask_file
-    input_noisy_pixel_mask_file
+    input_hits_file : string
+        Filename of the input hits file.
+    output_cluster_file : string
+        Filename of the output cluster file. If None, the filename will be generated.
+    create_cluster_hits_table : bool
+        If True, additionally create cluster hits table.
+    input_disabled_pixel_mask_file : string
+        Filename of the input disabled mask file.
+    input_noisy_pixel_mask_file : string
+        Filename of the input disabled mask file.
     min_hit_charge : uint
         Minimum hit charge. Minimum possible hit charge must be given in order to correcly calculate the cluster coordinates.
     max_hit_charge : uint
