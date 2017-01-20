@@ -162,7 +162,7 @@ def remove_noisy_pixels(input_hits_file, n_pixel, output_hits_file=None, pixel_s
     return output_hits_file
 
 
-def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel_mask_file=None, input_noisy_pixel_mask_file=None, min_hit_charge=0, max_hit_charge=None, column_cluster_distance=1, row_cluster_distance=1, frame_cluster_distance=1, dut_name=None, plot=True, chunk_size=1000000):
+def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_table=False, input_disabled_pixel_mask_file=None, input_noisy_pixel_mask_file=None, min_hit_charge=0, max_hit_charge=None, column_cluster_distance=1, row_cluster_distance=1, frame_cluster_distance=1, dut_name=None, plot=True, chunk_size=1000000):
     '''Clusters the hits in the data file containing the hit table.
 
     Parameters
@@ -218,13 +218,14 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
                 if not np.all(np.diff(clusters['event_number']) >= 0):
                     raise RuntimeError('The event number does not always increase. The cluster cannot be used like this!')
                 # create cluster hits table dynamically
-                if cluster_hits_table is None:
+                if create_cluster_hits_table and cluster_hits_table is None:
                     cluster_hits_table = output_file_h5.create_table(output_file_h5.root, name='ClusterHits', description=cluster_hits.dtype, title='Cluster hits table', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 # create cluster table dynamically
                 if cluster_table is None:
                     cluster_table = output_file_h5.create_table(output_file_h5.root, name='Cluster', description=clusters.dtype, title='Cluster table', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
-                cluster_hits_table.append(cluster_hits)
+                if create_cluster_hits_table:
+                    cluster_hits_table.append(cluster_hits)
                 cluster_table.append(clusters)
 
     if plot:
