@@ -56,7 +56,7 @@ def run_analysis():
         'pixel_mask_name': "NoisyPixelMask",
         'pixel_size': pixel_size[i],
         'threshold': threshold[i],
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
@@ -77,7 +77,7 @@ def run_analysis():
         'column_cluster_distance': column_cluster_distance[i],
         'row_cluster_distance': row_cluster_distance[i],
         'frame_cluster_distance': frame_cluster_distance[i],
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)

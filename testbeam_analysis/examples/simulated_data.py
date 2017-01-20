@@ -64,7 +64,7 @@ def run_analysis(n_events):
         'column_cluster_distance': 1,
         'row_cluster_distance': 1,
         'frame_cluster_distance': 2,  # simulation
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': data_files[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)

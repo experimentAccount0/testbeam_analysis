@@ -83,7 +83,7 @@ def run_analysis():
         'pixel_mask_name': "NoisyPixelMask",
         'pixel_size': pixel_size[i],
         'threshold': 0.5,
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
@@ -100,7 +100,7 @@ def run_analysis():
         'column_cluster_distance': 3,
         'row_cluster_distance': 3,
         'frame_cluster_distance': 1,  # recoreded by the EUTelescope 
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
