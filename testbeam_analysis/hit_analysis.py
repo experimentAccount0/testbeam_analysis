@@ -167,8 +167,26 @@ def cluster_hits(input_hits_file, output_cluster_file=None, input_disabled_pixel
 
     Parameters
     ----------
-    data_file : pytables file
-    output_file : pytables file
+    input_hits_file : pytables file
+    output_cluster_file : pytables file
+    input_disabled_pixel_mask_file
+    input_noisy_pixel_mask_file
+    min_hit_charge : uint
+        Minimum hit charge. Minimum possible hit charge must be given in order to correcly calculate the cluster coordinates.
+    max_hit_charge : uint
+        Maximum hit charge. Hits wit charge above the limit will be ignored.
+    column_cluster_distance : uint
+        Maximum column distance between hist so that they are assigned to the same cluster. Value of 0 effectively disables the clusterizer in column direction.
+    row_cluster_distance : uint
+        Maximum row distance between hist so that they are assigned to the same cluster. Value of 0 effectively disables the clusterizer in row direction.
+    frame_cluster_distance : uint
+        Sometimes an event has additional timing information (e.g. bunch crossing ID, frame ID). Value of 0 effectively disables the clusterization in time.
+    dut_name : string
+        Name of the DUT. If None, file name of the hit table will be printed.
+    plot : bool
+        If True, create additional output plots.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
 
     logging.info('=== Cluster hits in %s ===', input_hits_file)
