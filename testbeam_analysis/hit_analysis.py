@@ -75,11 +75,11 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
     pixel_mask = np.ma.getmaskarray(occupancy)
 
     with tb.open_file(output_mask_file, 'w') as out_file_h5:
-        # Creating occupancy table without masking noisy pixels
+        # Create occupancy array without masking pixels
         occupancy_array_table = out_file_h5.create_carray(out_file_h5.root, name='HistOcc', title='Occupancy Histogram', atom=tb.Atom.from_dtype(occupancy.dtype), shape=occupancy.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         occupancy_array_table[:] = np.ma.getdata(occupancy)
 
-        # Creating noisy pixels table
+        # Create masked pixels array
         pixel_table = out_file_h5.create_carray(out_file_h5.root, name=pixel_mask_name, title='Pixel Mask', atom=tb.Atom.from_dtype(pixel_mask.dtype), shape=pixel_mask.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
         pixel_table[:] = pixel_mask
 
