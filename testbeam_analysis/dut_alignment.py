@@ -415,14 +415,16 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     idx = (np.abs(x_selected - 1 - plot_index)).argmin()
                     plot_index = np.array(x_selected - 1, dtype=np.int)[idx]
 
+                    x_fit = np.linspace(start=x_ref.min(), stop=x_ref.max(), num=500, endpoint=True)
                     if np.all(np.isnan(coeff_fitted[plot_index][3:6])):
-                        y_fit = analysis_utils.gauss_offset(x_ref, *coeff_fitted[plot_index][[0, 1, 2, 6]])
+                        y_fit = analysis_utils.gauss_offset(x_fit, *coeff_fitted[plot_index][[0, 1, 2, 6]])
                         fit_label = "Gauss-Offset"
                     else:
-                        y_fit = analysis_utils.double_gauss_offset(x_ref, *coeff_fitted[plot_index])
+                        y_fit = analysis_utils.double_gauss_offset(x_fit, *coeff_fitted[plot_index])
                         fit_label = "Gauss-Gauss-Offset"
                     plot_utils.plot_correlation_fit(x=x_ref,
                                                     y=data[plot_index, :],
+                                                    x_fit=x_fit,
                                                     y_fit=y_fit,
                                                     xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
                                                     fit_label=fit_label,
