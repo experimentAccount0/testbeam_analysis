@@ -98,7 +98,20 @@ def plot_noisy_pixels(input_hits_file, pixel_size=None, output_pdf_file=None, du
         plt.close()
 
 
-def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
+def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None, chunk_size=1000000):
+    '''Plotting cluster size histogram.
+
+    Parameters
+    ----------
+    input_cluster_file : string
+        Filename of the input cluster file.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
+    dut_name : string
+        Name of the DUT. If None, the filename of the input cluster file will be used.
+    chunk_size : int
+        Chunk size of the data when reading from file.
+    '''
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_cluster_file)[0] + '.pdf'
 
@@ -107,26 +120,38 @@ def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None):
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
-            cluster_n_hits = input_file_h5.root.Cluster[:1000000]['n_hits']
-            # Save cluster size histogram
-            max_cluster_size = np.amax(cluster_n_hits) + 1
-            plt.clf()
-            left = np.arange(max_cluster_size)
-            hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size,))
-            plt.bar(left, hight, align='center')
-            plt.title('Cluster size of %s' % dut_name)
-            plt.xlabel('Cluster size')
-            plt.ylabel('#')
-            plt.grid()
-            plt.yscale('log')
-            plt.xlim(xmin=0.5)
-            plt.ylim(ymin=1e-1)
-            output_pdf.savefig()
-            plt.yscale('linear')
-            plt.ylim(ymax=np.amax(hight))
-            plt.xlim(0.5, min(10, max_cluster_size - 1) + 0.5)
-            output_pdf.savefig()
+            hight = None
+            n_hits = 0
+            n_clusters = input_file_h5.root.Cluster.nrows
+            for start_index in range(0, n_clusters, chunk_size):
+                cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
+                # calculate cluster size histogram
+                if hight is None:
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                elif max_cluster_size < np.amax(cluster_n_hits):
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight.resize(max_cluster_size + 1)
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                else:
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                n_hits += np.sum(cluster_n_hits)
 
+        left = np.arange(max_cluster_size + 1)
+        plt.clf()
+        plt.bar(left, hight, align='center')
+        plt.title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
+        plt.xlabel('Cluster size')
+        plt.ylabel('#')
+        plt.grid()
+        plt.yscale('log')
+        plt.xlim(xmin=0.5)
+        plt.ylim(ymin=1e-1)
+        output_pdf.savefig()
+        plt.yscale('linear')
+        plt.ylim(ymax=np.amax(hight))
+        plt.xlim(0.5, min(10, max_cluster_size) + 0.5)
+        output_pdf.savefig()
 
 def plot_correlation_fit(x, y, y_fit, xlabel, fit_label, title, output_pdf):
     plt.clf()
