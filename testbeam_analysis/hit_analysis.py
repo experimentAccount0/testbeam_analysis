@@ -97,7 +97,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     input_hits_file : string
         Filename of the input hits file.
     output_cluster_file : string
-        Filename of the output cluster file. If None, the filename will be generated.
+        Filename of the output cluster file. If None, the filename will be derived from the input hits file.
     create_cluster_hits_table : bool
         If True, additionally create cluster hits table.
     input_disabled_pixel_mask_file : string
@@ -115,7 +115,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     frame_cluster_distance : uint
         Sometimes an event has additional timing information (e.g. bunch crossing ID, frame ID). Value of 0 effectively disables the clusterization in time.
     dut_name : string
-        Name of the DUT. If None, file name of the hit table will be printed.
+        Name of the DUT. If None, filename of the output cluster file will be used.
     plot : bool
         If True, create additional output plots.
     chunk_size : int
