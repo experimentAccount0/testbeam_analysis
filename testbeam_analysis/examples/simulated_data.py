@@ -59,11 +59,12 @@ def run_analysis(n_events):
     # Cluster hits off all DUTs
     kwargs = [{
         'input_hits_file': data_files[i],
-        'max_x_distance': 1,
-        'max_y_distance': 1,
-        'max_time_distance': 2,
+        'min_hit_charge': 1,  # in electrons
         'max_hit_charge': 2 ** 16,
-        "dut_name": data_files[i]} for i in range(len(data_files))]
+        'column_cluster_distance': 1,
+        'row_cluster_distance': 1,
+        'frame_cluster_distance': 2,  # simulation
+        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)

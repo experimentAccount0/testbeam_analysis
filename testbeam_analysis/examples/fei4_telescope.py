@@ -46,16 +46,17 @@ def run_analysis():
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
     # Cluster hits off all DUTs
-    kwargs = [{  # Input parameters of the cluster function
+    kwargs = [{
         'input_hits_file': data_files[i],
-        'max_x_distance': 2,
-        'max_y_distance': 1,
-        'max_time_distance': 2,
-        'max_cluster_hits':1000,
+        'min_hit_charge': 0,  # FEI4 ToT value
+        'max_hit_charge': 13,
+        'column_cluster_distance': 1,
+        'row_cluster_distance': 2,
+        'frame_cluster_distance': 2,  # BCID, recoreded by pyBAR
         'dut_name': dut_names[i]} for i in range(0, len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)  # Non blocking call of the cluster function, runs in seperate process
+        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
     pool.close()
     pool.join()
 
