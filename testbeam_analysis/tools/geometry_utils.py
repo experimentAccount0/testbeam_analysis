@@ -67,8 +67,7 @@ def get_line_intersections_with_plane(line_origins, line_directions,
                                         line_directions.T))
 
     # Initialize result to nan
-    t = np.empty_like(norm_dot_off)
-    t[:] = np.NAN
+    t = np.full_like(norm_dot_off, fill_value=np.nan)
 
     # Warn if some intersection cannot be calculated
     if np.any(norm_dot_dir == 0):
