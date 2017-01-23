@@ -98,7 +98,7 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
     data_1, data_2: np.recarray
         Hit/cluster array. Must have event_number / mean_column / mean_row columns.
     column_corr_hist, row_corr_hist: np.array
-        Correlation array with the correlation data. Has to be of sufficient size.
+        2D correlation array containing the correlation data. Has to be of sufficient size.
 
     """
     index_data_2 = 0
