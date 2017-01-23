@@ -82,10 +82,9 @@ def merge_on_event_number(data_1, data_2):
 
 @njit
 def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr_hist):
-    """
-    Merges the data_2 cluster index with data_1 cluster index on an event basis with all permutations
-    That means: merge all hits of every event in data_2 on all hits of the same event in data_1.
-    Then the cluster hits are used to fill a correlation histogram.
+    """Correlating the hit/cluster indices of two arrays on an event basis with all permutations.
+    In other words: correlate all hit/cluster indices of particular event in data_2 with all hit/cluster indices of the same event in data_1.
+    Then the hit/cluster indices are used to fill a correlation histograms.
 
     Does the same than the merge of the pandas package:
         df = data_1.merge(data_2, how='left', on='event_number')
@@ -97,9 +96,9 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
     Parameters
     ----------
     data_1, data_2: np.recarray
-        Has to have event_number / mean_column / mean_row columns
-    column_corr_hist, row_corr_hist: np.arrays
-        Holds correlation data. Has to be of sufficient size
+        Hit/cluster array. Must have event_number / mean_column / mean_row columns.
+    column_corr_hist, row_corr_hist: np.array
+        Correlation array with the correlation data. Has to be of sufficient size.
 
     """
     index_data_2 = 0
