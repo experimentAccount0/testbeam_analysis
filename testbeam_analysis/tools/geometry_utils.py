@@ -123,17 +123,11 @@ def spherical_to_cartesian(phi, theta, r):
     Cartesian coordinates x, y and z.
     '''
     if np.any(r < 0):
-        raise RuntimeError(
-            'Conversion from spherical to cartesian coordinates failed, '
-            'because r < 0')
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because r < 0')
     if np.any(theta < 0) or np.any(theta >= np.pi):
-        raise RuntimeError(
-            'Conversion from spherical to cartesian coordinates failed, '
-            'because theta exceeds [0, Pi[')
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because theta exceeds [0, Pi[')
     if np.any(phi < 0) or np.any(phi >= 2 * np.pi):
-        raise RuntimeError(
-            'Conversion from spherical to cartesian coordinates failed, '
-            'because phi exceeds [0, 2*Pi[')
+        raise RuntimeError('Conversion from spherical to cartesian coordinates failed, because phi exceeds [0, 2*Pi[')
     x = r * np.cos(phi) * np.sin(theta)
     y = r * np.sin(phi) * np.sin(theta)
     z = r * np.cos(theta)
