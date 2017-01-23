@@ -135,7 +135,7 @@ def spherical_to_cartesian(phi, theta, r):
     return x, y, z
 
 
-def rotation_matrix_x(angle):
+def rotation_matrix_x(alpha):
     ''' Calculates the rotation matrix for the rotation around the x axis by an angle alpha in a cartesian right-handed coordinate system.
 
     Note
@@ -152,11 +152,11 @@ def rotation_matrix_x(angle):
     Array with shape (3, 3).
     '''
     return np.array([[1, 0, 0],
-                     [0, np.cos(angle), np.sin(angle)],
-                     [0, -np.sin(angle), np.cos(angle)]])
+                     [0, np.cos(alpha), np.sin(alpha)],
+                     [0, -np.sin(alpha), np.cos(alpha)]])
 
 
-def rotation_matrix_y(angle):
+def rotation_matrix_y(beta):
     ''' Calculates the rotation matrix for the rotation around the y axis by an angle beta in a cartesian right-handed coordinate system.
 
     Note
@@ -173,12 +173,12 @@ def rotation_matrix_y(angle):
     -------
     Array with shape (3, 3).
     '''
-    return np.array([[np.cos(angle), 0, - np.sin(angle)],
+    return np.array([[np.cos(beta), 0, - np.sin(beta)],
                      [0, 1, 0],
-                     [np.sin(angle), 0, np.cos(angle)]])
+                     [np.sin(beta), 0, np.cos(beta)]])
 
 
-def rotation_matrix_z(angle):
+def rotation_matrix_z(gamma):
     ''' Calculates the rotation matrix for the rotation around the z axis by an angle gamma in a cartesian right-handed coordinate system.
 
     Note
@@ -195,8 +195,8 @@ def rotation_matrix_z(angle):
     -------
     Array with shape (3, 3).
     '''
-    return np.array([[np.cos(angle), np.sin(angle), 0],
-                     [-np.sin(angle), np.cos(angle), 0],
+    return np.array([[np.cos(gamma), np.sin(gamma), 0],
+                     [-np.sin(gamma), np.cos(gamma), 0],
                      [0, 0, 1]])
 
 
@@ -231,9 +231,7 @@ def rotation_matrix(alpha, beta, gamma):
     -------
     Array with shape (3, 3).
     '''
-
-    return np.dot(rotation_matrix_x(alpha),
-                  np.dot(rotation_matrix_y(beta), rotation_matrix_z(gamma)))
+    return np.dot(rotation_matrix_x(alpha=alpha), np.dot(rotation_matrix_y(beta=beta), rotation_matrix_z(gamma=gamma)))
 
 
 def translation_matrix(x, y, z):
@@ -302,13 +300,13 @@ def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
     Array with shape (4, 4).
     '''
     # Extend rotation matrix R by one dimension
-    R = np.eye(4, 4, 0)
-    R[:3, :3] = rotation_matrix(alpha, beta, gamma).T
+    rotation_matrix = np.eye(4, 4, 0)
+    rotation_matrix[:3, :3] = rotation_matrix(alpha=alpha, beta=beta, gamma=gamma).T
 
     # Get translation matrix T
-    T = translation_matrix(-x, -y, -z)
+    translation_matrix = translation_matrix(x=-x, y=-y, z=-z)
 
-    return np.dot(R, T)
+    return np.dot(rotation_matrix, translation_matrix)
 
 
 def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
@@ -342,13 +340,13 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
     Array with shape (4, 4).
     '''
     # Extend inverse rotation matrix R by one dimension
-    R = np.eye(4, 4, 0)
-    R[:3, :3] = rotation_matrix(alpha, beta, gamma)
+    rotation_matrix = np.eye(4, 4, 0)
+    rotation_matrix[:3, :3] = rotation_matrix(alpha=alpha, beta=beta, gamma=gamma)
 
     # Get inverse translation matrix T
-    T = translation_matrix(x, y, z)
+    translation_matrix = translation_matrix(x=x, y=y, z=z)
 
-    return np.dot(T, R)
+    return np.dot(translation_matrix, rotation_matrix)
 
 
 def apply_transformation_matrix(x, y, z, transformation_matrix):
@@ -371,9 +369,9 @@ def apply_transformation_matrix(x, y, z, transformation_matrix):
     pos = np.column_stack((x, y, z, np.ones_like(x))).T
 
     # Transform and delete extra dimension
-    pos_T = np.dot(transformation_matrix, pos).T[:, :-1]
+    pos_transformed = np.dot(transformation_matrix, pos).T[:, :-1]
 
-    return pos_T[:, 0], pos_T[:, 1], pos_T[:, 2]
+    return pos_transformed[:, 0], pos_transformed[:, 1], pos_transformed[:, 2]
 
 
 def apply_rotation_matrix(x, y, z, rotation_matrix):
@@ -393,9 +391,9 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     Array with rotated coordinates.
     '''
     pos = np.column_stack((x, y, z)).T
-    pos_T = np.dot(rotation_matrix, pos).T
+    pos_transformed = np.dot(rotation_matrix, pos).T
 
-    return pos_T[:, 0], pos_T[:, 1], pos_T[:, 2]
+    return pos_transformed[:, 0], pos_transformed[:, 1], pos_transformed[:, 2]
 
 
 def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
