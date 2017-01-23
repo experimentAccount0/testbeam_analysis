@@ -14,17 +14,17 @@ def get_plane_normal(direction_vector_1, direction_vector_2):
 
     Plane is define by two non parallel direction vectors within the plane.
 
-    Paramter:
-    --------
-    direction_vector_1 : array like with 3 dimensions
-    direction_vector_2 : array like with 3 dimensions
+    Parameters
+    ----------
+    direction_vector_1 : array
+       Array with x, y and z.
+    direction_vector_2 : array
+       Array with x, y and z.
 
-
-    Returns:
-    --------
-    array like with 3 dimension
+    Returns
+    -------
+    Array with x, y and z.
     '''
-
     return np.cross(direction_vector_1, direction_vector_2)
 
 
@@ -40,23 +40,22 @@ def get_line_intersections_with_plane(line_origins, line_directions,
     Further information:
     http://stackoverflow.com/questions/4938332/line-plane-intersection-based-on-points
 
-    Paramter:
-    --------
-    line_origins : array like with n, 3 dimensions
-        A point of the line for n lines
-    line_directions : array like with n, 3 dimensions
-        The direction vector of the line for n lines
-    position_plane : array like with 3 dimensions
-        A vector to the plane
-    normal_plane : array like with 3 dimensions
-        The normal vector of the plane
+    Parameters
+    ----------
+    line_origins : array
+        A point (x, y and z) on the line for each of the n lines.
+    line_directions : array
+        The direction vector of the line for n lines.
+    position_plane : array
+        A array (x, y and z) to the plane.
+    normal_plane : array
+        The normal vector (x, y and z) of the plane.
 
 
-    Returns:
-    --------
-    array like with n, 3 dimension with the intersection point
+    Returns
+    -------
+    Array with shape (n, 3) with the intersection point.
     '''
-
     # Calculate offsets and extend in missing dimension
     offsets = position_plane[np.newaxis, :] - line_origins
 
@@ -90,16 +89,15 @@ def cartesian_to_spherical(x, y, z):
 
     Convention: r = 0 --> phi = theta = 0
 
-    Paramter:
-    --------
-    x, y, z : number
-        Position in cartesian space
+    Parameters
+    ----------
+    x, y, z : float
+        Position in cartesian space.
 
-    Returns:
-    --------
-    spherical coordinates: phi, theta, r
+    Returns
+    -------
+    Spherical coordinates phi, theta and r.
     '''
-
     r = np.sqrt(x * x + y * y + z * z)
     phi = np.zeros_like(r)  # define phi = 0 for x = 0
     theta = np.zeros_like(r)  # theta = 0 for r = 0
@@ -114,16 +112,16 @@ def cartesian_to_spherical(x, y, z):
 def spherical_to_cartesian(phi, theta, r):
     ''' Transformation from spherical to cartesian coordinates.
 
-    Includes error checks.
+    Including error checks.
 
-    Paramter:
-    --------
-    phi, theta, r : number
-        Position in spherical space
+    Parameters
+    ----------
+    phi, theta, r : float
+        Position in spherical space.
 
-    Returns:
-    --------
-    Cartesian coordinates: x, y, z
+    Returns
+    -------
+    Cartesian coordinates x, y and z.
     '''
     if np.any(r < 0):
         raise RuntimeError(
@@ -145,43 +143,42 @@ def spherical_to_cartesian(phi, theta, r):
 
 
 def rotation_matrix_x(angle):
-    ''' Rotation matrix for rotation around x axis by an angle.
+    ''' Calculates the rotation matrix for the rotation around the x axis by an angle alpha in a cartesian right-handed coordinate system.
 
-    Note:
-    -----
-    Rotation in a cartesian right-handed coordinate system
+    Note
+    ----
+    Rotation in a cartesian right-handed coordinate system.
 
-    Paramter:
-    --------
-    angle : number
-        Angle in radians
+    Parameters
+    ----------
+    alpha : float
+        Angle in radians.
 
-    Returns:
-    --------
-    np.array with shape 3, 3
+    Returns
+    -------
+    Array with shape (3, 3).
     '''
-
     return np.array([[1, 0, 0],
                      [0, np.cos(angle), np.sin(angle)],
                      [0, -np.sin(angle), np.cos(angle)]])
 
 
 def rotation_matrix_y(angle):
-    ''' Rotation matrix for rotation around y axis by an angle.
+    ''' Calculates the rotation matrix for the rotation around the y axis by an angle beta in a cartesian right-handed coordinate system.
 
-    Note:
-    -----
-    Rotation in a cartesian right-handed coordinate system
+    Note
+    ----
+    Rotation in a cartesian right-handed coordinate system.
 
 
-    Paramter:
-    --------
-    angle : number
-        Angle in radians
+    Parameters
+    ----------
+    beta : float
+        Angle in radians.
 
-    Returns:
-    --------
-    np.array with shape 3, 3
+    Returns
+    -------
+    Array with shape (3, 3).
     '''
     return np.array([[np.cos(angle), 0, - np.sin(angle)],
                      [0, 1, 0],
@@ -189,21 +186,21 @@ def rotation_matrix_y(angle):
 
 
 def rotation_matrix_z(angle):
-    ''' Rotation matrix for rotation around z axis by an angle.
+    ''' Calculates the rotation matrix for the rotation around the z axis by an angle gamma in a cartesian right-handed coordinate system.
 
-    Note:
-    -----
-    Rotation in a cartesian right-handed coordinate system
+    Note
+    ----
+    Rotation in a cartesian right-handed coordinate system.
 
 
-    Paramter:
-    --------
-    gamma : number
-        Angle in radians
+    Parameters
+    ----------
+    gamma : float
+        Angle in radians.
 
-    Returns:
-    --------
-    np.array with shape 3, 3
+    Returns
+    -------
+    Array with shape (3, 3).
     '''
     return np.array([[np.cos(angle), np.sin(angle), 0],
                      [-np.sin(angle), np.cos(angle), 0],
@@ -211,37 +208,35 @@ def rotation_matrix_z(angle):
 
 
 def rotation_matrix(alpha, beta, gamma):
-    ''' Rotation matrix for the rotation around the three cartesian axis x, y, z.
+    ''' Calculates the rotation matrix for the rotation around the three cartesian axis x, y, z in a right-handed system.
 
-    Note:
-    -----
+    Note
+    ----
     In a right-handed system. The rotation is done around x then y then z.
 
     Remember:
         - Transform to the locale coordinate system before applying rotations
         - Rotations are associative but not commutative
 
-    Usage:
-    ------
+    Usage
+    -----
         A rotation by (alpha, beta, gamma) of the vector (x, y, z) in the local
         coordinate system can be done by:
           np.dot(rotation_matrix(alpha, beta, gamma), np.array([x, y, z]))
 
 
-    Paramter:
-    --------
+    Parameters
+    ----------
+    alpha : float
+        Angle in radians for rotation around x.
+    beta : float
+        Angle in radians for rotation around y.
+    gamma : float
+        Angle in radians for rotation around z.
 
-    alpha : number
-        Angle in radians for rotation around x
-    beta : number
-        Angle in radians for rotation around y
-    gamma : number
-        Angle in radians for rotation around z
-
-    Returns:
-    --------
-
-    np.array with shape 3, 3
+    Returns
+    -------
+    Array with shape (3, 3).
     '''
 
     return np.dot(rotation_matrix_x(alpha),
@@ -249,34 +244,31 @@ def rotation_matrix(alpha, beta, gamma):
 
 
 def translation_matrix(x, y, z):
-    ''' Translation matrix for the translation in x, y, z in a cartesian system.
+    ''' Calculates the translation matrix for the translation in x, y, z in a cartesian right-handed system.
 
-    Note:
+    Note
+    ----
+    Remember: Translations are associative and commutative
+
+    Usage
     -----
-        Remember: Translations are associative and commutative
-
-    Usage:
-    ------
         A translation of a vector (x, y, z) by dx, dy, dz can be done by:
           np.dot(translation_matrix(dx, dy, dz), np.array([x, y, z, 1]))
 
 
-    Paramter:
-    --------
+    Parameters
+    ----------
+    x : float
+        Translation in x.
+    y : float
+        Translation in y.
+    z : float
+        Translation in z.
 
-    x : number
-        Translation in x
-    y : number
-        Translation in y
-    z : number
-        Translation in z
-
-    Returns:
-    --------
-
-    np.array with shape 4, 4
+    Returns
+    -------
+    Array with shape (4, 4).
     '''
-
     translation_matrix = np.eye(4, 4, 0)
     translation_matrix[3, :3] = np.array([x, y, z])
 
@@ -290,34 +282,32 @@ def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
     Translation is T=(-x, -y, -z) to the local coordinate system followed
     by a rotation = R(alpha, beta, gamma).T in the local coordinate system.
 
-    Note:
-    -----
+    Note
+    ----
         - This function is the inverse of
           local_to_global_transformation_matrix()
         - The resulting transformation matrix is 4 x 4
         - Translation and Rotation operations are not commutative
 
-    Paramter:
-    --------
+    Parameters
+    ----------
+    x : float
+        Translation in x.
+    y : float
+        Translation in y.
+    z : float
+        Translation in z.
+    alpha : float
+        Angle in radians for rotation around x.
+    beta : float
+        Angle in radians for rotation around y.
+    gamma : float
+        Angle in radians for rotation around z.
 
-    x : number
-        Translation in x
-    y : number
-        Translation in y
-    z : number
-        Translation in z
-    alpha : number
-        Angle in radians for rotation around x
-    beta : number
-        Angle in radians for rotation around y
-    gamma : number
-        Angle in radians for rotation around z
-
-    Returns:
-    --------
-    np.array with shape 4, 4
+    Returns
+    -------
+    Array with shape (4, 4).
     '''
-
     # Extend rotation matrix R by one dimension
     R = np.eye(4, 4, 0)
     R[:3, :3] = rotation_matrix(alpha, beta, gamma).T
@@ -334,32 +324,30 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
     Inverse rotation in the local coordinate system followed by an inverse
     translation by x, y, z to the global coordinate system.
 
-    Note:
-    -----
+    Note
+    ----
         - The resulting transformation matrix is 4 x 4
         - Translation and Rotation operations do not commutative
 
-    Paramter:
-    --------
+    Parameters
+    ----------
+    x : float
+        Translation in x.
+    y : float
+        Translation in y.
+    z : float
+        Translation in z.
+    alpha : float
+        Angle in radians for rotation around x.
+    beta : float
+        Angle in radians for rotation around y.
+    gamma : float
+        Angle in radians for rotation around z.
 
-    x : number
-        Translation in x
-    y : number
-        Translation in y
-    z : number
-        Translation in z
-    alpha : number
-        Angle in radians for rotation around x
-    beta : number
-        Angle in radians for rotation around y
-    gamma : number
-        Angle in radians for rotation around z
-
-    Returns:
-    --------
-    np.array with shape 4, 4
+    Returns
+    -------
+    Array with shape (4, 4).
     '''
-
     # Extend inverse rotation matrix R by one dimension
     R = np.eye(4, 4, 0)
     R[:3, :3] = rotation_matrix(alpha, beta, gamma)
@@ -373,21 +361,19 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
 def apply_transformation_matrix(x, y, z, transformation_matrix):
     ''' Takes arrays for x, y, z and applies a transformation matrix (4 x 4).
 
-    Paramter:
-    --------
-
+    Parameters
+    ----------
     x : array
-        Position in x
+        Array of x coordinates.
     y : array
-        Position in y
+        Array of y coordinates.
     z : array
-        Position in z
+        Array of z coordinates.
 
-    Returns:
-    --------
-    np.array with shape 3, 3
+    Returns
+    -------
+    Array with transformed coordinates.
     '''
-
     # Add extra 4th dimension
     pos = np.column_stack((x, y, z, np.ones_like(x))).T
 
@@ -400,21 +386,19 @@ def apply_transformation_matrix(x, y, z, transformation_matrix):
 def apply_rotation_matrix(x, y, z, rotation_matrix):
     ''' Takes array in x, y, z and applies a rotation matrix (3 x 3).
 
-    Paramter:
-    --------
+    Parameters
+    ----------
+    x : array
+        Array of x coordinates.
+    y : array
+        Array of x coordinates.
+    z : array
+        Array of x coordinates.
 
-    x : number
-        Position in x
-    y : number
-        Position in y
-    z : number
-        Position in z
-
-    Returns:
-    --------
-    np.array with shape 3, 3
+    Returns
+    -------
+    Array with rotated coordinates.
     '''
-
     pos = np.column_stack((x, y, z)).T
     pos_T = np.dot(rotation_matrix, pos).T
 
@@ -432,22 +416,23 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
     If both are given alignment data is taken.
     The transformation can be inverted.
 
-    Paramter:
-    --------
+    Parameters
+    ---------
+    hits_x, hits_y, hits_z : array
+        Array with corresponding hit positions.
+    dut_index : int
+        Needed to select the corrct alignment info.
+    alignment : array
+        Alignment information with rotations and translations.
+    prealignment : array
+        Pre-alignment information with offsets and slopes.
+    inverse : bool
+        Apply inverse transformation if True.
 
-    hits_x, hits_y, hits_z : numpy arrays with corresponding hit positions
-    dut_index : integer
-        Needed to select the corrct alignment info
-    alignment : nunmpy array
-        Alignment information with rotations and translations
-    prealignment : numpy array
-        Pre-alignment information with offsets and slopes
-    inverse : boolean
-        Apply inverse transformation if true
-
-    Returns:
-    --------
-    hits_x, hits_y, hits_z : numpy arrays
+    Returns
+    -------
+    hits_x, hits_y, hits_z : array
+        Array with transformed hit positions.
     '''
     if (alignment is None and prealignment is None) or \
        (alignment is not None and prealignment is not None):
@@ -556,19 +541,17 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
 
     Absolute (overwriting) and relative (add angles, translations) supported.
 
-    Paramter:
-    --------
-
-    alignment_file : pytables file
-        The pytables file with the alignment
-    alignment_parameters : numpy recarray
-        An array with the alignment values
+    Parameters
+    ---------
+    alignment_file : string
+        The pytables file name containing the alignment.
+    alignment_parameters : recarray
+        An array with the alignment values.
     mode : string
-        'relative' and 'absolute' supported
+        Select relative or absolute alignment. The strings 'relative' and 'absolute' are supported.
     use_duts : iterable
-        In relative mode only change specified DUTs
+        In relative mode only change specified DUTs.
     '''
-
     description = np.zeros((1,), dtype=alignment_parameters.dtype).dtype
 
     # Open file with alignment data
