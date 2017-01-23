@@ -117,7 +117,8 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
                 column_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_column'] - 0.5))
                 row_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_row'] - 0.5))
 
-                assert column_index_dut_1 >= 0 and row_index_dut_1 >= 0 and column_index_dut_2 >= 0 and row_index_dut_2 >= 0
+                if not (column_index_dut_1 >= 0 and row_index_dut_1 >= 0 and column_index_dut_2 >= 0 and row_index_dut_2 >= 0):
+                    raise ValueError('Column and/or row index is smaller than 0.5')
 
                 # Add correlation to histogram
                 column_corr_hist[column_index_dut_2, column_index_dut_1] += 1
