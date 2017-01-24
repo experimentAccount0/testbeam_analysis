@@ -460,13 +460,14 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 try:
                     result_table = out_file_h5.create_table(out_file_h5.root, name='PreAlignment', description=result.dtype, title='Prealignment alignment from correlation', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     result_table.append(result)
+                    result_table.attrs.fit_limits = fit_limits
                 except tb.exceptions.NodeError:
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
 
 def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):
 
-    def calc_limits_from_fit(coeff):
+    def calc_limits_from_fit(x, coeff):
         ''' Calculates the fit limits from the last successfull fit.'''
         limits = [
             [0.1 * coeff[0], x.min(), 0.5 * coeff[2], 0.01 * coeff[3], x.min(), 0.5 * coeff[5], 0.5 * coeff[6]],
@@ -477,7 +478,7 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
             limits[1][2] = 10.
         return limits
 
-    def signal_sanity_check(coeff, signal_noise, A_peak):
+    def signal_sanity_check(coeff, s_n, A_peak):
         ''' Sanity check if signal was deducted correctly from background.
 
             3 Conditions:
@@ -485,7 +486,7 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
             2. The signal + background has to be large enough: Amplidute 1 + Amplitude 2 + Offset > Data maximum / 2
             3. The Signal Sigma has to be smaller than the background sigma, otherwise beam would be larger than one pixel pitch
         '''
-        if coeff[0] < (coeff[3] + coeff[6]) * signal_noise or coeff[0] + coeff[3] + coeff[6] < A_peak / 2.0 or coeff[2] > coeff[5] / 2.0:
+        if coeff[0] < (coeff[3] + coeff[6]) * s_n or coeff[0] + coeff[3] + coeff[6] < A_peak / 2.0 or coeff[2] > coeff[5] / 2.0:
             return False
         return True
 
@@ -525,7 +526,7 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
         # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
         if fit_converged and not reduce_background:  # Set start values from last successfull fit, no large difference expected
             p0 = coeff  # Set start values from last successfull fit
-            bounds = calc_limits_from_fit(coeff)  # Set boundaries from previous converged fit
+            bounds = calc_limits_from_fit(x, coeff)  # Set boundaries from previous converged fit
         else:  # No (last) successfull fit, try to dedeuce reasonable start values
             p0 = [A_peak[index], mu_peak[index], 5.0, A_background[index], mu_background[index], analysis_utils.get_rms_from_histogram(data[index, :], x), 0.0]
             bounds = [[0.0, x.min(), 0.0, 0.0, x.min(), 0.0, 0.0], [2.0 * A_peak[index], x.max(), x.max() - x.min(), 2.0 * A_peak[index], x.max(), np.inf, A_peak[index]]]
@@ -560,17 +561,8 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
             bounds_gauss_offset = [0, np.inf]
             bounds_gauss_offset[0] = [bound_val for i, bound_val in enumerate(bounds[0]) if i in (0, 1, 2, 6)]
             bounds_gauss_offset[1] = [bound_val for i, bound_val in enumerate(bounds[1]) if i in (0, 1, 2, 6)]
-            
-#             print index
-#             print bounds_gauss_offset
-#             plt.bar(x, data[index, :], label='Data')
-
-#             xx = np.linspace(x[0], x[-1], num=10000, endpoint=True)
-#             plt.plot(xx, analysis_utils.gauss_offset(xx, *p0_gauss_offset), label='Start Values')
-
             try:
                 coeff_gauss_offset, var_matrix = curve_fit(analysis_utils.gauss_offset, x, data[index, :], p0=p0_gauss_offset, bounds=bounds_gauss_offset)
-#                 plt.plot(xx, analysis_utils.gauss_offset(xx, *coeff_gauss_offset), label='Fit')
             except RuntimeError:  # curve_fit failed
                 fit_converged = False
             else:
@@ -581,9 +573,7 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
                     coeff = np.insert(coeff_gauss_offset, 3, [np.nan] * 3)  # Parameters: A_1, mu_1, sigma_1, A_2, mu_2, sigma_2, offset
                 else:
                     fit_converged = False
-#             plt.grid(True)
-#             plt.legend(loc=0)
-#             plt.show()
+
         # Set fit results for given index if successful
         if fit_converged:
             coeff_fitted[index] = coeff
@@ -591,7 +581,6 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
             mean_error_fitted[index] = np.sqrt(np.abs(np.diag(var_matrix)))[1]
             sigma_fitted[index] = np.abs(coeff[2])
             chi2[index] = analysis_utils.get_chi2(y_data=data[index, :], y_fit=analysis_utils.double_gauss_offset(x, *coeff))
-
 
     if no_correlation_indices:
         logging.info('No correlation entries for indices %s. Omit correlation fit.', str(no_correlation_indices)[1:-1])
