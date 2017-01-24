@@ -484,8 +484,9 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative',
     if select_duts is None:  # Select all DUTs
         select_duts = np.ones(old_alignment.shape[0], dtype=np.bool)
     else:
-        select_duts = np.zeros(old_alignment.shape[0], dtype=np.bool)
-        select_duts[np.array(select_duts)] = True
+        select = np.zeros(old_alignment.shape[0], dtype=np.bool)
+        select[np.array(select_duts)] = True
+        select_duts = select
 
     # Do not change input parameters
     align_pars = old_alignment.copy()
