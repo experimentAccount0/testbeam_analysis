@@ -503,6 +503,7 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
     coeff = None
     fit_converged = False  # To signal that las fit was good, thus the results can be taken as start values for next fit
 
+    # for logging
     no_correlation_indices = []
     few_correlation_indices = []
 
