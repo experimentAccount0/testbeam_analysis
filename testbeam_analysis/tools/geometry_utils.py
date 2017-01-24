@@ -559,7 +559,7 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
                                                   fletcher32=False))
             align_tab.append(alignment_parameters)
         except tb.NodeError:
-            align_pars = merge_alignment_parameters(
+            alignment_parameters = merge_alignment_parameters(
                 old_alignment=out_file.root.Alignment[:],
                 new_alignment=alignment_parameters,
                 mode=mode,
@@ -577,7 +577,7 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
                                                   complib='blosc',
                                                   complevel=5,
                                                   fletcher32=False))
-            align_tab.append(align_pars)
+            align_tab.append(alignment_parameters)
 
         string = "\n".join(['DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, '
                             'x/y/z=%d/%d/%d um' % (dut_values['DUT'],
@@ -587,5 +587,5 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
                                                    dut_values['translation_x'],
                                                    dut_values['translation_y'],
                                                    dut_values['translation_z'])
-                            for dut_values in align_pars])
+                            for dut_values in alignment_parameters])
         logging.info('Set alignment parameters to:\n%s' % string)
