@@ -488,40 +488,40 @@ def merge_alignment_parameters(old_alignment, new_alignment, mode='relative',
         select_duts[np.array(select_duts)] = True
 
     # Do not change input parameters
-    alig_pars = old_alignment.copy()
+    align_pars = old_alignment.copy()
 
     if mode == 'absolute':
         logging.info('Set alignment')
-        alig_pars[select_duts] = new_alignment[select_duts]
-        return alig_pars
+        align_pars[select_duts] = new_alignment[select_duts]
+        return align_pars
     elif mode == 'relative':
         logging.info('Merge new alignment with old alignment')
 
-        alig_pars['translation_x'][select_duts] += new_alignment[
+        align_pars['translation_x'][select_duts] += new_alignment[
             'translation_x'][select_duts]
-        alig_pars['translation_y'][select_duts] += new_alignment[
+        align_pars['translation_y'][select_duts] += new_alignment[
             'translation_y'][select_duts]
-        alig_pars['translation_z'][select_duts] += new_alignment[
+        align_pars['translation_z'][select_duts] += new_alignment[
             'translation_z'][select_duts]
 
-        alig_pars['alpha'][select_duts] += new_alignment['alpha'][select_duts]
-        alig_pars['beta'][select_duts] += new_alignment['beta'][select_duts]
-        alig_pars['gamma'][select_duts] += new_alignment['gamma'][select_duts]
+        align_pars['alpha'][select_duts] += new_alignment['alpha'][select_duts]
+        align_pars['beta'][select_duts] += new_alignment['beta'][select_duts]
+        align_pars['gamma'][select_duts] += new_alignment['gamma'][select_duts]
 
         # TODO: Is this always a good idea? Usually works, but what if one
         # heavily tilted device?
         # All alignments are relative, thus center them around 0 by
         # substracting the mean (exception: z position)
         if np.count_nonzero(select_duts) > 1:
-            alig_pars['alpha'][select_duts] -= np.mean(alig_pars['alpha'][select_duts])
-            alig_pars['beta'][select_duts] -= np.mean(alig_pars['beta'][select_duts])
-            alig_pars['gamma'][select_duts] -= np.mean(alig_pars['gamma'][select_duts])
-            alig_pars['translation_x'][select_duts] -= np.mean(alig_pars[
+            align_pars['alpha'][select_duts] -= np.mean(align_pars['alpha'][select_duts])
+            align_pars['beta'][select_duts] -= np.mean(align_pars['beta'][select_duts])
+            align_pars['gamma'][select_duts] -= np.mean(align_pars['gamma'][select_duts])
+            align_pars['translation_x'][select_duts] -= np.mean(align_pars[
                 'translation_x'][select_duts])
-            alig_pars['translation_y'][select_duts] -= np.mean(alig_pars[
+            align_pars['translation_y'][select_duts] -= np.mean(align_pars[
                 'translation_y'][select_duts])
 
-        return alig_pars
+        return align_pars
     else:
         raise RuntimeError('Unknown mode %s', str(mode))
 
