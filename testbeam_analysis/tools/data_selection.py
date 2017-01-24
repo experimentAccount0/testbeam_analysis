@@ -21,13 +21,16 @@ def combine_hit_files(hit_files, combined_file, event_number_offsets=None,
 
     Parameters
     ----------
-    hit_files : iterable of pytables files with hit tables
-    combined_file : pytables file
+    hit_files : iterable
+       Filenames of files containing the hit array.
+    combined_file : string
+       Filename of the output file containing the combined hit array.
     event_number_offsets : iterable
-        Event numbers at the beginning of each hit file. Needed to synchronize
-        the event number of different DUT files.
-    chunk_size : number
-        Amount of hits read at once. Limited by available RAM.
+        Manually set start event number offset for each hit array.
+        The event number is increased by the given number.
+        If None, the event number will be generated automatically.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
 
     used_event_number_offsets = []
@@ -71,13 +74,13 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
 
     Parameters
     ----------
-    hit_files : iterable of pytables files
-        with hit talbes
-    fraction : numer
-        The fraction of left over events.
-        e.g.: 10 would correspond to n_events = total_events / fraction
-    chunk_size : number
-        Amount of hits read at once. Limited by available RAM.
+    hit_files : iterable
+       Filenames of files containing the hit array.
+    fraction : uint
+        The fraction of leftover events,
+        e.g.: 10 would correspond to n_events = total_events / fraction.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
 
     for hit_file in hit_files:
@@ -99,24 +102,22 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
 def select_hits(hit_file, max_hits=None, condition=None, track_quality=None,
                 track_quality_mask=None, output_file=None,
                 chunk_size=10000000):
-    ''' Function to select a fraction of hits fullfilling a condition.
+    ''' Function to select a fraction of hits fulfilling a given condition.
 
     Needed for analysis speed up, when very large runs are used.
+
     Parameters
     ----------
-    hit_files : iterable of pytables files
-        with hit talbes
-    max_hits : number
+    hit_file : string
+        Filename of the input hits file.
+    max_hits : uint
         Number of maximum hits with selection. For data reduction.
     condition : string
         A condition that is applied to the hits in numexpr. Only if the
         expression evaluates to True the hit is taken.
         E.g.: condition = 'track_quality == 2 & event_number < 1000'
-    fraction : numer
-        The fraction of left over hits where the condiiton applies.
-        e.g.: 10 would correspond to n_events = total_events / fraction
-    chunk_size : number
-        Amount of hits read at once. Limited by available RAM.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
 
     with tb.open_file(hit_file, mode='r') as in_file:
