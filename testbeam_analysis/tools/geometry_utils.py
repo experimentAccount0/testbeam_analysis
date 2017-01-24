@@ -482,44 +482,44 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
 def merge_alignment_parameters(old_alignment, new_alignment, mode='relative',
                                select_duts=None):
     if select_duts is None:  # Select all DUTs
-        dut_sel = np.ones(old_alignment.shape[0], dtype=np.bool)
+        select_duts = np.ones(old_alignment.shape[0], dtype=np.bool)
     else:
-        dut_sel = np.zeros(old_alignment.shape[0], dtype=np.bool)
-        dut_sel[np.array(select_duts)] = True
+        select_duts = np.zeros(old_alignment.shape[0], dtype=np.bool)
+        select_duts[np.array(select_duts)] = True
 
     # Do not change input parameters
     alig_pars = old_alignment.copy()
 
     if mode == 'absolute':
         logging.info('Set alignment')
-        alig_pars[dut_sel] = new_alignment[dut_sel]
+        alig_pars[select_duts] = new_alignment[select_duts]
         return alig_pars
     elif mode == 'relative':
         logging.info('Merge new alignment with old alignment')
 
-        alig_pars['translation_x'][dut_sel] += new_alignment[
-            'translation_x'][dut_sel]
-        alig_pars['translation_y'][dut_sel] += new_alignment[
-            'translation_y'][dut_sel]
-        alig_pars['translation_z'][dut_sel] += new_alignment[
-            'translation_z'][dut_sel]
+        alig_pars['translation_x'][select_duts] += new_alignment[
+            'translation_x'][select_duts]
+        alig_pars['translation_y'][select_duts] += new_alignment[
+            'translation_y'][select_duts]
+        alig_pars['translation_z'][select_duts] += new_alignment[
+            'translation_z'][select_duts]
 
-        alig_pars['alpha'][dut_sel] += new_alignment['alpha'][dut_sel]
-        alig_pars['beta'][dut_sel] += new_alignment['beta'][dut_sel]
-        alig_pars['gamma'][dut_sel] += new_alignment['gamma'][dut_sel]
+        alig_pars['alpha'][select_duts] += new_alignment['alpha'][select_duts]
+        alig_pars['beta'][select_duts] += new_alignment['beta'][select_duts]
+        alig_pars['gamma'][select_duts] += new_alignment['gamma'][select_duts]
 
         # TODO: Is this always a good idea? Usually works, but what if one
         # heavily tilted device?
         # All alignments are relative, thus center them around 0 by
         # substracting the mean (exception: z position)
-        if np.count_nonzero(dut_sel) > 1:
-            alig_pars['alpha'][dut_sel] -= np.mean(alig_pars['alpha'][dut_sel])
-            alig_pars['beta'][dut_sel] -= np.mean(alig_pars['beta'][dut_sel])
-            alig_pars['gamma'][dut_sel] -= np.mean(alig_pars['gamma'][dut_sel])
-            alig_pars['translation_x'][dut_sel] -= np.mean(alig_pars[
-                'translation_x'][dut_sel])
-            alig_pars['translation_y'][dut_sel] -= np.mean(alig_pars[
-                'translation_y'][dut_sel])
+        if np.count_nonzero(select_duts) > 1:
+            alig_pars['alpha'][select_duts] -= np.mean(alig_pars['alpha'][select_duts])
+            alig_pars['beta'][select_duts] -= np.mean(alig_pars['beta'][select_duts])
+            alig_pars['gamma'][select_duts] -= np.mean(alig_pars['gamma'][select_duts])
+            alig_pars['translation_x'][select_duts] -= np.mean(alig_pars[
+                'translation_x'][select_duts])
+            alig_pars['translation_y'][select_duts] -= np.mean(alig_pars[
+                'translation_y'][select_duts])
 
         return alig_pars
     else:
