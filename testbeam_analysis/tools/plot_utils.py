@@ -322,7 +322,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
 
         n_hit_cut = np.percentile(n_cluster[selected_data], n_hit_percentile)  # Cut off low/high % of the hits
         n_hit_cut_index = np.zeros_like(n_cluster, dtype=np.bool)
-        n_hit_cut_index |= (n_cluster < n_hit_cut)
+        n_hit_cut_index |= (n_cluster <= n_hit_cut)
         n_hit_cut_index[selected_data] |= (np.abs(offset[selected_data]) > offset_limit)
         n_hit_cut_index[~np.isfinite(offset)] = 1
         n_hit_cut_index[selected_data] |= (np.abs(mean_error_fitted[selected_data]) > error_limit)
