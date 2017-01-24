@@ -300,13 +300,13 @@ def global_to_local_transformation_matrix(x, y, z, alpha, beta, gamma):
     Array with shape (4, 4).
     '''
     # Extend rotation matrix R by one dimension
-    rotation_matrix = np.eye(4, 4, 0)
-    rotation_matrix[:3, :3] = rotation_matrix(alpha=alpha, beta=beta, gamma=gamma).T
+    R = np.eye(4, 4, 0)
+    R[:3, :3] = rotation_matrix(alpha=alpha, beta=beta, gamma=gamma).T
 
     # Get translation matrix T
-    translation_matrix = translation_matrix(x=-x, y=-y, z=-z)
+    T = translation_matrix(x=-x, y=-y, z=-z)
 
-    return np.dot(rotation_matrix, translation_matrix)
+    return np.dot(R, T)
 
 
 def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
@@ -340,13 +340,13 @@ def local_to_global_transformation_matrix(x, y, z, alpha, beta, gamma):
     Array with shape (4, 4).
     '''
     # Extend inverse rotation matrix R by one dimension
-    rotation_matrix = np.eye(4, 4, 0)
-    rotation_matrix[:3, :3] = rotation_matrix(alpha=alpha, beta=beta, gamma=gamma)
+    R = np.eye(4, 4, 0)
+    R[:3, :3] = rotation_matrix(alpha=alpha, beta=beta, gamma=gamma)
 
     # Get inverse translation matrix T
-    translation_matrix = translation_matrix(x=x, y=y, z=z)
+    T = translation_matrix(x=x, y=y, z=z)
 
-    return np.dot(translation_matrix, rotation_matrix)
+    return np.dot(T, R)
 
 
 def apply_transformation_matrix(x, y, z, transformation_matrix):
