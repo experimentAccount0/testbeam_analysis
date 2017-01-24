@@ -28,30 +28,29 @@ warnings.simplefilter("ignore", OptimizeWarning)  # Fit errors are handled inter
 
 
 def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pixel_size=None, dut_names=None, chunk_size=4999999):
-    '''Histograms the cluster column (row) of two different devices on an event basis.
-
-    If the cluster positions are correlated a line should be seen. The cluster positions are round to 1 um precision to increase the histogramming speed.
-    All permutations are considered (all cluster of the first device are correlated with all cluster of the second device).
+    '''"Calculates the correlation histograms from the cluster arrays.
+    The 2D correlation array of pairs of two different devices are created on event basis.
+    All permutations are considered (all clusters of the first device are correlated with all clusters of the second device).
 
     Parameters
     ----------
-    input_cluster_files : iterable of pytables file
-        Input files with cluster data. One file per DUT.
-    output_correlation_file : pytables file
-        Output file with the correlation histograms.
+    input_cluster_files : iterable
+        Iterable of filenames of the cluster files.
+    output_correlation_file : string
+        Filename of the output correlation file with the correlation histograms.
     n_pixels : iterable of tuples
-        One tuple per DUT describing the number of pixels in column, row direction
-        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]
+        One tuple per DUT describing the total number of pixels (column/row),
+        e.g. for two FE-I4 DUTs [(80, 336), (80, 336)].
     pixel_size : iterable of tuples
-        One tuple per DUT describing the pixel dimension in um in column, row direction
-        e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
+        One tuple per DUT describing the pixel dimension (column/row),
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
+        If None, assuming same pixel size for all DUTs.
     dut_names : iterable of strings
-        To show the DUT names in the plot
-    chunk_size: int
-        Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
+        Names of the DUTs. If None, the DUT index will be used.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
-
-    logging.info('=== Correlate the position of %d DUTs ===', len(input_cluster_files))
+    logging.info('=== Correlating the index of %d DUTs ===', len(input_cluster_files))
 
     with tb.open_file(output_correlation_file, mode="w") as out_file_h5:
         n_duts = len(input_cluster_files)
