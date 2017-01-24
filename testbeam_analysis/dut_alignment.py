@@ -124,11 +124,11 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
     output_merged_file : pytables file
         File name of the output tracklet file.
     n_pixels : iterable of tuples
-        One tuple per DUT describing the number of pixels in column, row direction
-        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]
+        One tuple per DUT describing the total number of pixels (column/row),
+        e.g. for two FE-I4 DUTs [(80, 336), (80, 336)].
     pixel_size : iterable of tuples
-        One tuple per DUT describing the pixel dimension in um in column, row direction
-        e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
+        One tuple per DUT describing the pixel dimension (column/row),
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
     chunk_size: int
         Defines the amount of in RAM data. The higher the more RAM is used and the faster this function works.
     '''
@@ -210,32 +210,33 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
     Parameters
     ----------
-    input_correlation_file : pytbales file
-        The input file with the correlation histograms.
-    output_alignment_file : pytables file
-        The output file for correlation data.
+    input_correlation_file : string
+        Filename of the input correlation file.
+    output_alignment_file : string
+        Filename of the output alignment file.
     z_positions : iterable
-        The positions of the devices in z in um
+        The z positions of the DUTs in um.
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension (column/row),
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
     s_n : float
-        The signal to noise ratio for peak signal over background peak. This should be specified when the background is fitted with a gaussian.
-        Usually data with a lot if tracks per event have a gaussian background. The S/N can be guesses by looking at the correlation plot. The std.
-        value is usually fine.
+        The signal to noise ratio for peak signal over background peak. This should be specified when the background is fitted with a gaussian function.
+        Usually data with a lot if tracks per event have a gaussian background. A good S/N value can be estimated by investigating the correlation plot.
+        The default value is usually fine.
     fit_background : bool
         Data with a lot if tracks per event have a gaussian background from the beam profile. Also try to fit this background to determine the correlation
         peak correctly. If you see a clear 2D gaussian in the correlation plot this shoud be activated. If you have 1-2 tracks per event and large pixels
         this option should be off, because otherwise overfitting is possible.
     reduce_background : bool
-        Reduce background (uncorrelated events) with the help of SVD.
+        Reduce background (uncorrelated events) by using SVD of the 2D correlation array.
+    dut_names: iterable
+        Names of the DUTs. If None, the DUT index will be used.
     no_fit : bool
         Use Hough transformation to calculate slope and offset.
-    pixel_size: iterable
-        Iterable of tuples with column and row pixel size in um
-    dut_names: iterable
-        List of names of the DUTs.
-    non_interactive : boolean
-        Deactivate user interaction and apply cuts automatically
-    iterations : number
-        Only used in non interactive mode. Sets how often automatic cuts are applied.
+    non_interactive : bool
+        Deactivate user interaction and estimate fit range automatically.
+    iterations : uint
+        The number of iterations in non-interactive mode.
     '''
     logging.info('=== Pre-alignment ===')
 
