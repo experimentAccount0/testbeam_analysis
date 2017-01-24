@@ -460,7 +460,6 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 try:
                     result_table = out_file_h5.create_table(out_file_h5.root, name='PreAlignment', description=result.dtype, title='Prealignment alignment from correlation', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                     result_table.append(result)
-                    result_table.attrs.fit_limits = fit_limits
                 except tb.exceptions.NodeError:
                     logging.warning('Coarse alignment table exists already. Do not create new.')
 
