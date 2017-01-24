@@ -42,7 +42,7 @@ def combine_hit_files(hit_files, combined_file, event_number_offsets=None,
                                                             complevel=5,
                                                             fletcher32=False))
         for index, hit_file in enumerate(hit_files):
-            if event_number_offsets and event_number_offsets[index]:
+            if event_number_offsets and event_number_offsets[index] is not None:
                 event_number_offset = event_number_offsets[index]
             elif index == 0:
                 event_number_offset = 0  # by default no offset for the first file
