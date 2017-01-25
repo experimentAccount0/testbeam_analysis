@@ -508,7 +508,7 @@ def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error
     plt.title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
     ax.set_xlabel("%s [um]" % dut_name)
     ax.set_ylabel("%s [um]" % ref_name)
-    ax2.set_ylabel("Error [a.u.]")
+    ax2.set_ylabel("Error / Offset [a.u.]")
 #     plt.xlim((0, x.shape[0]))
     ax.grid()
     if output_pdf:
