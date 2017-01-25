@@ -661,26 +661,24 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     n_duts = alignment.shape[0]
 
     def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
-        selection = hits_chunk['x_dut_%d' % dut_index] != np.nan  # Do not change virtual hits
-
         if use_prealignment:  # Apply transformation from pre-alignment information
             hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
-                hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
-                hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
-                hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
+                hits_x=hits_chunk['x_dut_%d' % dut_index],
+                hits_y=hits_chunk['y_dut_%d' % dut_index],
+                hits_z=hits_chunk['z_dut_%d' % dut_index],
                 dut_index=dut_index,
                 prealignment=alignment,
                 inverse=inverse)
         else:  # Apply transformation from fine alignment information
             hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
-                hits_x=hits_chunk['x_dut_%d' % dut_index][selection],
-                hits_y=hits_chunk['y_dut_%d' % dut_index][selection],
-                hits_z=hits_chunk['z_dut_%d' % dut_index][selection],
+                hits_x=hits_chunk['x_dut_%d' % dut_index],
+                hits_y=hits_chunk['y_dut_%d' % dut_index],
+                hits_z=hits_chunk['z_dut_%d' % dut_index],
                 dut_index=dut_index,
                 alignment=alignment,
                 inverse=inverse)
         if not no_z:
-            hits_chunk['z_dut_%d' % dut_index][selection] = hit_z
+            hits_chunk['z_dut_%d' % dut_index] = hit_z
 
     # Looper over the hits of all DUTs of all hit tables in chunks and apply the alignment
     with tb.open_file(input_hit_file, mode='r') as in_file_h5:
