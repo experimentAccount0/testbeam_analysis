@@ -195,7 +195,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         selection_track_quality = [selection_track_quality for _ in selection_hit_duts]
 
     # Std. case: use all DUTs that are required to have a hit for track fitting
-    if not selection_fit_duts:
+    if selection_fit_duts is None:
         selection_fit_duts = selection_hit_duts
 
     if not isinstance(selection_fit_duts, Iterable):
