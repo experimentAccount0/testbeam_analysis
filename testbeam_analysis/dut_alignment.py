@@ -987,7 +987,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         if not any([i == dut for j in align_duts for i in j]):
             missing_duts.append(dut)
     if len(missing_duts) > 0:
-        logging.warning('These DUTs will not be aligned: %s', str(missing_duts)[1:-1])
+        logging.warning('These DUTs will not be aligned: %s', ", ".join(str(dut) for dut in missing_duts))
 
     # Loop over all combinations of DUTs to align, simplest case: use all DUTs at once to align
     # Usual case: align high resolution devices first, then other devices
