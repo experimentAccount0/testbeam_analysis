@@ -202,17 +202,14 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         selection_fit_duts = [selection_hit_duts for _ in range(n_duts)]
 
     # Convert potential selection valid for all duts to required selection for each DUT
-    try:
-        iter(selection_hit_duts[0])
-    except TypeError:  # not iterable
+
+    if not isinstance(selection_hit_duts, Iterable):
         selection_hit_duts = [selection_hit_duts for _ in range(n_duts)]
-    try:
-        iter(selection_fit_duts[0])
-    except:
+
+    if not isinstance(selection_fit_duts, Iterable):
         selection_fit_duts = [selection_fit_duts for _ in range(n_duts)]
-    try:
-        iter(selection_track_quality[0])
-    except:
+
+    if not isinstance(selection_track_quality, Iterable):
         selection_track_quality = [selection_track_quality for _ in range(n_duts)]
 
     if len(selection_hit_duts) != len(selection_track_quality):
