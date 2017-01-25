@@ -188,7 +188,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         logging.info('Use alignment data')
 
     # Create track, hit selection
-    if not selection_hit_duts:  # If None: use all DUTs
+    if selection_hit_duts is None:  # If None: use all DUTs
         selection_hit_duts = [i for i in range(n_duts)]
 
     if not isinstance(selection_track_quality, Iterable):
