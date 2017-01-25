@@ -1011,7 +1011,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         else:
             actual_selection_track_quality = selection_track_quality
 
-        logging.info('Align DUTs %s', str(actual_align_duts)[1:-1])
+        logging.info('Aligning DUTs: %s', ", ".join(str(dut) for dut in actual_align_duts))
 
         duts_alignment(align_duts=actual_align_duts, n_duts=n_duts, selection_fit_duts=actual_selection_fit_duts, selection_hit_duts=actual_selection_hit_duts, selection_track_quality=actual_selection_track_quality, alignment_index=index)
 
