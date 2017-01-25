@@ -597,7 +597,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 im = plt.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
                 dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
                 ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
-                plt.title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", dut_name, ref_name))
+                plt.title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", ref_name, dut_name))
                 plt.xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
                 plt.ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
                 # do not append to axis to preserve aspect ratio
