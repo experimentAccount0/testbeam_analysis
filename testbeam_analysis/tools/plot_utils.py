@@ -1016,3 +1016,35 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
             plt.show()
     else:
         logging.warning('Cannot create efficiency plots, all pixels are masked')
+
+
+def plot_track_angle(input_track_slopes, output_data, output_pdf, use_n_duts, n_bins):
+    direction = ['x', 'y', 'z']
+
+    with PdfPages(output_pdf) as output_fig:
+        for key, i in zip(input_track_slopes, range(use_n_duts)):
+            for j in (0, 1):  # iterate over slope directions
+                min = np.min(input_track_slopes[key][j])
+                max = np.max(input_track_slopes[key][j])
+                edges = np.arange(min, max, np.absolute(max) / n_bins)
+                bin_center = (edges[1:] + edges[:-1]) / 2.0
+
+                sigma = np.std(np.arctan(input_track_slopes[key][j]))  # initial guess for sigma
+                mean = np.mean(np.arctan(input_track_slopes[key][j]))  # initial guess for mean
+
+                histo = plt.hist(np.arctan(input_track_slopes[key][j]), edges, label='Angular Distribution', color='b')
+                fit, cov = curve_fit(testbeam_analysis.tools.analysis_utils.gauss, bin_center, histo[0], p0=[np.amax(histo[0]), mean, sigma])
+
+                x_gauss = np.arange(np.min(edges), np.max(edges), step=0.00001)
+                plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), color='r', label='Gauss-Fit:\nMean: %.5f,\nSigma: %.5f' % (fit[1], fit[2]))
+
+                output_data['mean_slope_%s' % direction[j]][i] = fit[1]
+                output_data['sigma_slope_%s' % direction[j]][i] = fit[2]
+                print fit[1], fit[2]
+                plt.title('Angular Distribution of Fitted Tracks for DUT%i' % i)
+                plt.ylabel('#')
+                plt.xlabel('Track angle in %s-direction / rad' % direction[j])
+                plt.legend(loc='best', fancybox=True, frameon=True)
+
+                output_fig.savefig()
+                plt.close()
