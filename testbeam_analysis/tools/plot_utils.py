@@ -732,8 +732,9 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
 def plot_track_chi2(chi2s, fit_dut, output_fig):
     # Plot track chi2 and angular distribution
     plt.clf()
-    limit_x = np.percentile(chi2s, q=68.3)  # Plot up to 1 sigma of the chi2 range
-    plt.hist(chi2s, bins=200, range=(0, limit_x))
+    limit_x = int(np.percentile(chi2s, q=99.73))  # Plot up to 3 sigma of the chi2 range
+    plt.hist(chi2s, bins=100, range=(0, limit_x))
+    plt.xlim(0, limit_x)
     plt.grid()
     plt.xlabel('Track Chi2 [um*um]')
     plt.ylabel('#')
