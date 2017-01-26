@@ -156,14 +156,14 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
         with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
             progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
             progress_bar.start()
-            for cluster_dut_0, start_indices_data_loop[0] in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, start=start_indices_data_loop[0], start_event_number=actual_start_event_number, stop_event_number=None, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+            for cluster_dut_0, start_indices_data_loop[0] in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, start_index=start_indices_data_loop[0], start_event_number=actual_start_event_number, stop_event_number=None, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
                 actual_event_numbers = cluster_dut_0[:]['event_number']
 
                 # First loop: calculate the minimum event number indices needed to merge all cluster from all files to this event number index
                 common_event_numbers = actual_event_numbers
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
-                        for actual_cluster, start_indices_merging_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_merging_loop[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+                        for actual_cluster, start_indices_merging_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start_index=start_indices_merging_loop[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size, fail_on_missing_events=False):  # Loop over the cluster in the actual cluster file in chunks
                             common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
                 merged_cluster_array = np.full(shape=(common_event_numbers.shape[0],), fill_value=np.nan, dtype=description)  # Result array to be filled. For no hit: column = row = charge = NaN
 
@@ -184,7 +184,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 # Second loop: get the cluster from all files and merge them to the common event number
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-                        for actual_cluster, start_indices_data_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_indices_data_loop[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+                        for actual_cluster, start_indices_data_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start_index=start_indices_data_loop[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size, fail_on_missing_events=False):  # Loop over the cluster in the actual cluster file in chunks
                             actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
                             # Select real hits, values with nan are virtual hits
                             selection = ~np.isnan(actual_cluster['mean_column'])
@@ -1322,7 +1322,7 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
 # Helper functions to be called from multiple processes
 def _correlate_cluster(cluster_dut_0, cluster_file, start_index, start_event_number, stop_event_number, column_correlation, row_correlation, chunk_size):
     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-        for actual_dut_cluster, start_index in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start=start_index, start_event_number=start_event_number, stop_event_number=stop_event_number, chunk_size=chunk_size):  # Loop over the cluster in the actual cluster file in chunks
+        for actual_dut_cluster, start_index in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start_index=start_index, start_event_number=start_event_number, stop_event_number=stop_event_number, chunk_size=chunk_size, fail_on_missing_events=False):  # Loop over the cluster in the actual cluster file in chunks
 
             analysis_utils.correlate_cluster_on_event_number(data_1=cluster_dut_0,
                                                              data_2=actual_dut_cluster,
