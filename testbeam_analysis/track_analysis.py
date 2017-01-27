@@ -198,7 +198,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     # Create track, hit selection
     if selection_hit_duts is None:  # If None: use all DUTs
         selection_hit_duts = range(n_duts)
-    # Check for value errors
+    # Check iterable and length
     if not isinstance(selection_hit_duts, Iterable):
         raise ValueError("selection_hit_duts is no iterable")
     elif not selection_hit_duts:  # empty iterable
@@ -222,7 +222,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         # copy each item
         for hit_duts in selection_hit_duts:
             selection_fit_duts.append(hit_duts[:])  # require a hit for each fit DUT
-    # Check for value errors
+    # Check iterable and length
     if not isinstance(selection_fit_duts, Iterable):
         raise ValueError("selection_fit_duts is no iterable")
     elif not selection_fit_duts:  # empty iterable
@@ -245,7 +245,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     # Create track, hit selection
     if not isinstance(selection_track_quality, Iterable):  # all items the same, special case for selection_track_quality
         selection_track_quality = [[selection_track_quality] * len(hit_duts) for hit_duts in selection_hit_duts]  # every hit DUTs require a track quality value
-    # Check for value errors
+    # Check iterable and length
     if not isinstance(selection_track_quality, Iterable):
         raise ValueError("selection_track_quality is no iterable")
     elif not selection_track_quality:  # empty iterable
