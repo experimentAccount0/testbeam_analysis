@@ -35,8 +35,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def _init_tabs(self):
         # Add tabs and widgets for the different analysis steps
-        self.tab_order = ('Files', 'Setup', 'HotPixelRemoval', 'Clustering',
-                          'Alignment', 'TrackAnalysis')
+        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering',
+                          'Correlations', 'Pre-alignment', 'Track finding', 'Alignment',
+                          'Track fitting', 'Track Analysis')
         self.tab_widgets = {}
 
         # Add QTabWidget for tabs
@@ -71,6 +72,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
+    font = QtGui.QFont()
+    font.setPointSize(12)
+    app.setFont(font)
     aw = AnalysisWindow()
     aw.show()
     sys.exit(app.exec_())
