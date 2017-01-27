@@ -317,9 +317,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             dut_fit_selection |= ((1 << selected_fit_dut))
             info_str_fit += 'DUT%d ' % (selected_fit_dut)
 
-        if same_tracks_for_all_duts:
-            logging.info('Fit tracks for all DUTs at the same time!')
-
         logging.info('Use %d DUTs for track selection: %s', bin(dut_selection)[2:].count("1"), info_str_hit)
         logging.info("Use %d DUTs for track fit: %s", bin(dut_fit_selection)[2:].count("1"), info_str_fit)
 
