@@ -1,15 +1,106 @@
 import tables as tb
 
-# Qt imports
+from pyqtgraph.dockarea import Dock
 from PyQt5 import QtCore, QtWidgets, QtGui
+
+
+class DataTab(object):
+    ''' Implements the tab content for data file handling'''
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.input_files = list()
+        self.output_folder = str()
+
+        self._setup()
+#         self._setup_test()
+# 
+#     def _setup_test(self):
+#         self.items = QtWidgets.QDockWidget("Dockable", self)
+#         pass
+
+    def _setup(self):
+        # Setup widgets
+        button_size = QtCore.QSize(150, 40)
+
+        select_widget = QtWidgets.QWidget()
+        select_layout = QtWidgets.QGridLayout(select_widget)
+        select_button = QtGui.QPushButton('Select data of DUTs')
+        select_button.setMaximumSize(button_size)
+        dut_name_button = QtGui.QPushButton('Set DUT names')
+        dut_name_button.setMaximumSize(button_size)
+        da = DropArea()
+        select_layout.addWidget(da, 0, 0, 1, 1)
+        select_layout.addWidget(select_button, 0, 1, 1, 1)
+        select_layout.addWidget(dut_name_button, 0, 2, 1, 1)
+
+        handle_widget = QtWidgets.QWidget()
+        handle_layout = QtWidgets.QGridLayout(handle_widget)
+        up_button = QtGui.QPushButton('Move up')
+        up_button.setMaximumSize(button_size)
+        down_button = QtGui.QPushButton('Move down')
+        down_button.setMaximumSize(button_size)
+        remove_button = QtGui.QPushButton('Remove DUT')
+        remove_button.setMaximumSize(button_size)
+        handle_layout.addWidget(up_button, 0, 0, 1, 1)
+        handle_layout.addWidget(down_button, 0, 1, 1, 1)
+        handle_layout.addWidget(remove_button, 0, 2, 1, 1)
+
+        table_widget = QtWidgets.QWidget()
+        table_layout = QtWidgets.QVBoxLayout(table_widget)
+        self.data_table = DataTable(self.parent)
+        table_layout.addWidget(self.data_table)
+
+        # Connect buttons
+        # da.fileDrop.connect(data_table.get_data(table_widget, da.returnData()))
+        select_button.clicked.connect(
+            lambda: self.data_table.get_data(table_widget,
+                                             self.input_files))
+
+        for x in [lambda: self.data_table.move_up(),
+                  lambda: self._update_setup(),
+                  lambda: self.data_table.check_data(self.input_files)]:
+            up_button.clicked.connect(x)
+
+        for x in [lambda: self.data_table.move_down(),
+                  lambda: self._update_setup(),
+                  lambda: self.data_table.check_data(self.input_files)]:
+            down_button.clicked.connect(x)
+
+        for x in [lambda: self.data_table.remove_data(),
+                  lambda: self._update_setup(),
+                  lambda: self.data_table.handle_data(table_widget,
+                                                      self.input_files)]:
+            remove_button.clicked.connect(x)
+
+        for x in [lambda: self.data_table.set_dut_names(),
+                  lambda: self._update_setup(),
+                  lambda: self.data_table.check_data(self.input_files)]:
+            dut_name_button.clicked.connect(x)
+
+        select_dock = Dock('Select DUTs')
+#         select_dock.setMaximumSize(self.screen.width() / 2, 150)
+        handle_dock = Dock('Handle selected \n DUT')
+#         handle_dock.setMaximumSize(self.screen.width() / 2, 150)
+        table_dock = Dock('Selected DUTs')
+        select_dock.addWidget(select_widget)
+        handle_dock.addWidget(handle_widget)
+        table_dock.addWidget(table_widget)
+        self.parent.addDock(select_dock, 'left')
+        self.parent.addDock(handle_dock, 'right')
+        self.parent.addDock(table_dock, 'bottom')
+
+    def _update_setup(self):
+        self.input_files = self.data_table.update_data()
+        self.dut_names = self.data_table.update_dut_names()
 
 
 class DataTable(QtWidgets.QTableWidget):
     ''' TODO: DOCSTRING MISSING'''
 
-    def __init__(self):
+    def __init__(self, parent=None):
+        super(DataTable, self).__init__(parent)
 
-        QtWidgets.QTableWidget.__init__(self)
         self.horizontalHeader().setResizeMode(QtGui.QHeaderView.Stretch)
         self.verticalHeader().setResizeMode(QtGui.QHeaderView.Stretch)
         self.showGrid()
@@ -114,10 +205,10 @@ class DataTable(QtWidgets.QTableWidget):
                     if not all(name in field_req for name
                                in in_file.root.Hits.colnames):
                         incompatible_data[i] = 'Data does not contain all ' \
-                                                'required information!'
+                            'required information!'
                 except tb.exceptions.NoSuchNodeError:
                     incompatible_data[i] = 'NoSuchNodeError: Data does not ' \
-                                            'contain hits!'
+                        'contain hits!'
 
         font = QtGui.QFont()
         font.setBold(True)
@@ -125,7 +216,8 @@ class DataTable(QtWidgets.QTableWidget):
 
         for row in range(self.rowCount()):
             statusItem = QtGui.QTableWidgetItem()
-            statusItem.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            statusItem.setFlags(
+                QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             statusItem.setTextAlignment(QtCore.Qt.AlignCenter)
 
             if row in incompatible_data.keys():
