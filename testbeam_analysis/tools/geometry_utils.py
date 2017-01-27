@@ -544,16 +544,14 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
     use_duts : iterable
         In relative mode only change specified DUTs.
     '''
-    description = np.zeros((1,), dtype=alignment_parameters.dtype).dtype
-
     # Open file with alignment data
-    with tb.open_file(alignment_file, mode="r+") as out_file:
+    with tb.open_file(alignment_file, mode="r+") as out_file_h5:
         try:
-            align_tab = out_file.create_table(out_file.root, name='Alignment',
+            align_tab = out_file_h5.create_table(out_file_h5.root, name='Alignment',
                                               title='Table containing the '
                                               'alignment geometry parameters '
                                               '(translations and rotations)',
-                                              description=description,
+                                              description=alignment_parameters.dtype,
                                               filters=tb.Filters(
                                                   complib='blosc',
                                                   complevel=5,
@@ -561,19 +559,19 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
             align_tab.append(alignment_parameters)
         except tb.NodeError:
             alignment_parameters = merge_alignment_parameters(
-                old_alignment=out_file.root.Alignment[:],
+                old_alignment=out_file_h5.root.Alignment[:],
                 new_alignment=alignment_parameters,
                 mode=mode,
                 select_duts=select_duts)
 
             logging.info('Overwrite existing alignment!')
-            # Remove old node, is there a better way?
-            out_file.root.Alignment._f_remove()
-            align_tab = out_file.create_table(out_file.root, name='Alignment',
+            # Remove old node
+            out_file_h5.root.Alignment._f_remove()
+            align_tab = out_file_h5.create_table(out_file_h5.root, name='Alignment',
                                               title='Table containing the '
                                               'alignment geometry parameters '
                                               '(translations and rotations)',
-                                              description=description,
+                                              description=alignment_parameters.dtype,
                                               filters=tb.Filters(
                                                   complib='blosc',
                                                   complevel=5,
