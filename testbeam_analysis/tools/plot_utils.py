@@ -743,7 +743,7 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     output_fig.savefig()
     plt.clf()
     plt.hist(chi2s, bins=100, range=(0, 5000))
-    plt.xlim(0, 2500)
+    plt.xlim(0, 5000)
     plt.grid()
     plt.xlabel('Track Chi2 [um*um]')
     plt.ylabel('#')
