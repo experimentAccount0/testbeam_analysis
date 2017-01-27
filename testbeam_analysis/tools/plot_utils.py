@@ -741,6 +741,15 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     plt.yscale('log')
     plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
     output_fig.savefig()
+    plt.clf()
+    plt.hist(chi2s, bins=100, range=(0, 5000))
+    plt.xlim(0, 2500)
+    plt.grid()
+    plt.xlabel('Track Chi2 [um*um]')
+    plt.ylabel('#')
+    plt.yscale('log')
+    plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
+    output_fig.savefig()
 
 
 def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig=None):
