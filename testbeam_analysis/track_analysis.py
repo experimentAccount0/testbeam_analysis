@@ -192,7 +192,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     elif not isinstance(fit_duts, Iterable):
         fit_duts = [fit_duts]
     # Check for duplicates
-    if not len(fit_duts) != len(set(fit_duts)):
+    if len(fit_duts) != len(set(fit_duts)):
         raise ValueError("found douplicate in fit_duts")
     # Check if any iterable in iterable
     if any(map(lambda val: isinstance(val, Iterable), fit_duts)):
