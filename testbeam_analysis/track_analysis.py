@@ -187,37 +187,84 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 use_prealignment = True
         n_duts = z_positions.shape[0]
 
+    if fit_duts is None:
+        fit_duts = range(n_duts)  # standard setting: fit tracks for all DUTs
+    elif not isinstance(fit_duts, Iterable):
+        fit_duts = [fit_duts]
+    # Check if any iterable in iterable
+    if any(map(lambda val: isinstance(val, Iterable), fit_duts)):
+        raise ValueError("item in fit_duts is iterable")
+
     # Create track, hit selection
     if selection_hit_duts is None:  # If None: use all DUTs
-        selection_hit_duts = [i for i in range(n_duts)]
+        selection_hit_duts = range(n_duts)
+    # Check for value errors
+    if not isinstance(selection_hit_duts, Iterable):
+        raise ValueError("selection_hit_duts is no iterable")
+    elif not selection_hit_duts:  # empty iterable
+        raise ValueError("selection_hit_duts has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), selection_hit_duts)):
+        selection_hit_duts = [selection_hit_duts[:] for _ in fit_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_hit_duts)):
+        raise ValueError("not all items in selection_hit_duts are iterable")
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_hit_duts)):
+        raise ValueError("not all items in selection_hit_duts are iterable")
+    # Finally check length of all arrays
+    if len(selection_hit_duts) != len(fit_duts):  # empty iterable
+        raise ValueError("selection_hit_duts has the wrong length")
+    for hit_dut in selection_hit_duts:
+        if len(hit_dut) < 2:  # check the length of the items
+            raise ValueError("item in selection_hit_duts has length < 2")
 
-    if not isinstance(selection_track_quality, Iterable):
-        selection_track_quality = [selection_track_quality for _ in selection_hit_duts]
-
-    # Std. case: use all DUTs that are required to have a hit for track fitting
-    if selection_fit_duts is None:
-        selection_fit_duts = selection_hit_duts
-
+    # Create track, hit selection
+    if selection_fit_duts is None:  # If None: use all DUTs
+        selection_fit_duts = []
+        # copy each item
+        for hit_duts in selection_hit_duts:
+            selection_fit_duts.append(hit_duts[:])  # require a hit for each fit DUT
+    # Check for value errors
     if not isinstance(selection_fit_duts, Iterable):
-        selection_fit_duts = [selection_hit_duts for _ in range(n_duts)]
+        raise ValueError("selection_fit_duts is no iterable")
+    elif not selection_fit_duts:  # empty iterable
+        raise ValueError("selection_fit_duts has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), selection_fit_duts)):
+        selection_fit_duts = [selection_fit_duts[:] for _ in fit_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_fit_duts)):
+        raise ValueError("not all items in selection_fit_duts are iterable")
+    # Finally check length of all arrays
+    if len(selection_fit_duts) != len(fit_duts):  # empty iterable
+        raise ValueError("selection_fit_duts has the wrong length")
+    for index, fit_dut in enumerate(selection_fit_duts):
+        if len(fit_dut) < 2:  # check the length of the items
+            raise ValueError("item in selection_fit_duts has length < 2")
+        if set(selection_hit_duts[index]) - set(fit_dut):  # fit DUTs are required to have a hit
+            raise ValueError("DUT in selection_fit_duts is not in selection_hit_duts")
 
-    # Convert potential selection valid for all duts to required selection for each DUT
-
-    if not isinstance(selection_hit_duts[0], Iterable):
-        selection_hit_duts = [selection_hit_duts for _ in range(n_duts)]
-
-    if not isinstance(selection_fit_duts[0], Iterable):
-        selection_fit_duts = [selection_fit_duts for _ in range(n_duts)]
-
-    if not isinstance(selection_track_quality[0], Iterable):
-        selection_track_quality = [selection_track_quality for _ in range(n_duts)]
-
-    if len(selection_hit_duts) != len(selection_track_quality):
-        raise ValueError('The length of the hit dut selection has to be equal to the quality selection!')
-
-    for (sel_1, sel_2) in zip(selection_hit_duts, selection_fit_duts):
-        if not all(x in sel_1 for x in sel_2):
-            raise NotImplementedError('All DUTs defined in selection_fit_duts have to be defined in selection_hit_duts!')
+    # Create track, hit selection
+    if not isinstance(selection_track_quality, Iterable):  # all items the same, special case for selection_track_quality
+        selection_track_quality = [[selection_track_quality] * len(hit_duts) for hit_duts in selection_hit_duts]  # every hit DUTs require a track quality value
+    # Check for value errors
+    if not isinstance(selection_track_quality, Iterable):
+        raise ValueError("selection_track_quality is no iterable")
+    elif not selection_track_quality:  # empty iterable
+        raise ValueError("selection_track_quality has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), selection_track_quality)):
+        selection_track_quality = [selection_track_quality for _ in fit_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_track_quality)):
+        raise ValueError("not all items in selection_track_quality are iterable")
+    # Finally check length of all arrays
+    if len(selection_track_quality) != len(fit_duts):  # empty iterable
+        raise ValueError("selection_track_quality has the wrong length")
+    for index, track_quality in enumerate(selection_track_quality):
+        if len(track_quality) != len(selection_hit_duts[index]):  # check the length of each items
+            raise ValueError("item in selection_track_quality and selection_hit_duts does not have the same length")
 
     # Special mode: use all DUTs in the fit and the selections are all the same --> the data does only have to be fitted once
     if not exclude_dut_hit and all(set(x) == set(selection_hit_duts[0]) for x in selection_hit_duts) and all(set(x) == set(selection_fit_duts[0]) for x in selection_fit_duts) and all(list(x) == list(selection_track_quality[0]) for x in selection_track_quality):
@@ -338,9 +385,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             except OSError:
                 pass
             with tb.open_file(output_tracks_file, mode='a') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
-                n_duts = sum(['charge' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
-                fit_duts = fit_duts if fit_duts is not None else range(n_duts)  # Std. setting: fit tracks for all DUTs
-
                 if min_track_distance is True:
                     min_track_distance = np.array([(200.)] * n_duts)
                 elif min_track_distance is False:
