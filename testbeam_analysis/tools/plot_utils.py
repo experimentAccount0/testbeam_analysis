@@ -479,38 +479,41 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
 def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
     plt.clf()
     fig = plt.gcf()
-    ax = fig.add_subplot(1, 1, 1)
-    ax2 = ax.twinx()
-    ax.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation', zorder=10)
-    ax2.plot(x[mask], mean_error_fitted[mask] * 10.0, linestyle='', color="red", marker='o', label='Error x10')
-    ax2.errorbar(x[mask], np.abs(fit_fn(x[mask]) - mean_fitted[mask]), mean_error_fitted[mask], linestyle='', color="lightgreen", marker='o', label='Offset')
+    ax1 = fig.add_subplot(1, 1, 1)
+    ax2 = ax1.twinx()
+    ax1.errorbar(x[mask], mean_fitted[mask], yerr=mean_error_fitted[mask], linestyle='', color="blue", fmt='.', label='Correlation', zorder=9)
+    ax2.plot(x[mask], mean_error_fitted[mask] * 10.0, linestyle='', color="red", marker='o', label='Error x10', zorder=2)
+    ax2.errorbar(x[mask], np.abs(fit_fn(x[mask]) - mean_fitted[mask]), mean_error_fitted[mask], linestyle='', color="lightgreen", marker='o', label='Offset', zorder=3)
     ax2.plot(x, chi2 / 1e5, 'r--', label="Chi$^2$")
     # Plot masked data points, but they should not influence the ylimit
     y_limits = ax2.get_ylim()
-    plt.errorbar(x[~mask], mean_fitted[~mask], yerr=mean_error_fitted[~mask], linestyle='', color="darkblue", fmt='.')
-    plt.plot(x[~mask], mean_error_fitted[~mask] * 10.0, linestyle='', color="darkred", marker='o')
-    plt.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]), mean_error_fitted[~mask], linestyle='', color="darkgreen", marker='o')
+    ax1.plot(x[~mask], mean_fitted[~mask], linestyle='', color="darkblue", marker='.', zorder=10)
+    ax2.plot(x[~mask], mean_error_fitted[~mask] * 10.0, linestyle='', color="darkred", marker='o', zorder=4)
+    ax2.errorbar(x[~mask], np.abs(fit_fn(x[~mask]) - mean_fitted[~mask]), mean_error_fitted[~mask], linestyle='', color="darkgreen", marker='o', zorder=5)
     ax2.set_ylim(y_limits)
     ax2.set_ylim(ymin=0.0)
-    ax.set_ylim((-n_pixel_ref * pixel_size_ref / 2.0, n_pixel_ref * pixel_size_ref / 2.0))
+    ax1.set_ylim((-n_pixel_ref * pixel_size_ref / 2.0, n_pixel_ref * pixel_size_ref / 2.0))
     plt.xlim((-n_pixel_dut * pixel_size_dut / 2.0, n_pixel_dut * pixel_size_dut / 2.0))
-    ax2.bar(x, n_cluster / np.max(n_cluster).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x)))  # Plot number of hits for each correlation point
+    ax2.bar(x, n_cluster / np.max(n_cluster).astype(np.float) * ax2.get_ylim()[1], align='center', alpha=0.5, label='# Cluster [a.u.]', width=np.min(np.diff(x)), zorder=1)  # Plot number of hits for each correlation point
     # Plot again to draw line above the markers
     if len(pcov) > 1:
         fit_legend_entry = 'Fit: $c_0+c_1*x$\n$c_0=%.1e \pm %.1e$\n$c_1=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5, fit[1], np.absolute(pcov[1][1]) ** 0.5)
     else:
         fit_legend_entry = 'Fit: $c_0+x$\n$c_0=%.1e \pm %.1e$' % (fit[0], np.absolute(pcov[0][0]) ** 0.5)
-    ax.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
+    ax1.plot(x, fit_fn(x), linestyle='-', color="darkorange", label=fit_legend_entry)
 
-    lines, labels = ax.get_legend_handles_labels()
+    lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax2.legend(lines + lines2, labels + labels2, loc=0)
+    ax1.legend(lines + lines2, labels + labels2, loc=0)
     plt.title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
-    ax.set_xlabel("%s [um]" % dut_name)
-    ax.set_ylabel("%s [um]" % ref_name)
+    ax1.set_xlabel("%s [um]" % dut_name)
+    ax1.set_ylabel("%s [um]" % ref_name)
     ax2.set_ylabel("Error / Offset [a.u.]")
 #     plt.xlim((0, x.shape[0]))
-    ax.grid()
+    ax1.grid()
+    # put ax in front of ax2
+    ax1.set_zorder(ax2.get_zorder() + 1)
+    ax1.patch.set_visible(False)  # hide the canvas
     if output_pdf:
         output_pdf.savefig()
     else:
