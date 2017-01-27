@@ -394,13 +394,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 else:
                     min_track_distance = np.array(min_track_distance)
 
-                for fit_dut in fit_duts:  # Loop over the DUTs where tracks shall be fitted for
-                    logging.info('Fit tracks for DUT %d', fit_dut)
-
-                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut)
+                for fit_dut_index, actual_fit_dut in enumerate(fit_duts):  # Loop over the DUTs where tracks shall be fitted for
+                    logging.info('Fit tracks for DUT %d', actual_fit_dut)
+                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
-                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', fit_dut)
+                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', actual_fit_dut)
                         continue
 
                     progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.TrackCandidates.shape[0], term_width=80)
@@ -463,10 +462,10 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Store the data
                         if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
-                            store_track_data(fit_dut, min_track_distance)
+                            store_track_data(actual_fit_dut, min_track_distance)
                         else:
-                            for fit_dut in fit_duts:
-                                store_track_data(fit_dut, min_track_distance)
+                            for dut_index in fit_duts:
+                                store_track_data(dut_index, min_track_distance)
 
                         progress_bar.update(index_candidates)
                     progress_bar.finish()
