@@ -648,7 +648,7 @@ def _fit_tracks_loop(track_hits):
     ''' Do 3d line fit and calculate chi2 for each fit. '''
     def line_fit_3d(hits):
         datamean = hits.mean(axis=0)
-        offset, slope = datamean, np.linalg.svd(hits - datamean)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
+        offset, slope = datamean, np.linalg.svd(hits - datamean, full_matrices=False)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
         intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # Fitted line and DUT plane intersections (here: points)
         chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
         return datamean, slope, chi2
