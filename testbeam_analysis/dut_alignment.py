@@ -972,10 +972,23 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         mode='absolute')
 
     # Create list with combinations of DUTs to align
-    if align_duts is None:  # Align all duts
-        align_duts = [range(n_duts)]
-    elif not isinstance(align_duts[0], Iterable):
+    if align_duts is None:  # If None: align all DUTs
+        align_duts = range(n_duts)
+    # Check for value errors
+    if not isinstance(align_duts, Iterable):
+        raise ValueError("align_duts is no iterable")
+    elif not align_duts:  # empty iterable
+        raise ValueError("align_duts has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), align_duts)):
         align_duts = [align_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), align_duts)):
+        raise ValueError("not all items in align_duts are iterable")
+    # Finally check length of all iterables in iterable
+    for dut in align_duts:
+        if not dut:  # check the length of the items
+            raise ValueError("item in align_duts has length 0")
 
     # Check if some DUTs will not be aligned
     all_align_duts = []
@@ -985,37 +998,89 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     if no_align_duts:
         logging.warning('These DUTs will not be aligned: %s', ", ".join(no_align_duts))
 
+    # Create track, hit selection
+    if selection_hit_duts is None:  # If None: use all DUTs
+        selection_hit_duts = []
+        # copy each item
+        for duts in align_duts:
+            selection_hit_duts.append(duts[:])  # require a hit for each fit DUT
+    # Check iterable and length
+    if not isinstance(selection_hit_duts, Iterable):
+        raise ValueError("selection_hit_duts is no iterable")
+    elif not selection_hit_duts:  # empty iterable
+        raise ValueError("selection_hit_duts has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), selection_hit_duts)):
+        selection_hit_duts = [selection_hit_duts[:] for _ in align_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_hit_duts)):
+        raise ValueError("not all items in selection_hit_duts are iterable")
+    # Finally check length of all arrays
+    if len(selection_hit_duts) != len(align_duts):  # empty iterable
+        raise ValueError("selection_hit_duts has the wrong length")
+    for hit_dut in selection_hit_duts:
+        if len(hit_dut) < 2:  # check the length of the items
+            raise ValueError("item in selection_hit_duts has length < 2")
+
+    # Create track, hit selection
+    if selection_fit_duts is None:  # If None: use all DUTs
+        selection_fit_duts = []
+        # copy each item
+        for hit_duts in selection_hit_duts:
+            selection_fit_duts.append(hit_duts[:])  # require a hit for each fit DUT
+    # Check iterable and length
+    if not isinstance(selection_fit_duts, Iterable):
+        raise ValueError("selection_fit_duts is no iterable")
+    elif not selection_fit_duts:  # empty iterable
+        raise ValueError("selection_fit_duts has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), selection_fit_duts)):
+        selection_fit_duts = [selection_fit_duts[:] for _ in align_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_fit_duts)):
+        raise ValueError("not all items in selection_fit_duts are iterable")
+    # Finally check length of all arrays
+    if len(selection_fit_duts) != len(align_duts):  # empty iterable
+        raise ValueError("selection_fit_duts has the wrong length")
+    for index, fit_dut in enumerate(selection_fit_duts):
+        if len(fit_dut) < 2:  # check the length of the items
+            raise ValueError("item in selection_fit_duts has length < 2")
+        if set(selection_hit_duts[index]) - set(fit_dut):  # fit DUTs are required to have a hit
+            raise ValueError("DUT in selection_fit_duts is not in selection_hit_duts")
+
+    # Create track, hit selection
+    if not isinstance(selection_track_quality, Iterable):  # all items the same, special case for selection_track_quality
+        selection_track_quality = [[selection_track_quality] * len(hit_duts) for hit_duts in selection_hit_duts]  # every hit DUTs require a track quality value
+    # Check iterable and length
+    if not isinstance(selection_track_quality, Iterable):
+        raise ValueError("selection_track_quality is no iterable")
+    elif not selection_track_quality:  # empty iterable
+        raise ValueError("selection_track_quality has no items")
+    # Check if only non-iterable in iterable
+    if all(map(lambda val: not isinstance(val, Iterable), selection_track_quality)):
+        selection_track_quality = [selection_track_quality for _ in align_duts]
+    # Check if only iterable in iterable
+    if not all(map(lambda val: isinstance(val, Iterable), selection_track_quality)):
+        raise ValueError("not all items in selection_track_quality are iterable")
+    # Finally check length of all arrays
+    if len(selection_track_quality) != len(align_duts):  # empty iterable
+        raise ValueError("selection_track_quality has the wrong length")
+    for index, track_quality in enumerate(selection_track_quality):
+        if len(track_quality) != len(selection_hit_duts[index]):  # check the length of each items
+            raise ValueError("item in selection_track_quality and selection_hit_duts does not have the same length")
+
     # Loop over all combinations of DUTs to align, simplest case: use all DUTs at once to align
     # Usual case: align high resolution devices first, then other devices
     for index, actual_align_duts in enumerate(align_duts):
-        if selection_fit_duts is None:
-            actual_selection_fit_duts = actual_align_duts
-        elif isinstance(selection_fit_duts[index], Iterable):
-            actual_selection_fit_duts = selection_fit_duts[index]
-        else:
-            actual_selection_fit_duts = selection_fit_duts
-        if selection_hit_duts is None:
-            actual_selection_hit_duts = actual_align_duts
-        elif isinstance(selection_hit_duts[index], Iterable):
-            actual_selection_hit_duts = selection_hit_duts[index]
-        else:
-            actual_selection_hit_duts = selection_hit_duts
-        if not isinstance(selection_track_quality, Iterable):
-            actual_selection_track_quality = [selection_track_quality] * len(actual_selection_hit_duts)
-        elif isinstance(selection_track_quality[index], Iterable):
-            actual_selection_track_quality = selection_track_quality[index]
-        else:
-            actual_selection_track_quality = selection_track_quality
-
         logging.info('Aligning DUTs: %s', ", ".join(str(dut) for dut in actual_align_duts))
 
         duts_alignment(
             alignment_index=index,
             align_duts=actual_align_duts,
             n_duts=n_duts,
-            selection_fit_duts=actual_selection_fit_duts,
-            selection_hit_duts=actual_selection_hit_duts,
-            selection_track_quality=actual_selection_track_quality)
+            selection_fit_duts=selection_fit_duts[index],
+            selection_hit_duts=selection_hit_duts[index],
+            selection_track_quality=selection_track_quality[index])
 
     logging.info('Alignment finished successfully!')
 
