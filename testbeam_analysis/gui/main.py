@@ -3,7 +3,7 @@ import sys
 from PyQt5 import QtCore, QtWidgets, QtGui
 from pyqtgraph.dockarea import DockArea, Dock
 
-from analysis_widgets import DataTable, DropArea
+from data_table import DataTable, DropArea
 
 PROJECT_NAME = 'Testbeam Analysis'
 
