@@ -705,7 +705,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
     logging.debug('File with newly aligned hits %s', output_hit_aligned_file)
 
 
-def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel_size, align_duts=None, selection_fit_duts=None, selection_hit_duts=None, selection_track_quality=None, initial_rotation=None, initial_translation=None, max_iterations=10, use_n_tracks=200000, plot_result=True, chunk_size=100000):
+def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel_size, align_duts=None, selection_fit_duts=None, selection_hit_duts=None, selection_track_quality=1, initial_rotation=None, initial_translation=None, max_iterations=10, use_n_tracks=200000, plot_result=True, chunk_size=100000):
     ''' This function does an alignment of the DUTs and sets translation and rotation values for all DUTs.
     The reference DUT defines the global coordinate system position at 0, 0, 0 and should be well in the beam and not heavily rotated.
 
@@ -988,20 +988,20 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     # Loop over all combinations of DUTs to align, simplest case: use all DUTs at once to align
     # Usual case: align high resolution devices first, then other devices
     for index, actual_align_duts in enumerate(align_duts):
-        if not selection_fit_duts:
+        if selection_fit_duts is None:
             actual_selection_fit_duts = actual_align_duts
         elif isinstance(selection_fit_duts[index], Iterable):
             actual_selection_fit_duts = selection_fit_duts[index]
         else:
             actual_selection_fit_duts = selection_fit_duts
-        if not selection_hit_duts:
+        if selection_hit_duts is None:
             actual_selection_hit_duts = actual_align_duts
         elif isinstance(selection_hit_duts[index], Iterable):
             actual_selection_hit_duts = selection_hit_duts[index]
         else:
             actual_selection_hit_duts = selection_hit_duts
-        if not selection_track_quality:
-            actual_selection_track_quality = [1] * len(actual_selection_hit_duts)
+        if not isinstance(selection_track_quality, Iterable):
+            actual_selection_track_quality = [selection_track_quality] * len(actual_selection_hit_duts)
         elif isinstance(selection_track_quality[index], Iterable):
             actual_selection_track_quality = selection_track_quality[index]
         else:
