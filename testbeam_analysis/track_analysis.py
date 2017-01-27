@@ -220,7 +220,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             raise NotImplementedError('All DUTs defined in selection_fit_duts have to be defined in selection_hit_duts!')
 
     # Special mode: use all DUTs in the fit and the selections are all the same --> the data does only have to be fitted once
-    if not exclude_dut_hit and all(x == selection_hit_duts[0] for x in selection_hit_duts) and all(x == selection_fit_duts[0] for x in selection_fit_duts) and all(x == selection_track_quality[0] for x in selection_track_quality):
+    if not exclude_dut_hit and all(set(x) == set(selection_hit_duts[0]) for x in selection_hit_duts) and all(set(x) == set(selection_fit_duts[0]) for x in selection_fit_duts) and all(list(x) == list(selection_track_quality[0]) for x in selection_track_quality):
         same_tracks_for_all_duts = True
     else:
         same_tracks_for_all_duts = False
