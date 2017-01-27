@@ -209,9 +209,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     # Check if only iterable in iterable
     if not all(map(lambda val: isinstance(val, Iterable), selection_hit_duts)):
         raise ValueError("not all items in selection_hit_duts are iterable")
-    # Check if only iterable in iterable
-    if not all(map(lambda val: isinstance(val, Iterable), selection_hit_duts)):
-        raise ValueError("not all items in selection_hit_duts are iterable")
     # Finally check length of all arrays
     if len(selection_hit_duts) != len(fit_duts):  # empty iterable
         raise ValueError("selection_hit_duts has the wrong length")
