@@ -46,7 +46,20 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Add DockArea to each tab
         for name in self.tab_order:
-            self.tab_widgets[name] = DockArea()
+            if name == 'Files':
+                self.tab_widgets[name] = DockArea()
+            else:
+                self.tab_widgets[name] = QtWidgets.QWidget()
+                layout_widget = QtWidgets.QVBoxLayout()
+                layout_buttons = QtWidgets.QHBoxLayout()
+                layout_buttons.addWidget(QtWidgets.QPushButton('Test'))
+                layout_buttons.addWidget(QtWidgets.QPushButton('Test2'))
+                layout_buttons_2 = QtWidgets.QHBoxLayout()
+                layout_buttons_2.addWidget(QtWidgets.QPushButton('Test3'))
+                layout_buttons_2.addWidget(QtWidgets.QPushButton('Test4'))
+                layout_widget.addLayout(layout_buttons)
+                layout_widget.addLayout(layout_buttons_2)
+                self.tab_widgets[name].setLayout(layout_widget)
             tabs.addTab(self.tab_widgets[name], name)
 
         # Init tab number 1 with data
