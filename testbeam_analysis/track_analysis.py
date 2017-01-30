@@ -688,6 +688,7 @@ def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several t
 def _fit_tracks_loop(track_hits):
     ''' Do 3d line fit and calculate chi2 for each fit. '''
     def line_fit_3d(hits):
+        # subtract mean for each component (x,y,z) for SVD calculation
         datamean = hits.mean(axis=0)
         offset, slope = datamean, np.linalg.svd(hits - datamean, full_matrices=False)[2][0]  # http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
         intersections = offset + slope / slope[2] * (hits.T[2][:, np.newaxis] - offset[2])  # Fitted line and DUT plane intersections (here: points)
