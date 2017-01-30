@@ -689,9 +689,9 @@ def _fit_tracks_loop(track_hits):
         chi2 = np.sum(np.square(hits - intersections), dtype=np.uint32)  # Chi2 of the fit in um
         return datamean, slope / slope_mag, chi2
 
-    slope = np.empty((track_hits.shape[0], 3,))
-    offset = np.empty((track_hits.shape[0], 3,))
-    chi2 = np.empty((track_hits.shape[0],))
+    slope = np.empty((track_hits.shape[0], 3), dtype=np.float)
+    offset = np.empty((track_hits.shape[0], 3), dtype=np.float)
+    chi2 = np.empty((track_hits.shape[0],), dtype=np.float)
 
     for index, actual_hits in np.ndenumerate(track_hits):  # Loop over selected track candidate hits and fit
         try:
