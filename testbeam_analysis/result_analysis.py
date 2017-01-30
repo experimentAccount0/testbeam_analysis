@@ -93,7 +93,6 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         with tb.open_file(output_residuals_file, mode='w') as out_file_h5:
             for node in in_file_h5.root:
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                actual_max_chi2 = max_chi2[actual_dut]
                 if use_duts and actual_dut not in use_duts:
                     continue
                 logging.debug('Calculate residuals for DUT %d', actual_dut)
@@ -101,9 +100,10 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                 initialize = True  # initialize the histograms
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
 
-                    if actual_max_chi2:
-                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= actual_max_chi2]
-                    tracks_chunk = tracks_chunk[np.logical_and(~np.isnan(tracks_chunk['x_dut_%d' % actual_dut]), ~np.isnan(tracks_chunk['y_dut_%d' % actual_dut]))]  # Take only tracks where actual dut has a hit, otherwise residual wrong
+                    if max_chi2[actual_dut] is not None:
+                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2[actual_dut]]
+                    selection = np.logical_and(~np.isnan(tracks_chunk['x_dut_%d' % actual_dut]), ~np.isnan(tracks_chunk['y_dut_%d' % actual_dut]))
+                    tracks_chunk = tracks_chunk[selection]  # Take only tracks where actual dut has a hit, otherwise residual wrong
 
                     # Coordinates in global coordinate system (x, y, z)
                     hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut], tracks_chunk['y_dut_%d' % actual_dut], tracks_chunk['z_dut_%d' % actual_dut]
