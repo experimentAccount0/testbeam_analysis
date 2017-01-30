@@ -649,12 +649,16 @@ def peak_detect(x, y):
 
 
 def simple_peak_detect(x, y):
+    y = np.array(y)
     half_maximum = np.max(y) * 0.5
     greater = (y > half_maximum)
     change_indices = np.where(greater[:-1] != greater[1:])[0]
     if np.all(greater == False) or greater[0] == True or greater[-1] == True:
         raise RuntimeError("Cannot determine peak")
-    fwhm_left_right = (x[change_indices[0]], x[change_indices[-1] + 1])
+    x = np.array(x)
+    # get center of indices for higher precision peak position and FWHM
+    x_center = (x[1:] + x[:-1]) / 2.0
+    fwhm_left_right = (x_center[change_indices[0]], x_center[change_indices[-1]])
     fwhm_value = fwhm_left_right[-1] - fwhm_left_right[0]
     max_position = x[np.argmax(y)]
     center = (fwhm_left_right[0] + fwhm_left_right[-1]) / 2.0
