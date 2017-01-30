@@ -129,7 +129,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                                                                                                                           alignment=alignment,
                                                                                                                           inverse=True)
 
-                    if not np.allclose(hit_z_local[np.isfinite(hit_z_local)], 0) or not np.allclose(intersection_z_local, 0):
+                    if not np.allclose(hit_z_local, 0.0) or not np.allclose(intersection_z_local, 0.0):
                         logging.error('Hit z position = %s and z intersection %s', str(hit_z_local[:3]), str(intersection_z_local[:3]))
                         raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
 
