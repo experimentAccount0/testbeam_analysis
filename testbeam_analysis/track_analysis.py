@@ -480,7 +480,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
     # Set track quality of actual DUT from actual DUT hit
     column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
-    if not np.isnan(row):  # row = nan is no hit
+    if not np.isnan(column):  # column = nan is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
         if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
@@ -501,8 +501,7 @@ def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_inde
     column, row = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index]
 
     actual_track['track_quality'] &= ~(65793 << dut_index)  # Reset track quality to zero
-
-    if not np.isnan(row):  # row = nan is no hit
+    if not np.isnan(column):  # column = nan is no hit
         actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
         if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
@@ -610,7 +609,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                     if tracklets[hit_index]['event_number'] != actual_event_number:  # Abort condition
                         break
                     column, row, z, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index]
-                    if not np.isnan(row):  # Check for hit
+                    if not np.isnan(column):  # column = nan is no hit
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
                         column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
                         hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
