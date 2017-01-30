@@ -10,7 +10,6 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 from scipy.stats import binned_statistic_2d
-import os
 
 from testbeam_analysis.tools import plot_utils
 from testbeam_analysis.tools import geometry_utils
