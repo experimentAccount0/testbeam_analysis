@@ -565,10 +565,6 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
     # Numba uses c scopes, thus define all used variables here
     n_actual_tracks = 0
     track_index, actual_hit_track_index = 0, 0  # Track index of table and first track index of actual event
-    column, row = np.nan, np.nan
-    actual_track_column, actual_track_row = 0., 0.
-    column_distance, row_distance = 0., 0.
-    hit_distance = 0.
 
     for track_index, actual_track in enumerate(tracklets):  # Loop over all possible tracks
         #         print '== ACTUAL TRACK  ==', track_index
@@ -594,15 +590,8 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
         n_track_hits = 0
 
         for dut_index in range(n_duts):  # loop over all DUTs in the actual track
+#             print '== ACTUAL DUT ==', dut_index
             actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
-
-            # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
-            current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
-            current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
-            if np.isnan(tr_column[track_index][dut_index]):  # No hit at the actual position
-                current_hit_distance = -1  # Signal no hit
-
-#             print '== ACTUAL DUT  ==', dut_index
 
             if not reference_hit_set and not np.isnan(tr_row[track_index][dut_index]):  # Search for first DUT that registered a hit
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
@@ -611,6 +600,11 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
                 n_track_hits += 1
 #                 print 'ACTUAL REFERENCE HIT', actual_track_column, actual_track_row
             elif reference_hit_set:  # First hit found, now find best (closest) DUT hit
+                # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
+                current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
+                current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
+                if np.isnan(tr_column[track_index][dut_index]):
+                    current_hit_distance = -1  # Signal no hit
                 shortest_hit_distance = -1  # The shortest hit distance to the actual hit; -1 means not assigned
                 for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # Loop over all not sorted hits of actual DUT
                     if tracklets[hit_index]['event_number'] != actual_event_number:  # Abort condition
