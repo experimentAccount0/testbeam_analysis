@@ -288,7 +288,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             description.append(('offset_%d' % dimension, np.float))
         for dimension in range(3):
             description.append(('slope_%d' % dimension, np.float))
-        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.int8)])
+        description.extend([('track_chi2', np.float), ('track_quality', np.uint32), ('n_tracks', np.int8)])
 
         # Define structure of track_array
         tracks_array = np.zeros((n_tracks,), dtype=description)
@@ -693,14 +693,10 @@ def _fit_tracks_loop(track_hits):
     offset = np.empty((track_hits.shape[0], 3,))
     chi2 = np.empty((track_hits.shape[0],))
 
-    slope[:] = np.nan
-    offset[:] = np.nan
-    chi2[:] = np.nan
-
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
         try:
             offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits)
         except np.linalg.linalg.LinAlgError:
-            chi2[index] = 1e9
+            offset[index], slope[index], chi2[index] = np.nan, np.nan, np.nan
 
     return offset, slope, chi2
