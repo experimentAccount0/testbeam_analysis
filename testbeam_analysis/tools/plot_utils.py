@@ -982,19 +982,20 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
                     fig.tight_layout()
                     output_fig.savefig(fig)
 
+
 def plot_track_distances(distance_min_array, distance_max_array, distance_mean_array, actual_dut, plot_range, cut_distance, output_fig):
     # get number of entries for every histogram
     n_hits_distance_min_array = distance_min_array.count()
     n_hits_distance_max_array = distance_max_array.count()
     n_hits_distance_mean_array = distance_mean_array.count()
-    
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_fig.savefig(fig)
-    
+
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
