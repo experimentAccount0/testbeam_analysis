@@ -693,7 +693,7 @@ def _fit_tracks_loop(track_hits):
     offset = np.empty((track_hits.shape[0], 3,))
     chi2 = np.empty((track_hits.shape[0],))
 
-    for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
+    for index, actual_hits in np.ndenumerate(track_hits):  # Loop over selected track candidate hits and fit
         try:
             offset[index], slope[index], chi2[index] = line_fit_3d(actual_hits)
         except np.linalg.linalg.LinAlgError:
