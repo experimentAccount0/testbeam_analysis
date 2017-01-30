@@ -593,7 +593,7 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
 #             print '== ACTUAL DUT ==', dut_index
             actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
 
-            if not reference_hit_set and not np.isnan(tr_row[track_index][dut_index]):  # Search for first DUT that registered a hit
+            if not reference_hit_set and not np.isnan(tr_column[track_index][dut_index]):  # Search for first DUT that registered a hit
                 actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
                 reference_hit_set = True
                 tracklets[track_index]['track_quality'] |= (65793 << dut_index)  # First track hit has best quality by definition
