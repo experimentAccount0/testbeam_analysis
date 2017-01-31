@@ -64,14 +64,14 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
             column_correlations.append(np.zeros(shape_column, dtype=np.int))
             row_correlations.append(np.zeros(shape_row, dtype=np.int))
 
-        start_indices = [0] * (n_duts - 1)  # Store the loop indices for speed up
+        start_indices = [None] * n_duts  # Store the loop indices for speed up
 
         with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
             progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
             progress_bar.start()
 
             pool = Pool()  # Provide worker pool
-            for cluster_dut_0, index in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+            for cluster_dut_0, start_indices[0] in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, start_index=start_indices[0], chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
                 actual_event_numbers = cluster_dut_0[:]['event_number']
 
                 # Create correlation histograms to the reference device for all other devices
@@ -81,7 +81,7 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     dut_results.append(pool.apply_async(_correlate_cluster, kwds={'cluster_dut_0': cluster_dut_0,
                                                                                   'cluster_file': cluster_file,
-                                                                                  'start_index': start_indices[dut_index - 1],
+                                                                                  'start_index': start_indices[dut_index],
                                                                                   'start_event_number': actual_event_numbers[0],
                                                                                   'stop_event_number': actual_event_numbers[-1] + 1,
                                                                                   'column_correlation': column_correlations[dut_index - 1],
@@ -91,9 +91,9 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
                                                         ))
                 # Collect results when available
                 for dut_index, dut_result in enumerate(dut_results, start=1):
-                    (start_indices[dut_index - 1], column_correlations[dut_index - 1], row_correlations[dut_index - 1]) = dut_result.get()
+                    (start_indices[dut_index], column_correlations[dut_index - 1], row_correlations[dut_index - 1]) = dut_result.get()
 
-                progress_bar.update(index)
+                progress_bar.update(start_indices[0])
 
             pool.close()
             pool.join()
