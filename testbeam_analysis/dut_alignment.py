@@ -367,7 +367,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     selected_data = np.ones_like(x_dut, dtype=np.bool)
                     actual_iteration = 0  # Refit counter for non interactive mode
                     while(refit):
-                        selected_data, fit, refit = plot_utils.plot_alignments(x=x_dut_scaled_selected,
+                        selected_data, fit, refit = plot_utils.plot_prealignments(x=x_dut_scaled_selected,
                                                                                mean_fitted=mean_fitted_scaled_selected,
                                                                                mean_error_fitted=mean_error_fitted_scaled_selected,
                                                                                n_cluster=n_cluster_selected,
@@ -432,7 +432,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     selected_indices = np.searchsorted(x_dut_scaled, x_dut_scaled_selected)
                     mask = np.zeros_like(x_dut_scaled, dtype=np.bool)
                     mask[selected_indices] = True
-                    plot_utils.plot_alignment_fit(
+                    plot_utils.plot_prealignment_fit(
                         x=x_dut_scaled,
                         mean_fitted=mean_fitted_scaled,
                         mask=mask,

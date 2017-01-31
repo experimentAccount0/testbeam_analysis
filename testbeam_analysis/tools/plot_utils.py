@@ -210,7 +210,7 @@ def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y
     output_pdf.savefig()
 
 
-def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, non_interactive=False):
+def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, non_interactive=False):
     '''PLots the correlation and lets the user cut on the data in an interactive way.
 
     Parameters
@@ -474,7 +474,7 @@ def plot_alignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_alignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
+def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
     plt.clf()
     fig = plt.gcf()
     ax1 = fig.add_subplot(1, 1, 1)
