@@ -779,7 +779,7 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
         plt.xlim([edges[0], edges[-1]])
         if output_fig:
             output_fig.savefig()
-        elif output_fig is None:
+        elif output_fig is True:
             plt.show()
 
 
