@@ -729,11 +729,11 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     input_alignment_file : pytables file
         File name of the input aligment data
     n_pixels : iterable of tuples
-        The number of pixels per DUT in (column, row).
-        E.g.: two DUTS: [(80, 336), (80, 336)]
+        One tuple per DUT describing the total number of pixels (column/row),
+        e.g. for two FE-I4 DUTs [(80, 336), (80, 336)].
     pixel_size : iterable of tuples
-        The pixel sizer per DUT in (column, row) in um.
-        E.g.: two DUTS: [(50, 250), (50, 250)]
+        One tuple per DUT describing the pixel dimension (column/row),
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
     align_duts : iterable or iterable of iterable
         The combination of duts that are algined at once. One should always align the high resolution planes first.
         E.g. for a telesope (first and last 3 planes) with 2 devices in the center (3, 4):
@@ -749,15 +749,15 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         does not have to be used in the fit itself! This is useful for time reference planes.
         E.g.  To use telescope planes (first and last 3 planes) + time reference plane (3)
         selection_hit_duts = [0, 1, 2, 4, 5, 6, 7]
+    selection_track_quality : uint or iterable or iterable of iterable
+        Track quality for each hit DUT.
+    initial_rotation : array
+        Initial rotation array.
+    initial_translation : array
+        Initial Translation array.
     max_iterations : uint
         Maximum number of iterations of calc residuals, apply rotation refit loop until constant result is expected.
         Usually the procedure converges rather fast (< 5 iterations)
-    selection_hit_duts : iterable, or iterable of iterable
-        The duts that are required to have a hit with the given track quality. Otherwise the track is omitted
-        If None: require all DUTs to have a hit, but if require_dut_hit = False do not use actual fit_dut.
-        If iterable: use selection for all dut selections
-        If iterable of iterable: define dut with hits for each dut selection separately.
-        E.g: for 2 devices: selection_hit_duts = ((1, 2), (0, 1, 2))
     use_n_tracks: uint
         Defines the amount of tracks to be used for the alignment. More tracks can potentially make the result
         more precise, but will also increase the calculation time.
