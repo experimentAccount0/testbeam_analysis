@@ -603,7 +603,7 @@ def refit_advanced(x_data, y_data, y_fit, p0):
     return coeff, var_matrix
 
 
-def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
+def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
     ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hits positions. The alignment data is used. If this is not
     available a fallback to the pre-alignment is done.
     One can also inverse the alignment or apply the alignment without changing the z position.
@@ -617,7 +617,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
         Filename of the input hits file (e.g. merged data file, tracklets file, etc.).
     input_alignment : string
         Filename of the input alignment file.
-    output_hit_aligned_file : string
+    output_hit_file : string
         Filename of the output hits file with hit data after alignment was applied.
     inverse : boolean
         If True, apply the inverse alignment.
@@ -678,7 +678,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
 
     # Looper over the hits of all DUTs of all hit tables in chunks and apply the alignment
     with tb.open_file(input_hit_file, mode='r') as in_file_h5:
-        with tb.open_file(output_hit_aligned_file, mode='w') as out_file_h5:
+        with tb.open_file(output_hit_file, mode='w') as out_file_h5:
             for node in in_file_h5.root:  # Loop over potential hit tables in data file
                 hits = node
                 new_node_name = hits.name
@@ -702,7 +702,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
                     progress_bar.update(index)
                 progress_bar.finish()
 
-    logging.debug('File with newly aligned hits %s', output_hit_aligned_file)
+    logging.debug('File with realigned hits %s', output_hit_file)
 
 
 def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel_size, align_duts=None, selection_fit_duts=None, selection_hit_duts=None, selection_track_quality=1, initial_rotation=None, initial_translation=None, max_iterations=10, use_n_tracks=200000, plot_result=True, chunk_size=100000):
@@ -951,7 +951,7 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
     logging.info('= Alignment step 1: Revert pre-alignment =')
     apply_alignment(input_hit_file=track_candidates_reduced,
                     input_alignment=alignment_file,  # Revert prealignent
-                    output_hit_aligned_file=track_candidates_reduced[:-3] + '_not_aligned.h5',
+                    output_hit_file=track_candidates_reduced[:-3] + '_not_aligned.h5',
                     inverse=True,
                     force_prealignment=True,
                     chunk_size=chunk_size)
@@ -978,7 +978,7 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
             # Apply final alignment result
             apply_alignment(input_hit_file=track_candidates_reduced[:-3] + '_not_aligned.h5',
                             input_alignment=alignment_file,
-                            output_hit_aligned_file=track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
+                            output_hit_file=track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
                             chunk_size=chunk_size)
             fit_tracks(input_track_candidates_file=track_candidates_file[:-3] + '_final_tmp_%d.h5' % alignment_index,
                        input_alignment_file=alignment_file,
@@ -1017,7 +1017,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
 
         apply_alignment(input_hit_file=track_candidates_file,  # Always apply alignment to starting file
                         input_alignment=alignment_file,
-                        output_hit_aligned_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
+                        output_hit_file=track_candidates_file[:-3] + '_no_align_%d_tmp.h5' % iteration,
                         inverse=False,
                         force_prealignment=False,
                         chunk_size=chunk_size)

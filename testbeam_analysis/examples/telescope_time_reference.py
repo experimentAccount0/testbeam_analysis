@@ -108,7 +108,7 @@ def run_analysis():
     # Apply the prealignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
+                                  output_hit_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
                                   force_prealignment=True)
 
     # Find tracks from the prealigned tracklets and stores the with quality indicator into track candidates table
@@ -167,14 +167,14 @@ def run_analysis():
     # Due to the large beam angle track finding fails on aligned data. Thus rely on the found tracks from prealignment.
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'TrackCandidates_prealignment_reduced.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'Merged_small.h5'),  # This is the new not aligned but preselected merged data file to apply (pre-) alignment on
+                                  output_hit_file=os.path.join(output_folder, 'Merged_small.h5'),  # This is the new not aligned but preselected merged data file to apply (pre-) alignment on
                                   inverse=True,
                                   force_prealignment=True)
 
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged_small.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'TrackCandidates.h5'))
+                                  output_hit_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
     # Fit track using alignment
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
