@@ -1066,7 +1066,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
         # FIXME: This step does not work well
 #         # Step 5: Try to find better rotation by minimizing the residual in x + y for different angles
 #         logging.info('= Alignment step 5 / iteration %d: Optimize alignment by minimizing residuals =', iteration)
-#         new_alignment_parameters, new_total_residual = _optimize_alignment(input_tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
+#         new_alignment_parameters, new_total_residual = _optimize_alignment(tracks_file=track_candidates_file[:-3] + '_tracks_%d_tmp.h5' % iteration,
 #                                                                            alignment_last_iteration=alignment_last_iteration,
 #                                                                            new_alignment_parameters=new_alignment_parameters,
 #                                                                            pixel_size=pixel_size)
@@ -1184,7 +1184,7 @@ def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_du
     return alignment_parameters, total_residual
 
 
-def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignment_parameters, pixel_size):
+def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_parameters, pixel_size):
     ''' Changes the angles of a virtual plane such that the projected track intersections onto this virtual plane
     are most close to the measured hits on the real DUT at this position. Then the angles of the virtual plane
     should correspond to the real DUT angles. The distance is not weighted quadratically (RMS) but linearly since
@@ -1229,7 +1229,7 @@ def _optimize_alignment(input_tracks_file, alignment_last_iteration, new_alignme
         return np.sum(np.abs(hit_x_local - intersection_x_local) / pixel_size[0]) + np.sum(np.abs(hit_y_local - intersection_y_local)) / pixel_size[1]
 #         return np.sqrt(np.square(np.std(hit_x_local - intersection_x_local) / pixel_size[0]) + np.square(np.std(hit_y_local - intersection_y_local)) / pixel_size[1])
 
-    with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
+    with tb.open_file(tracks_file, mode='r') as in_file_h5:
         residuals_before = []
         residuals_after = []
         for node in in_file_h5.root:
