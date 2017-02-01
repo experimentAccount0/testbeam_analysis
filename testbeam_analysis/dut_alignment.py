@@ -1048,7 +1048,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
 
         # Step 4: Deduce rotations from the residuals
         logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
-        alignment_parameters_change, new_total_residual = _analyze_residuals(residuals_file_h5=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
+        alignment_parameters_change, new_total_residual = _analyze_residuals(residuals_file=track_candidates_file[:-3] + '_residuals_%d_tmp.h5' % iteration,
                                                                              output_fig=output_fig,
                                                                              fit_duts=fit_duts,
                                                                              pixel_size=pixel_size,
@@ -1118,13 +1118,13 @@ def _create_alignment_array(n_duts):
     return array
 
 
-def _analyze_residuals(residuals_file_h5, output_fig, fit_duts, pixel_size, n_duts, translation_only=False, relaxation_factor=1.0, plot_title_prefix=''):
+def _analyze_residuals(residuals_file, output_fig, fit_duts, pixel_size, n_duts, translation_only=False, relaxation_factor=1.0, plot_title_prefix=''):
     ''' Take the residual plots and deduce rotation and translation angles from them '''
     alignment_parameters = _create_alignment_array(n_duts)
 
     total_residual = 0  # Sum of all residuals to judge the overall alignment
 
-    with tb.open_file(residuals_file_h5) as in_file_h5:
+    with tb.open_file(residuals_file) as in_file_h5:
         for dut_index in fit_duts:
             alignment_parameters[dut_index]['DUT'] = dut_index
             # Global residuals
