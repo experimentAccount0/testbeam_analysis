@@ -47,7 +47,7 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
         If None, assuming same pixel size for all DUTs.
     dut_names : iterable of strings
         Names of the DUTs. If None, the DUT index will be used.
-    chunk_size : int
+    chunk_size : uint
         Chunk size of the data when reading from file.
     '''
     logging.info('=== Correlating the index of %d DUTs ===', len(input_cluster_files))
@@ -129,8 +129,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension (column/row),
         e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
-    chunk_size: int
-        Defines the amount of in RAM data. The higher the more RAM is used and the faster this function works.
+    chunk_size : uint
+        Chunk size of the data when reading from file.
     '''
     logging.info('=== Merge cluster from %d DUTSs to merged hit file ===', len(input_cluster_files))
 
@@ -613,22 +613,22 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_aligned_file, in
 
     Parameters
     ----------
-    input_hit_file : pytables file
-        Input file name with hit data (e.g. merged data file, tracklets file, etc.)
-    input_alignment : pytables file or alignment array
-        The alignment file with the data
-    output_hit_aligned_file : pytables file
-        Output file name with hit data after alignment was applied
+    input_hit_file : string
+        Filename of the input hits file (e.g. merged data file, tracklets file, etc.).
+    input_alignment : string
+        Filename of the input alignment file.
+    output_hit_aligned_file : string
+        Filename of the output hits file with hit data after alignment was applied.
     inverse : boolean
-        Apply the inverse alignment
-    force_prealignment : boolean
-        Take the pre-alignment, although if a coarse alignment is availale
-    no_z : boolean
-        Do not change the z alignment. Needed since the z position is special for x / y based plane measurements.
+        If True, apply the inverse alignment.
+    force_prealignment : bool
+        If True, use pre-alignment, even if alignment data is availale.
+    no_z : bool
+        If True, do not change the z alignment. Needed since the z position is special for x / y based plane measurements.
     use_duts : iterable
-        Iterable of DUT indices to apply the alignment to. Std. setting is all DUTs.
-    chunk_size: int
-        Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
+        Iterable of DUT indices to apply the alignment to. If None, use all DUTs.
+    chunk_size : uint
+        Chunk size of the data when reading from file.
     '''
     logging.info('== Apply alignment to %s ==', input_hit_file)
 
@@ -749,7 +749,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         does not have to be used in the fit itself! This is useful for time reference planes.
         E.g.  To use telescope planes (first and last 3 planes) + time reference plane (3)
         selection_hit_duts = [0, 1, 2, 4, 5, 6, 7]
-    max_iterations : int
+    max_iterations : uint
         Maximum number of iterations of calc residuals, apply rotation refit loop until constant result is expected.
         Usually the procedure converges rather fast (< 5 iterations)
     selection_hit_duts : iterable, or iterable of iterable
@@ -758,14 +758,14 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         If iterable: use selection for all dut selections
         If iterable of iterable: define dut with hits for each dut selection separately.
         E.g: for 2 devices: selection_hit_duts = ((1, 2), (0, 1, 2))
-    use_n_tracks: int
+    use_n_tracks: uint
         Defines the amount of tracks to be used for the alignment. More tracks can potentially make the result
         more precise, but will also increase the calculation time.
-    plot_result : boolean
+    plot_result : bool
         If true the final alignment applied to the complete data set is plotted. If you have hugh amount
         of data, deactivate this to save time.
-    chunk_size: int
-        Defines the amount of in-RAM data. The higher the more RAM is used and the faster this function works.
+    chunk_size : uint
+        Chunk size of the data when reading from file.
     '''
 
     logging.info('=== Aligning DUTs ===')
