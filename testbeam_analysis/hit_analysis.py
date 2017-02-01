@@ -145,7 +145,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
             cluster_hits_table = None
             cluster_table = None
-            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size, try_speedup=False):
+            for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
                 if not np.all(np.diff(hits['event_number']) >= 0):
                     raise RuntimeError('The event number does not always increase. The hits cannot be used like this!')
                 cluster_hits, clusters = clusterizer.cluster_hits(hits, noisy_pixels=noisy_pixels, disabled_pixels=disabled_pixels)  # Cluster hits
