@@ -242,7 +242,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     for index, fit_dut in enumerate(selection_fit_duts):
         if len(fit_dut) < 2:  # check the length of the items
             raise ValueError("item in selection_fit_duts has length < 2")
-        if set(selection_hit_duts[index]) - set(fit_dut):  # fit DUTs are required to have a hit
+        if set(fit_dut) - set(selection_hit_duts[index]):  # fit DUTs are required to have a hit
             raise ValueError("DUT in selection_fit_duts is not in selection_hit_duts")
 
     # Create track, hit selection
