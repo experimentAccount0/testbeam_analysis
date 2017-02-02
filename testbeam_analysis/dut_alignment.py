@@ -196,7 +196,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
 
                 merged_cluster_table.append(merged_cluster_array)
                 actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read
-                progress_bar.update(index)
+                progress_bar.update(start_indices_data_loop[0])
             progress_bar.finish()
 
 
