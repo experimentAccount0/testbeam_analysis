@@ -371,7 +371,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
         track_quality_mask = 0
         for index, dut in enumerate(selection_hit_duts[dut_index]):
-            if exclude_dut_hit and dut == dut_index:
+            if exclude_dut_hit and dut == fit_duts[dut_index]:
                 continue
             for quality in range(3):
                 if quality <= selection_track_quality[dut_index][index]:
