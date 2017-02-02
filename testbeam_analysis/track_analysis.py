@@ -395,7 +395,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     min_track_distance = np.array(min_track_distance)
 
                 for fit_dut_index, actual_fit_dut in enumerate(fit_duts):  # Loop over the DUTs where tracks shall be fitted for
-                    logging.info('Fit tracks for DUT %d', actual_fit_dut)
+                    logging.info('Fit tracks for DUT%d', actual_fit_dut)
                     dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
