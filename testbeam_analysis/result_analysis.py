@@ -440,7 +440,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_y_residual_y_yedges,
                     xlabel='Y position [um]',
                     ylabel='Y residual [um]',
-                    title='Residuals for DUT %d' % (dut_name,),
+                    title='Residuals for %s' % (dut_name,),
                     output_fig=output_fig
                 )
                 out_y_res_y = out_file_h5.create_carray(out_file_h5.root,
@@ -461,7 +461,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
                     yedges=hist_x_residual_y_yedges,
                     xlabel='X position [um]',
                     ylabel='Y residual [um]',
-                    title='Residuals for DUT %d' % (dut_name,),
+                    title='Residuals for %s' % (dut_name,),
                     output_fig=output_fig
                 )
                 out_x_res_y = out_file_h5.create_carray(out_file_h5.root,
