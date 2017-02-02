@@ -734,7 +734,11 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     # Plot track chi2 and angular distribution
     chi2s = chi2s[np.isfinite(chi2s)]
     plt.clf()
-    limit_x = int(np.percentile(chi2s, q=99.73))  # Plot up to 3 sigma of the chi2 range
+    try:
+        # Plot up to 3 sigma of the chi2 range
+        limit_x = np.ceil(np.percentile(chi2s, q=99.73))
+    except IndexError:  # array empty
+        limit_x = 1
     plt.hist(chi2s, bins=100, range=(0, limit_x))
     plt.xlim(0, limit_x)
     plt.grid()
