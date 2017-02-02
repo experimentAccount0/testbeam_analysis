@@ -410,34 +410,44 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     for track_candidates_chunk, index_candidates in analysis_utils.data_aligned_at_events(in_file_h5.root.TrackCandidates, chunk_size=chunk_size):
 
                         # Select tracks based on the dut that are required to have a hit (dut_selection) with a certain quality (track_quality)
-
+                        n_tracks = track_candidates_chunk.shape[0]
                         good_track_selection = (track_candidates_chunk['track_quality'] & track_quality_mask) == track_quality_mask
-
-                        n_track_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection)
-
+                        n_tracks_quality = np.count_nonzero(good_track_selection)
+                        removed_n_tracks_quality = n_tracks - n_tracks_quality
+                        # remove merged clusters
                         good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] > 0)  # n_tracks < 0 means merged cluster, omit these to allow valid efficiency calculation
-
-                        n_merged_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection) - n_track_cut
+                        n_tracks_not_merged = np.count_nonzero(good_track_selection)
+                        removed_n_tracks_merged = n_tracks_quality - n_tracks_not_merged
 
                         if max_tracks:  # Option to neglect events with too many hits
                             good_track_selection = np.logical_and(good_track_selection, track_candidates_chunk['n_tracks'] <= max_tracks)
-                            n_tracks_cut = good_track_selection.shape[0] - np.count_nonzero(good_track_selection) - n_track_cut - n_merged_cut
-                            logging.info('Removed %d tracks candidates (%d tracks due to quality, %d tracks due to merged cluster, %d # tracks), %.1f%% ',
-                                         good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
-                                         n_track_cut,
-                                         n_merged_cut,
-                                         n_tracks_cut,
-                                         (1.0 - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.0)
+                            n_tracks_max_tracks = np.count_nonzero(good_track_selection)
+                            removed_n_tracks_max_tracks = n_tracks_not_merged - n_tracks_max_tracks
+                            removed_n_tracks = removed_n_tracks_quality + removed_n_tracks_merged + removed_n_tracks_max_tracks
+                            logging.info('Removed %d of %d (%.1f%%) track candidates (quality: %d tracks, merged clusters: %d tracks, max tracks: %d tracks)',
+                                         removed_n_tracks,
+                                         n_tracks,
+                                         100.0 * removed_n_tracks / n_tracks,
+                                         removed_n_tracks_quality,
+                                         removed_n_tracks_merged,
+                                         removed_n_tracks_max_tracks)
                         else:
-                            logging.info('Removed %d tracks candidates (%d tracks due to quality, %d tracks due to merged cluster), %.1f%% ',
-                                         good_track_selection.shape[0] - np.count_nonzero(good_track_selection),
-                                         n_track_cut,
-                                         n_merged_cut,
-                                         (1.0 - float(np.count_nonzero(good_track_selection) / float(good_track_selection.shape[0]))) * 100.0)
+                            removed_n_tracks = removed_n_tracks_quality + removed_n_tracks_merged
+                            logging.info('Removed %d of %d (%.1f%%) track candidates (quality: %d tracks, merged clusters: %d tracks)',
+                                         removed_n_tracks,
+                                         n_tracks,
+                                         100.0 * removed_n_tracks / n_tracks,
+                                         removed_n_tracks_quality,
+                                         removed_n_tracks_merged)
 
                         if use_correlated:  # Reduce track selection to correlated DUTs only
                             good_track_selection &= (track_candidates_chunk['track_quality'] & (dut_selection << 24) == (dut_selection << 24))
-                            logging.info('Removed %d tracks candidates due to correlated cuts', good_track_selection.shape[0] - np.sum(track_candidates_chunk['track_quality'] & (dut_selection << 24) == (dut_selection << 24)))
+                            n_tracks_correlated = np.count_nonzero(good_track_selection)
+                            removed_n_tracks_correlated = n_tracks - n_tracks_correlated - removed_n_tracks
+                            logging.info('Removed %d of %d (%.1f%%) track candidates due to correlated cuts',
+                                         removed_n_tracks_correlated,
+                                         n_tracks,
+                                         100.0 * removed_n_tracks_correlated / n_tracks)
 
                         good_track_candidates = track_candidates_chunk[good_track_selection]
 
