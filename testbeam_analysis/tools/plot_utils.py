@@ -57,7 +57,7 @@ def plot_noisy_pixels(input_mask_file, pixel_size=None, output_pdf_file=None, du
         occupancy = input_file_h5.root.HistOcc[:].T
 
     if pixel_size:
-        aspect = pixel_size[0] / pixel_size[1]
+        aspect = pixel_size[1] / pixel_size[0]
     else:
         aspect = "auto"
 
