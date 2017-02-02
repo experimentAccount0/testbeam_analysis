@@ -122,42 +122,44 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     Parameters
     ----------
     input_track_candidates_file : string
-        file name with the track candidates table
-    input_alignment_file : pytables file
-        File name of the input aligment data
+        Filename of the input track candidate file.
+    input_alignment_file : string
+        Filename of the input alignment file.
     output_tracks_file : string
-        file name of the created track file having the track table
+        Filename of the output tracks file.
     fit_duts : iterable
-        the duts to fit tracks for. If None all duts are used
+        Specify DUTs for which tracks will be fitted. A track table will be generated for each fit DUT.
+        If None, all existing DUTs are used.
     selection_hit_duts : iterable, or iterable of iterable
-        The duts that are required to have a hit with the given track quality. Otherwise the track is omitted
+        The duts that are required to have a hit with the given track quality. Otherwise the track is omitted.
         If None: require all DUTs to have a hit, but if exclude_dut_hit = True do not use actual fit_dut.
-        If iterable: use selection for all devices, e.g.: Require hit in DUT 0, and 3: selection_hit_duts = (0, 3)
-        If iterable of iterable: define dut with hits for all devices seperately.
-        E.g: for 3 devices: selection_hit_duts = ((1, 2), (0, 1, 2), (0, 1))
+        If iterable: use selection for all devices, e.g.: Require hit in DUT 0, and 3: selection_hit_duts = (0, 3).
+        If iterable of iterable: define dut with hits for all devices seperately,
+        e.g. for 3 devices: selection_hit_duts = ((1, 2), (0, 1, 2), (0, 1))
     selection_fit_duts : iterable, or iterable of iterable or None
-        If None: selection_hit_duts are used for fitting
-        Cannot define DUTs that are not in selection_hit_duts.
-        E.g.: Require hits in DUT0, DUT1, DUT3, DUT4 but do not use DUT3 in the fit:
+        If None, selection_hit_duts are used for fitting.
+        Cannot define DUTs that are not in selection_hit_duts,
+        e.g. require hits in DUT0, DUT1, DUT3, DUT4 but do not use DUT3 in the fit:
         selection_hit_duts = (0, 1, 3, 4)
         selection_fit_duts = (0, 1, 4)
-    exclude_dut_hit: boolean
-        Set to not require a hit in the actual fit DUT (e.g.: for uncontrained residuals)
+    exclude_dut_hit: bool
+        Set to not require a hit in the actual fit DUT (e.g.: for unconstrained residuals).
         False: Just use all devices as specified in selection_hit_duts.
-        True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts
-    max_tracks : int, None
-        only events with tracks <= max tracks are taken
-    selection_track_quality : int, iterable
+        True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts.
+    max_tracks : uint
+        Take only events with tracks <= max_tracks. If None, take any event.
+    selection_track_quality : uint, iterable
         One number valid for all DUTs or an iterable with a number for each DUT.
         0: All tracks with hits in DUT and references are taken
         1: The track hits in DUT and reference are within 2-sigma of the correlation
         2: The track hits in DUT and reference are within 1-sigma of the correlation
         Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each 'quality stage', one digit per DUT.
         E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
-    pixel_size : iterable, (x dimensions, y dimension)
-        the size in um of the pixels, needed for chi2 calculation
-    correlated_only : bool
-        Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension (column/row),
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
+    use_correlated : bool
+        Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     min_track_distance : iterable, boolean
         A minimum distance all track intersection at the DUT have to be apart, otherwise these tracks are deleted.
         This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone and will not be implemented.
