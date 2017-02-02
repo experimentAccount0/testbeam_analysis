@@ -354,12 +354,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         info_str_fit = ''  # For info output
 
         for hit_dut in selection_hit_duts[dut_index]:
-            if exclude_dut_hit and hit_dut == dut_index:
+            if exclude_dut_hit and hit_dut == fit_duts[dut_index]:
                 continue
             dut_selection |= ((1 << hit_dut))
             info_str_hit += 'DUT%d ' % (hit_dut)
         for selected_fit_dut in selection_fit_duts[dut_index]:
-            if exclude_dut_hit and selected_fit_dut == dut_index:
+            if exclude_dut_hit and selected_fit_dut == fit_duts[dut_index]:
                 continue
             dut_fit_selection |= ((1 << selected_fit_dut))
             info_str_fit += 'DUT%d ' % (selected_fit_dut)
