@@ -177,39 +177,6 @@ def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pd
         plt.show()
 
 
-def plot_coarse_alignment_check(column_0, column_1, row_0, row_1, corr_x, corr_y, dut_index, output_pdf):
-    # Plot column check
-    plt.clf()
-    plt.title('Coarse alignment check, column of DUT%d against reference DUT' % dut_index)
-    median = np.median(column_1 - column_0)
-    std = np.std(column_1 - column_0)
-    y, _, _ = plt.hist(column_1 - column_0, bins=100, range=(-2 * std, 2 * std), label='Data')
-    plt.plot([median, median], [0, y.max()], label='Median %1.2f um' % median)
-    plt.plot([median - corr_x, median - corr_x], [0, y.max()], '--', color='red', label='68 % of the data')
-    plt.plot([median + corr_x, median + corr_x], [0, y.max()], '--', color='red')
-    plt.grid()
-    plt.xlabel('Difference [um]')
-    plt.ylabel('#')
-    plt.yscale('log')
-    plt.legend(loc=0)
-    output_pdf.savefig()
-    # Plot row check
-    plt.clf()
-    plt.title('Coarse alignment check, row of DUT%d against reference DUT' % dut_index)
-    median = np.median(row_1 - row_0)
-    std = np.std(row_1 - row_0)
-    y, _, _ = plt.hist(row_1 - row_0, bins=100, range=(-2 * std, 2 * std), label='Data')
-    plt.plot([median, median], [0, y.max()], label='Median %1.2f um' % median)
-    plt.plot([median - corr_x, median - corr_x], [0, y.max()], '--', color='red', label='68 % of the data')
-    plt.plot([median + corr_x, median + corr_x], [0, y.max()], '--', color='red')
-    plt.grid()
-    plt.xlabel('Difference [um]')
-    plt.ylabel('#')
-    plt.yscale('log')
-    plt.legend(loc=0)
-    output_pdf.savefig()
-
-
 def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, non_interactive=False):
     '''PLots the correlation and lets the user cut on the data in an interactive way.
 
@@ -610,51 +577,6 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 output_pdf.savefig()
 
 
-def plot_hit_alignment(title, difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100):
-    plt.clf()
-    plt.hist(difference, bins=bins, range=(-1. / 100. * np.amax(particles[:][ref_dut_column]) / 1., 1. / 100. * np.amax(particles[:][ref_dut_column]) / 1.))
-    try:
-        plt.yscale('log')
-    except ValueError:
-        pass
-    plt.xlabel('%s - %s' % (ref_dut_column, table_column))
-    plt.ylabel('#')
-    plt.title(title)
-    plt.grid()
-    plt.plot([actual_median, actual_median], [0, plt.ylim()[1]], '-', linewidth=2.0, label='Median %1.1f' % actual_median)
-    plt.plot([actual_mean, actual_mean], [0, plt.ylim()[1]], '-', linewidth=2.0, label='Mean %1.1f' % actual_mean)
-    plt.legend(loc=0)
-    output_fig.savefig()
-
-
-def plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig):
-    plt.clf()
-    plt.xlabel('Hits')
-    plt.ylabel('Offset')
-    plt.grid()
-    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), median, linewidth=2.0, label='Median')
-    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), mean, linewidth=2.0, label='Mean')
-    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), correlation, linewidth=2.0, label='Alignment')
-    plt.legend(loc=0)
-    output_fig.savefig()
-
-
-def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, dut_index, output_fig):
-    plt.clf()
-    plt.plot([dut_z_col.x, dut_z_col.x], [0., 1.], "--", label="DUT%d, col, z=%1.4f" % (dut_index, dut_z_col.x))
-    plt.plot([dut_z_row.x, dut_z_row.x], [0., 1.], "--", label="DUT%d, row, z=%1.4f" % (dut_index, dut_z_row.x))
-    plt.plot(z, dut_z_col_pos_errors / np.amax(dut_z_col_pos_errors), "-", label="DUT%d, column" % dut_index)
-    plt.plot(z, dut_z_row_pos_errors / np.amax(dut_z_row_pos_errors), "-", label="DUT%d, row" % dut_index)
-    plt.grid()
-    plt.legend(loc=1)
-    plt.ylim((np.amin(dut_z_col_pos_errors / np.amax(dut_z_col_pos_errors)), 1.))
-    plt.xlabel('Relative z-position')
-    plt.ylabel('Mean squared offset [a.u.]')
-    plt.gca().set_yscale('log')
-    plt.gca().get_yaxis().set_ticks([])
-    output_fig.savefig()
-
-
 def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_pdf=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
@@ -786,26 +708,6 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
             output_fig.savefig()
         elif output_fig is True:
             plt.show()
-
-
-def plot_position_residuals(hist, xedges, yedges, x, y, x_label, y_label, title=None, yerr=None, output_fig=None, fit=None):  # Plot the residuals as a function of the position
-    plt.clf()
-    plt.grid()
-    if title:
-        plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.imshow(np.ma.masked_equal(hist, 0).T, origin='low', aspect='auto', interpolation='none', extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]], label='Residual')
-    plt.plot(x, y, 'go', linewidth=2, label='Median residual')
-    if fit is not None:
-        axis = plt.gca()
-        x_lim = np.array(axis.get_xlim(), dtype=np.float)
-        plt.plot(x_lim, testbeam_analysis.tools.analysis_utils.linear(x_lim, *fit[0]), linestyle='-', color="darkorange", linewidth=2, label='Mean residual fit\n%.2e + %.2e x' % (fit[0][0], fit[0][1]))
-    plt.legend(loc=0)
-    if output_fig:
-        output_fig.savefig()
-    elif output_fig is None:
-        plt.show()
 
 
 def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, output_fig=None, fit=None, cov=None):  # Plot the residuals as a function of the position
