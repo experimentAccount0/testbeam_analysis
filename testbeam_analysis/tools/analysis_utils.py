@@ -821,23 +821,6 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
     return alpha, beta, gamma
 
 
-def fit_residuals(positions, residuals, n_bins):
-    ''' Takes unhistogrammed residuals as a function of the position, histograms and fits these with errors'''
-    # calculating the data points
-    hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
-    # selecting data points to be included into fit
-    hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins)
-    n_hits_threshold = np.percentile(hist_position_residual_count[0], 100 - 68.3)  # Simple threshold, take bins with 1 sigma of the data
-    selection = np.logical_and(hist_position_residual_count[0] >= n_hits_threshold, np.isfinite(hist_position_residual[0]))
-    position_residual_fit_x = hist_position_residual[1][:-1][selection]
-    position_residual_fit_y = hist_position_residual[0][selection]
-    position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
-
-    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(linear, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
-
-    return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
-
-
 def fit_residuals(hist, edges, label="", title="", output_fig=None):
     bin_center = (edges[1:] + edges[:-1]) / 2.0
     hist_mean = get_mean_from_histogram(hist, bin_center)
