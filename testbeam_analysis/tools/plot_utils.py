@@ -655,26 +655,23 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     chi2s = chi2s[np.isfinite(chi2s)]
     try:
         # Plot up to 3 sigma of the chi2 range
-        limit_x = np.ceil(np.percentile(chi2s, q=99.73))
+        x_limits = [np.ceil(np.percentile(chi2s, q=99.73))]
     except IndexError:  # array empty
-        limit_x = 1
-    plt.hist(chi2s, bins=100, range=(0, limit_x))
-    plt.xlim(0, limit_x)
-    plt.grid()
-    plt.xlabel('Track Chi2 [um*um]')
-    plt.ylabel('#')
-    plt.yscale('log')
-    plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
-    output_fig.savefig()
-    plt.clf()
-    plt.hist(chi2s, bins=100, range=(0, 5000))
-    plt.xlim(0, 5000)
-    plt.grid()
-    plt.xlabel('Track Chi2 [um*um]')
-    plt.ylabel('#')
-    plt.yscale('log')
-    plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
-    output_fig.savefig()
+        x_limits = [1]
+    x_limits.append(2500)  # plot fixed narrow range
+    for x_limit in x_limits:
+        plt.clf()
+        plt.hist(chi2s, bins=100, range=(0, limit_x))
+        plt.xlim(0, limit_x)
+        plt.grid()
+        plt.xlabel('Track Chi2 [um*um]')
+        plt.ylabel('#')
+        plt.yscale('log')
+        plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
+        if isinstance(output_fig, PdfPages):
+            output_fig.savefig()
+        elif output_pdf is True:
+            plt.show()
 
 
 def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig=None):
