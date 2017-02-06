@@ -1040,7 +1040,6 @@ def plot_track_angle(input_track_slopes, output_data, output_pdf, use_n_duts, n_
 
                 output_data['mean_slope_%s' % direction[j]][i] = fit[1]
                 output_data['sigma_slope_%s' % direction[j]][i] = fit[2]
-                print fit[1], fit[2]
                 plt.title('Angular Distribution of Fitted Tracks for DUT%i' % i)
                 plt.ylabel('#')
                 plt.xlabel('Track angle in %s-direction / rad' % direction[j])
