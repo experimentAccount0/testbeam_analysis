@@ -10,6 +10,7 @@ import tables as tb
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import binned_statistic_2d
+from scipy.optimize import curve_fit
 
 from testbeam_analysis.tools import plot_utils
 from testbeam_analysis.tools import geometry_utils
@@ -856,55 +857,95 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     return efficiencies, pass_tracks, total_tracks
 
 
-def histogram_track_angle(input_tracks_file, output_track_angle_file, n_bins, use_duts=None, output_pdf=None, chunk_size=499999):
+def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bins=100, plot_range=((-0.01, +0.01), (-0.01, +0.01)), use_duts=None, dut_names=None, plot=True, chunk_size=499999):
     '''Calculates and histograms the track angle of the fitted tracks for selected DUTs.
+
     Parameters
     ----------
     input_tracks_file : string
-        file name with the tracks table
+        Filename of the input tracks file.
     output_track_angle_file: string
-        output pytables file with fitted means and sigmas of track angles for selected DUTs
+        Filename of the output track angle file with track angle histogram and fitted means and sigmas of track angles for selected DUTs.
+        If None, deduce filename from input tracks file.
+    n_bins : uint
+        Number of bins for the histogram.
+    plot_range : iterable of tuples
+        Tuple of the plot range in rad for alpha and beta angular distribution, e.g. ((-0.01, +0.01), -0.01, +0.01)).
     use_duts : iterable
-        The duts to plot/calculate the track angle. If None all duts in the input_tracks_file are used
-    n_bins: int
-        number of bins for track angle histogram
-    output_pdf : string
-        file name for the output pdf
-    chunk_size : integer
-        The size of data in RAM
+        Calculate the track angle for given DUTs. If None, all duts are used.
+    dut_names : iterable
+        Name of the DUTs. If None, DUT numbers will be used.
+    plot : bool
+        If True, create additional output plots.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
-    logging.info('=== Calculate track angles ===')
+    logging.info('=== Calculating track angles ===')
 
-    slopes = {}  # initialize dict for track slopes
+    if output_track_angle_file is None:
+        output_track_angle_file = os.path.splitext(input_tracks_file)[0] + '_track_angles.h5'
+
+    x_angle_hist = None
+    y_angle_hist = None
     with tb.open_file(input_tracks_file, 'r') as in_file_h5:
-        n_duts = len(in_file_h5.list_nodes("/"))  # determine number of DUTs
+        with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
+            n_duts = len(in_file_h5.list_nodes("/"))  # determine number of max DUTs
 
-        if use_duts is None:
-            use_duts = range(n_duts)
-        else:
-            use_duts = use_duts
-        dut_index = [('Tracks_DUT_%i' % i) for i in use_duts]
+            if use_duts is None:
+                use_duts = range(n_duts)
+            else:
+                use_duts = use_duts
 
-        slope_0_temp = np.array([])
-        slope_1_temp = np.array([])
-        for node in in_file_h5.root:  # loop through all DUTs in track table
-            if node.name in dut_index:
+            for node in in_file_h5.root:  # loop through all DUTs in track table
+                actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                if use_duts and actual_dut not in use_duts:
+                    continue
+
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # only store track slopes of selected DUTs
-                    slope_0_chunk = tracks_chunk['slope_0']
-                    slope_1_chunk = tracks_chunk['slope_1']
-                    slope_0_temp = np.concatenate((slope_0_temp, slope_0_chunk))
-                    slope_1_temp = np.concatenate((slope_1_temp, slope_1_chunk))
-                    slopes.update({node.name: [slope_0_temp,
-                                               slope_1_temp]})
-                slope_0_temp = np.array([])  # reset array for next DUT
-                slope_1_temp = np.array([])  # reset array for next DUT
+                    if x_angle_hist is None:
+                        x_angle_hist, x_angle_hist_edges = np.histogram(np.arctan(tracks_chunk['slope_0']), bins=n_bins, range=plot_range[0])
+                    else:
+                        x_angle_hist += np.histogram(np.arctan(tracks_chunk['slope_0']), bins=n_bins, range=plot_range[0])[0]
+                    if y_angle_hist is None:
+                        y_angle_hist, y_angle_hist_edges = np.histogram(np.arctan(tracks_chunk['slope_1']), bins=n_bins, range=plot_range[1])
+                    else:
+                        y_angle_hist += np.histogram(np.arctan(tracks_chunk['slope_1']), bins=n_bins, range=plot_range[1])[0]
 
-    result = np.zeros(shape=(n_duts,), dtype=[('mean_slope_x', np.float), ('mean_slope_y', np.float), ('sigma_slope_x', np.float), ('sigma_slope_y', np.float)])
+                # write results
+                track_angle_x = out_file_h5.create_carray(where=out_file_h5.root,
+                                                          name='Track_Angle_Hist_x_DUT%s' % (actual_dut),
+                                                          title='Track angle distribution in x-direction for DUT%s' % (actual_dut),
+                                                          atom=tb.Atom.from_dtype(x_angle_hist.dtype),
+                                                          shape=x_angle_hist.shape,
+                                                          filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                track_angle_y = out_file_h5.create_carray(where=out_file_h5.root,
+                                                          name='Track_Angle_Hist_y_DUT%s' % (actual_dut),
+                                                          title='Track angle distribution in y-direction for DUT%s' % (actual_dut),
+                                                          atom=tb.Atom.from_dtype(x_angle_hist.dtype),
+                                                          shape=x_angle_hist.shape,
+                                                          filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
-    logging.info('=== Plot track angles ===')
+                # fit histograms for x and y direction
+                bin_center = (x_angle_hist_edges[1:] + x_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(x_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(x_angle_hist, bin_center)
+                fit_x, cov = curve_fit(analysis_utils.gauss, bin_center, x_angle_hist, p0=[np.amax(x_angle_hist), mean, rms])
 
-    plot_utils.plot_track_angle(input_track_slopes=slopes, output_data=result, output_pdf=output_pdf, use_n_duts=len(use_duts), n_bins=n_bins)
+                bin_center = (y_angle_hist_edges[1:] + y_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(y_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(y_angle_hist, bin_center)
+                fit_y, cov = curve_fit(analysis_utils.gauss, bin_center, y_angle_hist, p0=[np.amax(y_angle_hist), mean, rms])
 
-    with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
-        result_table = out_file_h5.create_table(out_file_h5.root, name='TrackAngle', description=result.dtype, title='Fitted means and sigmas for track angles', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-        result_table.append(result)
+                track_angle_x.attrs.edges = x_angle_hist_edges
+                track_angle_x.attrs.amp = fit_x[0]
+                track_angle_x.attrs.mean = fit_x[1]
+                track_angle_x.attrs.sigma = fit_x[2]
+                track_angle_y.attrs.edges = y_angle_hist_edges
+                track_angle_y.attrs.amp = fit_y[0]
+                track_angle_y.attrs.mean = fit_y[1]
+                track_angle_y.attrs.sigma = fit_y[2]
+                track_angle_x[:] = x_angle_hist
+                track_angle_y[:] = y_angle_hist
+
+    if plot:
+        plot_utils.plot_track_angle(input_track_angle_file=output_track_angle_file, output_pdf_file=None, dut_names=dut_names)

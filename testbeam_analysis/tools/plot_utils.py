@@ -1018,32 +1018,49 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         logging.warning('Cannot create efficiency plots, all pixels are masked')
 
 
-def plot_track_angle(input_track_slopes, output_data, output_pdf, use_n_duts, n_bins):
-    direction = ['x', 'y', 'z']
+def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=None):
+    ''' Plot track slopes.
 
-    with PdfPages(output_pdf) as output_fig:
-        for key, i in zip(input_track_slopes, range(use_n_duts)):
-            for j in (0, 1):  # iterate over slope directions
-                min = np.min(input_track_slopes[key][j])
-                max = np.max(input_track_slopes[key][j])
-                edges = np.arange(min, max, np.absolute(max) / n_bins)
+    Parameters
+    ----------
+    input_track_angle_file : string
+        Filename of the track angle file.
+    output_pdf_file: string
+        Filename of the output PDF file.
+        If None, deduce filename from input track angle file.
+    dut_names : iterable of strings
+        Names of the DUTs. If None, the DUT index will be used.
+    '''
+    logging.info('Plotting track angle histogram')
+    if output_pdf_file is None:
+        output_pdf_file = os.path.splitext(input_track_angle_file)[0] + '_track_angle.pdf'
+
+    with PdfPages(output_pdf_file) as output_pdf:
+        with tb.open_file(input_track_angle_file, mode="r") as in_file_h5:
+            for node in in_file_h5.root:
+                actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                if dut_names is not None:
+                    dut_name = dut_names[actual_dut]
+                else:
+                    dut_name = "DUT %d" % actual_dut
+                track_angle_hist = node[:]
+                edges = node._v_attrs.edges * 1000  # conversion to mrad
+                mean = node._v_attrs.mean * 1000  # conversion to mrad
+                sigma = node._v_attrs.sigma * 1000  # conversion to mrad
+                amp = node._v_attrs.amp
                 bin_center = (edges[1:] + edges[:-1]) / 2.0
-
-                sigma = np.std(np.arctan(input_track_slopes[key][j]))  # initial guess for sigma
-                mean = np.mean(np.arctan(input_track_slopes[key][j]))  # initial guess for mean
-
-                histo = plt.hist(np.arctan(input_track_slopes[key][j]), edges, label='Angular Distribution', color='b')
-                fit, cov = curve_fit(testbeam_analysis.tools.analysis_utils.gauss, bin_center, histo[0], p0=[np.amax(histo[0]), mean, sigma])
-
+                plt.bar(bin_center, track_angle_hist, label=('Angular Distribution for %s' % dut_name), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
                 x_gauss = np.arange(np.min(edges), np.max(edges), step=0.00001)
-                plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), color='r', label='Gauss-Fit:\nMean: %.5f,\nSigma: %.5f' % (fit[1], fit[2]))
+                plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, amp, mean, sigma), color='r', label='Gauss-Fit:\nMean: %.5f mrad,\nSigma: %.5f mrad' % (mean, sigma))
 
-                output_data['mean_slope_%s' % direction[j]][i] = fit[1]
-                output_data['sigma_slope_%s' % direction[j]][i] = fit[2]
-                plt.title('Angular Distribution of Fitted Tracks for DUT%i' % i)
                 plt.ylabel('#')
-                plt.xlabel('Track angle in %s-direction / rad' % direction[j])
-                plt.legend(loc='best', fancybox=True, frameon=True)
-
-                output_fig.savefig()
+                if 'x' in node.name:
+                    plt.title('Angular distribution of fitted tracks for %s in X-direction (alpha)' % dut_name)
+                else:
+                    plt.title('Angular distribution of fitted tracks for %s in Y-direction (beta)' % dut_name)
+                plt.xlabel('Track angle [mrad]')
+                plt.legend(loc=1, fancybox=True, frameon=True)
+                plt.grid(True)
+                plt.xlim(min(edges), max(edges))
+                output_pdf.savefig()
                 plt.close()
