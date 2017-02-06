@@ -67,7 +67,7 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
     std = np.ma.std(difference)
     abs_occ_threshold = threshold * std
     occupancy = np.ma.masked_where(difference > abs_occ_threshold, occupancy)
-    logging.info('Removed %d hot pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
+    logging.info('Masked %d pixels at threshold %.1f in %s', np.ma.count_masked(occupancy), threshold, input_hits_file)
     # Generate tuple col / row array of hot pixels, do not use getmask()
     pixel_mask = np.ma.getmaskarray(occupancy)
 
@@ -121,7 +121,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     logging.info('=== Clustering hits in %s ===', input_hits_file)
 
     if output_cluster_file is None:
-        output_cluster_file = os.path.splitext(input_hits_file)[0] + '_cluster.h5'
+        output_cluster_file = os.path.splitext(input_hits_file)[0] + '_clustered.h5'
 
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_cluster_file, 'w') as output_file_h5:
