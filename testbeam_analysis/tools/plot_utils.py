@@ -106,25 +106,25 @@ def plot_noisy_pixels(input_mask_file, pixel_size=None, output_pdf_file=None, du
         plt.close()
 
 
-def plot_cluster_size(input_cluster_file, output_pdf_file=None, dut_name=None, chunk_size=1000000):
+def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, chunk_size=1000000):
     '''Plotting cluster size histogram.
 
     Parameters
     ----------
     input_cluster_file : string
         Filename of the input cluster file.
-    output_pdf_file : string
-        Filename of the output PDF file. If None, the filename is derived from the input file.
     dut_name : string
         Name of the DUT. If None, the filename of the input cluster file will be used.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '.pdf'
-
     if not dut_name:
         dut_name = os.path.split(input_cluster_file)[1]
+
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
@@ -523,15 +523,15 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
         plt.show()
 
 def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
-    '''Takes the correlation histograms and plots them
+    '''Takes the correlation histograms and plots them.
 
     Parameters
     ----------
-    input_correlation_file : pytables file
-        The input file with the correlation histograms.
-    output_pdf_file : pdf file name
+    input_correlation_file : string
+        Filename of the input correlation file.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
-
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_correlation_file)[0] + '.pdf'
 
@@ -570,10 +570,6 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 plt.ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
                 # do not append to axis to preserve aspect ratio
                 plt.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
-#                 divider = make_axes_locatable(plt.gca())
-#                 cax = divider.append_axes("right", size="5%", pad=0.1)
-#                 z_max = np.amax(data)
-#                 plt.colorbar(im, cax=cax, ticks=np.linspace(start=0, stop=z_max, num=9, endpoint=True))
                 output_pdf.savefig()
 
 
@@ -582,14 +578,16 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
 
     Parameters
     ----------
-    input_tracks_file : pytables file with tracks
-    event_range : iterable:
-        (start event number, stop event number(
-    dut : int
-        Take data from this DUT
-    max_chi2 : int
-        Plot only converged fits (cut on chi2)
-    output_pdf : pdf file name
+    input_tracks_file : string
+       Filename of the input tracks file.
+    event_range : iterable
+        Tuple of start event number and stop event number (excluding), e.g. (0, 100).
+    dut : uint
+        Take data from DUT with the given number.
+    max_chi2 : uint
+        Plot events with track chi2 smaller than the gven number.
+    output_pdf_file : string
+        Filename of the output PDF file.
     '''
 
     output_fig = PdfPages(output_pdf) if output_pdf else None
@@ -655,7 +653,6 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
 def plot_track_chi2(chi2s, fit_dut, output_fig):
     # Plot track chi2 and angular distribution
     chi2s = chi2s[np.isfinite(chi2s)]
-    plt.clf()
     try:
         # Plot up to 3 sigma of the chi2 range
         limit_x = np.ceil(np.percentile(chi2s, q=99.73))
@@ -710,7 +707,9 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
             plt.show()
 
 
-def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, output_fig=None, fit=None, cov=None):  # Plot the residuals as a function of the position
+def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, fit=None, cov=None, output_pdf=None):
+    '''Plot the residuals as a function of the position.
+    '''
     plt.clf()
     plt.grid()
     if title:
@@ -738,25 +737,26 @@ def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=No
 
 def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
+
     Parameters
     ----------
     input_tracks_file : string
-        file name with the tracks table
+        Filename of the input tracks file.
     output_pdf : pdf file name object
     z_positions : iterable
-        Iterable with z-positions of all DUTs
-    dim_x, dim_y : integer
-        front end dimensions of device (number of pixel)
+        Iterable with z-positions of all DUTs.
+    dim_x, dim_y : int
+        Number of pixels.
     pixel_size : iterable
-        pixel size (x, y) for every plane
+        Tuple of the pixel size for column and row for every plane, e.g. [[250, 50], [250, 50]].
     mask_zero : bool
-        Mask heatmap entries = 0 for plotting
+        Mask heatmap entries = 0 for plotting.
     use_duts : iterable
-        the duts to plot track density for. If None all duts are used
-    max_chi2 : int
-        only use tracks with a chi2 <= max_chi2
+        DUTs that will be used for plotting. If None, all DUTs are used.
+    max_chi2 : uint
+        Plot events with track chi2 smaller than the gven number.
     '''
-    logging.info('Plot track density')
+    logging.info('Plotting track density')
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
             plot_ref_dut = False
@@ -831,21 +831,22 @@ def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y,
 
 def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
     '''Takes the data and plots the charge distribution for selected DUTs.
+
     Parameters
     ----------
     input_track_candidates_file : string
-        file name with the tracks table
+        Filename of the input track candidates file.
     output_pdf : pdf file name object
-    dim_x, dim_y : integer
-        front end dimensions of device (number of pixel)
+    dim_x, dim_y : int
+        Number of pixels.
     pixel_size : iterable
-        pixel size (x, y) for every plane
+        Tuple of the pixel size for column and row for every plane, e.g. [[250, 50], [250, 50]].
     mask_zero : bool
-        Mask heatmap entries = 0 for plotting
+        Masking heatmap entries = 0 for plotting.
     use_duts : iterable
-        the duts to plot track density for. If None all duts are used
+        DUTs that will be used for plotting. If None, all DUTs are used.
     '''
-    logging.info('Plot charge distribution')
+    logging.info('Plotting charge distribution')
     with PdfPages(output_pdf) as output_fig:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             dimensions = []
@@ -973,4 +974,4 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
         output_fig.savefig()
     else:
-        logging.warning('Cannot create efficiency plots, since all pixels are masked')
+        logging.warning('Cannot create efficiency plots, all pixels are masked')

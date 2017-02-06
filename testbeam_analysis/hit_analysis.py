@@ -18,8 +18,6 @@ from testbeam_analysis.tools.plot_utils import (plot_noisy_pixels,
 def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
     '''Generating pixel mask from the hit table.
 
-    The hit table is read in chunks to reduce the memory footprint.
-
     Parameters
     ----------
     input_hits_file : string
@@ -121,8 +119,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
-
-    logging.info('=== Cluster hits in %s ===', input_hits_file)
+    logging.info('=== Clustering hits in %s ===', input_hits_file)
 
     if output_cluster_file is None:
         output_cluster_file = os.path.splitext(input_hits_file)[0] + '_cluster.h5'

@@ -44,7 +44,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         If false the cluster distance is not considered.
         The events where any plane does have hits < min_cluster_distance is flagged with n_tracks = -1
     '''
-    logging.info('=== Find tracks ===')
+    logging.info('=== Finding tracks ===')
 
     # Get alignment errors from file
     with tb.open_file(input_alignment_file, mode='r') as in_file_h5:
@@ -167,7 +167,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         e.g.: For two devices: min_track_distance = (50, 250)
         If false the track distance is not considered.
     '''
-
     logging.info('=== Fitting tracks ===')
 
     # Load alignment data

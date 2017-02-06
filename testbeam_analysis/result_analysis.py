@@ -4,6 +4,7 @@ from __future__ import division
 import logging
 import re
 from collections import Iterable
+import os.path
 
 import tables as tb
 import numpy as np
@@ -18,26 +19,29 @@ from testbeam_analysis.tools import analysis_utils
 
 def calculate_residuals(input_tracks_file, input_alignment_file, output_residuals_file, n_pixels, pixel_size, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, output_pdf=True, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
+
     Parameters
     ----------
     input_tracks_file : string
-        File name with the tracks table
-    input_alignment_file : pytables file
-        File name of the input aligment data
-    output_residuals_file : pytables file
-        File name of the output file with the residual data
+        Filename of the input tracks file.
+    input_alignment_file : string
+        Filename of the input aligment file.
+    output_residuals_file : string
+        Filename of the output residual file.
     n_pixels : iterable of tuples
         One tuple per DUT describing the number of pixels in column, row direction
         e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension in um in column, row direction
         e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]
+    dut_names : iterable
+        Name of the DUTs. If None, DUT numbers will be used.
     use_duts : iterable
         The duts to calculate residuals for. If None all duts in the input_tracks_file are used
-    max_chi2 : int, iterable, None
+    max_chi2 : uint, iterable
         Use only not heavily scattered tracks to increase track pointing resolution (cut on chi2).
         Cut can be a number and is used then for all DUTS or a list with a chi 2 cut for each DUT.
-        If None no cut is applied.
+        If None, no cut is applied.
     nbins_per_pixel : int
         Number of bins per pixel along the residual axis. Number is a positive integer or None to automatically set the binning.
     npixels_per_bin : int
@@ -50,11 +54,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         Set to False to not create plots, saves a lot of time.
     chunk_size : integer
         The size of data in RAM
-    Returns
-    -------
-    A list of residuals in column row. e.g.: [Col residual DUT 0, Row residual DUT 0, Col residual DUT 1, Row residual DUT 1, ...]
     '''
-    logging.info('=== Calculate residuals ===')
+    logging.info('=== Calculating residuals ===')
 
     use_prealignment = True if force_prealignment else False
 
@@ -83,7 +84,6 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
         output_fig = output_pdf  # output_fig is PDFpages object
         close_pdf = False  # Externally handled object do not close it
 
-    residuals = []
 
     if not isinstance(max_chi2, Iterable):
         max_chi2 = [max_chi2] * n_duts
@@ -624,36 +624,40 @@ def calculate_residuals(input_tracks_file, input_alignment_file, output_residual
 
 def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bin_size, sensor_size, pixel_size=None, n_pixels=None, minimum_track_density=1, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, chunk_size=1000000):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
+
     Parameters
     ----------
     input_tracks_file : string
-        file name with the tracks table
-    input_alignment_file : pytables file
-        File name of the input aligment data
-    output_pdf : pdf file name object
+        Filename of the input tracks file.
+    input_alignment_file : string
+        Filename of the input alignment file.
     bin_size : iterable
-        sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
+        Sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes.
     sensor_size : Tuple or list of tuples
         Describes the sensor size for each DUT. If one tuple is given it is (size x, size y)
         If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...]
+    output_efficiency_file : string
+        Filename of the output efficiency file.
     minimum_track_density : int
-        minimum track density required to consider bin for efficiency calculation
+        Minimum track density required to consider bin for efficiency calculation.
     use_duts : iterable
-        the DUTs to calculate efficiency for. If None all duts are used
-    max_chi2 : int
-        only use track with a chi2 <= max_chi2
-    force_prealignment : boolean
-        Take the prealignment, although if a coarse alignment is availale
+        Calculate the efficiency for selected DUTs. If None, all duts are selected.
+    max_chi2 : uint
+        Only use tracks with a chi2 <= max_chi2.
+    force_prealignment : bool
+        Take the prealignment, although if a coarse alignment is availale.
     cut_distance : int
-        use only distances (between DUT hit and track hit) smaller than cut_distance
+        Use only distances (between DUT hit and track hit) smaller than cut_distance.
     max_distance : int
-        defines binnig of distance values
+        Defines binnig of distance values.
     col_range, row_range : iterable
-        column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation)
-    chunk_size : integer
-        The size of data in RAM
+        Column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).
+    plot : bool
+        If True, create additional output plots.
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
-    logging.info('=== Calculate efficiency ===')
+    logging.info('=== Calculating efficiency ===')
 
     use_prealignment = True if force_prealignment else False
 
