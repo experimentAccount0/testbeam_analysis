@@ -670,7 +670,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, output_pdf, bi
                 logging.info('Use alignment data')
             except tb.exceptions.NodeError:
                 use_prealignment = True
-                logging.info('Use prealignment data')
+                logging.info('Use pre-alignment data')
 
     if not isinstance(max_chi2, Iterable):
         max_chi2 = [max_chi2] * n_duts
