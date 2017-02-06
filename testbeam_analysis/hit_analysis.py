@@ -11,8 +11,7 @@ from scipy.ndimage import median_filter
 
 from pixel_clusterizer.clusterizer import HitClusterizer
 from testbeam_analysis.tools import analysis_utils
-from testbeam_analysis.tools.plot_utils import (plot_noisy_pixels,
-                                                plot_cluster_size)
+from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size
 
 
 def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMask", output_mask_file=None, pixel_size=None, threshold=10.0, filter_size=3, dut_name=None, plot=True, chunk_size=1000000):
@@ -82,7 +81,7 @@ def generate_pixel_mask(input_hits_file, n_pixel, pixel_mask_name="NoisyPixelMas
         masked_pixel_table[:] = pixel_mask
 
     if plot:
-        plot_noisy_pixels(input_mask_file=output_mask_file, pixel_size=pixel_size, dut_name=dut_name)
+        plot_masked_pixels(input_mask_file=output_mask_file, pixel_size=pixel_size, dut_name=dut_name)
 
     return output_mask_file
 

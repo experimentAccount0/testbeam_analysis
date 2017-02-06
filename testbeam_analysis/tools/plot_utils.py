@@ -44,7 +44,7 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), fraction=0.04, pad=0.05)
 
 
-def plot_noisy_pixels(input_mask_file, pixel_size=None, output_pdf_file=None, dut_name=None):
+def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_pdf_file=None):
     with tb.open_file(input_mask_file, 'r') as input_file_h5:
         try:
             noisy_pixels = np.dstack(np.nonzero(input_file_h5.root.NoisyPixelMask[:].T))[0]
@@ -61,11 +61,11 @@ def plot_noisy_pixels(input_mask_file, pixel_size=None, output_pdf_file=None, du
     else:
         aspect = "auto"
 
-    if output_pdf_file is None:
-        output_pdf_file = os.path.splitext(input_mask_file)[0] + '.pdf'
-
     if dut_name is None:
         dut_name = os.path.split(input_mask_file)[1]
+
+    if output_pdf_file is None:
+        output_pdf_file = os.path.splitext(input_mask_file)[0] + '.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         cmap = cm.get_cmap('viridis')
