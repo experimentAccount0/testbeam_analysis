@@ -48,12 +48,16 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
     with tb.open_file(input_mask_file, 'r') as input_file_h5:
         try:
             noisy_pixels = np.dstack(np.nonzero(input_file_h5.root.NoisyPixelMask[:].T))[0]
+            n_noisy_pixels = np.count_nonzero(input_file_h5.root.NoisyPixelMask[:])
         except tb.NodeError:
             noisy_pixels = None
+            n_noisy_pixels = 0
         try:
             disabled_pixels = np.dstack(np.nonzero(input_file_h5.root.DisabledPixelMask[:].T))[0]
+            n_disabled_pixels = np.count_nonzero(input_file_h5.root.DisabledPixelMask[:])
         except tb.NodeError:
             disabled_pixels = None
+            n_disabled_pixels = 0
         occupancy = input_file_h5.root.HistOcc[:].T
 
     if pixel_size:
@@ -80,11 +84,11 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         # plot noisy pixels
         if noisy_pixels is not None:
             ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10)
-            ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (np.count_nonzero(noisy_pixels), ))
+            ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (n_noisy_pixels,))
         # plot disabled pixels
         if disabled_pixels is not None:
             ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
-            ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (np.count_nonzero(disabled_pixels), ))
+            ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
