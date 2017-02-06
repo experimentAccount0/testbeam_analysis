@@ -600,7 +600,7 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
     if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_events.pdf'
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_events.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_tracks_file, "r") as in_file_h5:
@@ -859,7 +859,7 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
     '''
     logging.info('Plotting charge distribution')
     if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_charge_distribution.pdf'
+        output_pdf_file = os.path.splitext(input_track_candidates_file)[0] + '_charge_distribution.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
