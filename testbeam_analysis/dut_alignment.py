@@ -460,7 +460,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                                  prefix=table_prefix,
                                                  output_pdf=output_pdf)
 
-        logging.info('Store pre alignment data in %s', output_alignment_file)
+        logging.info('Store pre-alignment data in %s', output_alignment_file)
         with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
             try:
                 result_table = out_file_h5.create_table(out_file_h5.root, name='PreAlignment', description=result.dtype, title='Prealignment alignment from correlation', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
