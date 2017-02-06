@@ -987,7 +987,8 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
                        selection_fit_duts=selection_fit_duts,  # Only use selected duts
                        selection_hit_duts=selection_hit_duts,
                        exclude_dut_hit=True,  # For unconstrained residuals
-                       selection_track_quality=selection_track_quality)
+                       selection_track_quality=selection_track_quality,
+                       chunk_size=chunk_size)
             calculate_residuals(input_tracks_file=track_candidates_file[:-3] + '_tracks_final_tmp_%d.h5' % alignment_index,
                                 input_alignment_file=alignment_file,
                                 output_residuals_file=track_candidates_file[:-3] + '_residuals_final_tmp_%d.h5' % alignment_index,
@@ -1032,7 +1033,8 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
                    selection_hit_duts=selection_hit_duts,  # Only use selected duts
                    exclude_dut_hit=False,  # For constrained residuals
                    selection_track_quality=selection_track_quality,
-                   force_prealignment=False)
+                   force_prealignment=False,
+                   chunk_size=chunk_size)
 
         # Step 3: Calculate the residuals for each DUT
         logging.info('= Alignment step 3 / iteration %d: Calculate the residuals for each selected DUT =', iteration)
@@ -1042,9 +1044,9 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
                             n_pixels=n_pixels,
                             pixel_size=pixel_size,
                             output_pdf=False,
-                            chunk_size=chunk_size,
                             npixels_per_bin=5 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
-                            nbins_per_pixel=1 if (iteration in [0, 1, 2]) else None)  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
+                            nbins_per_pixel=1 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
+                            chunk_size=chunk_size)
 
         # Step 4: Deduce rotations from the residuals
         logging.info('= Alignment step 4 / iteration %d: Deduce rotations and translations from the residuals =', iteration)
