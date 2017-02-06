@@ -34,7 +34,7 @@ def combine_hit_files(hit_files, combined_file, event_number_offsets=None,
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
-
+    last_event_number = 0
     used_event_number_offsets = []
     with tb.open_file(combined_file, mode="w") as out_file:
         hits_out = out_file.create_table(out_file.root, name='Hits',
