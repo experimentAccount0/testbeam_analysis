@@ -665,8 +665,8 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
     x_limits.append(2500)  # plot fixed narrow range
     for x_limit in x_limits:
         plt.clf()
-        plt.hist(chi2s, bins=100, range=(0, limit_x))
-        plt.xlim(0, limit_x)
+        plt.hist(chi2s, bins=100, range=(0, x_limit))
+        plt.xlim(0, x_limit)
         plt.grid()
         plt.xlabel('Track Chi2 [um*um]')
         plt.ylabel('#')
