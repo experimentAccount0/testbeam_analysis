@@ -821,7 +821,7 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
     return alpha, beta, gamma
 
 
-def fit_residuals(hist, edges, label="", title="", output_fig=None):
+def fit_residuals(hist, edges, label="", title="", output_pdf=None):
     bin_center = (edges[1:] + edges[:-1]) / 2.0
     hist_mean = get_mean_from_histogram(hist, bin_center)
     hist_std = get_rms_from_histogram(hist, bin_center)
@@ -830,21 +830,20 @@ def fit_residuals(hist, edges, label="", title="", output_fig=None):
     except RuntimeError:
         fit, cov = [np.amax(hist), hist_mean, hist_std], np.full((3, 3), np.nan)
 
-    if output_fig is not None:
-        testbeam_analysis.tools.plot_utils.plot_residuals(
-            histogram=hist,
-            edges=edges,
-            fit=fit,
-            fit_errors=cov,
-            x_label=label,
-            title=title,
-            output_fig=output_fig
-        )
+    testbeam_analysis.tools.plot_utils.plot_residuals(
+        histogram=hist,
+        edges=edges,
+        fit=fit,
+        fit_errors=cov,
+        x_label=label,
+        title=title,
+        output_pdf=output_pdf
+    )
 
     return fit, cov
 
 
-def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_fig=None):
+def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_pdf=None):
     xcenter = (xedges[1:] + xedges[:-1]) / 2.0
     ycenter = (yedges[1:] + yedges[:-1]) / 2.0
     y_sum = np.sum(hist, axis=1)
@@ -857,21 +856,20 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
     y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
     fit, cov = curve_fit(linear, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
 
-    if output_fig is not False:
-        testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(
-            hist,
-            xedges=xedges,
-            yedges=yedges,
-            xlabel=xlabel,
-            ylabel=ylabel,
-            res_mean=y_mean,
-            res_pos=xcenter,
-            selection=x_sel,
-            fit=fit,
-            cov=cov,
-            title=title,
-            output_fig=output_fig
-        )
+    testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(
+        hist,
+        xedges=xedges,
+        yedges=yedges,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        res_mean=y_mean,
+        res_pos=xcenter,
+        selection=x_sel,
+        fit=fit,
+        cov=cov,
+        title=title,
+        output_pdf=output_pdf
+    )
 
     return fit, cov
 

@@ -28,9 +28,10 @@ class TestResultAnalysis(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):  # remove created files
-        pass
-#         os.remove(os.path.join(cls.output_folder, 'Efficiency.pdf'))
-#         os.remove(os.path.join(cls.output_folder, 'Residuals.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Efficiency.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Efficiency.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Residuals.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Residuals.pdf'))
 
     @unittest.SkipTest
     def test_residuals_calculation(self):
@@ -49,7 +50,7 @@ class TestResultAnalysis(unittest.TestCase):
     @unittest.SkipTest
     def test_efficiency_calculation(self):
         efficiencies = result_analysis.calculate_efficiency(tracks_file=os.path.join(self.output_folder, 'Tracks_result.h5'),
-                                                            output_pdf=os.path.join(self.output_folder, r'Efficiency.pdf'),
+                                                            output_efficiency_file=os.path.join(self.output_folder, 'Efficiency.h5'),
                                                             z_positions=self.z_positions,
                                                             bin_size=(250, 50),
                                                             minimum_track_density=2,

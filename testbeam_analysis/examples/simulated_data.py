@@ -94,10 +94,13 @@ def run_analysis(n_events):
     pool.close()
     pool.join()
 
+    # Generate filenames for cluster data
+    input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
+                           for data_file in data_files]
+
     # Correlate the row / column of each DUT
     dut_alignment.correlate_cluster(
-        input_cluster_files=[data_file[:-3] + '_cluster.h5'
-                             for data_file in data_files],
+        input_cluster_files=input_cluster_files,
         output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
         n_pixels=sim.dut_n_pixel,
         pixel_size=sim.dut_pixel_size)
@@ -120,8 +123,7 @@ def run_analysis(n_events):
     # Correct all DUT hits via alignment information and merge the cluster
     # tables to one tracklets table aligned at the event number
     dut_alignment.merge_cluster_data(
-        input_cluster_files=[data_file[:-3] + '_cluster.h5'
-                             for data_file in data_files],
+        input_cluster_files=input_cluster_files,
         output_merged_file=os.path.join(output_folder, 'Merged.h5'),
         n_pixels=sim.dut_n_pixel,
         pixel_size=sim.dut_pixel_size)
@@ -163,8 +165,7 @@ def run_analysis(n_events):
     result_analysis.calculate_efficiency(
         input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_file=os.path.join(output_folder, 'Efficiency.h5'),
-        output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
+        output_efficiency_file=os.path.join(output_folder, 'Efficiency.h5'),
         bin_size=[(250, 50)],
         sensor_size=[(250. * 80, 50. * 336)],
         minimum_track_density=2,

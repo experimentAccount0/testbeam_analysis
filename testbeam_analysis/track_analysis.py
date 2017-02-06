@@ -345,7 +345,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         tracklets_table.append(tracks_array)
 
         # Plot chi2 distribution
-        plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
+        plot_utils.plot_track_chi2(chi2s=chi2s, fit_dut=fit_dut, output_pdf=output_pdf)
 
     def select_data(dut_index):  # Select track by and DUT hits to use
 
@@ -379,7 +379,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         return dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts
 
     pool = Pool()
-    with PdfPages(output_tracks_file[:-3] + '.pdf') as output_fig:
+    with PdfPages(os.path.splitext(output_tracks_file)[0] + '.pdf') as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             try:  # If file exists already delete it first
                 os.remove(output_tracks_file)

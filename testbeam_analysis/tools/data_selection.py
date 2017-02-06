@@ -1,10 +1,12 @@
 ''' Helper functions to select and combine data '''
+import logging
+import re
+import os
+
+import progressbar
 import numpy as np
 import tables as tb
 import numexpr as ne
-import re
-import logging
-import progressbar
 from numba import njit
 
 from testbeam_analysis.tools import analysis_utils
@@ -88,7 +90,7 @@ def reduce_hit_files(hit_files, fraction=10, chunk_size=10000000):
 
     for hit_file in hit_files:
         with tb.open_file(hit_file, mode='r') as in_file:
-            with tb.open_file(hit_file[:-3] +
+            with tb.open_file(os.path.splitext(hit_file)[0] +
                               '_reduced.h5', mode="w") as out_file:
                 filters = tb.Filters(complib='blosc', complevel=5,
                                      fletcher32=False)
@@ -125,7 +127,7 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None,
 
     with tb.open_file(hit_file, mode='r') as in_file:
         if not output_file:
-            output_file = hit_file[:-3] + '_reduced.h5'
+            output_file = os.path.splitext(hit_file)[0] + '_reduced.h5'
         with tb.open_file(output_file, mode="w") as out_file:
             for node in in_file.root:
                 total_hits = node.shape[0]

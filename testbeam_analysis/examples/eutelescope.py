@@ -55,8 +55,8 @@ def run_analysis():
         os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
 
     # The location of the example data files, one file per DUT
-    data_files = [(os.path.join(tests_data_folder,
-                                'TestBeamData_Mimosa26_DUT%d' % i + '.h5'))
+    data_files = [os.path.join(tests_data_folder,
+                               'TestBeamData_Mimosa26_DUT%d.h5' % i)
                   for i in range(6)]
 
     # Pixel dimesions and matrix size of the DUTs
@@ -95,7 +95,7 @@ def run_analysis():
     # A pool of workers to cluster hits for all files in parallel
     kwargs = [{
         'input_hits_file': data_files[i],
-        'input_noisy_pixel_mask_file': data_files[i][:-3] + '_noisy_pixel_mask.h5',
+        'input_noisy_pixel_mask_file': os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
         'min_hit_charge': 0,
         'max_hit_charge': 1,
         'column_cluster_distance': 3,
@@ -108,9 +108,11 @@ def run_analysis():
     pool.close()
     pool.join()
 
-    # Correlate the row / column of each DUT
-    input_cluster_files = [data_file[:-3] + '_cluster.h5'
+    # Generate filenames for cluster data
+    input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
                            for data_file in data_files]
+
+    # Correlate the row / column of each DUT
     dut_alignment.correlate_cluster(input_cluster_files=input_cluster_files,
                                     output_correlation_file=os.path.join(
                                         output_folder, 'Correlation.h5'),
@@ -134,8 +136,6 @@ def run_analysis():
                                non_interactive=True)
 
     # Merge the cluster tables to one merged table aligned at the event number
-    input_cluster_files = [data_file[:-3] + '_cluster.h5'
-                           for data_file in data_files]
     dut_alignment.merge_cluster_data(input_cluster_files=input_cluster_files,
                                      output_merged_file=os.path.join(
                                          output_folder, 'Merged.h5'),

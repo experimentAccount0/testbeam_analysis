@@ -71,7 +71,7 @@ def run_analysis():
     frame_cluster_distance = [0, 0, 0, 0, 0, 0, 0, 0]
     kwargs = [{
         'input_hits_file': data_files[i],
-        'input_noisy_pixel_mask_file': data_files[i][:-3] + '_noisy_pixel_mask.h5',
+        'input_noisy_pixel_mask_file': os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
         'min_hit_charge': 0,
         'max_hit_charge': 13,
         'column_cluster_distance': column_cluster_distance[i],
@@ -84,8 +84,12 @@ def run_analysis():
     pool.close()
     pool.join()
 
+    # Generate filenames for cluster data
+    input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
+                           for data_file in data_files]
+
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+    dut_alignment.correlate_cluster(input_cluster_files=input_cluster_files,
                                     output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                     n_pixels=n_pixels,
                                     pixel_size=pixel_size,
@@ -101,7 +105,7 @@ def run_analysis():
                                non_interactive=False)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Merge the cluster tables to one merged table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+    dut_alignment.merge_cluster_data(input_cluster_files=input_cluster_files,
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=pixel_size)
 
@@ -194,7 +198,7 @@ def run_analysis():
     # Calculate efficiency with aligned data
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                         output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
+                                         output_efficiency_file=os.path.join(output_folder, 'Efficiency.h5'),
                                          bin_size=(10, 10),
                                          use_duts=[3],
                                          sensor_size=[(20000, 10000),
@@ -225,7 +229,7 @@ def run_analysis():
     # Create efficiency plot with prealigned data
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks_prealignment.h5'),
                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                         output_pdf=os.path.join(output_folder, 'Efficiency_prealignment.pdf'),
+                                         output_efficiency_file=os.path.join(output_folder, 'Efficiency_prealignment.h5'),
                                          force_prealignment=True,
                                          bin_size=(10, 10),
                                          use_duts=[3],

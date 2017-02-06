@@ -69,7 +69,7 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         dut_name = os.path.split(input_mask_file)[1]
 
     if output_pdf_file is None:
-        output_pdf_file = os.path.splitext(input_mask_file)[0] + '.pdf'
+        output_pdf_file = os.path.splitext(input_mask_file)[0] + '_masked_pixels.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         cmap = cm.get_cmap('viridis')
@@ -128,7 +128,7 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
         dut_name = os.path.split(input_cluster_file)[1]
 
     if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '.pdf'
+        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '_cluster_size.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
@@ -165,7 +165,9 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
         plt.xlim(0.5, min(10, max_cluster_size) + 0.5)
         output_pdf.savefig()
 
-def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf):
+def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf=None):
+    if not output_pdf:
+        return
     plt.clf()
     plt.plot(x, y, 'r.-', label='Data')
     plt.plot(x_fit, y_fit, 'g-', linewidth=2, label='Fit: %s' % fit_label)
@@ -175,9 +177,9 @@ def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pd
     plt.xlim((np.min(x), np.max(x)))
     plt.grid()
     plt.legend(loc=0)
-    if output_pdf:
+    if isinstance(output_pdf, PdfPages):
         output_pdf.savefig()
-    else:
+    elif output_pdf is True:
         plt.show()
 
 
@@ -445,7 +447,9 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
+def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf=None):
+    if not output_pdf:
+        return
     plt.clf()
     fig = plt.gcf()
     ax1 = fig.add_subplot(1, 1, 1)
@@ -483,13 +487,15 @@ def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_er
     # put ax in front of ax2
     ax1.set_zorder(ax2.get_zorder() + 1)
     ax1.patch.set_visible(False)  # hide the canvas
-    if output_pdf:
+    if isinstance(output_pdf, PdfPages):
         output_pdf.savefig()
-    else:
+    elif output_pdf is True:
         plt.show()
 
 
-def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf):
+def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf=None):
+    if not output_pdf:
+        return
     capital_prefix = prefix
     if prefix:
         capital_prefix = prefix.title()
@@ -507,9 +513,9 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     plt.title("Accumulator plot of %s correlations: %s vs. %s" % (prefix, ref_name, dut_name))
     ax.set_xlabel(r'$\theta$ [degree]')
     ax.set_ylabel(r'$\rho$ [um]')
-    if output_pdf:
+    if isinstance(output_pdf, PdfPages):
         output_pdf.savefig()
-    else:
+    elif output_pdf is True:
         plt.show()
     plt.clf()
     fig = plt.gcf()
@@ -521,9 +527,9 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     ax.set_xlabel("%s %s" % (capital_prefix, dut_name))
     ax.set_ylabel("%s %s" % (capital_prefix, ref_name))
     ax.legend(loc=0)
-    if output_pdf:
+    if isinstance(output_pdf, PdfPages):
         output_pdf.savefig()
-    else:
+    elif output_pdf is True:
         plt.show()
 
 def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
@@ -537,7 +543,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
     if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_correlation_file)[0] + '.pdf'
+        output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_correlation.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
@@ -577,7 +583,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 output_pdf.savefig()
 
 
-def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_pdf=None):
+def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_file=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -591,70 +597,65 @@ def plot_events(input_tracks_file, event_range, dut=None, max_chi2=None, output_
     max_chi2 : uint
         Plot events with track chi2 smaller than the gven number.
     output_pdf_file : string
-        Filename of the output PDF file.
+        Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_events.pdf'
 
-    output_fig = PdfPages(output_pdf) if output_pdf else None
+    with PdfPages(output_pdf_file) as output_pdf:
+        with tb.open_file(input_tracks_file, "r") as in_file_h5:
+            fitted_tracks = False
+            try:  # data has track candidates
+                table = in_file_h5.root.TrackCandidates
+            except tb.NoSuchNodeError:  # data has fitted tracks
+                table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % dut)
+                fitted_tracks = True
 
-    with tb.open_file(input_tracks_file, "r") as in_file_h5:
-        fitted_tracks = False
-        try:  # data has track candidates
-            table = in_file_h5.root.TrackCandidates
-        except tb.NoSuchNodeError:  # data has fitted tracks
-            table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % dut)
-            fitted_tracks = True
+            n_duts = sum(['charge' in col for col in table.dtype.names])
+            array = table[:]
+            tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+            if tracks.shape[0] == 0:
+                logging.warning('No tracks in event selection, cannot plot events!')
+                return
+            if max_chi2:
+                tracks = tracks[tracks['track_chi2'] <= max_chi2]
+            mpl.rcParams['legend.fontsize'] = 10
+            fig = plt.figure()
+            ax = fig.gca(projection='3d')
+            for track in tracks:
+                x, y, z = [], [], []
+                for dut_index in range(0, n_duts):
+                    if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
+                        x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
+                        y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
+                        z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
 
-        n_duts = sum(['charge' in col for col in table.dtype.names])
-        array = table[:]
-        tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
-        if tracks.shape[0] == 0:
-            logging.warning('No tracks in event selection, cannot plot events!')
-            return
-        if max_chi2:
-            tracks = tracks[tracks['track_chi2'] <= max_chi2]
-        mpl.rcParams['legend.fontsize'] = 10
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        for track in tracks:
-            x, y, z = [], [], []
-            for dut_index in range(0, n_duts):
-                if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
-                    x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
-                    y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
-                    z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
-
-            if fitted_tracks:
-                offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
-                slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
-                linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
-
-            n_hits = bin(track['track_quality'] & 0xFF).count('1')
-            n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
-
-            if n_hits > 2:  # only plot tracks with more than 2 hits
                 if fitted_tracks:
-                    ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
-                    ax.plot3D(*linepts.T)
-                else:
-                    ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
+                    offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
+                    slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
+                    linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
 
-#         ax.set_xlim(0, 20)
-#         ax.set_ylim(0, 20)
-        ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
-        ax.set_xlabel('x [mm]')
-        ax.set_ylabel('y [mm]')
-        ax.set_zlabel('z [mm]')
-        plt.title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
-        if output_pdf is not None:
-            output_fig.savefig()
-        else:
-            plt.show()
+                n_hits = bin(track['track_quality'] & 0xFF).count('1')
+                n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
 
-    if output_fig:
-        output_fig.close()
+                if n_hits > 2:  # only plot tracks with more than 2 hits
+                    if fitted_tracks:
+                        ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
+                        ax.plot3D(*linepts.T)
+                    else:
+                        ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
+
+            ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
+            ax.set_xlabel('x [mm]')
+            ax.set_ylabel('y [mm]')
+            ax.set_zlabel('z [mm]')
+            plt.title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
+            output_pdf.savefig()
 
 
-def plot_track_chi2(chi2s, fit_dut, output_fig):
+def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
+    if not output_pdf:
+        return
     # Plot track chi2 and angular distribution
     chi2s = chi2s[np.isfinite(chi2s)]
     try:
@@ -672,13 +673,15 @@ def plot_track_chi2(chi2s, fit_dut, output_fig):
         plt.ylabel('#')
         plt.yscale('log')
         plt.title('Track Chi2 for DUT %d tracks' % fit_dut)
-        if isinstance(output_fig, PdfPages):
-            output_fig.savefig()
+        if isinstance(output_pdf, PdfPages):
+            output_pdf.savefig()
         elif output_pdf is True:
             plt.show()
 
 
-def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig=None):
+def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_pdf=None):
+    if not output_pdf:
+        return
     for plot_log in [False, True]:  # plot with log y or not
         plt.clf()
         # Calculate bin centers
@@ -702,15 +705,17 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_fig
             plt.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             plt.legend(loc=0)
         plt.xlim([edges[0], edges[-1]])
-        if output_fig:
-            output_fig.savefig()
-        elif output_fig is True:
+        if isinstance(output_pdf, PdfPages):
+            output_pdf.savefig()
+        elif output_pdf is True:
             plt.show()
 
 
 def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, fit=None, cov=None, output_pdf=None):
     '''Plot the residuals as a function of the position.
     '''
+    if not output_pdf:
+        return
     plt.clf()
     plt.grid()
     if title:
@@ -730,20 +735,19 @@ def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=No
     plt.xlim([xedges[0], xedges[-1]])
     plt.ylim([yedges[0], yedges[-1]])
     plt.legend(loc=0)
-    if output_fig:
-        output_fig.savefig()
-    elif output_fig is None:
-        plt.show(),
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
 
-def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None):
+def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None, output_pdf_file=None):
     '''Takes the tracks and calculates the track density projected on selected DUTs.
 
     Parameters
     ----------
     input_tracks_file : string
         Filename of the input tracks file.
-    output_pdf : pdf file name object
     z_positions : iterable
         Iterable with z-positions of all DUTs.
     dim_x, dim_y : int
@@ -756,9 +760,14 @@ def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y,
         DUTs that will be used for plotting. If None, all DUTs are used.
     max_chi2 : uint
         Plot events with track chi2 smaller than the gven number.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
     logging.info('Plotting track density')
-    with PdfPages(output_pdf) as output_fig:
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_track_density.pdf'
+
+    with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
             plot_ref_dut = False
             dimensions = []
@@ -796,7 +805,7 @@ def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y,
                     ax = fig.add_subplot(111)
                     plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
                     fig.tight_layout()
-                    output_fig.savefig(fig)
+                    output_pdf.savefig(fig)
 
                     plot_ref_dut = False
 
@@ -820,24 +829,23 @@ def plot_track_density(input_tracks_file, output_pdf, z_positions, dim_x, dim_y,
                 ax = fig.add_subplot(111)
                 plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
-                output_fig.savefig(fig)
+                output_pdf.savefig(fig)
 
                 fig = Figure()
                 fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
                 plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
-                output_fig.savefig(fig)
+                output_pdf.savefig(fig)
 
 
-def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None):
+def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, output_pdf_file=None):
     '''Takes the data and plots the charge distribution for selected DUTs.
 
     Parameters
     ----------
     input_track_candidates_file : string
         Filename of the input track candidates file.
-    output_pdf : pdf file name object
     dim_x, dim_y : int
         Number of pixels.
     pixel_size : iterable
@@ -846,9 +854,14 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
         Masking heatmap entries = 0 for plotting.
     use_duts : iterable
         DUTs that will be used for plotting. If None, all DUTs are used.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
     logging.info('Plotting charge distribution')
-    with PdfPages(output_pdf) as output_fig:
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_charge_distribution.pdf'
+
+    with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             dimensions = []
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
@@ -889,10 +902,12 @@ def plot_charge_distribution(input_track_candidates_file, output_pdf, dim_x, dim
                     ax = fig.add_subplot(111)
                     plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
                     fig.tight_layout()
-                    output_fig.savefig(fig)
+                    output_pdf.savefig(fig)
 
 
-def plot_track_distances(distance_min_array, distance_max_array, distance_mean_array, actual_dut, plot_range, cut_distance, output_fig):
+def plot_track_distances(distance_min_array, distance_max_array, distance_mean_array, actual_dut, plot_range, cut_distance, output_pdf=None):
+    if not output_pdf:
+        return
     # get number of entries for every histogram
     n_hits_distance_min_array = distance_min_array.count()
     n_hits_distance_max_array = distance_max_array.count()
@@ -903,24 +918,34 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
-    output_fig.savefig(fig)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
-    output_fig.savefig(fig)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
     fig.tight_layout()
-    output_fig.savefig(fig)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
-
-def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, output_fig, mask_zero=True):
+def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, mask_zero=True, output_pdf=None):
+    if not output_pdf:
+        return
     # get number of entries for every histogram
     n_hits_hit_hist = np.count_nonzero(hit_hist)
     n_tracks_track_density = np.count_nonzero(track_density)
@@ -938,21 +963,30 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
-    output_fig.savefig(fig)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
-    output_fig.savefig(fig)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
     fig = Figure()
     fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
-    output_fig.savefig(fig)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
 
     if np.any(~efficiency.mask):
         fig = Figure()
@@ -963,7 +997,10 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
             z_min = 90.
         plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
         fig.tight_layout()
-        output_fig.savefig(fig)
+        if isinstance(output_pdf, PdfPages):
+            output_pdf.savefig()
+        elif output_pdf is True:
+            plt.show()
 
         plt.clf()
         plt.grid()
@@ -973,6 +1010,9 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         plt.yscale('log')
         plt.xlim([-0.5, 101.5])
         plt.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
-        output_fig.savefig()
+        if isinstance(output_pdf, PdfPages):
+            output_pdf.savefig()
+        elif output_pdf is True:
+            plt.show()
     else:
         logging.warning('Cannot create efficiency plots, all pixels are masked')
