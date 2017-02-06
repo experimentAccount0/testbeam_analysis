@@ -9,7 +9,6 @@ import os.path
 import tables as tb
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
-from scipy.optimize import curve_fit
 from scipy.stats import binned_statistic_2d
 
 from testbeam_analysis.tools import plot_utils
@@ -855,3 +854,57 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
         output_pdf.close()
 
     return efficiencies, pass_tracks, total_tracks
+
+
+def histogram_track_angle(input_tracks_file, output_track_angle_file, n_bins, use_duts=None, output_pdf=None, chunk_size=499999):
+    '''Calculates and histograms the track angle of the fitted tracks for selected DUTs.
+    Parameters
+    ----------
+    input_tracks_file : string
+        file name with the tracks table
+    output_track_angle_file: string
+        output pytables file with fitted means and sigmas of track angles for selected DUTs
+    use_duts : iterable
+        The duts to plot/calculate the track angle. If None all duts in the input_tracks_file are used
+    n_bins: int
+        number of bins for track angle histogram
+    output_pdf : string
+        file name for the output pdf
+    chunk_size : integer
+        The size of data in RAM
+    '''
+    logging.info('=== Calculate track angles ===')
+
+    slopes = {}  # initialize dict for track slopes
+    with tb.open_file(input_tracks_file, 'r') as in_file_h5:
+        n_duts = len(in_file_h5.list_nodes("/"))  # determine number of DUTs
+
+        if use_duts is None:
+            use_duts = range(n_duts)
+        else:
+            use_duts = use_duts
+        dut_index = [('Tracks_DUT_%i' % i) for i in use_duts]
+
+        slope_0_temp = np.array([])
+        slope_1_temp = np.array([])
+        for node in in_file_h5.root:  # loop through all DUTs in track table
+            if node.name in dut_index:
+                for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # only store track slopes of selected DUTs
+                    slope_0_chunk = tracks_chunk['slope_0']
+                    slope_1_chunk = tracks_chunk['slope_1']
+                    slope_0_temp = np.concatenate((slope_0_temp, slope_0_chunk))
+                    slope_1_temp = np.concatenate((slope_1_temp, slope_1_chunk))
+                    slopes.update({node.name: [slope_0_temp,
+                                               slope_1_temp]})
+                slope_0_temp = np.array([])  # reset array for next DUT
+                slope_1_temp = np.array([])  # reset array for next DUT
+
+    result = np.zeros(shape=(n_duts,), dtype=[('mean_slope_x', np.float), ('mean_slope_y', np.float), ('sigma_slope_x', np.float), ('sigma_slope_y', np.float)])
+
+    logging.info('=== Plot track angles ===')
+
+    plot_utils.plot_track_angle(input_track_slopes=slopes, output_data=result, output_pdf=output_pdf, use_n_duts=len(use_duts), n_bins=n_bins)
+
+    with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
+        result_table = out_file_h5.create_table(out_file_h5.root, name='TrackAngle', description=result.dtype, title='Fitted means and sigmas for track angles', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+        result_table.append(result)
