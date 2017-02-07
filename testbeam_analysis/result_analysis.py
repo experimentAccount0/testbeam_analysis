@@ -653,7 +653,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     logging.info('=== Calculating efficiency ===')
 
     if output_efficiency_file is None:
-        output_efficiency_file = os.path.splitext(input_hits_file)[0] + '_efficiency.h5'
+        output_efficiency_file = os.path.splitext(input_tracks_file)[0] + '_efficiency.h5'
 
     if plot is True:
         output_pdf = PdfPages(os.path.splitext(output_efficiency_file)[0] + '.pdf')

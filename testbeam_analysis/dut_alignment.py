@@ -777,7 +777,6 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     chunk_size : uint
         Chunk size of the data when reading from file.
     '''
-
     logging.info('=== Aligning DUTs ===')
 
     # Open the pre-alignment and create empty alignment info (at the beginning only the z position is set)
