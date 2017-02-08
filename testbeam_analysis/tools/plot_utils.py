@@ -33,15 +33,14 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     bounds = np.linspace(start=z_min, stop=z_max, num=255, endpoint=True)
     cmap = cm.get_cmap('viridis')
     cmap.set_bad('w')
-    norm = colors.BoundaryNorm(bounds, cmap.N)
-    im = ax.imshow(hist2d, interpolation='none', aspect="auto", cmap=cmap, norm=norm, extent=extent, clim=(0, z_max))
+    im = ax.imshow(hist2d, interpolation='none', aspect="auto", extent=extent, cmap=cmap, clim=(0, z_max))
     if title is not None:
         ax.set_title(title)
     if x_axis_title is not None:
         ax.set_xlabel(x_axis_title)
     if y_axis_title is not None:
         ax.set_ylabel(y_axis_title)
-    fig.colorbar(im, boundaries=bounds, cmap=cmap, norm=norm, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), fraction=0.04, pad=0.05)
+    fig.colorbar(im, boundaries=bounds, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), fraction=0.04, pad=0.05)
 
 
 def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_pdf_file=None):
@@ -73,9 +72,7 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
 
     with PdfPages(output_pdf_file) as output_pdf:
         cmap = cm.get_cmap('viridis')
-    #     cmap.set_bad('w')
-    #     norm = colors.LogNorm()
-        norm = None
+        cmap.set_bad('w')
         c_max = np.percentile(occupancy, 99)
 
         plt.figure()
@@ -89,7 +86,7 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         if disabled_pixels is not None:
             ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
             ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
-        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
+        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
         ax.set_xlabel("Column")
@@ -99,14 +96,13 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         plt.figure()
         ax = plt.subplot(111)
         ax.set_title('%s' % (dut_name, ))
-        ax.imshow(occupancy, aspect=aspect, cmap=cmap, norm=norm, interpolation='none', origin='lower', clim=(0, c_max))
+        ax.imshow(occupancy, aspect=aspect, cmap=cmap, interpolation='none', origin='lower', clim=(0, c_max))
     #     np.ma.filled(occupancy, fill_value=0)
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
         ax.set_xlabel("Column")
         ax.set_ylabel("Row")
         output_pdf.savefig()
-
         plt.close()
 
 
@@ -508,6 +504,7 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     fig = plt.gcf()
     ax = fig.add_subplot(1, 1, 1)
     cmap = cm.get_cmap('viridis')
+    cmap.set_bad('w')
     plt.imshow(accumulator, interpolation="none", origin="lower", aspect="auto", cmap=cmap, extent=[np.rad2deg(theta_edges[0]), np.rad2deg(theta_edges[-1]), rho_edges[0], rho_edges[-1]])
     plt.xticks([-90, -45, 0, 45, 90])
     plt.title("Accumulator plot of %s correlations: %s vs. %s" % (prefix, ref_name, dut_name))
@@ -531,6 +528,7 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
         output_pdf.savefig()
     elif output_pdf is True:
         plt.show()
+
 
 def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
     '''Takes the correlation histograms and plots them.
@@ -566,7 +564,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
 
                 plt.clf()
                 cmap = cm.get_cmap('viridis')
-#                 cmap.set_bad('w')
+                cmap.set_bad('w')
                 norm = colors.LogNorm()
                 if pixel_size:
                     aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
@@ -801,7 +799,6 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                     n_ref_hits = np.count_nonzero(heatmap_ref_hits)
 
                     fig = Figure()
-                    fig.patch.set_facecolor('white')
                     ax = fig.add_subplot(111)
                     plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
                     fig.tight_layout()
@@ -825,14 +822,12 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                 n_hits_heatmap_hits = np.count_nonzero(heatmap_hits)
 
                 fig = Figure()
-                fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
                 plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_pdf.savefig(fig)
 
                 fig = Figure()
-                fig.patch.set_facecolor('white')
                 ax = fig.add_subplot(111)
                 plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
@@ -898,7 +893,6 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
                     charge_density = np.ma.masked_invalid(charge_density)
 
                     fig = Figure()
-                    fig.patch.set_facecolor('white')
                     ax = fig.add_subplot(111)
                     plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
                     fig.tight_layout()
@@ -914,34 +908,31 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     n_hits_distance_mean_array = distance_mean_array.count()
 
     fig = Figure()
-    fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     if isinstance(output_pdf, PdfPages):
-        output_pdf.savefig()
+        output_pdf.savefig(fig)
     elif output_pdf is True:
-        plt.show()
+        fig.show()
 
     fig = Figure()
-    fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     if isinstance(output_pdf, PdfPages):
-        output_pdf.savefig()
+        output_pdf.savefig(fig)
     elif output_pdf is True:
-        plt.show()
+        fig.show()
 
     fig = Figure()
-    fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
     fig.tight_layout()
     if isinstance(output_pdf, PdfPages):
-        output_pdf.savefig()
+        output_pdf.savefig(fig)
     elif output_pdf is True:
-        plt.show()
+        fig.show()
 
 def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, mask_zero=True, output_pdf=None):
     if not output_pdf:
@@ -959,38 +950,34 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
 
     fig = Figure()
-    fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     if isinstance(output_pdf, PdfPages):
-        output_pdf.savefig()
+        output_pdf.savefig(fig)
     elif output_pdf is True:
-        plt.show()
+        fig.show()
 
     fig = Figure()
-    fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     if isinstance(output_pdf, PdfPages):
-        output_pdf.savefig()
+        output_pdf.savefig(fig)
     elif output_pdf is True:
-        plt.show()
+        fig.show()
 
     fig = Figure()
-    fig.patch.set_facecolor('white')
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     if isinstance(output_pdf, PdfPages):
-        output_pdf.savefig()
+        output_pdf.savefig(fig)
     elif output_pdf is True:
-        plt.show()
+        fig.show()
 
     if np.any(~efficiency.mask):
         fig = Figure()
-        fig.patch.set_facecolor('white')
         ax = fig.add_subplot(111)
         z_min = np.ma.min(efficiency)
         if z_min == 100.:  # One cannot plot with 0 z axis range
@@ -998,9 +985,9 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
         fig.tight_layout()
         if isinstance(output_pdf, PdfPages):
-            output_pdf.savefig()
+            output_pdf.savefig(fig)
         elif output_pdf is True:
-            plt.show()
+            fig.show()
 
         plt.clf()
         plt.grid()
