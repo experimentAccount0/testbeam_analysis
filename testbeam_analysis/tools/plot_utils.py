@@ -948,6 +948,7 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         hit_hist = np.ma.array(hit_hist, mask=(hit_hist == 0))
         track_density = np.ma.array(track_density, mask=(track_density == 0))
         track_density_with_DUT_hit = np.ma.array(track_density_with_DUT_hit, mask=(track_density_with_DUT_hit == 0))
+        efficiency = np.ma.array(efficiency, mask=(efficiency == 0))
 
     fig = Figure()
     ax = fig.add_subplot(111)
