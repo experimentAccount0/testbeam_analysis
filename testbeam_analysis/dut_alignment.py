@@ -420,21 +420,34 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 plot_index = np.array(x_selected - 1, dtype=np.int)[idx]
 
                 x_fit = np.linspace(start=x_ref.min(), stop=x_ref.max(), num=500, endpoint=True)
-                if np.all(np.isnan(coeff_fitted[plot_index][3:6])):
-                    y_fit = analysis_utils.gauss_offset(x_fit, *coeff_fitted[plot_index][[0, 1, 2, 6]])
-                    fit_label = "Gauss-Offset"
-                else:
-                    y_fit = analysis_utils.double_gauss_offset(x_fit, *coeff_fitted[plot_index])
-                    fit_label = "Gauss-Gauss-Offset"
+                indices_lower = np.arange(plot_index)
+                indices_higher = np.arange(plot_index, n_pixel_dut)
+                alternating_indices = np.vstack((np.hstack([indices_higher, indices_lower[::-1]]), np.hstack([indices_lower[::-1], indices_higher]))).reshape((-1,),order='F')
+                unique_indices = np.unique(alternating_indices, return_index=True)[1]
+                alternating_indices = alternating_indices[np.sort(unique_indices)]
+                for plot_index in alternating_indices:
+                    plot_correlation_fit = False
+                    if coeff_fitted[plot_index] is not None:
+                        plot_correlation_fit = True
+                        break
+                if plot_correlation_fit:
+                    if np.all(np.isnan(coeff_fitted[plot_index][3:6])):
+                        y_fit = analysis_utils.gauss_offset(x_fit, *coeff_fitted[plot_index][[0, 1, 2, 6]])
+                        fit_label = "Gauss-Offset"
+                    else:
+                        y_fit = analysis_utils.double_gauss_offset(x_fit, *coeff_fitted[plot_index])
+                        fit_label = "Gauss-Gauss-Offset"
 
-                plot_utils.plot_correlation_fit(x=x_ref,
-                                                y=data[plot_index, :],
-                                                x_fit=x_fit,
-                                                y_fit=y_fit,
-                                                xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
-                                                fit_label=fit_label,
-                                                title="Correlation of %s: %s vs. %s at %s %d" % (table_prefix + "s", ref_name, dut_name, table_prefix, plot_index),
-                                                output_pdf=output_pdf)
+                    plot_utils.plot_correlation_fit(x=x_ref,
+                                                    y=data[plot_index, :],
+                                                    x_fit=x_fit,
+                                                    y_fit=y_fit,
+                                                    xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
+                                                    fit_label=fit_label,
+                                                    title="Correlation of %s: %s vs. %s at %s %d" % (table_prefix + "s", ref_name, dut_name, table_prefix, plot_index),
+                                                    output_pdf=output_pdf)
+                else:
+                    logging.warning("Cannot plot correlation fit, no fit data available")
 
                 # Plot selected data with fit
                 fit_fn = np.poly1d(re_fit[::-1])
