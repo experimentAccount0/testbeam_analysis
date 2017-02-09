@@ -526,8 +526,19 @@ def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_
     # for logging
     no_correlation_indices = []
     few_correlation_indices = []
+    # get index of the highest background value
+    fit_start_index = np.argmax(A_background)
+    indices_lower = np.arange(fit_start_index)[::-1]
+    indices_higher = np.arange(fit_start_index, n_pixel_dut)
+    stacked_indices = np.hstack([indices_lower, indices_higher])
 
-    for index in np.arange(n_pixel_dut):  # Loop over x dimension of correlation histogram
+    for index in stacked_indices:  # Loop over x dimension of correlation histogram
+        if index == fit_start_index:
+            if index > 0 and coeff_fitted[index - 1] is not None:
+                coeff = coeff_fitted[index - 1]
+                fit_converged = True
+            else:
+                fit_converged = False
         # TODO: start fitting from the beam center to get a higher chance to pick up the correlation peak
 
         # omit correlation fit with no entries / correlation (e.g. sensor edges, masked columns)
