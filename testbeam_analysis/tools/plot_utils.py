@@ -220,16 +220,19 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
 
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
+        global selected_data
+        global offset
         global offset_limit
-        offset_limit = offset_limit_new
-        #offset_limit_plot.set_ydata([offset_limit, offset_limit])
+        if np.count_nonzero(np.abs(offset[selected_data]) <= offset_limit_new) > 1:
+            offset_limit = offset_limit_new
         update_selected_data()
         update_plot()
 
     def update_error(error_limit_new):  # Function called when error slider is moved
+        global selected_data
         global error_limit
-        error_limit = error_limit_new / 10.0
-        #error_limit_plot.set_ydata([error_limit * 10.0, error_limit * 10.0])
+        if np.count_nonzero(np.abs(mean_error_fitted[selected_data]) <= error_limit_new / 10.0) > 1:
+            error_limit = error_limit_new / 10.0
         update_selected_data()
         update_plot()
 
@@ -239,9 +242,7 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         global x_diff
         if left_limit_new >= right_limit - 1.0 * x_diff:
             left_limit_new = right_limit - 2.0 * x_diff
-            left_slider.set_val(left_limit_new)
         left_limit = left_limit_new
-        #left_limit_plot.set_xdata([left_limit, left_limit])
         update_selected_data()
         update_plot()
 
@@ -251,14 +252,13 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         global x_diff
         if right_limit_new <= left_limit + 1.0 * x_diff:
             right_limit_new = left_limit + 2.0 * x_diff
-            right_slider.set_val(right_limit_new)
         right_limit = right_limit_new
-        #right_limit_plot.set_xdata([right_limit, right_limit])
         update_selected_data()
         update_plot()
 
     def update_selected_data():
         global selected_data
+        global offset
         global error_limit
         global offset_limit
         global left_limit
@@ -266,13 +266,14 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         #init_selected_data()
         selected_data = initial_select.copy()
 #         selected_data &= np.logical_and(np.logical_and(np.logical_and(np.abs(offset) <= offset_limit, np.abs(mean_error_fitted) <= error_limit), x >= left_limit), x <= right_limit)
-        selected_data[selected_data] &= (np.abs(offset[selected_data]) <= offset_limit)
-        selected_data[selected_data] &= (np.abs(mean_error_fitted[selected_data]) <= error_limit)
+        selected_data = (np.abs(offset) <= offset_limit)
+        selected_data = (np.abs(mean_error_fitted) <= error_limit)
         selected_data &= (x >= left_limit)
         selected_data &= (x <= right_limit)
 
     def update_auto(event):  # Function called when auto button is pressed
         global selected_data
+        global offset
         global error_limit
         global offset_limit
         global left_limit
@@ -318,28 +319,58 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
             left_limit = x[left_cut]
             right_limit = x[right_cut]
 
-        fit_data()
         update_selected_data()
+        fit_data()
         if not non_interactive:
-            left_slider.set_val(left_limit)
-            right_slider.set_val(right_limit)
-            error_slider.set_val(error_limit * 10.0)
-            offset_slider.set_val(offset_limit)
+            offset_limit = np.max(np.abs(offset[selected_data]))
+            error_limit = np.max(np.abs(mean_error_fitted[selected_data]))
             update_plot()
 
     def update_plot():  # Replot correlation data with new selection
         global selected_data
         global offset
+        global error_limit
+        global offset_limit
+        global left_limit
+        global right_limit
         if np.count_nonzero(selected_data) > 1:
-            ax2.set_ylim(ymax=max(np.max(np.abs(mean_error_fitted[selected_data]) * 10.0), np.max(np.abs(offset[selected_data]))))
+            left_index = np.where(x <= left_limit)[0][-1]
+            right_index = np.where(x >= right_limit)[0][0]
+            # set ymax to maximum of either error or offset within the left and right limit, and increase by 10%
+            ax2.set_ylim(ymax=max(np.max(np.abs(mean_error_fitted[selected_data])) * 10.0, np.max(np.abs(offset[selected_data])) * 1.0) * 1.1)
             offset_limit_plot.set_ydata([offset_limit, offset_limit])
             error_limit_plot.set_ydata([error_limit * 10.0, error_limit * 10.0])
             left_limit_plot.set_xdata([left_limit, left_limit])
             right_limit_plot.set_xdata([right_limit, right_limit])
+            # setting calculated offset data
             offset_plot.set_data(x[initial_select], np.abs(offset[initial_select]))
-            offset_slider.valmax = np.max(np.abs(offset))
-            offset_slider.ax.set_xlim(xmax=np.max(np.abs(offset)))
-            mean_plot.set_data(x[selected_data], mean_fitted[selected_data])
+            # update offset slider
+            offset_max = np.max(np.abs(offset[left_index:right_index]))
+            ax_offset.set_xlim(xmax=offset_max)
+            offset_slider.valmax = offset_max
+            cid = offset_slider.cnt - 1
+            offset_slider.disconnect(cid)
+            offset_slider.set_val(offset_limit)
+            offset_slider.on_changed(update_offset)
+            # update error slider
+            error_max = np.max(np.abs(mean_error_fitted[left_index:right_index])) * 10.0
+            ax_error.set_xlim(xmax=error_max)
+            error_slider.valmax = error_max
+            cid = error_slider.cnt - 1
+            error_slider.disconnect(cid)
+            error_slider.set_val(error_limit * 10.0)
+            error_slider.on_changed(update_error)
+            # update left slider
+            cid = left_slider.cnt - 1
+            left_slider.disconnect(cid)
+            left_slider.set_val(left_limit)
+            left_slider.on_changed(update_left_limit)
+            # update right slider
+            cid = right_slider.cnt - 1
+            right_slider.disconnect(cid)
+            right_slider.set_val(right_limit)
+            right_slider.on_changed(update_right_limit)
+            # setting calculated fit line
             line_plot.set_data(x, fit_fn(x))
         else:
             if non_interactive:
@@ -373,8 +404,6 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         fit, _ = curve_fit(testbeam_analysis.tools.analysis_utils.linear, x[selected_data], mean_fitted[selected_data])  # Fit straight line
         fit_fn = np.poly1d(fit[::-1])
         offset = fit_fn(x) - mean_fitted  # Calculate straight line fit offset
-#         offset = np.full_like(mean_fitted, np.nan)
-#         offset[selected_data] = fit_fn(x[selected_data]) - mean_fitted[selected_data]  # Calculate straight line fit offset
 
     # Require the gaussian fit error to be reasonable
 #     selected_data = (mean_error_fitted < 1e-2)
@@ -409,7 +438,7 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         right_limit_plot = ax2.axvline(right_limit, linestyle='-', color='r', linewidth=2)  # Plot right cut as a vertical line
         ncluster_plot = ax.bar(x[selected_data], n_cluster[selected_data] / np.max(n_cluster[selected_data]).astype(np.float) * abs(np.diff(ax.get_ylim())[0]), bottom=ax.get_ylim()[0], align='center', alpha=0.1, label='#Cluster [a.u.]', width=np.min(np.diff(x[selected_data])))  # Plot number of hits for each correlation point
         ax.set_ylim(ymin=np.min(mean_fitted[selected_data]), ymax=np.max(mean_fitted[selected_data]))
-        ax2.set_ylim(ymin=0.0)
+        ax2.set_ylim(ymin=0.0, ymax=max(np.max(np.abs(mean_error_fitted[selected_data])) * 10.0, np.max(np.abs(offset[selected_data])) * 1.0) * 1.1)
         ax.set_xlim((np.nanmin(x), np.nanmax(x)))
         ax.set_title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
         ax.set_xlabel("%s [um]" % dut_name)
@@ -428,10 +457,10 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         ax_button_refit = plt.axes([0.735, 0.01, 0.08, 0.05], axisbg='black')
         ax_button_ok = plt.axes([0.82, 0.01, 0.08, 0.05], axisbg='black')
         # Create widgets
-        offset_slider = Slider(ax_offset, 'Offset Cut', 0.0, offset_limit, valinit=offset_limit)
-        error_slider = Slider(ax_error, 'Error cut', 0.0, error_limit * 10.0, valinit=error_limit * 10.0)
-        left_slider = Slider(ax_left_limit, 'Left cut', left_limit, right_limit, valinit=left_limit)
-        right_slider = Slider(ax_right_limit, 'Right cut', left_limit, right_limit, valinit=right_limit)
+        offset_slider = Slider(ax=ax_offset, label='Offset limit', valmin=0.0, valmax=offset_limit, valinit=offset_limit, closedmin=True, closedmax=True)
+        error_slider = Slider(ax=ax_error, label='Error limit', valmin=0.0, valmax=error_limit * 10.0, valinit=error_limit * 10.0, closedmin=True, closedmax=True)
+        left_slider = Slider(ax=ax_left_limit, label='Left limit', valmin=left_limit, valmax=right_limit, valinit=left_limit, closedmin=True, closedmax=True)
+        right_slider = Slider(ax=ax_right_limit, label='Right limit', valmin=left_limit, valmax=right_limit, valinit=right_limit, closedmin=True, closedmax=True)
         auto_button = Button(ax_button_auto, 'Auto')
         refit_button = Button(ax_button_refit, 'Refit')
         ok_button = Button(ax_button_ok, 'OK')
