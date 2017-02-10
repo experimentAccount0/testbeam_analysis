@@ -266,8 +266,8 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         #init_selected_data()
         selected_data = initial_select.copy()
 #         selected_data &= np.logical_and(np.logical_and(np.logical_and(np.abs(offset) <= offset_limit, np.abs(mean_error_fitted) <= error_limit), x >= left_limit), x <= right_limit)
-        selected_data = (np.abs(offset) <= offset_limit)
-        selected_data = (np.abs(mean_error_fitted) <= error_limit)
+        selected_data[selected_data] = (np.abs(offset[selected_data]) <= offset_limit)
+        selected_data[selected_data] = (np.abs(mean_error_fitted[selected_data]) <= error_limit)
         selected_data &= (x >= left_limit)
         selected_data &= (x <= right_limit)
 
