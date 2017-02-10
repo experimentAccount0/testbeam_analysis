@@ -72,10 +72,10 @@ class TestExamples(unittest.TestCase):
         # Remove old files and rename reduced files
         for file_name in cls.examples_fei4_hit_files:
             os.remove(file_name)
-            os.rename(file_name[:-3] + '_reduced.h5', file_name)
+            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5', file_name)
         for file_name in cls.examples_mimosa_hit_files:
             os.remove(file_name)
-            os.rename(file_name[:-3] + '_reduced.h5', file_name)
+            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5', file_name)
 
     # Alignments do not converge for reduced data set
     # Thus mock out the alignment steps

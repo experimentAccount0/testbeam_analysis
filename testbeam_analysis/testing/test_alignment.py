@@ -27,11 +27,7 @@ class TestAlignmentAnalysis(unittest.TestCase):
             cls.vdisplay = Xvfb()
             cls.vdisplay.start()
 
-        cls.data_files = [os.path.join(tests_data_folder, r'Cluster_DUT0_cluster.h5'),
-                          os.path.join(tests_data_folder, r'Cluster_DUT1_cluster.h5'),
-                          os.path.join(tests_data_folder, r'Cluster_DUT2_cluster.h5'),
-                          os.path.join(tests_data_folder, r'Cluster_DUT3_cluster.h5')
-                          ]
+        cls.data_files = [os.path.join(tests_data_folder, 'Cluster_DUT%d_cluster.h5' % i) for i in range(4)]
         cls.output_folder = tests_data_folder
         cls.n_pixels = [(80, 336)] * 4
         cls.pixel_size = [(250, 50)] * 4  # in um
@@ -40,7 +36,9 @@ class TestAlignmentAnalysis(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):  # remove created files
         os.remove(os.path.join(cls.output_folder, 'Correlation.h5'))
-        os.remove(os.path.join(cls.output_folder, 'Correlation.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Correlation_correlation.pdf'))
+        os.remove(os.path.join(cls.output_folder, 'Correlation_2.h5'))
+        os.remove(os.path.join(cls.output_folder, 'Correlation_2_correlation.pdf'))
         os.remove(os.path.join(cls.output_folder, 'Merged.h5'))
         os.remove(os.path.join(cls.output_folder, 'Merged_2.h5'))
         os.remove(os.path.join(cls.output_folder, 'Tracklets.h5'))
@@ -101,7 +99,7 @@ class TestAlignmentAnalysis(unittest.TestCase):
         self.assertTrue(data_equal, msg=error_msg)
 
     def test_cluster_merging(self):
-        cluster_files = [os.path.join(tests_data_folder, 'Cluster_DUT%d_cluster.h5') % i for i in range(4)]
+        cluster_files = [os.path.join(tests_data_folder, 'Cluster_DUT%d_cluster.h5' % i) for i in range(4)]
         dut_alignment.merge_cluster_data(cluster_files,
                                          output_merged_file=os.path.join(self.output_folder, 'Merged.h5'),
                                          n_pixels=self.n_pixels,
@@ -122,7 +120,7 @@ class TestAlignmentAnalysis(unittest.TestCase):
     def test_apply_alignment(self):
         dut_alignment.apply_alignment(input_hit_file=os.path.join(tests_data_folder, 'Merged_result.h5'),
                                       input_alignment=os.path.join(self.output_folder, 'Prealignment_result.h5'),
-                                      output_hit_aligned_file=os.path.join(tests_data_folder, 'Tracklets.h5'),
+                                      output_hit_file=os.path.join(tests_data_folder, 'Tracklets.h5'),
                                       force_prealignment=True)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets.h5'))
         self.assertTrue(data_equal, msg=error_msg)
@@ -130,7 +128,7 @@ class TestAlignmentAnalysis(unittest.TestCase):
         # Retest with tiny chunk size to force chunked alignment apply
         dut_alignment.apply_alignment(input_hit_file=os.path.join(tests_data_folder, 'Merged_result.h5'),
                                       input_alignment=os.path.join(self.output_folder, 'Prealignment_result.h5'),
-                                      output_hit_aligned_file=os.path.join(tests_data_folder, 'Tracklets_2.h5'),
+                                      output_hit_file=os.path.join(tests_data_folder, 'Tracklets_2.h5'),
                                       force_prealignment=True,
                                       chunk_size=293)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))

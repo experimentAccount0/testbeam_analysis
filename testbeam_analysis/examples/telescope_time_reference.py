@@ -47,38 +47,49 @@ def run_analysis():
 
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
-    # Remove hot pixel, only needed for devices with noisy pixels (here: Mimosa 26)
-    # A pool of workers to remove the noisy pixels in all files in parallel
-    threshold = (2, 2, 2, 10, 10, 2, 2, 2)
+    # Generate noisy pixel mask
+    # A pool of workers to remove the noisy pixels for all files in parallel
+    threshold = [2, 2, 2, 10, 10, 2, 2, 2]
     kwargs = [{
         'input_hits_file': data_files[i],
         'n_pixel': n_pixels[i],
+        'pixel_mask_name': "NoisyPixelMask",
         'pixel_size': pixel_size[i],
         'threshold': threshold[i],
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
-        hit_analysis.remove_noisy_pixels(**kwarg)
+        pool.apply_async(hit_analysis.generate_pixel_mask, kwds=kwarg)
     pool.close()
     pool.join()
 
-    # Cluster hits off all DUTs
-    # A pool of workers to cluster hits in all files in parallel
+    # Cluster hits from all DUTs
+    # A pool of workers to cluster hits for all files in parallel
+    column_cluster_distance = [3, 3, 3, 2, 2, 3, 3, 3]
+    row_cluster_distance = [3, 3, 3, 3, 3, 3, 3, 3]
+    # events built with Judith analysis software, no frame information available
+    frame_cluster_distance = [0, 0, 0, 0, 0, 0, 0, 0]
     kwargs = [{
-        'input_hits_file': data_files[i][:-3] + '_noisy_pixels.h5',
-        'max_x_distance': 3,
-        'max_y_distance': 3,
-        'max_time_distance': 2,
-        'max_cluster_hits': 5000,
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'input_hits_file': data_files[i],
+        'input_noisy_pixel_mask_file': os.path.splitext(data_files[i])[0] + '_noisy_pixel_mask.h5',
+        'min_hit_charge': 0,
+        'max_hit_charge': 13,
+        'column_cluster_distance': column_cluster_distance[i],
+        'row_cluster_distance': row_cluster_distance[i],
+        'frame_cluster_distance': frame_cluster_distance[i],
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
         pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
     pool.close()
     pool.join()
 
+    # Generate filenames for cluster data
+    input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
+                           for data_file in data_files]
+
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+    dut_alignment.correlate_cluster(input_cluster_files=input_cluster_files,
                                     output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                     n_pixels=n_pixels,
                                     pixel_size=pixel_size,
@@ -94,14 +105,14 @@ def run_analysis():
                                non_interactive=False)  # Tries to find cuts automatically; deactivate to do this manualy
 
     # Merge the cluster tables to one merged table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_noisy_pixels_cluster.h5' for data_file in data_files],
+    dut_alignment.merge_cluster_data(input_cluster_files=input_cluster_files,
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=pixel_size)
 
     # Apply the prealignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
+                                  output_hit_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
                                   force_prealignment=True)
 
     # Find tracks from the prealigned tracklets and stores the with quality indicator into track candidates table
@@ -160,14 +171,14 @@ def run_analysis():
     # Due to the large beam angle track finding fails on aligned data. Thus rely on the found tracks from prealignment.
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'TrackCandidates_prealignment_reduced.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'Merged_small.h5'),  # This is the new not aligned but preselected merged data file to apply (pre-) alignment on
+                                  output_hit_file=os.path.join(output_folder, 'Merged_small.h5'),  # This is the new not aligned but preselected merged data file to apply (pre-) alignment on
                                   inverse=True,
                                   force_prealignment=True)
 
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged_small.h5'),
                                   input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'TrackCandidates.h5'))
+                                  output_hit_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
     # Fit track using alignment
     track_analysis.fit_tracks(input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
@@ -187,7 +198,7 @@ def run_analysis():
     # Calculate efficiency with aligned data
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks.h5'),
                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                         output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
+                                         output_efficiency_file=os.path.join(output_folder, 'Efficiency.h5'),
                                          bin_size=(10, 10),
                                          use_duts=[3],
                                          sensor_size=[(20000, 10000),
@@ -218,7 +229,7 @@ def run_analysis():
     # Create efficiency plot with prealigned data
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks_prealignment.h5'),
                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                         output_pdf=os.path.join(output_folder, 'Efficiency_prealignment.pdf'),
+                                         output_efficiency_file=os.path.join(output_folder, 'Efficiency_prealignment.h5'),
                                          force_prealignment=True,
                                          bin_size=(10, 10),
                                          use_duts=[3],

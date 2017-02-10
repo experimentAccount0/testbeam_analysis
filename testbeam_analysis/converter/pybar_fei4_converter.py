@@ -182,10 +182,6 @@ def format_hit_table(input_file, output_file):
             hit_table_out.append(hits_formatted)
 
 
-def _function_wrapper_process_dut(args):  # needed for multiprocessing call with arguments
-    return process_dut(*args)
-
-
 if __name__ == "__main__":
 
     # Input raw data file names

@@ -4,7 +4,7 @@
 Examples
 ********
 
-There are plenty of examples available that cover different setups.
+There are several examples available that cover different setups.
 These examples are a good starting point to get to know `Testbeam Analysis`.
 
 ATLAS FE-I4 telescope
