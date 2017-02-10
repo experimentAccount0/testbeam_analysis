@@ -351,31 +351,41 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
         dut_selection = 0  # DUTs to be used in the fit
         dut_fit_selection = 0  # DUT to use in fit
-        info_str_hit = ''  # For info output
-        info_str_fit = ''  # For info output
+        info_str_hit = []  # For info output
+        info_str_fit = []  # For info output
 
         for hit_dut in selection_hit_duts[dut_index]:
             if exclude_dut_hit and hit_dut == fit_duts[dut_index]:
                 continue
             dut_selection |= ((1 << hit_dut))
-            info_str_hit += 'DUT%d ' % (hit_dut)
+            info_str_hit.append('DUT%d' % hit_dut)
+        n_slection_duts = bin(dut_selection)[2:].count("1")
+        logging.info('Use %d DUTs for track selection: %s', n_slection_duts, ', '.join(info_str_hit))
+
         for selected_fit_dut in selection_fit_duts[dut_index]:
             if exclude_dut_hit and selected_fit_dut == fit_duts[dut_index]:
                 continue
             dut_fit_selection |= ((1 << selected_fit_dut))
-            info_str_fit += 'DUT%d ' % (selected_fit_dut)
-
-        logging.info('Use %d DUTs for track selection: %s', bin(dut_selection)[2:].count("1"), info_str_hit)
-        logging.info("Use %d DUTs for track fit: %s", bin(dut_fit_selection)[2:].count("1"), info_str_fit)
+            info_str_fit.append('DUT%d' % selected_fit_dut)
+        n_fit_duts = bin(dut_fit_selection)[2:].count("1")
+        logging.info("Use %d DUTs for track fit: %s", n_fit_duts, ', '.join(info_str_fit))
 
         track_quality_mask = 0
+        quality_index = 0
+        info_quality = ['no hit'] * n_slection_duts
         for index, dut in enumerate(selection_hit_duts[dut_index]):
             if exclude_dut_hit and dut == fit_duts[dut_index]:
                 continue
             for quality in range(3):
                 if quality <= selection_track_quality[dut_index][index]:
                     track_quality_mask |= ((1 << dut) << quality * 8)
-        logging.info("Use track quality: %s", str(selection_track_quality[dut_index])[1:-1])
+                    if quality == 0:
+                        info_quality[quality_index] = 'only hit'
+                    else:
+                        info_quality[quality_index] = str(quality)
+            quality_index += 1
+        logging.info("Use track quality for track selection: %s", ', '.join(info_quality))
+
         return dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts
 
     pool = Pool()
