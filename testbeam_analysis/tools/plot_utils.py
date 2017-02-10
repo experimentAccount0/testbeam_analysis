@@ -320,7 +320,7 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
             def consecutive(data, max_stepsize=1):  # Returns group of consecutive increasing values
                 return np.split(data, np.where(np.diff(data) > max_stepsize)[0] + 1)
             cons = consecutive(n_hit_cut_index, max_stepsize=10)
-            left_cut = left_index if cons[0].shape[0] == 1 else cons[0][-1] + 1
+            left_cut = left_index if cons[0].shape[0] == 1 else cons[0][-1]
             right_cut = right_index if cons[-1].shape[0] == 1 else cons[-1][0] - 1
             left_limit = x[left_cut]
             right_limit = x[right_cut]
