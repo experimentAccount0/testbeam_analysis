@@ -279,6 +279,12 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         global left_limit
         global right_limit
 
+        selected_data_tmp = selected_data.copy()
+        error_limit_tmp = error_limit
+        offset_limit_tmp = offset_limit
+        left_limit_tmp = left_limit
+        right_limit_tmp = right_limit
+
         # This function automatically applies cuts according to these percentiles
         n_hit_percentile = 1
         mean_error_percentile = 95
@@ -320,6 +326,13 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
             right_limit = x[right_cut]
 
         update_selected_data()
+        if np.count_nonzero(selected_data) < 2:
+            logging.warning("Automatic cut reached limit where less than 2 data points left")
+            selected_data = selected_data_tmp
+            error_limit = error_limit_tmp
+            offset_limit = offset_limit_tmp
+            left_limit = left_limit_tmp
+            right_limit = right_limit_tmp
         fit_data()
         if not non_interactive:
             offset_limit = np.max(np.abs(offset[selected_data]))
