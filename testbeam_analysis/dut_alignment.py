@@ -1077,8 +1077,9 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
                             output_residuals_file=os.path.splitext(track_candidates_file)[0] + '_residuals_%d_tmp.h5' % iteration,
                             n_pixels=n_pixels,
                             pixel_size=pixel_size,
-                            npixels_per_bin=5 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
-                            nbins_per_pixel=1 if (iteration in [0, 1, 2]) else None,  # use a coarse binning for the first steps, FIXME: good code practice: nothing hardcoded
+                            # smaller devices needs None, otherwise npixels_per_bin=5 and nbins_per_pixel=1 might improve the first step
+                            npixels_per_bin=None,
+                            nbins_per_pixel=None,
                             plot=False,
                             chunk_size=chunk_size)
 
