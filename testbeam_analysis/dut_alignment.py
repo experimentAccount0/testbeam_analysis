@@ -865,7 +865,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         all_align_duts.extend(duts)
     no_align_duts = set(range(n_duts)) - set(all_align_duts)
     if no_align_duts:
-        logging.warning('These DUTs will not be aligned: %s', ", ".join(no_align_duts))
+        logging.warning('These DUTs will not be aligned: %s', ", ".join(str(align_dut) for align_dut in no_align_duts))
 
     # Create track, hit selection
     if selection_hit_duts is None:  # If None: use all DUTs
