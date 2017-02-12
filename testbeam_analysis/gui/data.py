@@ -14,7 +14,7 @@ class DataTab(object):
 
         self._setup()
 #         self._setup_test()
-# 
+#
 #     def _setup_test(self):
 #         self.items = QtWidgets.QDockWidget("Dockable", self)
 #         pass
