@@ -1,11 +1,25 @@
 import sys
+import logging
 
 from PyQt5 import QtCore, QtWidgets, QtGui
-from pyqtgraph.dockarea import DockArea, Dock
+from pyqtgraph.dockarea import DockArea
 
-from data_tab import DataTable, DropArea, DataTab
+from data import DataTab
+from testbeam_analysis.gui import tab_widget
 
 PROJECT_NAME = 'Testbeam Analysis'
+
+
+# For testing until widget provide this info
+setup = {'n_pixel': (10, 10),
+         'pixel_size': (100, 100),
+         'dut_name': 'myDUT'}
+
+options = {'working_directory': '',
+           'input_hits_file': 'test_DUT0.h5',
+           'output_mask_file': 'tt',
+           'chunk_size': 1000000,
+           'plot': False}
 
 
 class AnalysisWindow(QtWidgets.QMainWindow):
@@ -34,36 +48,37 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             4000)
 
     def _init_tabs(self):
-        # Add tabs and widgets for the different analysis steps
+        # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering',
                           'Correlations', 'Pre-alignment', 'Track finding', 'Alignment',
                           'Track fitting', 'Track Analysis')
-        self.tab_widgets = {}
 
-        # Add QTabWidget for tabs
+        # Add QTabWidget for tab_widget
         tabs = QtWidgets.QTabWidget()
         self.setCentralWidget(tabs)
 
-        # Add DockArea to each tab
+        # Initialize each tab
         for name in self.tab_order:
             if name == 'Files':
-                self.tab_widgets[name] = DockArea()
+                continue
+                widget = DockArea()
+                self.data_tab = DataTab(parent=widget)
+            elif name == 'Noisy Pixel':
+                widget = tab_widget.NoisyPixelsTab(parent=tabs,
+                                                   setup=setup,
+                                                   options=options)
+            elif name == 'Clustering':
+                widget = tab_widget.ClusterPixelsTab(parent=tabs,
+                                                     setup=setup,
+                                                     options=options)
+            elif name == 'Correlations':
+                widget = tab_widget.CorrelateClusterTab(parent=tabs,
+                                                        setup=setup,
+                                                        options=options)
             else:
-                self.tab_widgets[name] = QtWidgets.QWidget()
-                layout_widget = QtWidgets.QVBoxLayout()
-                layout_buttons = QtWidgets.QHBoxLayout()
-                layout_buttons.addWidget(QtWidgets.QPushButton('Test'))
-                layout_buttons.addWidget(QtWidgets.QPushButton('Test2'))
-                layout_buttons_2 = QtWidgets.QHBoxLayout()
-                layout_buttons_2.addWidget(QtWidgets.QPushButton('Test3'))
-                layout_buttons_2.addWidget(QtWidgets.QPushButton('Test4'))
-                layout_widget.addLayout(layout_buttons)
-                layout_widget.addLayout(layout_buttons_2)
-                self.tab_widgets[name].setLayout(layout_widget)
-            tabs.addTab(self.tab_widgets[name], name)
-
-        # Init tab number 1 with data
-        self.data_tab = DataTab(parent=self.tab_widgets[self.tab_order[0]])
+                #                 logging.warning('GUI for %s not implemented yet', name)
+                continue
+            tabs.addTab(widget, name)
 
     def _init_menu(self):
         self.file_menu = QtWidgets.QMenu('&File', self)
