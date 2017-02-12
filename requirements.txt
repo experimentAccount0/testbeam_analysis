@@ -10,3 +10,4 @@ pykalman  # for track fitting
 pylandau>2.0.0  # for charge deposition simulation
 progressbar-latest  # to show a progress bar
 numexpr  # for fast c compiled loops on numpy arrays
+numpydoc  # To use numpy docstring for gui tooltips
