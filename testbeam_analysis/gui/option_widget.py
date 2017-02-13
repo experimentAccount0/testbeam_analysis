@@ -1,4 +1,7 @@
-''' Implements option widgets to set function arguments
+''' Implements option widgets to set function arguments.
+
+    Options can set numbers, strings and booleans.
+    Optional options can be deactivated with the value None.
 '''
 
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -81,8 +84,7 @@ class OptionText(QtWidgets.QWidget):
 
         layout.addWidget(self.edit)
 
-        self.edit.textChanged.connect(
-            lambda: self.valueChanged.emit(self.edit.text()))
+        self.edit.textChanged.connect(lambda: self._emit_value())
 
         if default_value is not None:
             self.edit.setText(default_value)
@@ -94,12 +96,20 @@ class OptionText(QtWidgets.QWidget):
             palette.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
             self.edit.setPalette(palette)
             self.edit.setReadOnly(True)
+            self._emit_value()
         else:
             palette = QtGui.QPalette()
             palette.setColor(QtGui.QPalette.Base, QtCore.Qt.white)
             palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
             self.edit.setPalette(palette)
             self.edit.setReadOnly(False)
+            self._emit_value()
+
+    def _emit_value(self):
+        if self.edit.isReadOnly():
+            self.valueChanged.emit('None')
+        else:
+            self.valueChanged.emit(self.edit.text())
 
 
 class OptionBool(QtWidgets.QWidget):  # FIXME: optional not implemented
@@ -122,7 +132,7 @@ class OptionBool(QtWidgets.QWidget):  # FIXME: optional not implemented
         layout.addWidget(text)
         layout.addLayout(layout_b)
 
-        rb_t.toggled.connect(lambda v: self.valueChanged.emit(rb_t.isChecked()))
+        rb_t.toggled.connect(lambda: self.valueChanged.emit(rb_t.isChecked()))
 
         if tooltip:
             text.setToolTip(tooltip)

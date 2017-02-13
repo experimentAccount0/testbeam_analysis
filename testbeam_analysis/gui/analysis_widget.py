@@ -219,11 +219,15 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.func = func
         # Set tooltip from function docstring
         doc = FunctionDoc(self.func)
-        self.label_option.setToolTip(doc['Summary'][0])
+        self.label_option.setToolTip('\n'.join(doc['Summary']))
         # Add function options to gui
         self.add_options_auto()
 
     def _set_argument(self, name, value):
+        # Workaround for https://www.riverbankcomputing.com/pipermail/pyqt/2016-June/037662.html
+        # Cannot transmit None for signals with string
+        if type(value) == str and 'None' in value:
+            value = None
         self.keywords[name] = value
 
     def _call_func(self):
