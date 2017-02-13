@@ -46,6 +46,7 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
 
             check_box.stateChanged.connect(
                 lambda v: self._set_readonly(v == 0))
+            self._set_readonly()
         else:
             layout.addWidget(text)
         layout.addLayout(layout_2)
@@ -53,7 +54,7 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
         slider.valueChanged.connect(lambda v: self.edit.setText(str(v)))
         self.edit.returnPressed.connect(
             lambda: slider.setMaximum(float(self.edit.text()) * 2))
-        slider.valueChanged.connect(lambda v: self._emit_value())
+        slider.valueChanged.connect(lambda _: self._emit_value())
 
         if default_value is not None:
             slider.setValue(default_value)
@@ -79,10 +80,8 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
 
     def _emit_value(self):
         if self.edit.isReadOnly() or not self.edit.text():
-            print 'READONLY'
             self.valueChanged.emit(float('nan'))
         else:
-            print 'WRITEALSO'
             self.valueChanged.emit(int(self.edit.text()))
 
 
