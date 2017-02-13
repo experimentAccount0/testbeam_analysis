@@ -58,18 +58,14 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
     use_prealignment = True if force_prealignment else False
 
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        prealignment = in_file_h5.root.PreAlignment[:]
-        n_duts = prealignment.shape[0]
-        if not use_prealignment:
-            try:
-                alignment = in_file_h5.root.Alignment[:]
-            except tb.exceptions.NodeError:
-                use_prealignment = True
-
-    if use_prealignment:
-        logging.info('Use prealignment data')
-    else:
-        logging.info('Use alignment data')
+        if use_prealignment:
+            logging.info('Use pre-alignment data')
+            prealignment = in_file_h5.root.PreAlignment[:]
+            n_duts = prealignment.shape[0]
+        else:
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+            n_duts = alignment.shape[0]
 
     if output_residuals_file is None:
         output_residuals_file = os.path.splitext(input_tracks_file)[0] + '_residuals.h5'
@@ -664,15 +660,14 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     use_prealignment = True if force_prealignment else False
 
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        prealignment = in_file_h5.root.PreAlignment[:]
-        n_duts = prealignment.shape[0]
-        if not use_prealignment:
-            try:
-                alignment = in_file_h5.root.Alignment[:]
-                logging.info('Use alignment data')
-            except tb.exceptions.NodeError:
-                use_prealignment = True
-                logging.info('Use pre-alignment data')
+        if use_prealignment:
+            logging.info('Use pre-alignment data')
+            prealignment = in_file_h5.root.PreAlignment[:]
+            n_duts = prealignment.shape[0]
+        else:
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+            n_duts = alignment.shape[0]
 
     if not isinstance(max_chi2, Iterable):
         max_chi2 = [max_chi2] * n_duts

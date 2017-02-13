@@ -671,34 +671,34 @@ def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inver
 
     try:
         with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-            alignment = in_file_h5.root.PreAlignment[:]
-            if not use_prealignment:
-                try:
-                    alignment = in_file_h5.root.Alignment[:]
-                    logging.info('Use alignment data from file')
-                except tb.exceptions.NodeError:
-                    use_prealignment = True
-                    logging.info('Use pre-alignment data from file')
-    except TypeError:  # The input_alignment is an array
-        alignment = input_alignment
+            if use_prealignment:
+                logging.info('Use pre-alignment data')
+                prealignment = in_file_h5.root.PreAlignment[:]
+                n_duts = prealignment.shape[0]
+            else:
+                logging.info('Use alignment data')
+                alignment = in_file_h5.root.Alignment[:]
+                n_duts = alignment.shape[0]
+    except TypeError:  # The input_alignment_file is an array
+        alignment = input_alignment_file
         try:  # Check if array is prealignent array
             alignment['column_c0']
             logging.info('Use pre-alignment data')
+            n_duts = prealignment.shape[0]
             use_prealignment = True
         except ValueError:
             logging.info('Use alignment data')
+            n_duts = alignment.shape[0]
             use_prealignment = False
 
-    n_duts = alignment.shape[0]
-
-    def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
+    def apply_alignment_to_chunk(hits_chunk, dut_index, use_prealignment, alignment, inverse, no_z):
         if use_prealignment:  # Apply transformation from pre-alignment information
             hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
                 hits_x=hits_chunk['x_dut_%d' % dut_index],
                 hits_y=hits_chunk['y_dut_%d' % dut_index],
                 hits_z=hits_chunk['z_dut_%d' % dut_index],
                 dut_index=dut_index,
-                prealignment=alignment,
+                prealignment=prealignment,
                 inverse=inverse)
         else:  # Apply transformation from fine alignment information
             hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
@@ -731,7 +731,7 @@ def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inver
                         if use_duts is not None and dut_index not in use_duts:  # omit DUT
                             continue
 
-                        apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z)
+                        apply_alignment_to_chunk(hits_chunk=hits_chunk, dut_index=dut_index, use_prealignment=use_prealignment, alignment=prealignment if use_prealignment else alignment, inverse=inverse, no_z=no_z)
 
                     hits_aligned_table.append(hits_chunk)
                     progress_bar.update(index)

@@ -172,21 +172,15 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     # Load alignment data
     use_prealignment = True if force_prealignment else False
 
-    if use_prealignment:
-        logging.info('Use pre-alignment data')
-    else:
-        logging.info('Use alignment data')
-
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        z_positions = in_file_h5.root.PreAlignment[:]['z']
-        if not use_prealignment:
-            try:
-                alignment = in_file_h5.root.Alignment[:]
-                use_prealignment = False
-            except tb.exceptions.NodeError:
-                z_positions = in_file_h5.root.PreAlignment[:]['z']
-                use_prealignment = True
-        n_duts = z_positions.shape[0]
+        if use_prealignment:
+            logging.info('Use pre-alignment data')
+            prealignment = in_file_h5.root.PreAlignment[:]
+            n_duts = prealignment.shape[0]
+        else:
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+            n_duts = alignment.shape[0]
 
     if fit_duts is None:
         fit_duts = range(n_duts)  # standard setting: fit tracks for all DUTs
