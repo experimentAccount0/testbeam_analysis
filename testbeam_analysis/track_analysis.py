@@ -303,16 +303,16 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         return tracks_array
 
     def store_track_data(fit_dut, min_track_distance):  # Set the offset to the track intersection with the tilted plane and store the data
-        if not use_prealignment:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
+        if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+            dut_position = np.array([0., 0., prealignment['z'][fit_dut]])
+            dut_plane_normal = np.array([0., 0., 1.])
+        else:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
             dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
             rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
                                                              beta=alignment[fit_dut]['beta'],
                                                              gamma=alignment[fit_dut]['gamma'])
             basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
             dut_plane_normal = basis_global[2]
-        else:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
-            dut_position = np.array([0., 0., z_positions[fit_dut]])
-            dut_plane_normal = np.array([0., 0., 1.])
 
         # Set the offset to the track intersection with the tilted plane
         actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
