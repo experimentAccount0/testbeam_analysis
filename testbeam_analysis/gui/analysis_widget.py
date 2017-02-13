@@ -143,8 +143,10 @@ class AnalysisWidget(QtWidgets.QWidget):
                     'Cannot deduce data type for %s, because no default parameter exists', option)
 
         # Get optional argument from default function argument
-        if optional is None and not default_value:
+        if optional is None and default_value is None:
             optional = True
+        else:
+            optional = False
 
         # Create widget according to data type
         if 'str' in dtype:

@@ -41,8 +41,11 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: optional not implemented
             lambda: slider.setMaximum(float(value.text()) * 2))
         slider.valueChanged.connect(lambda v: self.valueChanged.emit(v))
 
-        if default_value:
+        if default_value is not None:
             slider.setValue(default_value)
+            # Needed because set value does not issue a value changed
+            # if value stays constant
+            value.setText(str(slider.value()))
 
 
 class OptionText(QtWidgets.QWidget):
@@ -81,7 +84,7 @@ class OptionText(QtWidgets.QWidget):
         self.edit.textChanged.connect(
             lambda: self.valueChanged.emit(self.edit.text()))
 
-        if default_value:
+        if default_value is not None:
             self.edit.setText(default_value)
 
     def _set_readonly(self, value=True):
