@@ -76,7 +76,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                                         setup=setup,
                                                         options=options)
             else:
-                #                 logging.warning('GUI for %s not implemented yet', name)
+                logging.info('GUI for %s not implemented yet', name)
                 continue
             tabs.addTab(widget, name)
 
