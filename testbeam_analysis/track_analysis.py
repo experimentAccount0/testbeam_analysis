@@ -395,7 +395,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 os.remove(output_tracks_file)
             except OSError:
                 pass
-            with tb.open_file(output_tracks_file, mode='a') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
+            with tb.open_file(output_tracks_file, mode='w') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
                 if min_track_distance is True:
                     min_track_distance = np.array([(200.)] * n_duts)
                 elif min_track_distance is False:
