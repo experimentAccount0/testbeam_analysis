@@ -638,7 +638,7 @@ def refit_advanced(x_data, y_data, y_fit, p0):
     return coeff, var_matrix
 
 
-def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
+def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
     ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hits positions. The alignment data is used. If this is not
     available a fallback to the pre-alignment is done.
     One can also inverse the alignment or apply the alignment without changing the z position.
@@ -650,7 +650,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=Fa
     ----------
     input_hit_file : string
         Filename of the input hits file (e.g. merged data file, tracklets file, etc.).
-    input_alignment : string
+    input_alignment_file : string
         Filename of the input alignment file.
     output_hit_file : string
         Filename of the output hits file with hit data after alignment was applied.
@@ -670,7 +670,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=Fa
     use_prealignment = True if force_prealignment else False
 
     try:
-        with tb.open_file(input_alignment, mode="r") as in_file_h5:  # Open file with alignment data
+        with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
             alignment = in_file_h5.root.PreAlignment[:]
             if not use_prealignment:
                 try:
@@ -983,7 +983,7 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
     # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
     logging.info('= Alignment step 1: Revert pre-alignment =')
     apply_alignment(input_hit_file=track_candidates_reduced,
-                    input_alignment=alignment_file,  # Revert prealignent
+                    input_alignment_file=alignment_file,  # Revert prealignent
                     output_hit_file=os.path.splitext(track_candidates_reduced)[0] + '_not_aligned.h5',
                     inverse=True,
                     force_prealignment=True,
@@ -1010,8 +1010,8 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
         with PdfPages(os.path.join(os.path.dirname(os.path.realpath(track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
             # Apply final alignment result
             apply_alignment(input_hit_file=os.path.splitext(track_candidates_reduced)[0] + '_not_aligned.h5',
-                            input_alignment=alignment_file,
-                            output_hit_file=os.path.splitext(track_candidates_file)[0] + '_final_tmp_%d.h5' % alignment_index,
+                            input_alignment_file=alignment_file,
+                            output_hit_file=os.path.splitext(track_candidates_file)[0] + '_final_tmp_%s.h5' % alignment_index,
                             chunk_size=chunk_size)
             fit_tracks(input_track_candidates_file=os.path.splitext(track_candidates_file)[0] + '_final_tmp_%d.h5' % alignment_index,
                        input_alignment_file=alignment_file,

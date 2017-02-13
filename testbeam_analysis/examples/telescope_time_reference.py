@@ -111,7 +111,7 @@ def run_analysis():
 
     # Apply the prealignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
-                                  input_alignment=os.path.join(output_folder, 'Alignment.h5'),
+                                  input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                   output_hit_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
                                   force_prealignment=True)
 
@@ -170,14 +170,14 @@ def run_analysis():
     # Revert alignment from track candidates. Usually one would just apply the alignment to the merged data.
     # Due to the large beam angle track finding fails on aligned data. Thus rely on the found tracks from prealignment.
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'TrackCandidates_prealignment_reduced.h5'),
-                                  input_alignment=os.path.join(output_folder, 'Alignment.h5'),
+                                  input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                   output_hit_file=os.path.join(output_folder, 'Merged_small.h5'),  # This is the new not aligned but preselected merged data file to apply (pre-) alignment on
                                   inverse=True,
                                   force_prealignment=True)
 
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged_small.h5'),
-                                  input_alignment=os.path.join(output_folder, 'Alignment.h5'),
+                                  input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                   output_hit_file=os.path.join(output_folder, 'TrackCandidates.h5'))
 
     # Fit track using alignment
