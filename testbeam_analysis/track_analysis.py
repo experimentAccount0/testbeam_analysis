@@ -165,7 +165,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone and will not be implemented.
         If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
         e.g.: For two devices: min_track_distance = (50, 250)
-        If false the track distance is not considered.
+        If False, the minimum track distance is not considered.
     '''
     logging.info('=== Fitting tracks ===')
 
