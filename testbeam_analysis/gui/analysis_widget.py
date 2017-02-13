@@ -93,11 +93,13 @@ class AnalysisWidget(QtWidgets.QWidget):
 
     def add_options_auto(self):
         for name in get_default_args(self.func):
+            # Only add as function parameter if the info is not
+            # given in setup/option data structures
             if name in self.setup:
                 self.add_fixed_option(option=name, value=self.setup[name])
-            if name in self.options:
+            elif name in self.options:
                 self.add_fixed_option(option=name, value=self.options[name])
-            elif name not in self.options:
+            else:
                 self.add_option(option=name)
 
     def add_option(self, option, dtype=None, name=None, optional=None):
