@@ -1,6 +1,7 @@
 import os
 import inspect
 import logging
+import math
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
@@ -225,8 +226,11 @@ class AnalysisWidget(QtWidgets.QWidget):
 
     def _set_argument(self, name, value):
         # Workaround for https://www.riverbankcomputing.com/pipermail/pyqt/2016-June/037662.html
-        # Cannot transmit None for signals with string
+        # Cannot transmit None for signals with string (likely also float)
+        print name, value
         if type(value) == str and 'None' in value:
+            value = None
+        if type(value) == float and math.isnan(value):
             value = None
         self.keywords[name] = value
 

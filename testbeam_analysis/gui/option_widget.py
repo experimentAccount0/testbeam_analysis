@@ -7,13 +7,13 @@
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 
-class OptionSlider(QtWidgets.QWidget):  # FIXME: optional not implemented
+class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
     ''' Option slider for numbers
 
         Shows the value as text and can increase range
     '''
 
-    valueChanged = QtCore.pyqtSignal([int], [float])
+    valueChanged = QtCore.pyqtSignal([float])
 
     def __init__(self, name, default_value, optional, tooltip, parent=None):
         super(OptionSlider, self).__init__(parent)
@@ -21,34 +21,69 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: optional not implemented
         # Slider with textbox to the right
         layout_2 = QtWidgets.QHBoxLayout()
         slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        value = QtWidgets.QLineEdit()
+        self.edit = QtWidgets.QLineEdit()
         validator = QtGui.QDoubleValidator()
-        value.setValidator(validator)
-        value.setMaxLength(3)
+        self.edit.setValidator(validator)
+        self.edit.setMaxLength(3)
         size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred,
                                             QtWidgets.QSizePolicy.Preferred)
-        value.setSizePolicy(size_policy)
+        self.edit.setSizePolicy(size_policy)
         layout_2.addWidget(slider)
-        layout_2.addWidget(value)
+        layout_2.addWidget(self.edit)
 
         # Option name with slider below
-        layout_1 = QtWidgets.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         text = QtWidgets.QLabel(name)
         if tooltip:
             text.setToolTip(tooltip)
-        layout_1.addWidget(text)
-        layout_1.addLayout(layout_2)
+        if optional:
+            layout_1 = QtWidgets.QHBoxLayout()
+            layout_1.addWidget(text)
+            layout_1.addStretch(0)
+            check_box = QtWidgets.QCheckBox()
+            layout_1.addWidget(check_box)
+            layout.addLayout(layout_1)
 
-        slider.valueChanged.connect(lambda v: value.setText(str(v)))
-        value.returnPressed.connect(
-            lambda: slider.setMaximum(float(value.text()) * 2))
-        slider.valueChanged.connect(lambda v: self.valueChanged.emit(v))
+            check_box.stateChanged.connect(
+                lambda v: self._set_readonly(v == 0))
+        else:
+            layout.addWidget(text)
+        layout.addLayout(layout_2)
+
+        slider.valueChanged.connect(lambda v: self.edit.setText(str(v)))
+        self.edit.returnPressed.connect(
+            lambda: slider.setMaximum(float(self.edit.text()) * 2))
+        slider.valueChanged.connect(lambda v: self._emit_value())
 
         if default_value is not None:
             slider.setValue(default_value)
             # Needed because set value does not issue a value changed
             # if value stays constant
-            value.setText(str(slider.value()))
+            self.edit.setText(str(slider.value()))
+
+    def _set_readonly(self, value=True):
+        if value:
+            palette = QtGui.QPalette()
+            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.gray)
+            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
+            self.edit.setPalette(palette)
+            self.edit.setReadOnly(True)
+            self._emit_value()
+        else:
+            palette = QtGui.QPalette()
+            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.white)
+            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+            self.edit.setPalette(palette)
+            self.edit.setReadOnly(False)
+            self._emit_value()
+
+    def _emit_value(self):
+        if self.edit.isReadOnly() or not self.edit.text():
+            print 'READONLY'
+            self.valueChanged.emit(float('nan'))
+        else:
+            print 'WRITEALSO'
+            self.valueChanged.emit(int(self.edit.text()))
 
 
 class OptionText(QtWidgets.QWidget):
@@ -140,17 +175,3 @@ class OptionBool(QtWidgets.QWidget):  # FIXME: optional not implemented
         if default_value is not None:
             rb_t.setChecked(default_value is True)
             rb_f.setChecked(default_value is False)
-
-    def _set_readonly(self, value=True):
-        if value:
-            palette = QtGui.QPalette()
-            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.gray)
-            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
-            self.edit.setPalette(palette)
-            self.edit.setReadOnly(True)
-        else:
-            palette = QtGui.QPalette()
-            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.white)
-            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
-            self.edit.setPalette(palette)
-            self.edit.setReadOnly(False)
