@@ -1051,7 +1051,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
             raise RuntimeError('Did not converge to good solution in %d iterations. Increase max_iterations', iteration)
 
         apply_alignment(input_hit_file=track_candidates_file,  # Always apply alignment to starting file
-                        input_alignment=alignment_file,
+                        input_alignment_file=alignment_file,
                         output_hit_file=os.path.splitext(track_candidates_file)[0] + '_no_align_%d_tmp.h5' % iteration,
                         inverse=False,
                         force_prealignment=False,
