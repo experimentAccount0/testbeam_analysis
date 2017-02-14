@@ -484,6 +484,8 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         auto_button.on_clicked(update_auto)
         refit_button.on_clicked(refit)
         ok_button.on_clicked(finish)
+        # refit on pressing close button, same effect as OK button
+        fig.canvas.mpl_connect(s='close_event', func=finish)
 
     if non_interactive:
         update_auto(None)
