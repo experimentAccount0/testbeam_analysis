@@ -400,13 +400,12 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     def finish(event):  # Fit result is ok
         global do_refit
         do_refit = False  # Set to signal that no refit is required anymore
-        fit_data()
         update_selected_data()
+        fit_data()
         plt.close()  # Close the plot to let the program continue (blocking)
 
     def refit(event):
         fit_data()
-        update_selected_data()
         update_plot()
 
     def fit_data():
