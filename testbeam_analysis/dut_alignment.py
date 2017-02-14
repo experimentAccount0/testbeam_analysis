@@ -102,8 +102,8 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
 
         # Store the correlation histograms
         for dut_index in range(n_duts - 1):
-            out_col = out_file_h5.create_carray(out_file_h5.root, name='CorrelationColumn_%d_0' % (dut_index + 1), title='Column Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(column_correlations[dut_index].dtype), shape=column_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            out_row = out_file_h5.create_carray(out_file_h5.root, name='CorrelationRow_%d_0' % (dut_index + 1), title='Row Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(row_correlations[dut_index].dtype), shape=row_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            out_col = out_file_h5.create_carray(out_file_h5.root, name='CorrelationColumn_%d_0' % (dut_index + 1), title='Column Correlation between DUT%d and DUT%d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(column_correlations[dut_index].dtype), shape=column_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            out_row = out_file_h5.create_carray(out_file_h5.root, name='CorrelationRow_%d_0' % (dut_index + 1), title='Row Correlation between DUT%d and DUT%d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(row_correlations[dut_index].dtype), shape=row_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             out_col.attrs.filenames = [str(input_cluster_files[0]), str(input_cluster_files[dut_index])]
             out_row.attrs.filenames = [str(input_cluster_files[0]), str(input_cluster_files[dut_index])]
             out_col[:] = column_correlations[dut_index]
@@ -271,8 +271,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             dut_idx = int(indices[0])
             ref_idx = int(indices[1])
             result[dut_idx]['DUT'] = dut_idx
-            dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
-            ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
+            dut_name = dut_names[dut_idx] if dut_names else ("DUT" + str(dut_idx))
+            ref_name = dut_names[ref_idx] if dut_names else ("DUT" + str(ref_idx))
             logging.info('Aligning data from %s', node.name)
 
             if "column" in node.name.lower():
@@ -1176,7 +1176,7 @@ def _analyze_residuals(residuals_file, fit_duts, pixel_size, n_duts, translation
                                           edges=hist_node._v_attrs.xedges,
                                           fit=hist_node._v_attrs.fit_coeff,
                                           fit_errors=hist_node._v_attrs.fit_cov,
-                                          title='Residuals for DUT %d' % dut_index,
+                                          title='Residuals for DUT%d' % dut_index,
                                           x_label='X residual [um]',
                                           output_pdf=output_pdf)
 
@@ -1194,7 +1194,7 @@ def _analyze_residuals(residuals_file, fit_duts, pixel_size, n_duts, translation
                                           edges=hist_node._v_attrs.xedges,
                                           fit=hist_node._v_attrs.fit_coeff,
                                           fit_errors=hist_node._v_attrs.fit_cov,
-                                          title='Residuals for DUT %d' % dut_index,
+                                          title='Residuals for DUT%d' % dut_index,
                                           x_label='Y residual [um]',
                                           output_pdf=output_pdf)
 
@@ -1307,7 +1307,7 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
                                     offsets,
                                     slopes)
             residuals_before.append(residual)
-            logging.info('Optimize angles / z of DUT %d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
+            logging.info('Optimize angles / z of DUT%d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
                                                                                                                                              alpha,
                                                                                                                                              beta,
                                                                                                                                              gamma,
@@ -1335,7 +1335,7 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
                                     slopes)
             residuals_after.append(residual)
 
-            logging.info('Found angles of DUT %d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
+            logging.info('Found angles of DUT%d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
                                                                                                                                  alpha,
                                                                                                                                  beta,
                                                                                                                                  gamma,

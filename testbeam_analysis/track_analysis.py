@@ -404,7 +404,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
-                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', actual_fit_dut)
+                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT%d', actual_fit_dut)
                         continue
 
                     progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.TrackCandidates.shape[0], term_width=80)

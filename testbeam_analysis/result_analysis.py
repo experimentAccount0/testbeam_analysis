@@ -84,7 +84,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
-                logging.debug('Calculate residuals for DUT %d', actual_dut)
+                logging.debug('Calculate residuals for DUT%d', actual_dut)
 
                 initialize = True  # initialize the histograms
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
@@ -364,7 +364,7 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
 
                 logging.debug('Storing residual histograms...')
 
-                dut_name = dut_names[actual_dut] if dut_names else ("DUT " + str(actual_dut))
+                dut_name = dut_names[actual_dut] if dut_names else ("DUT" + str(actual_dut))
                 # Global residuals
                 fit_residual_x, cov_residual_x = analysis_utils.fit_residuals(
                     hist=hist_residual_x_hist,
@@ -680,7 +680,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
             actual_dut = int(re.findall(r'\d+', node.name)[-1])
             if use_duts and actual_dut not in use_duts:
                 continue
-            logging.info('Calculate efficiency for DUT %d', actual_dut)
+            logging.info('Calculate efficiency for DUT%d', actual_dut)
 
             # Calculate histogram properties (bins size and number of bins)
             bin_size = [bin_size, ] if not isinstance(bin_size, Iterable) else bin_size
@@ -787,7 +787,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
                 total_track_density_with_DUT_hit += np.histogram2d(intersection_valid_hit[:, 0], intersection_valid_hit[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]
 
                 if np.all(total_track_density == 0):
-                    logging.warning('No tracks on DUT %d, cannot calculate efficiency', actual_dut)
+                    logging.warning('No tracks on DUT%d, cannot calculate efficiency', actual_dut)
                     continue
 
             efficiency = np.zeros_like(total_track_density_with_DUT_hit)

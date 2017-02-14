@@ -526,8 +526,8 @@ def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_er
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc=0)
     ax1.set_title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
-    ax1.set_xlabel("%s [um]" % dut_name)
-    ax1.set_ylabel("%s [um]" % ref_name)
+    ax1.set_xlabel("%s %s [um]" % (prefix.title(), dut_name))
+    ax1.set_ylabel("%s %s [um]" % (prefix.title(), ref_name))
     ax2.set_ylabel("Error / Offset [a.u.]")
     ax1.grid()
     # put ax in front of ax2
@@ -717,7 +717,7 @@ def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
         ax.set_xlabel('Track Chi2 [um*um]')
         ax.set_ylabel('#')
         ax.set_yscale('log')
-        ax.set_title('Track Chi2 for DUT %d tracks' % fit_dut)
+        ax.set_title('Track Chi2 for DUT%d tracks' % fit_dut)
         output_pdf.savefig(fig)
 
 
@@ -825,7 +825,7 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
-                logging.info('Plot track density for DUT %d', actual_dut)
+                logging.info('Plot track density for DUT%d', actual_dut)
 
                 track_array = node[:]
 
@@ -868,14 +868,14 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT%d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_pdf.savefig(fig)
 
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_pdf.savefig(fig)
 
@@ -925,7 +925,7 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
 
                     if use_duts and actual_dut not in use_duts:
                         continue
-                    logging.info('Plot charge distribution for DUT %d', actual_dut)
+                    logging.info('Plot charge distribution for DUT%d', actual_dut)
 
                     track_array = in_file_h5.root.TrackCandidates[:]
 
@@ -941,7 +941,7 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
                     fig = Figure()
                     _ = FigureCanvas(fig)
                     ax = fig.add_subplot(111)
-                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
+                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT%d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
                     fig.tight_layout()
                     output_pdf.savefig(fig)
 
@@ -957,21 +957,21 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT%d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT%d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
+    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT%d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
     fig.tight_layout()
     output_pdf.savefig(fig)
 
@@ -995,21 +995,21 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT%d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT%d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_pdf.savefig(fig)
 
@@ -1020,7 +1020,7 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         z_min = np.ma.min(efficiency)
         if z_min == 100.:  # One cannot plot with 0 z axis range
             z_min = 90.
-        plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
+        plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT%d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
         fig.tight_layout()
         output_pdf.savefig(fig)
 
@@ -1028,7 +1028,7 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         _ = FigureCanvas(fig)
         ax = fig.add_subplot(111)
         ax.grid()
-        ax.set_title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
+        ax.set_title('Efficiency per pixel for DUT%d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
         ax.set_xlabel('Efficiency [%]')
         ax.set_ylabel('#')
         ax.set_yscale('log')
@@ -1064,7 +1064,7 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 if dut_names is not None:
                     dut_name = dut_names[actual_dut]
                 else:
-                    dut_name = "DUT %d" % actual_dut
+                    dut_name = "DUT%d" % actual_dut
                 track_angle_hist = node[:]
                 edges = node._v_attrs.edges * 1000  # conversion to mrad
                 mean = node._v_attrs.mean * 1000  # conversion to mrad
