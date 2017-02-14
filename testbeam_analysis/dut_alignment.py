@@ -393,7 +393,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     # Stop in non interactive mode if the number of refits (iterations) is reached
                     if non_interactive:
                         actual_iteration += 1
-                        if actual_iteration > iterations:
+                        if actual_iteration >= iterations:
                             break
 
                 # Linear fit, usually describes correlation very well, slope is close to 1.
