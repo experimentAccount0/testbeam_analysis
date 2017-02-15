@@ -669,8 +669,10 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
             alignment = in_file_h5.root.Alignment[:]
             n_duts = alignment.shape[0]
 
+    use_duts = use_duts if use_duts is not None else range(n_duts)  # standard setting: fit tracks for all DUTs
+
     if not isinstance(max_chi2, Iterable):
-        max_chi2 = [max_chi2] * n_duts
+        max_chi2 = [max_chi2] * len(use_duts)
 
     efficiencies = []
     pass_tracks = []
@@ -678,7 +680,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
         for index, node in enumerate(in_file_h5.root):
             actual_dut = int(re.findall(r'\d+', node.name)[-1])
-            if use_duts and actual_dut not in use_duts:
+            if actual_dut not in use_duts:
                 continue
             logging.info('Calculate efficiency for DUT%d', actual_dut)
 
