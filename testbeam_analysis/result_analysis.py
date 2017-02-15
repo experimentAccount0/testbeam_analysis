@@ -683,21 +683,24 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if actual_dut not in use_duts:
                     continue
+                dut_index = np.where(np.array(use_duts) == actual_dut)[0][0]
                 logging.info('Calculate efficiency for DUT%d', actual_dut)
 
                 # Calculate histogram properties (bins size and number of bins)
                 bin_size = [bin_size, ] if not isinstance(bin_size, Iterable) else bin_size
-                if len(bin_size) != 1:
-                    actual_bin_size_x = bin_size[index][0]
-                    actual_bin_size_y = bin_size[index][1]
-                else:
+                if len(bin_size) == 1:
                     actual_bin_size_x = bin_size[0][0]
                     actual_bin_size_y = bin_size[0][1]
+                else:
+                    actual_bin_size_x = bin_size[dut_index][0]
+                    actual_bin_size_y = bin_size[dut_index][1]
+
                 dimensions = [sensor_size, ] if not isinstance(sensor_size, Iterable) else sensor_size  # Sensor dimensions for each DUT
                 if len(dimensions) == 1:
                     dimensions = dimensions[0]
                 else:
-                    dimensions = dimensions[index]
+                    dimensions = dimensions[dut_index]
+
                 n_bin_x = int(dimensions[0] / actual_bin_size_x)
                 n_bin_y = int(dimensions[1] / actual_bin_size_y)
 
@@ -707,7 +710,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
                 total_track_density = np.zeros(shape=(n_bin_x, n_bin_y))
                 total_track_density_with_DUT_hit = np.zeros(shape=(n_bin_x, n_bin_y))
 
-                actual_max_chi2 = max_chi2[index]
+                actual_max_chi2 = max_chi2[dut_index]
 
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
                     # Cut in Chi 2 of the track fit
@@ -757,16 +760,21 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
 
                     # Select hits from column, row range (e.g. to supress edge pixels)
                     col_range = [col_range, ] if not isinstance(col_range, Iterable) else col_range
-                    row_range = [row_range, ] if not isinstance(row_range, Iterable) else row_range
                     if len(col_range) == 1:
-                        index = 0
-                    if len(row_range) == 1:
-                        index = 0
-                    if col_range[index] is not None:
-                        selection = np.logical_and(intersections_local[:, 0] >= col_range[index][0], intersections_local[:, 0] <= col_range[index][1])  # Select real hits
+                        curr_col_range = col_range[0]
+                    else:
+                        curr_col_range = col_range[dut_index]
+                    if curr_col_range is not None:
+                        selection = np.logical_and(intersections_local[:, 0] >= curr_col_range[0], intersections_local[:, 0] <= curr_col_range[1])  # Select real hits
                         hits_local, intersections_local = hits_local[selection], intersections_local[selection]
-                    if row_range[index] is not None:
-                        selection = np.logical_and(intersections_local[:, 1] >= row_range[index][0], intersections_local[:, 1] <= row_range[index][1])  # Select real hits
+
+                    row_range = [row_range, ] if not isinstance(row_range, Iterable) else row_range
+                    if len(row_range) == 1:
+                        curr_row_range = row_range[0]
+                    else:
+                        curr_row_range = row_range[dut_index]
+                    if curr_row_range is not None:
+                        selection = np.logical_and(intersections_local[:, 1] >= curr_row_range[0], intersections_local[:, 1] <= curr_row_range[1])  # Select real hits
                         hits_local, intersections_local = hits_local[selection], intersections_local[selection]
 
                     # Calculate distance between track hit and DUT hit
