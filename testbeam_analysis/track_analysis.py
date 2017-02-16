@@ -165,28 +165,22 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone and will not be implemented.
         If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
         e.g.: For two devices: min_track_distance = (50, 250)
-        If false the track distance is not considered.
+        If False, the minimum track distance is not considered.
     '''
     logging.info('=== Fitting tracks ===')
 
     # Load alignment data
     use_prealignment = True if force_prealignment else False
 
-    if use_prealignment:
-        logging.info('Use pre-alignment data')
-    else:
-        logging.info('Use alignment data')
-
     with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
-        z_positions = in_file_h5.root.PreAlignment[:]['z']
-        if not use_prealignment:
-            try:
-                alignment = in_file_h5.root.Alignment[:]
-                use_prealignment = False
-            except tb.exceptions.NodeError:
-                z_positions = in_file_h5.root.PreAlignment[:]['z']
-                use_prealignment = True
-        n_duts = z_positions.shape[0]
+        if use_prealignment:
+            logging.info('Use pre-alignment data')
+            prealignment = in_file_h5.root.PreAlignment[:]
+            n_duts = prealignment.shape[0]
+        else:
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+            n_duts = alignment.shape[0]
 
     if fit_duts is None:
         fit_duts = range(n_duts)  # standard setting: fit tracks for all DUTs
@@ -309,16 +303,16 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         return tracks_array
 
     def store_track_data(fit_dut, min_track_distance):  # Set the offset to the track intersection with the tilted plane and store the data
-        if not use_prealignment:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
+        if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+            dut_position = np.array([0., 0., prealignment['z'][fit_dut]])
+            dut_plane_normal = np.array([0., 0., 1.])
+        else:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
             dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
             rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
                                                              beta=alignment[fit_dut]['beta'],
                                                              gamma=alignment[fit_dut]['gamma'])
             basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
             dut_plane_normal = basis_global[2]
-        else:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
-            dut_position = np.array([0., 0., z_positions[fit_dut]])
-            dut_plane_normal = np.array([0., 0., 1.])
 
         # Set the offset to the track intersection with the tilted plane
         actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
@@ -395,7 +389,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 os.remove(output_tracks_file)
             except OSError:
                 pass
-            with tb.open_file(output_tracks_file, mode='a') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
+            with tb.open_file(output_tracks_file, mode='w') as out_file_h5:  # Append mode to be able to append to existing tables; file is created here since old file is deleted
                 if min_track_distance is True:
                     min_track_distance = np.array([(200.)] * n_duts)
                 elif min_track_distance is False:
@@ -410,7 +404,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                     dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
-                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT %d', actual_fit_dut)
+                        logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT%d', actual_fit_dut)
                         continue
 
                     progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.TrackCandidates.shape[0], term_width=80)

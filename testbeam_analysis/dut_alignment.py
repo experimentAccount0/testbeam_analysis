@@ -102,8 +102,8 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
 
         # Store the correlation histograms
         for dut_index in range(n_duts - 1):
-            out_col = out_file_h5.create_carray(out_file_h5.root, name='CorrelationColumn_%d_0' % (dut_index + 1), title='Column Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(column_correlations[dut_index].dtype), shape=column_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-            out_row = out_file_h5.create_carray(out_file_h5.root, name='CorrelationRow_%d_0' % (dut_index + 1), title='Row Correlation between DUT %d and %d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(row_correlations[dut_index].dtype), shape=row_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            out_col = out_file_h5.create_carray(out_file_h5.root, name='CorrelationColumn_%d_0' % (dut_index + 1), title='Column Correlation between DUT%d and DUT%d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(column_correlations[dut_index].dtype), shape=column_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+            out_row = out_file_h5.create_carray(out_file_h5.root, name='CorrelationRow_%d_0' % (dut_index + 1), title='Row Correlation between DUT%d and DUT%d' % (dut_index + 1, 0), atom=tb.Atom.from_dtype(row_correlations[dut_index].dtype), shape=row_correlations[dut_index].shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
             out_col.attrs.filenames = [str(input_cluster_files[0]), str(input_cluster_files[dut_index])]
             out_row.attrs.filenames = [str(input_cluster_files[0]), str(input_cluster_files[dut_index])]
             out_col[:] = column_correlations[dut_index]
@@ -271,8 +271,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             dut_idx = int(indices[0])
             ref_idx = int(indices[1])
             result[dut_idx]['DUT'] = dut_idx
-            dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
-            ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
+            dut_name = dut_names[dut_idx] if dut_names else ("DUT" + str(dut_idx))
+            ref_name = dut_names[ref_idx] if dut_names else ("DUT" + str(ref_idx))
             logging.info('Aligning data from %s', node.name)
 
             if "column" in node.name.lower():
@@ -393,7 +393,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                     # Stop in non interactive mode if the number of refits (iterations) is reached
                     if non_interactive:
                         actual_iteration += 1
-                        if actual_iteration > iterations:
+                        if actual_iteration >= iterations:
                             break
 
                 # Linear fit, usually describes correlation very well, slope is close to 1.
@@ -638,7 +638,7 @@ def refit_advanced(x_data, y_data, y_fit, p0):
     return coeff, var_matrix
 
 
-def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
+def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
     ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hits positions. The alignment data is used. If this is not
     available a fallback to the pre-alignment is done.
     One can also inverse the alignment or apply the alignment without changing the z position.
@@ -650,7 +650,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=Fa
     ----------
     input_hit_file : string
         Filename of the input hits file (e.g. merged data file, tracklets file, etc.).
-    input_alignment : string
+    input_alignment_file : string
         Filename of the input alignment file.
     output_hit_file : string
         Filename of the output hits file with hit data after alignment was applied.
@@ -670,35 +670,35 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=Fa
     use_prealignment = True if force_prealignment else False
 
     try:
-        with tb.open_file(input_alignment, mode="r") as in_file_h5:  # Open file with alignment data
-            alignment = in_file_h5.root.PreAlignment[:]
-            if not use_prealignment:
-                try:
-                    alignment = in_file_h5.root.Alignment[:]
-                    logging.info('Use alignment data from file')
-                except tb.exceptions.NodeError:
-                    use_prealignment = True
-                    logging.info('Use pre-alignment data from file')
-    except TypeError:  # The input_alignment is an array
-        alignment = input_alignment
+        with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+            if use_prealignment:
+                logging.info('Use pre-alignment data')
+                prealignment = in_file_h5.root.PreAlignment[:]
+                n_duts = prealignment.shape[0]
+            else:
+                logging.info('Use alignment data')
+                alignment = in_file_h5.root.Alignment[:]
+                n_duts = alignment.shape[0]
+    except TypeError:  # The input_alignment_file is an array
+        alignment = input_alignment_file
         try:  # Check if array is prealignent array
             alignment['column_c0']
             logging.info('Use pre-alignment data')
+            n_duts = prealignment.shape[0]
             use_prealignment = True
         except ValueError:
             logging.info('Use alignment data')
+            n_duts = alignment.shape[0]
             use_prealignment = False
 
-    n_duts = alignment.shape[0]
-
-    def apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z):
+    def apply_alignment_to_chunk(hits_chunk, dut_index, use_prealignment, alignment, inverse, no_z):
         if use_prealignment:  # Apply transformation from pre-alignment information
             hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
                 hits_x=hits_chunk['x_dut_%d' % dut_index],
                 hits_y=hits_chunk['y_dut_%d' % dut_index],
                 hits_z=hits_chunk['z_dut_%d' % dut_index],
                 dut_index=dut_index,
-                prealignment=alignment,
+                prealignment=prealignment,
                 inverse=inverse)
         else:  # Apply transformation from fine alignment information
             hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
@@ -731,7 +731,7 @@ def apply_alignment(input_hit_file, input_alignment, output_hit_file, inverse=Fa
                         if use_duts is not None and dut_index not in use_duts:  # omit DUT
                             continue
 
-                        apply_alignment_to_chunk(hits_chunk, dut_index, alignment, inverse, no_z)
+                        apply_alignment_to_chunk(hits_chunk=hits_chunk, dut_index=dut_index, use_prealignment=use_prealignment, alignment=prealignment if use_prealignment else alignment, inverse=inverse, no_z=no_z)
 
                     hits_aligned_table.append(hits_chunk)
                     progress_bar.update(index)
@@ -983,7 +983,7 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
     # Step 1: Take the found tracks and revert the pre-alignment to start alignment from the beginning
     logging.info('= Alignment step 1: Revert pre-alignment =')
     apply_alignment(input_hit_file=track_candidates_reduced,
-                    input_alignment=alignment_file,  # Revert prealignent
+                    input_alignment_file=alignment_file,  # Revert prealignent
                     output_hit_file=os.path.splitext(track_candidates_reduced)[0] + '_not_aligned.h5',
                     inverse=True,
                     force_prealignment=True,
@@ -1010,8 +1010,8 @@ def _duts_alignment(track_candidates_file, alignment_file, alignment_index, alig
         with PdfPages(os.path.join(os.path.dirname(os.path.realpath(track_candidates_file)), 'Alignment_%d.pdf' % alignment_index)) as output_pdf:
             # Apply final alignment result
             apply_alignment(input_hit_file=os.path.splitext(track_candidates_reduced)[0] + '_not_aligned.h5',
-                            input_alignment=alignment_file,
-                            output_hit_file=os.path.splitext(track_candidates_file)[0] + '_final_tmp_%d.h5' % alignment_index,
+                            input_alignment_file=alignment_file,
+                            output_hit_file=os.path.splitext(track_candidates_file)[0] + '_final_tmp_%s.h5' % alignment_index,
                             chunk_size=chunk_size)
             fit_tracks(input_track_candidates_file=os.path.splitext(track_candidates_file)[0] + '_final_tmp_%d.h5' % alignment_index,
                        input_alignment_file=alignment_file,
@@ -1051,7 +1051,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
             raise RuntimeError('Did not converge to good solution in %d iterations. Increase max_iterations', iteration)
 
         apply_alignment(input_hit_file=track_candidates_file,  # Always apply alignment to starting file
-                        input_alignment=alignment_file,
+                        input_alignment_file=alignment_file,
                         output_hit_file=os.path.splitext(track_candidates_file)[0] + '_no_align_%d_tmp.h5' % iteration,
                         inverse=False,
                         force_prealignment=False,
@@ -1098,6 +1098,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
         new_alignment_parameters = geometry_utils.merge_alignment_parameters(
             alignment_last_iteration,
             alignment_parameters_change,
+            select_duts=fit_duts,
             mode='relative')
 
         # FIXME: This step does not work well
@@ -1176,7 +1177,7 @@ def _analyze_residuals(residuals_file, fit_duts, pixel_size, n_duts, translation
                                           edges=hist_node._v_attrs.xedges,
                                           fit=hist_node._v_attrs.fit_coeff,
                                           fit_errors=hist_node._v_attrs.fit_cov,
-                                          title='Residuals for DUT %d' % dut_index,
+                                          title='Residuals for DUT%d' % dut_index,
                                           x_label='X residual [um]',
                                           output_pdf=output_pdf)
 
@@ -1194,7 +1195,7 @@ def _analyze_residuals(residuals_file, fit_duts, pixel_size, n_duts, translation
                                           edges=hist_node._v_attrs.xedges,
                                           fit=hist_node._v_attrs.fit_coeff,
                                           fit_errors=hist_node._v_attrs.fit_cov,
-                                          title='Residuals for DUT %d' % dut_index,
+                                          title='Residuals for DUT%d' % dut_index,
                                           x_label='Y residual [um]',
                                           output_pdf=output_pdf)
 
@@ -1307,7 +1308,7 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
                                     offsets,
                                     slopes)
             residuals_before.append(residual)
-            logging.info('Optimize angles / z of DUT %d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
+            logging.info('Optimize angles / z of DUT%d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
                                                                                                                                              alpha,
                                                                                                                                              beta,
                                                                                                                                              gamma,
@@ -1335,7 +1336,7 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
                                     slopes)
             residuals_after.append(residual)
 
-            logging.info('Found angles of DUT %d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
+            logging.info('Found angles of DUT%d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
                                                                                                                                  alpha,
                                                                                                                                  beta,
                                                                                                                                  gamma,

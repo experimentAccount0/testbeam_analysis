@@ -145,7 +145,7 @@ def run_analysis():
     # Apply the prealignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(
         input_hit_file=os.path.join(output_folder, 'Merged.h5'),
-        input_alignment=os.path.join(output_folder, 'Alignment.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_hit_file=os.path.join(output_folder,
                                              'Tracklets_prealigned.h5'),
         force_prealignment=True)
@@ -206,7 +206,7 @@ def run_analysis():
     # Apply the alignment to the merged cluster table to create tracklets
     dut_alignment.apply_alignment(
         input_hit_file=os.path.join(output_folder, 'Merged.h5'),
-        input_alignment=os.path.join(output_folder, 'Alignment.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_hit_file=os.path.join(output_folder, 'Tracklets.h5')
     )
 

@@ -210,50 +210,58 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     global offset_limit
     global left_limit
     global right_limit
-    global x_diff
     global offset
     global fit
     global fit_fn
-
-    x_diff = np.diff(x)[0]
 
     do_refit = True  # True as long as not the Refit button is pressed, needed to signal calling function that the fit is ok or not
 
     def update_offset(offset_limit_new):  # Function called when offset slider is moved
         global selected_data
-        global offset
         global offset_limit
-        if np.count_nonzero(np.abs(offset[selected_data]) <= offset_limit_new) > 1:
-            offset_limit = offset_limit_new
+        offset_limit_tmp = offset_limit
+        offset_limit = offset_limit_new
         update_selected_data()
+        if np.count_nonzero(selected_data) < 2:
+            logging.warning("Offset limit: less than 2 data points are left")
+            offset_limit = offset_limit_tmp
+            update_selected_data()
         update_plot()
 
     def update_error(error_limit_new):  # Function called when error slider is moved
         global selected_data
         global error_limit
-        if np.count_nonzero(np.abs(mean_error_fitted[selected_data]) <= error_limit_new / 10.0) > 1:
-            error_limit = error_limit_new / 10.0
+        error_limit_tmp = error_limit
+        error_limit = error_limit_new / 10.0
         update_selected_data()
+        if np.count_nonzero(selected_data) < 2:
+            logging.warning("Error limit: less than 2 data points are left")
+            error_limit = error_limit_tmp
+            update_selected_data()
         update_plot()
 
     def update_left_limit(left_limit_new):  # Function called when left limit slider is moved
-        global right_limit
+        global selected_data
         global left_limit
-        global x_diff
-        if left_limit_new >= right_limit - 1.0 * x_diff:
-            left_limit_new = right_limit - 2.0 * x_diff
+        left_limit_tmp = left_limit
         left_limit = left_limit_new
         update_selected_data()
+        if np.count_nonzero(selected_data) < 2:
+            logging.warning("Left limit: less than 2 data points are left")
+            left_limit = left_limit_tmp
+            update_selected_data()
         update_plot()
 
-    def update_right_limit(right_limit_new):  # Function called when left limit slider is moved
+    def update_right_limit(right_limit_new):  # Function called when right limit slider is moved
+        global selected_data
         global right_limit
-        global left_limit
-        global x_diff
-        if right_limit_new <= left_limit + 1.0 * x_diff:
-            right_limit_new = left_limit + 2.0 * x_diff
+        right_limit_tmp = right_limit
         right_limit = right_limit_new
         update_selected_data()
+        if np.count_nonzero(selected_data) < 2:
+            logging.warning("Right limit: less than 2 data points are left")
+            right_limit = right_limit_tmp
+            update_selected_data()
         update_plot()
 
     def update_selected_data():
@@ -327,12 +335,13 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
 
         update_selected_data()
         if np.count_nonzero(selected_data) < 2:
-            logging.warning("Automatic cut reached limit where less than 2 data points left")
+            logging.info("Automatic pre-alignment: less than 2 data points are left, discard new limits")
             selected_data = selected_data_tmp
             error_limit = error_limit_tmp
             offset_limit = offset_limit_tmp
             left_limit = left_limit_tmp
             right_limit = right_limit_tmp
+            update_selected_data()
         fit_data()
         if not non_interactive:
             offset_limit = np.max(np.abs(offset[selected_data]))
@@ -358,7 +367,9 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
             # setting calculated offset data
             offset_plot.set_data(x[initial_select], np.abs(offset[initial_select]))
             # update offset slider
-            offset_max = np.max(np.abs(offset[left_index:right_index]))
+            offset_range = offset[left_index:right_index]
+            offset_range = offset_range[np.isfinite(offset_range)]
+            offset_max = np.max(np.abs(offset_range))
             ax_offset.set_xlim(xmax=offset_max)
             offset_slider.valmax = offset_max
             cid = offset_slider.cnt - 1
@@ -366,7 +377,9 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
             offset_slider.set_val(offset_limit)
             offset_slider.on_changed(update_offset)
             # update error slider
-            error_max = np.max(np.abs(mean_error_fitted[left_index:right_index])) * 10.0
+            error_range = mean_error_fitted[left_index:right_index]
+            error_range = error_range[np.isfinite(error_range)]
+            error_max = np.max(np.abs(error_range)) * 10.0
             ax_error.set_xlim(xmax=error_max)
             error_slider.valmax = error_max
             cid = error_slider.cnt - 1
@@ -400,13 +413,12 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     def finish(event):  # Fit result is ok
         global do_refit
         do_refit = False  # Set to signal that no refit is required anymore
-        fit_data()
         update_selected_data()
+        fit_data()
         plt.close()  # Close the plot to let the program continue (blocking)
 
     def refit(event):
         fit_data()
-        update_selected_data()
         update_plot()
 
     def fit_data():
@@ -485,6 +497,8 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
         auto_button.on_clicked(update_auto)
         refit_button.on_clicked(refit)
         ok_button.on_clicked(finish)
+        # refit on pressing close button, same effect as OK button
+        fig.canvas.mpl_connect(s='close_event', func=finish)
 
     if non_interactive:
         update_auto(None)
@@ -526,8 +540,8 @@ def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_er
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc=0)
     ax1.set_title("Correlation of %s: %s vs. %s" % (prefix + "s", ref_name, dut_name))
-    ax1.set_xlabel("%s [um]" % dut_name)
-    ax1.set_ylabel("%s [um]" % ref_name)
+    ax1.set_xlabel("%s %s [um]" % (prefix.title(), dut_name))
+    ax1.set_ylabel("%s %s [um]" % (prefix.title(), ref_name))
     ax2.set_ylabel("Error / Offset [a.u.]")
     ax1.grid()
     # put ax in front of ax2
@@ -717,7 +731,7 @@ def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
         ax.set_xlabel('Track Chi2 [um*um]')
         ax.set_ylabel('#')
         ax.set_yscale('log')
-        ax.set_title('Track Chi2 for DUT %d tracks' % fit_dut)
+        ax.set_title('Track Chi2 for DUT%d tracks' % fit_dut)
         output_pdf.savefig(fig)
 
 
@@ -825,7 +839,7 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
-                logging.info('Plot track density for DUT %d', actual_dut)
+                logging.info('Plot track density for DUT%d', actual_dut)
 
                 track_array = node[:]
 
@@ -868,14 +882,14 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT %d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT%d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_pdf.savefig(fig)
 
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
+                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
                 output_pdf.savefig(fig)
 
@@ -925,7 +939,7 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
 
                     if use_duts and actual_dut not in use_duts:
                         continue
-                    logging.info('Plot charge distribution for DUT %d', actual_dut)
+                    logging.info('Plot charge distribution for DUT%d', actual_dut)
 
                     track_array = in_file_h5.root.TrackCandidates[:]
 
@@ -941,7 +955,7 @@ def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_si
                     fig = Figure()
                     _ = FigureCanvas(fig)
                     ax = fig.add_subplot(111)
-                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT %d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
+                    plot_2d_pixel_hist(fig, ax, charge_density.T, plot_range, title='Charge density for DUT%d' % actual_dut, x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=int(np.ma.average(charge_density) * 1.5))
                     fig.tight_layout()
                     output_pdf.savefig(fig)
 
@@ -957,21 +971,21 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_min_array.T, plot_range, title='Minimal distance for DUT%d (%d Hits)' % (actual_dut, n_hits_distance_min_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
+    plot_2d_pixel_hist(fig, ax, distance_max_array.T, plot_range, title='Maximal distance for DUT%d (%d Hits)' % (actual_dut, n_hits_distance_max_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=125000)
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT %d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
+    plot_2d_pixel_hist(fig, ax, distance_mean_array.T, plot_range, title='Weighted distance for DUT%d (%d Hits)' % (actual_dut, n_hits_distance_mean_array), x_axis_title="column [um]", y_axis_title="row [um]", z_min=0, z_max=cut_distance)
     fig.tight_layout()
     output_pdf.savefig(fig)
 
@@ -995,21 +1009,21 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT%d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT %d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
+    plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT%d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
     output_pdf.savefig(fig)
 
@@ -1020,7 +1034,7 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         z_min = np.ma.min(efficiency)
         if z_min == 100.:  # One cannot plot with 0 z axis range
             z_min = 90.
-        plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT %d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
+        plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT%d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
         fig.tight_layout()
         output_pdf.savefig(fig)
 
@@ -1028,7 +1042,7 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         _ = FigureCanvas(fig)
         ax = fig.add_subplot(111)
         ax.grid()
-        ax.set_title('Efficiency per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
+        ax.set_title('Efficiency per pixel for DUT%d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(efficiency), np.ma.std(efficiency)))
         ax.set_xlabel('Efficiency [%]')
         ax.set_ylabel('#')
         ax.set_yscale('log')
@@ -1064,7 +1078,7 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 if dut_names is not None:
                     dut_name = dut_names[actual_dut]
                 else:
-                    dut_name = "DUT %d" % actual_dut
+                    dut_name = "DUT%d" % actual_dut
                 track_angle_hist = node[:]
                 edges = node._v_attrs.edges * 1000  # conversion to mrad
                 mean = node._v_attrs.mean * 1000  # conversion to mrad
