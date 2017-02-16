@@ -1098,6 +1098,7 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
         new_alignment_parameters = geometry_utils.merge_alignment_parameters(
             alignment_last_iteration,
             alignment_parameters_change,
+            select_duts=fit_duts,
             mode='relative')
 
         # FIXME: This step does not work well
