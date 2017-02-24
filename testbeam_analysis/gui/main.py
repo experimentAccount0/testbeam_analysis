@@ -2,36 +2,25 @@ import sys
 import logging
 
 from PyQt5 import QtCore, QtWidgets, QtGui
-from pyqtgraph.dockarea import DockArea
 
 from data import DataTab
+from settings import SettingsWindow, DefaultSettings
 from testbeam_analysis.gui import tab_widget
 
 PROJECT_NAME = 'Testbeam Analysis'
 
 
-# For testing until widget provide this info
-setup = {'n_pixel': (10, 10),
-         'pixel_size': (100, 100),
-         'dut_name': 'myDUT'}
-
-options = {'working_directory': '',
-           'input_hits_file': 'test_DUT0.h5',
-           'output_mask_file': 'tt',
-           'chunk_size': 1000000,
-           'plot': False}
-
-
 class AnalysisWindow(QtWidgets.QMainWindow):
 
     def __init__(self, parent=None):
-        ''' TODO: DOCSTRING'''
+        """ TODO: DOCSTRING"""
         super(AnalysisWindow, self).__init__(parent)
-
+        self.setup = DefaultSettings().setup
+        self.options = DefaultSettings().options
         self._init_UI()
 
     def _init_UI(self):
-        ''' TODO: DOCSTRING'''
+        """ TODO: DOCSTRING"""
 
         # Main window settings
         self.setWindowTitle(PROJECT_NAME)
@@ -43,15 +32,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self._init_menu()
         self._init_tabs()
 
-        self.statusBar().showMessage(
-            "Hello and welcome to a simple and easy to use testbeam analysis!",
-            4000)
+        self.statusBar().showMessage("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
 
     def _init_tabs(self):
         # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering',
-                          'Correlations', 'Pre-alignment', 'Track finding', 'Alignment',
-                          'Track fitting', 'Track Analysis')
+                          'Correlations', 'Pre-alignment', 'Track finding',
+                          'Alignment', 'Track fitting', 'Track Analysis')
 
         # Add QTabWidget for tab_widget
         tabs = QtWidgets.QTabWidget()
@@ -60,21 +47,19 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Initialize each tab
         for name in self.tab_order:
             if name == 'Files':
-                continue
-                widget = DockArea()
-                self.data_tab = DataTab(parent=widget)
+                widget = DataTab(parent=tabs)
             elif name == 'Noisy Pixel':
                 widget = tab_widget.NoisyPixelsTab(parent=tabs,
-                                                   setup=setup,
-                                                   options=options)
+                                                   setup=self.setup,
+                                                   options=self.options)
             elif name == 'Clustering':
                 widget = tab_widget.ClusterPixelsTab(parent=tabs,
-                                                     setup=setup,
-                                                     options=options)
+                                                     setup=self.setup,
+                                                     options=self.options)
             elif name == 'Correlations':
                 widget = tab_widget.CorrelateClusterTab(parent=tabs,
-                                                        setup=setup,
-                                                        options=options)
+                                                        setup=self.setup,
+                                                        options=self.options)
             else:
                 logging.info('GUI for %s not implemented yet', name)
                 continue
@@ -90,10 +75,18 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.menuBar().addSeparator()
         self.menuBar().addMenu(self.help_menu)
 
+        self.settings_menu = QtWidgets.QMenu('&Settings', self)
+        self.settings_menu.addAction('&Global', self.global_settings)
+        self.menuBar().addMenu(self.settings_menu)
+
         # self.help_menu.addAction('&About', self.about)
 
     def file_quit(self):
         self.close()
+
+    def global_settings(self):
+        sw = SettingsWindow(self)
+        sw.show()
 
     def closeEvent(self, _):
         self.file_quit()
@@ -101,7 +94,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     font = QtGui.QFont()
-    font.setPointSize(12)
+    font.setPointSize(11)
     app.setFont(font)
     aw = AnalysisWindow()
     aw.show()

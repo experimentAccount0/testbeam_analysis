@@ -87,6 +87,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         widget_splitter.addWidget(right_widget)
         widget_splitter.setStretchFactor(0, 10)
         widget_splitter.setStretchFactor(1, 2.5)
+        widget_splitter.setChildrenCollapsible(False)
         # Add complete layout to this widget
         layout_widget = QtWidgets.QVBoxLayout()
         layout_widget.addWidget(widget_splitter)

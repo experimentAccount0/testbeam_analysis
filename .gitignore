@@ -46,6 +46,8 @@ target/
 #  Cython files
 analysis_functions.cpp
 data_clusterizer.cpp
+# PyCharm files
+.idea/
 # PyDev files
 .project
 .pydevproject

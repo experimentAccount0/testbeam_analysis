@@ -1,115 +1,421 @@
 import tables as tb
 
-from pyqtgraph.dockarea import Dock
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 
-class DataTab(object):
-    ''' Implements the tab content for data file handling'''
+class DataTab(QtWidgets.QWidget):
+    """
+    Implements the tab content for data file handling
+    """
 
-    def __init__(self, parent):
-        self.parent = parent
-        self.input_files = list()
-        self.output_folder = str()
+    def __init__(self, parent=None, dut_types=None, options=None, setup=None):
+        super(DataTab, self).__init__(parent)
 
         self._setup()
-#         self._setup_test()
-#
-#     def _setup_test(self):
-#         self.items = QtWidgets.QDockWidget("Dockable", self)
-#         pass
+        self.handle_type_btn()
 
     def _setup(self):
-        # Setup widgets
-        button_size = QtCore.QSize(150, 40)
+        # Table area
+        left_widget = QtWidgets.QWidget()
+        tab_layout = QtWidgets.QHBoxLayout()
+        left_widget.setLayout(tab_layout)
+        self.data_table = DataTable(left_widget)
+        tab_layout.addWidget(self.data_table)
+        # Option area
+        layout_options = QtWidgets.QVBoxLayout()
+        layout_options.setSpacing(20)
+        label_option = QtWidgets.QLabel('Options')
+        layout_options.addWidget(label_option)
+        # Buttons
+        layout_buttons = QtWidgets.QVBoxLayout()
+        layout_buttons.setSpacing(10)
+        # Select
+        layout_select = QtWidgets.QHBoxLayout()
+        layout_select.addSpacing(10)
+        button_select = QtWidgets.QPushButton('Select data of DUTs')
+        layout_select.addWidget(button_select)
+        button_select.clicked.connect(lambda: self.data_table.get_data())
+        # DUT names
+        layout_names = QtWidgets.QHBoxLayout()
+        layout_names.addSpacing(10)
+        button_names = QtWidgets.QPushButton('Set DUT names')
+        button_names.setToolTip('Set default DUT names')
+        layout_names.addWidget(button_names)
+        button_names.clicked.connect(lambda: self.data_table.set_dut_names())
+        # Clear
+        layout_clear = QtWidgets.QHBoxLayout()
+        layout_clear.addSpacing(10)
+        button_clear = QtWidgets.QPushButton('Clear')
+        button_clear.setToolTip('Clears table')
+        layout_clear.addWidget(button_clear)
+        button_clear.clicked.connect(lambda: self.data_table.clear_table())
+        # DUT types
+        layout_types = QtWidgets.QHBoxLayout()
+        layout_types.addSpacing(10)
+        self.button_types = QtWidgets.QPushButton('Set DUT types')
+        self.button_types.setDisabled(True)
+        layout_types.addWidget(self.button_types)
+        # Add to main layout
+        layout_buttons.addLayout(layout_select)
+        layout_buttons.addLayout(layout_names)
+        layout_buttons.addLayout(layout_clear)
+        layout_buttons.addLayout(layout_types)
+        layout_options.addLayout(layout_buttons)
+        # Proceed button
+        self.button_ok = QtWidgets.QPushButton('Ok')
+        self.button_ok.setToolTip('Select data of DUTs')
+        layout_options.addStretch(0)
+        layout_options.addWidget(self.button_ok)
+        self.button_ok.setDisabled(True)
+        self.button_ok.clicked.connect(lambda: self.data_table.save_config())
+        self.data_table.inputFilesChanged.connect(lambda: self.analysis_check())
+        # Add main layout to widget
+        right_widget = QtWidgets.QWidget()
+        right_widget.setLayout(layout_options)
+        # Split table and option area
+        widget_splitter = QtWidgets.QSplitter()
+        widget_splitter.addWidget(left_widget)
+        widget_splitter.addWidget(right_widget)
+        widget_splitter.setStretchFactor(0, 10)
+        widget_splitter.setStretchFactor(1, 2.5)
+        widget_splitter.setChildrenCollapsible(False)
+        # Add complete layout to this widget
+        layout_widget = QtWidgets.QVBoxLayout()
+        layout_widget.addWidget(widget_splitter)
+        self.setLayout(layout_widget)
 
-        select_widget = QtWidgets.QWidget()
-        select_layout = QtWidgets.QGridLayout(select_widget)
-        select_button = QtGui.QPushButton('Select data of DUTs')
-        select_button.setMaximumSize(button_size)
-        dut_name_button = QtGui.QPushButton('Set DUT names')
-        dut_name_button.setMaximumSize(button_size)
-        da = DropArea()
-        select_layout.addWidget(da, 0, 0, 1, 1)
-        select_layout.addWidget(select_button, 0, 1, 1, 1)
-        select_layout.addWidget(dut_name_button, 0, 2, 1, 1)
+    def analysis_check(self):
+        """
+        Handles  whether the proceed 'OK' button is clickable or not in regard to the input data.
+        If not, respective messages are shown in QMainWindows statusBar
+        """
+        if len(self.data_table.input_files) > 0 and len(self.data_table.incompatible_data) == 0:
+            self.button_ok.setDisabled(False)
+            self.button_ok.setToolTip('Proceed')
 
-        handle_widget = QtWidgets.QWidget()
-        handle_layout = QtWidgets.QGridLayout(handle_widget)
-        up_button = QtGui.QPushButton('Move up')
-        up_button.setMaximumSize(button_size)
-        down_button = QtGui.QPushButton('Move down')
-        down_button.setMaximumSize(button_size)
-        remove_button = QtGui.QPushButton('Remove DUT')
-        remove_button.setMaximumSize(button_size)
-        handle_layout.addWidget(up_button, 0, 0, 1, 1)
-        handle_layout.addWidget(down_button, 0, 1, 1, 1)
-        handle_layout.addWidget(remove_button, 0, 2, 1, 1)
+        else:
+            self.button_ok.setDisabled(True)
 
-        table_widget = QtWidgets.QWidget()
-        table_layout = QtWidgets.QVBoxLayout(table_widget)
-        self.data_table = DataTable(self.parent)
-        table_layout.addWidget(self.data_table)
+            try:
+                this = self
+                while not isinstance(this, QtWidgets.QMainWindow):
+                    this = this.parentWidget()
 
-        # Connect buttons
-        # da.fileDrop.connect(data_table.get_data(table_widget, da.returnData()))
-        select_button.clicked.connect(
-            lambda: self.data_table.get_data(table_widget,
-                                             self.input_files))
+                if len(self.data_table.incompatible_data) != 0:
+                    broken = []
+                    for key in self.data_table.incompatible_data.keys():
+                        broken.append(self.data_table.dut_names[key])
 
-        for x in [lambda: self.data_table.move_up(),
-                  lambda: self._update_setup(),
-                  lambda: self.data_table.check_data(self.input_files)]:
-            up_button.clicked.connect(x)
+                    this.statusBar().showMessage("Data of %s is broken. No testbeam analysis possible." %
+                                                 str(',').join(broken), 4000)
 
-        for x in [lambda: self.data_table.move_down(),
-                  lambda: self._update_setup(),
-                  lambda: self.data_table.check_data(self.input_files)]:
-            down_button.clicked.connect(x)
+                if len(self.data_table.input_files) == 0:
+                    this.statusBar().showMessage("No data. No testbeam analysis possible.", 4000)
 
-        for x in [lambda: self.data_table.remove_data(),
-                  lambda: self._update_setup(),
-                  lambda: self.data_table.handle_data(table_widget,
-                                                      self.input_files)]:
-            remove_button.clicked.connect(x)
+            except AttributeError:
+                pass
 
-        for x in [lambda: self.data_table.set_dut_names(),
-                  lambda: self._update_setup(),
-                  lambda: self.data_table.check_data(self.input_files)]:
-            dut_name_button.clicked.connect(x)
+    def handle_type_btn(self):
 
-        select_dock = Dock('Select DUTs')
-#         select_dock.setMaximumSize(self.screen.width() / 2, 150)
-        handle_dock = Dock('Handle selected \n DUT')
-#         handle_dock.setMaximumSize(self.screen.width() / 2, 150)
-        table_dock = Dock('Selected DUTs')
-        select_dock.addWidget(select_widget)
-        handle_dock.addWidget(handle_widget)
-        table_dock.addWidget(table_widget)
-        self.parent.addDock(select_dock, 'left')
-        self.parent.addDock(handle_dock, 'right')
-        self.parent.addDock(table_dock, 'bottom')
-
-    def _update_setup(self):
-        self.input_files = self.data_table.update_data()
-        self.dut_names = self.data_table.update_dut_names()
+        if not self.button_types.isCheckable():
+            self.button_types.setToolTip('Define a DUT type in Settings')
 
 
 class DataTable(QtWidgets.QTableWidget):
-    ''' TODO: DOCSTRING MISSING'''
+    """
+    Class to get, display and handle the input data of the DUTs
+    for which a testbeam analysis will be performed
+    """
+
+    inputFilesChanged = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super(DataTable, self).__init__(parent)
 
-        self.horizontalHeader().setResizeMode(QtGui.QHeaderView.Stretch)
-        self.verticalHeader().setResizeMode(QtGui.QHeaderView.Stretch)
+        # Lists for dut names, input files, etc.
+        self.dut_names = list()
+        self.input_files = list()
+        self.dut_types = list()
+
+        # store indices and status of incompatible data might occurring in check_data
+        self.incompatible_data = dict()
+
+        # Appearance
+        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+#        self.verticalHeader().setMinimumSectionSize(60)
+#        self.horizontalHeader().resizeSections(QtWidgets.QHeaderView.Interactive)
+#        self.horizontalHeader().resizeSection(1, QtWidgets.QHeaderView.Stretch)
+#        self.horizontalHeader().resizeSection(2, QtWidgets.QHeaderView.Stretch)
+#        self.horizontalHeader().resizeSection(3, QtWidgets.QHeaderView.Stretch)
+#        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+#        self.verticalHeader().setDefaultSectionSize(60)
+#        self.horizontalHeader().set
+#        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+#        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+        self.setWordWrap(True)
+        self.setTextElideMode(QtCore.Qt.ElideLeft)
         self.showGrid()
         self.setSortingEnabled(True)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
 
-    def move_down(self):
-        ''' Move current row down one place '''
-        row = self.currentRow()
-        column = self.currentColumn()
+    def get_data(self):
+        """
+        Open file dialog and select data files. Only *.h5 files are allowed
+        """
+
+        caption = 'Select data of DUTs'
+        for path in QtWidgets.QFileDialog.getOpenFileNames(parent=self,
+                                                           caption=caption,
+                                                           directory='~/',
+                                                           filter='*.h5')[0]:
+            self.input_files.append(path)
+
+        self.handle_data()
+
+    def handle_data(self):
+        """
+        Arranges input_data in the table and re-news table if DUT amount/order has been updated
+        """
+
+#        for widget in self.parentWidget().children():
+#            if isinstance(widget, QtWidgets.QTableWidget):
+#                #widget.clear()
+#                self.parentWidget().layout().removeWidget(widget)
+#        self.clear()
+
+        self.row_labels = [('DUT ' + '%d' % i) for i in range(len(self.input_files))]
+
+        if len(self.dut_types) > 0:
+            self.column_labels = ['Path', 'DUT name', 'DUT type', 'Status', 'Navigation']
+        else:
+            self.column_labels = ['Path', 'DUT name', 'Status', 'Navigation']
+
+        self.setColumnCount(len(self.column_labels))
+        self.setRowCount(len(self.row_labels))
+        self.setHorizontalHeaderLabels(self.column_labels)
+        self.setVerticalHeaderLabels(self.row_labels)
+
+        for row, dut in enumerate(self.input_files):
+            path_item = QtWidgets.QTableWidgetItem()
+            path_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            path_item.setTextAlignment(QtCore.Qt.AlignLeft)
+            path_item.setText(dut)
+            self.setItem(row, self.column_labels.index('Path'), path_item)
+
+        self.update_dut_names()
+        self.check_data()
+        self._make_nav_buttons()
+        self.inputFilesChanged.emit()
+
+    def check_data(self):
+        """
+        Checks if given input_files contain the necessary information like
+        event_number, column, row, etc.; visualizes broken input
+        """
+
+        field_req = ('event_number', 'frame', 'column', 'row', 'charge')
+        self.incompatible_data = dict()
+
+        for i, path in enumerate(self.input_files):
+            with tb.open_file(path, mode='r') as f:
+                try:
+                    fields = f.root.Hits.colnames
+                    missing = []
+                    for req in field_req:
+                        if req in fields:
+                            pass
+                        else:
+                            missing.append(req)
+                    if len(missing) != 0:
+                        self.incompatible_data[i] = 'Error! Data does not contain field(s):\n' + ', '.join(missing)
+
+                except tb.exceptions.NoSuchNodeError:
+                    self.incompatible_data[i] = 'NoSuchNodeError: Nodes:\n' + str(f.root)
+
+        font = QtGui.QFont()
+        font.setBold(True)
+
+        for row in range(self.rowCount()):
+            status_item = QtWidgets.QTableWidgetItem()
+            status_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            status_item.setTextAlignment(QtCore.Qt.AlignCenter)
+
+            if row in self.incompatible_data.keys():
+                error_font = font
+                error_font.setUnderline(True)
+                status_item.setText(self.incompatible_data[row])
+                self.setItem(row, self.column_labels.index('Status'), status_item)
+
+                for col in range(self.columnCount()):
+                    try:
+                        self.item(row, col).setFont(error_font)
+                        self.item(row, col).setForeground(QtGui.QColor('red'))
+                    except AttributeError:
+                        pass
+            else:
+                status_item.setText('Okay')
+                self.setItem(row, self.column_labels.index('Status'), status_item)
+                self.item(row, self.column_labels.index('Status')).setFont(font)
+                self.item(row, self.column_labels.index('Status')).setForeground(QtGui.QColor('green'))
+
+    def update_data(self):
+        """
+        Updates the data/DUT content/order by re-reading the filespaths
+        from the table and updating self.input_files
+        """
+
+        new = []
+        try:
+            for row in range(self.rowCount()):
+                new.append(self.item(row, self.column_labels.index('Path')).text())
+        except AttributeError:
+            pass
+
+        if new != self.input_files:  # and len(new) != 0:
+            self.input_files = new
+            self.inputFilesChanged.emit()
+
+    def set_dut_names(self, name='Tel'):
+        """
+        Set DUT names for further analysis. Std. setting is Tel_i  and i is index
+        """
+        #  FIXME: When reset, all dut names have same color, even though data is broken;
+        #  FIXME: split check data func and filling status column
+        for row in range(self.rowCount()):
+            dut_name = name + '_%d' % row
+            dut_item = QtWidgets.QTableWidgetItem()
+            dut_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            dut_item.setText(dut_name)
+            self.setItem(row, self.column_labels.index('DUT name'), dut_item)
+            self.dut_names.append(dut_name)
+
+    def update_dut_names(self, name='Tel'):
+        """
+        Read list of DUT names from table and update dut names. Also add new DUT names and update
+        """
+
+        new = []
+        try:
+            for row in range(self.rowCount()):
+                try:
+                    new.append(self.item(row, self.column_labels.index('DUT name')).text())
+                except AttributeError: # no QTableWidgetItem for new input data
+                    add_dut_item = QtWidgets.QTableWidgetItem()
+                    add_dut_item.setTextAlignment(QtCore.Qt.AlignCenter)
+                    add_dut_item.setText(name + '_%d' % row)
+                    self.setItem(row, self.column_labels.index('DUT name'), add_dut_item)
+                    new.append(self.item(row, self.column_labels.index('DUT name')).text())
+        except AttributeError: # no QTableWidgetItem has been created at all
+            self.set_dut_names()
+
+        if new != self.dut_names:  # and len(new) != 0:
+            self.dut_names = new
+            for row in range(self.rowCount()):
+                self.item(row, self.column_labels.index('DUT name')).setText(self.dut_names[row])
+
+#        self.resizeRowsToContents()
+#        self.resizeColumnsToContents()
+
+    def update_setup(self):
+        """
+        Updating all relevant lists for further analysis
+        """
+
+        self.update_data()
+        self.handle_data()
+#        self.update_dut_names()
+
+    def save_config(self):
+        """
+        Save configuration from table and get parent QMainWindow and ShowMessage
+        """
+        self.update_setup()
+
+        try:
+            this = self
+            while not isinstance(this, QtWidgets.QMainWindow):
+                this = this.parentWidget()
+            this.statusBar().showMessage("Configuration for %d DUT(s) saved" % (len(self.input_files)), 2000)
+        except AttributeError:
+            pass
+
+    def clear_table(self):
+        """
+        Clear table of all its contents
+        """
+
+        self.setRowCount(0)
+        self.update_data()
+
+    def _make_nav_buttons(self):
+        """
+        Make buttons to navigate through table and delete entries
+        """
+
+        for row in range(self.rowCount()):
+            widget_but = QtWidgets.QWidget()
+            layout_but = QtWidgets.QHBoxLayout()
+            layout_but.setAlignment(QtCore.Qt.AlignCenter)
+            self.button_up = QtWidgets.QPushButton()
+            self.button_down = QtWidgets.QPushButton()
+            self.button_del = QtWidgets.QPushButton()
+            button_size = QtCore.QSize(40,40)
+            icon_up = self.button_up.style().standardIcon(QtWidgets.QStyle.SP_ArrowUp)
+            icon_down = self.button_down.style().standardIcon(QtWidgets.QStyle.SP_ArrowDown)
+            icon_del = self.button_del.style().standardIcon(QtWidgets.QStyle.SP_TrashIcon)
+            icon_size = QtCore.QSize(30, 30)
+            self.button_up.setIcon(icon_up)
+            self.button_down.setIcon(icon_down)
+            self.button_del.setIcon(icon_del)
+            self.button_up.setIconSize(icon_size)
+            self.button_down.setIconSize(icon_size)
+            self.button_del.setIconSize(icon_size)
+            self.button_up.setFixedSize(button_size)
+            self.button_down.setFixedSize(button_size)
+            self.button_del.setFixedSize(button_size)
+            self.button_del.setToolTip('Delete')
+            self.button_up.setToolTip('Move up')
+            self.button_down.setToolTip('Move down')
+
+            for x in [lambda: self._move_up(), lambda: self.update_setup()]:
+                self.button_up.clicked.connect(x)
+
+            for x in [lambda: self._move_down(), lambda: self.update_setup()]:
+                self.button_down.clicked.connect(x)
+
+            for x in [lambda: self._delete_data(), lambda: self.handle_data()]:
+                self.button_del.clicked.connect(x)
+
+            layout_but.addWidget(self.button_up)
+            layout_but.addWidget(self.button_down)
+            layout_but.addWidget(self.button_del)
+            widget_but.setLayout(layout_but)
+            self.setCellWidget(row, self.column_labels.index('Navigation'), widget_but)
+
+    def _delete_data(self):
+        """
+        Deletes row at sending button position
+        """
+
+        button = self.sender()
+        index = self.indexAt(button.parentWidget().pos())
+        if index.isValid():
+            row = index.row()
+            self.removeRow(row)
+            self.input_files.pop(row)
+            self.inputFilesChanged.emit()
+
+    def _move_down(self):
+        """
+        Move row at sending button position one place down
+        """
+
+        button= self.sender()
+        index = self.indexAt(button.parentWidget().pos())
+        row = index.row()
+        column = index.column()
         if row < self.rowCount() - 1:
             self.insertRow(row + 2)
             for i in range(self.columnCount()):
@@ -118,10 +424,15 @@ class DataTable(QtWidgets.QTableWidget):
             self.removeRow(row)
             self.setVerticalHeaderLabels(self.row_labels)
 
-    def move_up(self):
-        ''' Move current row up one place '''
-        row = self.currentRow()
-        column = self.currentColumn()
+    def _move_up(self):
+        """
+        Move row at sending button position one place up
+        """
+
+        button = self.sender()
+        index = self.indexAt(button.parentWidget().pos())
+        row = index.row()
+        column = index.column()
         if row > 0:
             self.insertRow(row - 1)
             for i in range(self.columnCount()):
@@ -129,171 +440,3 @@ class DataTable(QtWidgets.QTableWidget):
                 self.setCurrentCell(row - 1, column)
             self.removeRow(row + 1)
             self.setVerticalHeaderLabels(self.row_labels)
-
-    def set_dut_names(self, name='Tel'):
-        ''' Set DUT names for further analysis
-
-            Std. setting is Tel_i  and i is index
-        '''
-        for i in range(self.rowCount()):
-            dutItem = QtGui.QTableWidgetItem()
-            dutItem.setTextAlignment(QtCore.Qt.AlignCenter)
-            dutItem.setText(name + '_%d' % i)
-            self.setItem(i, 1, dutItem)
-
-    def update_dut_names(self):
-        ''' Read list of DUT names from table and return tuple of names'''
-
-        new = []
-        try:
-            for row in range(self.rowCount()):
-                new.append(self.item(row, 1).text())
-        except AttributeError:
-            return None
-
-        return tuple(new)
-
-    def get_data(self, table_widget, input_files):
-        ''' Open file dialog and select data files
-
-            Only *.h5 files are allowed '''
-
-        caption = 'Select data of DUTs'
-        for path in QtGui.QFileDialog.getOpenFileNames(self,
-                                                       caption=caption,
-                                                       directory='~/',
-                                                       filter='*.h5')[0]:
-            input_files.append(path)
-
-        self.handle_data(table_widget, input_files)
-
-    def handle_data(self, table_widget, input_files):
-        ''' Arranges input_data in the table and re-news table if DUT amount/order has been updated '''
-
-        for widget in table_widget.children():
-            if isinstance(widget, QtGui.QTableWidget):
-                table_widget.layout().removeWidget(widget)
-
-        self.row_labels = [('DUT ' + '%d' % i)
-                           for i in range(len(input_files))]
-        self.column_labels = ['Path', 'DUT names', 'Status']
-        self.setColumnCount(len(self.column_labels))
-        self.setRowCount(len(self.row_labels))
-        self.setHorizontalHeaderLabels(self.column_labels)
-        self.setVerticalHeaderLabels(self.row_labels)
-
-        for i, dut in enumerate(input_files):
-            pathItem = QtGui.QTableWidgetItem()
-            pathItem.setFlags(
-                QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
-            pathItem.setTextAlignment(QtCore.Qt.AlignLeft)
-            pathItem.setText(dut)
-            self.setItem(i, 0, pathItem)
-
-        self.check_data(input_files)
-
-    def check_data(self, input_files):
-        ''' Checks if given input_files contain the necessary information like
-        event_number, column, row, etc.; visualzes broken input '''
-
-        field_req = ('event_number', 'frame', 'column', 'row', 'charge')
-        incompatible_data = {}  # store indices and status of incompatible data
-
-        for i, path in enumerate(input_files):
-            with tb.open_file(path, mode='r') as in_file:
-                try:
-                    if not all(name in field_req for name
-                               in in_file.root.Hits.colnames):
-                        incompatible_data[i] = 'Data does not contain all ' \
-                            'required information!'
-                except tb.exceptions.NoSuchNodeError:
-                    incompatible_data[i] = 'NoSuchNodeError: Data does not ' \
-                        'contain hits!'
-
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setUnderline(True)
-
-        for row in range(self.rowCount()):
-            statusItem = QtGui.QTableWidgetItem()
-            statusItem.setFlags(
-                QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
-            statusItem.setTextAlignment(QtCore.Qt.AlignCenter)
-
-            if row in incompatible_data.keys():
-                statusItem.setText(incompatible_data[row])
-                self.setItem(row, 2, statusItem)
-
-                for col in range(self.columnCount()):
-                    try:
-                        self.item(row, col).setFont(font)
-                        self.item(row, col).setForeground(QtGui.QColor('red'))
-                    except AttributeError:
-                        pass
-            else:
-                statusItem.setText('Okay')
-                self.setItem(row, 2, statusItem)
-
-    def update_data(self):
-        ''' Updates the data/DUT content/order by re-reading the filespaths
-        from the table and returnig a list with the new DUT order '''
-
-        new = []
-        for row in range(self.rowCount()):
-            new.append(self.item(row, 0).text())
-        return new
-
-    def remove_data(self):
-        ''' Removes an entire row from the data table e.g. a DUT '''
-
-        row = self.currentRow()
-        self.removeRow(row)
-
-
-class DropArea(QtWidgets.QFrame):
-
-    #fileDrop = QtCore.pyqtSignal()
-
-    def __init__(self):
-
-        QtWidgets.QFrame.__init__(self)
-        self.setFrameStyle(QtGui.QFrame.StyledPanel | QtGui.QFrame.Sunken)
-        self.setFrameShadow(QtGui.QFrame.Sunken)
-        self.setLineWidth(3)
-        self.setMinimumSize(200, 100)
-        self.setMaximumSize(300, 175)
-        self.layout = QtWidgets.QVBoxLayout(self)
-        self.layout.setAlignment(QtCore.Qt.AlignCenter)
-        self.setAcceptDrops(True)
-        self.input_files = []
-        self.init_UI()
-
-    def init_UI(self):
-
-        drop_label = QtGui.QLabel('Drag and Drop')
-        self.layout.addWidget(drop_label)
-
-    def dragEnterEvent(self, e):
-
-        if e.mimeData().hasUrls:
-            e.accept()
-        else:
-            e.ignore()
-
-    def dropEvent(self, e):
-
-        if e.mimeData().hasUrls:
-            e.setDropAction(QtCore.Qt.CopyAction)
-            e.accept()
-
-            for url in e.mimeData().urls():
-                self.input_files.append(str(url.toLocalFile()))
-
-        else:
-            e.ignore()
-
-        # if len(self.input_files) != 0:
-            # self.fileDrop.emit()
-
-    # def returnData(self):
-        # return self.input_files
