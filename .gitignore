@@ -50,14 +50,6 @@ data_clusterizer.cpp
 .project
 .pydevproject
 # Examples output data
-testbeam_analysis/examples/data/output*
-# Example output data
-TestBeamData_FEI4_DUT*_cluster.*
-TestBeamData_Mimosa26_DUT*_noisy_pixels*.*
-hit_clusterizer.cpp
-Alignment.h5
-Correlation.h5
-TrackCandidates.h5
-Tracklets.h5
-Tracklets_corr.h5
-Tracks.h5
+testbeam_analysis/examples/data/*.h5
+# Temp files
+tmp*.*
