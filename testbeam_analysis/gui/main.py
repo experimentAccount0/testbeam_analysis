@@ -47,7 +47,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Initialize each tab
         for name in self.tab_order:
             if name == 'Files':
-                widget = DataTab(parent=tabs)
+                widget = DataTab(parent=tabs, parent_window=self)
             elif name == 'Noisy Pixel':
                 widget = tab_widget.NoisyPixelsTab(parent=tabs,
                                                    setup=self.setup,

@@ -8,65 +8,81 @@ class DataTab(QtWidgets.QWidget):
     Implements the tab content for data file handling
     """
 
-    def __init__(self, parent=None, dut_types=None, options=None, setup=None):
+    def __init__(self, parent=None, parent_window=None):
         super(DataTab, self).__init__(parent)
 
+        # Store parent QMainWindow of DataTab
+        self.parent_window = parent_window
+
         self._setup()
-        self.handle_type_btn()
 
     def _setup(self):
         # Table area
         left_widget = QtWidgets.QWidget()
         tab_layout = QtWidgets.QHBoxLayout()
         left_widget.setLayout(tab_layout)
-        self.data_table = DataTable(left_widget)
+        self.data_table = DataTable(parent=left_widget, parent_window=self.parent_window)
         tab_layout.addWidget(self.data_table)
-        # Option area
+        # Make option area
         layout_options = QtWidgets.QVBoxLayout()
-        layout_options.setSpacing(20)
+        layout_options.setSpacing(30)
         label_option = QtWidgets.QLabel('Options')
         layout_options.addWidget(label_option)
-        # Buttons
+        # Make buttons and layout for option buttons
         layout_buttons = QtWidgets.QVBoxLayout()
-        layout_buttons.setSpacing(10)
-        # Select
+        layout_buttons.setSpacing(15)
+        # Make a select button to select input files
         layout_select = QtWidgets.QHBoxLayout()
         layout_select.addSpacing(10)
         button_select = QtWidgets.QPushButton('Select data of DUTs')
         layout_select.addWidget(button_select)
         button_select.clicked.connect(lambda: self.data_table.get_data())
-        # DUT names
+        # Make button to reset dut names
         layout_names = QtWidgets.QHBoxLayout()
         layout_names.addSpacing(10)
         button_names = QtWidgets.QPushButton('Set DUT names')
         button_names.setToolTip('Set default DUT names')
         layout_names.addWidget(button_names)
         button_names.clicked.connect(lambda: self.data_table.set_dut_names())
-        # Clear
+        # Make button to clear the table content
         layout_clear = QtWidgets.QHBoxLayout()
         layout_clear.addSpacing(10)
         button_clear = QtWidgets.QPushButton('Clear')
         button_clear.setToolTip('Clears table')
         layout_clear.addWidget(button_clear)
         button_clear.clicked.connect(lambda: self.data_table.clear_table())
-        # DUT types
-        layout_types = QtWidgets.QHBoxLayout()
-        layout_types.addSpacing(10)
-        self.button_types = QtWidgets.QPushButton('Set DUT types')
-        self.button_types.setDisabled(True)
-        layout_types.addWidget(self.button_types)
+        # Make button to select output folder
+        layout_output1 = QtWidgets.QHBoxLayout()
+        label_output = QtWidgets.QLabel('Output folder')
+        checkbox_output = QtWidgets.QCheckBox()
+        layout_output1.addWidget(label_output)
+        layout_output1.addStretch(0)
+        layout_output1.addWidget(checkbox_output)
+        layout_output2 = QtWidgets.QHBoxLayout()
+        layout_output2.addSpacing(10)
+        button_output = QtWidgets.QPushButton()
+        icon_output = button_output.style().standardIcon(QtWidgets.QStyle.SP_FileDialogStart)
+        button_output.setIcon(icon_output)
+        button_output.setIconSize(QtCore.QSize(30, 30))
+        button_output.setFixedSize(QtCore.QSize(35, 35))
+        button_output.setToolTip('Set output older')
+        edit_output = QtWidgets.QLineEdit()
+        edit_output.setFixedHeight(35)
+        layout_output2.addWidget(button_output)
+        layout_output2.addWidget(edit_output)
         # Add to main layout
         layout_buttons.addLayout(layout_select)
         layout_buttons.addLayout(layout_names)
         layout_buttons.addLayout(layout_clear)
-        layout_buttons.addLayout(layout_types)
         layout_options.addLayout(layout_buttons)
-        # Proceed button
+        layout_options.addLayout(layout_output1)
+        layout_options.addLayout(layout_output2)
+        # Make proceed button
         self.button_ok = QtWidgets.QPushButton('Ok')
-        self.button_ok.setToolTip('Select data of DUTs')
         layout_options.addStretch(0)
         layout_options.addWidget(self.button_ok)
         self.button_ok.setDisabled(True)
+        self.button_ok.setToolTip('Select data of DUTs')
         self.button_ok.clicked.connect(lambda: self.data_table.save_config())
         self.data_table.inputFilesChanged.connect(lambda: self.analysis_check())
         # Add main layout to widget
@@ -95,30 +111,19 @@ class DataTab(QtWidgets.QWidget):
 
         else:
             self.button_ok.setDisabled(True)
+            self.button_ok.setToolTip('Select data of DUTs')
 
-            try:
-                this = self
-                while not isinstance(this, QtWidgets.QMainWindow):
-                    this = this.parentWidget()
-
+            if self.parent_window is not None:
                 if len(self.data_table.incompatible_data) != 0:
                     broken = []
                     for key in self.data_table.incompatible_data.keys():
                         broken.append(self.data_table.dut_names[key])
 
-                    this.statusBar().showMessage("Data of %s is broken. No testbeam analysis possible." %
-                                                 str(',').join(broken), 4000)
+                    self.parent_window.statusBar().showMessage("Data of %s is broken. Analysis impossible." %
+                                                               str(',').join(broken), 4000)
 
                 if len(self.data_table.input_files) == 0:
-                    this.statusBar().showMessage("No data. No testbeam analysis possible.", 4000)
-
-            except AttributeError:
-                pass
-
-    def handle_type_btn(self):
-
-        if not self.button_types.isCheckable():
-            self.button_types.setToolTip('Define a DUT type in Settings')
+                    self.parent_window.statusBar().showMessage("No data. Analysis impossible.", 4000)
 
 
 class DataTable(QtWidgets.QTableWidget):
@@ -129,31 +134,26 @@ class DataTable(QtWidgets.QTableWidget):
 
     inputFilesChanged = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, parent_window=None):
         super(DataTable, self).__init__(parent)
 
+        # Store parent QMainWindow of DataTable
+        self.parent_window = parent_window
+
+        # Dict for returning
+        self.dut_data = {'input_files': None, 'dut_names': None}
+
         # Lists for dut names, input files, etc.
-        self.dut_names = list()
-        self.input_files = list()
-        self.dut_types = list()
+        self.dut_names = []
+        self.input_files = []
 
         # store indices and status of incompatible data might occurring in check_data
-        self.incompatible_data = dict()
+        self.incompatible_data = {}
 
         # Appearance
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-#        self.verticalHeader().setMinimumSectionSize(60)
-#        self.horizontalHeader().resizeSections(QtWidgets.QHeaderView.Interactive)
-#        self.horizontalHeader().resizeSection(1, QtWidgets.QHeaderView.Stretch)
-#        self.horizontalHeader().resizeSection(2, QtWidgets.QHeaderView.Stretch)
-#        self.horizontalHeader().resizeSection(3, QtWidgets.QHeaderView.Stretch)
-#        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-#        self.verticalHeader().setDefaultSectionSize(60)
-#        self.horizontalHeader().set
-#        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-#        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
         self.setWordWrap(True)
         self.setTextElideMode(QtCore.Qt.ElideLeft)
         self.showGrid()
@@ -185,12 +185,8 @@ class DataTable(QtWidgets.QTableWidget):
 #                self.parentWidget().layout().removeWidget(widget)
 #        self.clear()
 
-        self.row_labels = [('DUT ' + '%d' % i) for i in range(len(self.input_files))]
-
-        if len(self.dut_types) > 0:
-            self.column_labels = ['Path', 'DUT name', 'DUT type', 'Status', 'Navigation']
-        else:
-            self.column_labels = ['Path', 'DUT name', 'Status', 'Navigation']
+        self.row_labels = [('DUT ' + '%d' % i) for i, _ in enumerate(self.input_files)]
+        self.column_labels = ['Path', 'DUT name', 'Status', 'Navigation']
 
         self.setColumnCount(len(self.column_labels))
         self.setRowCount(len(self.row_labels))
@@ -281,13 +277,18 @@ class DataTable(QtWidgets.QTableWidget):
         """
         Set DUT names for further analysis. Std. setting is Tel_i  and i is index
         """
-        #  FIXME: When reset, all dut names have same color, even though data is broken;
-        #  FIXME: split check data func and filling status column
+
         for row in range(self.rowCount()):
             dut_name = name + '_%d' % row
             dut_item = QtWidgets.QTableWidgetItem()
             dut_item.setTextAlignment(QtCore.Qt.AlignCenter)
             dut_item.setText(dut_name)
+            if row in self.incompatible_data.keys():
+                font = dut_item.font()
+                font.setBold(True)
+                font.setUnderline(True)
+                dut_item.setFont(font)
+                dut_item.setForeground(QtGui.QColor('red'))
             self.setItem(row, self.column_labels.index('DUT name'), dut_item)
             self.dut_names.append(dut_name)
 
@@ -332,14 +333,12 @@ class DataTable(QtWidgets.QTableWidget):
         Save configuration from table and get parent QMainWindow and ShowMessage
         """
         self.update_setup()
+        self.dut_data['input_files'] = self.input_files
+        self.dut_data['dut_names'] = self.dut_names
 
-        try:
-            this = self
-            while not isinstance(this, QtWidgets.QMainWindow):
-                this = this.parentWidget()
-            this.statusBar().showMessage("Configuration for %d DUT(s) saved" % (len(self.input_files)), 2000)
-        except AttributeError:
-            pass
+        if self.parent_window is not None:
+            self.parent_window.statusBar().showMessage("Configuration for %d DUT(s) saved" %
+                                                       (len(self.input_files)), 2000)
 
     def clear_table(self):
         """
@@ -405,6 +404,8 @@ class DataTable(QtWidgets.QTableWidget):
             row = index.row()
             self.removeRow(row)
             self.input_files.pop(row)
+            if row in self.incompatible_data.keys():
+                self.incompatible_data.pop(row)
             self.inputFilesChanged.emit()
 
     def _move_down(self):
