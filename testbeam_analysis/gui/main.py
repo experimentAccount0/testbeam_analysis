@@ -38,7 +38,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering',
                           'Correlations', 'Pre-alignment', 'Track finding',
-                          'Alignment', 'Track fitting', 'Track Analysis')
+                          'Alignment', 'Track fitting', 'Analysis')
 
         # Add QTabWidget for tab_widget
         tabs = QtWidgets.QTabWidget()
@@ -60,6 +60,22 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.CorrelateClusterTab(parent=tabs,
                                                         setup=self.setup,
                                                         options=self.options)
+            elif name == 'Pre-alignment':
+                widget = tab_widget.PrealignmentTab(parent=tabs,
+                                                    setup=self.setup,
+                                                    options=self.options)
+            elif name == 'Track finding':
+                widget = tab_widget.TrackFindingTab(parent=tabs,
+                                                    setup=self.setup,
+                                                    options=self.options)
+            elif name == 'Alignment':
+                widget = tab_widget.AlignmentTab(parent=tabs,
+                                                 setup=self.setup,
+                                                 options=self.options)
+            elif name == 'Track fitting':
+                widget = tab_widget.TrackFittingTab(parent=tabs,
+                                                    setup=self.setup,
+                                                    options=self.options)
             else:
                 logging.info('GUI for %s not implemented yet', name)
                 continue
@@ -94,6 +110,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     font = QtGui.QFont()
+    font.setFamily(font.defaultFamily())
     font.setPointSize(11)
     app.setFont(font)
     aw = AnalysisWindow()

@@ -6,7 +6,7 @@
 
 from testbeam_analysis.gui.analysis_widget import AnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
-from testbeam_analysis.dut_alignment import correlate_cluster, merge_cluster_data, prealignment, apply_alignment
+from testbeam_analysis.dut_alignment import correlate_cluster, merge_cluster_data, prealignment, apply_alignment, alignment
 from testbeam_analysis.track_analysis import find_tracks, fit_tracks
 
 
@@ -38,3 +38,44 @@ class CorrelateClusterTab(AnalysisWidget):
             parent, setup, options, input_file=None)
 
         self.set_function(func=correlate_cluster)
+
+
+class PrealignmentTab(AnalysisWidget):
+    ''' Implements the prealignment gui'''
+
+    def __init__(self, parent, setup, options):
+        super(PrealignmentTab, self).__init__(
+            parent, setup, options, input_file=None)
+
+        self.set_function(func=prealignment)
+
+
+class TrackFindingTab(AnalysisWidget):
+    ''' Implements the track finding gui'''
+
+    def __init__(self, parent, setup, options):
+        super(TrackFindingTab, self).__init__(
+            parent, setup, options, input_file=None)
+
+        self.set_function(func=find_tracks)
+
+
+class AlignmentTab(AnalysisWidget):
+    ''' Implements the alignment gui'''
+
+    def __init__(self, parent, setup, options):
+        super(AlignmentTab, self).__init__(
+            parent, setup, options, input_file=None)
+
+        self.add_option(option='TEST', dtype='bool', name='HAMMA', optional=False, default_value=True)
+        self.set_function(func=alignment)
+
+
+class TrackFittingTab(AnalysisWidget):
+    ''' Implements the track fitting gui'''
+
+    def __init__(self, parent, setup, options):
+        super(TrackFittingTab, self).__init__(
+            parent, setup, options, input_file=None)
+
+        self.set_function(func=fit_tracks)

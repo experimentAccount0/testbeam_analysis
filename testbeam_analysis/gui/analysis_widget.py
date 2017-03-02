@@ -56,6 +56,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.keywords = {}
         self.option_widgets = {}
         self.multi = multi
+        self.func = None
         self._setup()
 
     def _setup(self):
@@ -104,7 +105,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             else:
                 self.add_option(option=name)
 
-    def add_option(self, option, dtype=None, name=None, optional=None):
+    def add_option(self, option, dtype=None, name=None, optional=None, default_value=None):
         ''' Add an option to the gui to set function arguments
 
             option: str
@@ -116,6 +117,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             optional: bool
                 Show as optional option, If optional is not defined all parameters with default value
                 None are set as optional. The common behavior is that None deactivates a parameter
+            default_value :
         '''
 
         # Get name from argument name
@@ -123,12 +125,16 @@ class AnalysisWidget(QtWidgets.QWidget):
             name = option.replace("_", " ").capitalize()
 
         # Get default argument value
-        default_value = get_default_args(self.func)[option]
+        if not default_value:
+            try:
+                default_value = get_default_args(self.func)[option]
+            except TypeError:  # No function defined
+                pass
 
         # Get parameter description from numpy style docstring
         try:
             tooltip = get_parameter_doc(self.func)[option]
-        except KeyError:  # No parameter docu available
+        except (KeyError, ValueError):  # No parameter docu available or no function defined
             tooltip = None
 
         # Get parameter dtype from numpy style docstring
@@ -143,8 +149,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             if default_value:
                 dtype = str(type(default_value).__name__)
             else:
-                raise RuntimeError(
-                    'Cannot deduce data type for %s, because no default parameter exists', option)
+                raise RuntimeError('Cannot deduce data type for %s, because no default parameter exists', option)
 
         # Get optional argument from default function argument
         if optional is None and default_value is None:
@@ -246,13 +251,15 @@ class AnalysisWidget(QtWidgets.QWidget):
             if arg not in self.keywords:
                 if arg in self.setup:
                     self.keywords[arg] = self.setup[arg]
-                elif arg in self.options:
-                    if 'input' in arg:
-                        if 'file' in arg:
-                            self.keywords[arg] = os.path.join(
-                                self.options['working_directory'], self.options[arg])
+                elif arg in self.options or 'file' in arg:
+                    try:
+                        if 'input' in arg or 'output' in arg:
+                            self.keywords[arg] = os.path.join(self.options['working_directory'],
+                                                              self.options[arg])
                         else:
                             self.keywords[arg] = self.options[arg]
+                    except KeyError:
+                        logging.error('File I/O %s not defined in settings', arg)
                 # Never plot
                 elif arg == 'plot':
                     self.keywords['plot'] = False
