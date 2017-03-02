@@ -148,6 +148,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts.
     max_tracks : uint
         Take only events with tracks <= max_tracks. If None, take any event.
+    force_prealignment : bool
+        If True, use pre-alignment, even if alignment data is availale.
     selection_track_quality : uint, iterable
         One number valid for all DUTs or an iterable with a number for each DUT.
         0: All tracks with hits in DUT and references are taken

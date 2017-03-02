@@ -228,7 +228,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         this option should be off, because otherwise overfitting is possible.
     reduce_background : bool
         Reduce background (uncorrelated events) by using SVD of the 2D correlation array.
-    dut_names: iterable
+    dut_names : iterable
         Names of the DUTs. If None, the DUT index will be used.
     no_fit : bool
         Use Hough transformation to calculate slope and offset.
