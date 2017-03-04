@@ -1,16 +1,6 @@
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
 
 window_title = 'Global settings'
-
-setup = {'n_pixel': (10, 10),
-         'pixel_size': (100, 100),
-         'dut_name': 'myDUT'}
-
-options = {'working_directory': '',
-           'input_hits_file': 'test_DUT0.h5',
-           'output_mask_file': 'tt',
-           'chunk_size': 1000000,
-           'plot': False}
 
 
 class DefaultSettings(object):
@@ -18,11 +8,20 @@ class DefaultSettings(object):
     def __init__(self):
         super(DefaultSettings, self).__init__()
 
-        self.setup = setup
-        self.options = options
+        self.setup = {'n_pixel': (10, 10),
+                      'pixel_size': (100, 100),
+                      'dut_name': 'myDUT'}
+
+        self.options = {'working_directory': '',
+                        'input_hits_file': 'test_DUT0.h5',
+                        'output_mask_file': 'tt',
+                        'chunk_size': 1000000,
+                        'plot': False}
 
 
 class SettingsWindow(QtWidgets.QMainWindow):
+
+    settingsUpdated = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         """
@@ -30,9 +29,9 @@ class SettingsWindow(QtWidgets.QMainWindow):
         """
 
         super(SettingsWindow, self).__init__(parent)
-        self.setup = setup
-        self.options = options
-        self.output_path = str()
+        ds = DefaultSettings()
+        self.setup = ds.setup
+        self.options = ds.options
         self._init_UI()
 
     def _init_UI(self):
@@ -43,51 +42,64 @@ class SettingsWindow(QtWidgets.QMainWindow):
         # Settings window
         self.setWindowTitle(window_title)
         self.screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.resize(0.5 * self.screen.width(), 0.5 * self.screen.height())
+        self.resize(0.25 * self.screen.width(), 0.25 * self.screen.height())
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
-        # Tabs
-        tabs = QtWidgets.QTabWidget()
-        self.setCentralWidget(tabs)
-        # Widgets
-        widget_global = QtWidgets.QWidget()
-        widget_types = QtWidgets.QWidget()
-        tabs.addTab(widget_global, 'Global')
-        tabs.addTab(widget_types, 'DUT types')
-        # options
+        # Widgets and layout
+        main_widget = QtWidgets.QWidget()
+        main_layout = QtWidgets.QVBoxLayout()
+        main_layout.setSpacing(10)
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+        layout_plot = QtWidgets.QHBoxLayout()
+        label_plot = QtWidgets.QLabel('Plot:')
+        self.rb_t = QtWidgets.QRadioButton('True')
+        self.rb_f = QtWidgets.QRadioButton('False')
+        if self.options['plot']:
+            self.rb_t.setChecked(True)
+        else:
+            self.rb_f.setChecked(True)
+        layout_plot.addWidget(label_plot)
+        layout_plot.setSpacing(10)
+        layout_plot.addWidget(self.rb_t)
+        layout_plot.addWidget(self.rb_f)
+        layout_chunk = QtWidgets.QHBoxLayout()
+        label_chunk = QtWidgets.QLabel('Chunk size:')
+        self.edit_chunk = QtWidgets.QLineEdit()
+        self.edit_chunk.setText(str(self.options['chunk_size']))
+        self.edit_chunk.setFixedWidth(0.5 * self.width())
+        layout_chunk.addWidget(label_chunk)
+        layout_chunk.setSpacing(10)
+        layout_chunk.addWidget(self.edit_chunk)
+        button_update = QtWidgets.QPushButton('Update settings')
+        button_update.clicked.connect(lambda: self._update_settings())
+        main_layout.addLayout(layout_plot)
+        main_layout.addLayout(layout_chunk)
+        main_layout.addWidget(button_update)
 
-        com = """
-        widget_options = QtWidgets.QWidget()
-        self.setCentralWidget(widget_options)
-        layout_options = QtWidgets.QVBoxLayout()
-        label_options = QtWidgets.QLabel('Options')
-        layout_options.addWidget(label_options)
+    def _update_settings(self):
 
-        layout_pix_dim = QtWidgets.QHBoxLayout()
-        label_pix_dim = QtWidgets.QLabel('Pixel array:')
-        label_col = QtWidgets.QLabel('Columns')
-        label_row = QtWidgets.QLabel('Rows')
-        edit_col = QtWidgets.QLineEdit()
-        edit_row = QtWidgets.QLineEdit()
-        edit_col.setText(str(setup['n_pixel'][0]))
-        edit_row.setText(str(setup['n_pixel'][1]))
-        layout_pix_dim.addWidget(label_pix_dim)
-        layout_pix_dim.addWidget(label_col)
-        layout_pix_dim.addWidget(edit_col)
-        layout_pix_dim.addWidget(label_row)
-        layout_pix_dim.addWidget(edit_row)
+        palette = QtGui.QPalette()
 
-        layout_options.addLayout(layout_pix_dim)
-        widget_options.setLayout(layout_options)
-        """
+        try:
+            n = int(self.edit_chunk.text())
+            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+            self.edit_chunk.setPalette(palette)
+            if self.options['chunk_size'] != n:
+                old_cs = self.options['chunk_size']
+                self.options['chunk_size'] = n
 
-    def _get_output_folder(self):
-        caption = 'Select output folder'
-        self.output_path = QtWidgets.QFileDialog.getExistingDirectory(parent=self,
-                                                                      caption=caption,
-                                                                      directory='~/')
-        self.edit_output.setText(self.output_path)
-        self.edit_output.adjustSize()
+        except (TypeError, ValueError):
+            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
+            self.edit_chunk.setPalette(palette)
+            n = self.edit_chunk.text()
+            self.statusBar().showMessage('Chunk size must be an integer, is type %s !' % type(n), 2000)
+            return
 
+        if self.rb_t.isChecked():
+            self.options['plot'] = True
+        else:
+            self.options['plot'] = False
 
-
+        self.statusBar().showMessage('Settings updated!', 2000)
+        self.settingsUpdated.emit()

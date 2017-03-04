@@ -4,6 +4,7 @@ import logging
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 from data import DataTab
+from setup import SetupTab
 from settings import SettingsWindow, DefaultSettings
 from testbeam_analysis.gui import tab_widget
 
@@ -28,11 +29,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.resize(0.75 * self.screen.width(), 0.75 * self.screen.height())
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
+        # Access tab widgets via dict
+        self.tw = {}
+
         # Add widgets to main window
         self._init_menu()
         self._init_tabs()
 
-        self.statusBar().showMessage("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
+        self.handle_messages("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
 
     def _init_tabs(self):
         # Add tab_widget and widgets for the different analysis steps
@@ -41,45 +45,53 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                           'Alignment', 'Track fitting', 'Analysis')
 
         # Add QTabWidget for tab_widget
-        tabs = QtWidgets.QTabWidget()
-        self.setCentralWidget(tabs)
+        self.tabs = QtWidgets.QTabWidget()
+        self.setCentralWidget(self.tabs)
 
         # Initialize each tab
         for name in self.tab_order:
             if name == 'Files':
-                widget = DataTab(parent=tabs, parent_window=self)
+                widget = DataTab(parent=self.tabs)
+            elif name == 'Setup':
+                widget = SetupTab(parent=self.tabs)
             elif name == 'Noisy Pixel':
-                widget = tab_widget.NoisyPixelsTab(parent=tabs,
+                widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
                                                    setup=self.setup,
                                                    options=self.options)
             elif name == 'Clustering':
-                widget = tab_widget.ClusterPixelsTab(parent=tabs,
+                widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
                                                      setup=self.setup,
                                                      options=self.options)
             elif name == 'Correlations':
-                widget = tab_widget.CorrelateClusterTab(parent=tabs,
+                widget = tab_widget.CorrelateClusterTab(parent=self.tabs,
                                                         setup=self.setup,
                                                         options=self.options)
             elif name == 'Pre-alignment':
-                widget = tab_widget.PrealignmentTab(parent=tabs,
+                widget = tab_widget.PrealignmentTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options)
             elif name == 'Track finding':
-                widget = tab_widget.TrackFindingTab(parent=tabs,
+                widget = tab_widget.TrackFindingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options)
             elif name == 'Alignment':
-                widget = tab_widget.AlignmentTab(parent=tabs,
+                widget = tab_widget.AlignmentTab(parent=self.tabs,
                                                  setup=self.setup,
                                                  options=self.options)
             elif name == 'Track fitting':
-                widget = tab_widget.TrackFittingTab(parent=tabs,
+                widget = tab_widget.TrackFittingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options)
             else:
                 logging.info('GUI for %s not implemented yet', name)
                 continue
-            tabs.addTab(widget, name)
+
+            self.tabs.addTab(widget, name)
+            self.tw[name] = widget
+
+        # Connect signals in between tabs and main window
+        self.tw['Files'].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
+        self.tw['Files'].proceedAnalysis.connect(lambda: self.tw['Setup'].get_data(self.tw['Files'].data))
 
     def _init_menu(self):
         self.file_menu = QtWidgets.QMenu('&File', self)
@@ -97,12 +109,28 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # self.help_menu.addAction('&About', self.about)
 
+    def handle_messages(self, message, ms):
+        """
+        Handles messages from the tabs shown in QMainWindows statusBar
+        """
+
+        self.statusBar().showMessage(message, ms)
+
+    def update_settings(self):
+        self.setup = self.sw.setup
+        self.options = self.sw.options
+
+        for i in range(self.tabs.count()):
+            # FIXME: We need update settings/options method for tabs
+            print self.tabs.widget(i)
+
     def file_quit(self):
         self.close()
 
     def global_settings(self):
-        sw = SettingsWindow(self)
-        sw.show()
+        self.sw = SettingsWindow(self)
+        self.sw.show()
+        self.sw.settingsUpdated.connect(lambda: self.update_settings())
 
     def closeEvent(self, _):
         self.file_quit()
@@ -110,7 +138,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     font = QtGui.QFont()
-    font.setFamily(font.defaultFamily())
+#    font.setFamily(font.defaultFamily())
     font.setPointSize(11)
     app.setFont(font)
     aw = AnalysisWindow()

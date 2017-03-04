@@ -1,3 +1,4 @@
+import os
 import tables as tb
 
 from PyQt5 import QtCore, QtWidgets, QtGui
@@ -8,86 +9,110 @@ class DataTab(QtWidgets.QWidget):
     Implements the tab content for data file handling
     """
 
-    def __init__(self, parent=None, parent_window=None):
+    statusMessage = QtCore.pyqtSignal(['QString'])
+    proceedAnalysis = QtCore.pyqtSignal()
+
+    def __init__(self, parent=None):
         super(DataTab, self).__init__(parent)
 
-        # Store parent QMainWindow of DataTab
-        self.parent_window = parent_window
+        # Add output data
+        self.data = {}
+        self.output_path = os.getcwd()
 
         self._setup()
 
     def _setup(self):
+        # Add layout/spacing related stuff
+        h_space = 10
+        v_space = 30
+        sub_v_space = 15
+
         # Table area
         left_widget = QtWidgets.QWidget()
         tab_layout = QtWidgets.QHBoxLayout()
         left_widget.setLayout(tab_layout)
-        self.data_table = DataTable(parent=left_widget, parent_window=self.parent_window)
-        tab_layout.addWidget(self.data_table)
+        self._data_table = DataTable(parent=left_widget)
+        tab_layout.addWidget(self._data_table)
+
         # Make option area
         layout_options = QtWidgets.QVBoxLayout()
-        layout_options.setSpacing(30)
+        layout_options.setSpacing(v_space)
         label_option = QtWidgets.QLabel('Options')
         layout_options.addWidget(label_option)
-        # Make buttons and layout for option buttons
+
+        # Add sub layout for horizontal spacing
+        sl = QtWidgets.QHBoxLayout()
+        sl.addSpacing(h_space)
+
+        # Make buttons and add layout for option buttons
         layout_buttons = QtWidgets.QVBoxLayout()
-        layout_buttons.setSpacing(15)
-        # Make a select button to select input files
-        layout_select = QtWidgets.QHBoxLayout()
-        layout_select.addSpacing(10)
+        layout_buttons.setSpacing(sub_v_space)
+
+        # Make a select button to select input files and connect
         button_select = QtWidgets.QPushButton('Select data of DUTs')
-        layout_select.addWidget(button_select)
-        button_select.clicked.connect(lambda: self.data_table.get_data())
-        # Make button to reset dut names
-        layout_names = QtWidgets.QHBoxLayout()
-        layout_names.addSpacing(10)
+        button_select.clicked.connect(lambda: self._data_table.get_data())
+
+        # Make button to reset dut names and connect
         button_names = QtWidgets.QPushButton('Set DUT names')
         button_names.setToolTip('Set default DUT names')
-        layout_names.addWidget(button_names)
-        button_names.clicked.connect(lambda: self.data_table.set_dut_names())
-        # Make button to clear the table content
-        layout_clear = QtWidgets.QHBoxLayout()
-        layout_clear.addSpacing(10)
+        button_names.clicked.connect(lambda: self._data_table.set_dut_names())
+
+        # Make button to clear the table content and connect
         button_clear = QtWidgets.QPushButton('Clear')
         button_clear.setToolTip('Clears table')
-        layout_clear.addWidget(button_clear)
-        button_clear.clicked.connect(lambda: self.data_table.clear_table())
-        # Make button to select output folder
-        layout_output1 = QtWidgets.QHBoxLayout()
+        button_clear.clicked.connect(lambda: self._data_table.clear_table())
+
+        # Add buttons to main layout
+        layout_buttons.addWidget(button_select)
+        layout_buttons.addWidget(button_names)
+        layout_buttons.addWidget(button_clear)
+        sl.addLayout(layout_buttons)
+        layout_options.addLayout(sl)
+
+        # Make button to select output folder and connect
+        # Add sub layout for horizontal spacing
+        sl_1 = QtWidgets.QHBoxLayout()
+        sl_1.addSpacing(h_space)
+        layout_out = QtWidgets.QVBoxLayout()
+        self.edit_output = QtWidgets.QTextEdit(self.output_path)
+        self.edit_output.setReadOnly(True)
+        self.edit_output.show()
+        height = self.edit_output.document().size().height()
+        self.edit_output.setFixedHeight(height)
+        self.edit_output.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
+        button_out = QtWidgets.QPushButton('Update output folder')
+        button_out.setToolTip('Set output older')
+        button_out.clicked.connect(lambda: self._get_output_folder())
+        layout_out.addWidget(self.edit_output)
+        layout_out.addWidget(button_out)
+        sl_1.addLayout(layout_out)
         label_output = QtWidgets.QLabel('Output folder')
-        checkbox_output = QtWidgets.QCheckBox()
-        layout_output1.addWidget(label_output)
-        layout_output1.addStretch(0)
-        layout_output1.addWidget(checkbox_output)
-        layout_output2 = QtWidgets.QHBoxLayout()
-        layout_output2.addSpacing(10)
-        button_output = QtWidgets.QPushButton()
-        icon_output = button_output.style().standardIcon(QtWidgets.QStyle.SP_FileDialogStart)
-        button_output.setIcon(icon_output)
-        button_output.setIconSize(QtCore.QSize(30, 30))
-        button_output.setFixedSize(QtCore.QSize(35, 35))
-        button_output.setToolTip('Set output older')
-        edit_output = QtWidgets.QLineEdit()
-        edit_output.setFixedHeight(35)
-        layout_output2.addWidget(button_output)
-        layout_output2.addWidget(edit_output)
+
         # Add to main layout
-        layout_buttons.addLayout(layout_select)
-        layout_buttons.addLayout(layout_names)
-        layout_buttons.addLayout(layout_clear)
-        layout_options.addLayout(layout_buttons)
-        layout_options.addLayout(layout_output1)
-        layout_options.addLayout(layout_output2)
+        layout_options.addWidget(label_output)
+        layout_options.addLayout(sl_1)
+
         # Make proceed button
         self.button_ok = QtWidgets.QPushButton('Ok')
-        layout_options.addStretch(0)
-        layout_options.addWidget(self.button_ok)
         self.button_ok.setDisabled(True)
         self.button_ok.setToolTip('Select data of DUTs')
-        self.button_ok.clicked.connect(lambda: self.data_table.save_config())
-        self.data_table.inputFilesChanged.connect(lambda: self.analysis_check())
+
+        # Connect proceed button and inputFilesChanged signal
+        message_ok = "Configuration for %d DUT(s) saved"
+        for x in [lambda: self._data_table.update_setup(),
+                  lambda: self._update_data(),
+                  lambda: self._emit_message(message_ok % (len(self._data_table.input_files)))]:
+            self.button_ok.clicked.connect(x)
+        self._data_table.inputFilesChanged.connect(lambda: self._analysis_check())
+
+        # Add to main layout
+        layout_options.addStretch(0)
+        layout_options.addWidget(self.button_ok)
+
         # Add main layout to widget
         right_widget = QtWidgets.QWidget()
         right_widget.setLayout(layout_options)
+
         # Split table and option area
         widget_splitter = QtWidgets.QSplitter()
         widget_splitter.addWidget(left_widget)
@@ -95,17 +120,29 @@ class DataTab(QtWidgets.QWidget):
         widget_splitter.setStretchFactor(0, 10)
         widget_splitter.setStretchFactor(1, 2.5)
         widget_splitter.setChildrenCollapsible(False)
+
         # Add complete layout to this widget
         layout_widget = QtWidgets.QVBoxLayout()
         layout_widget.addWidget(widget_splitter)
         self.setLayout(layout_widget)
 
-    def analysis_check(self):
+    def _get_output_folder(self):
+        """
+        Get output folder and display path in QTextEdit
+        """
+        caption = 'Select output folder'
+        path = QtWidgets.QFileDialog.getExistingDirectory(caption=caption,
+                                                                      directory='./')
+        if path != self.output_path and len(path) != 0:
+            self.output_path = path
+            self.edit_output.setText(self.output_path)
+
+    def _analysis_check(self):
         """
         Handles  whether the proceed 'OK' button is clickable or not in regard to the input data.
         If not, respective messages are shown in QMainWindows statusBar
         """
-        if len(self.data_table.input_files) > 0 and len(self.data_table.incompatible_data) == 0:
+        if len(self._data_table.input_files) > 0 and len(self._data_table.incompatible_data) == 0:
             self.button_ok.setDisabled(False)
             self.button_ok.setToolTip('Proceed')
 
@@ -113,17 +150,33 @@ class DataTab(QtWidgets.QWidget):
             self.button_ok.setDisabled(True)
             self.button_ok.setToolTip('Select data of DUTs')
 
-            if self.parent_window is not None:
-                if len(self.data_table.incompatible_data) != 0:
-                    broken = []
-                    for key in self.data_table.incompatible_data.keys():
-                        broken.append(self.data_table.dut_names[key])
+            if len(self._data_table.incompatible_data) != 0:
+                broken = []
+                for key in self._data_table.incompatible_data.keys():
+                    broken.append(self._data_table.dut_names[key])
+                message = "Data of %s is broken. Analysis impossible." % str(',').join(broken)
+                self._emit_message(message)
 
-                    self.parent_window.statusBar().showMessage("Data of %s is broken. Analysis impossible." %
-                                                               str(',').join(broken), 4000)
+            if len(self._data_table.input_files) == 0:
+                message = "No data. Analysis impossible."
+                self._emit_message(message)
 
-                if len(self.data_table.input_files) == 0:
-                    self.parent_window.statusBar().showMessage("No data. Analysis impossible.", 4000)
+    def _emit_message(self, message):
+        """
+        Emits statusMessage signal with message
+        """
+
+        self.statusMessage.emit(message)
+
+    def _update_data(self):
+        """
+        Updates the data returned by DataTab
+        """
+        self.data['output_path'] = self.output_path
+        self.data['input_files'] = self._data_table.input_files
+        self.data['dut_names'] = self._data_table.dut_names
+
+        self.proceedAnalysis.emit()
 
 
 class DataTable(QtWidgets.QTableWidget):
@@ -134,16 +187,10 @@ class DataTable(QtWidgets.QTableWidget):
 
     inputFilesChanged = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None, parent_window=None):
+    def __init__(self, parent=None):
         super(DataTable, self).__init__(parent)
 
-        # Store parent QMainWindow of DataTable
-        self.parent_window = parent_window
-
-        # Dict for returning
-        self.dut_data = {'input_files': None, 'dut_names': None}
-
-        # Lists for dut names, input files, etc.
+        # Lists for dut names, input files
         self.dut_names = []
         self.input_files = []
 
@@ -168,7 +215,7 @@ class DataTable(QtWidgets.QTableWidget):
         caption = 'Select data of DUTs'
         for path in QtWidgets.QFileDialog.getOpenFileNames(parent=self,
                                                            caption=caption,
-                                                           directory='~/',
+                                                           directory='./',
                                                            filter='*.h5')[0]:
             self.input_files.append(path)
 
@@ -194,6 +241,18 @@ class DataTable(QtWidgets.QTableWidget):
         self.setVerticalHeaderLabels(self.row_labels)
 
         for row, dut in enumerate(self.input_files):
+            # FIXME: replace with QTextEdit to show full text if needed
+            # edit_dut = QtWidgets.QTextEdit(dut)
+            # edit_dut.setLineWrapMode(True)
+            # edit_dut.setFrameStyle(0)
+            # edit_dut.setReadOnly(True)
+            # edit_dut.setVerticalScrollBarPolicy(1)
+            # edit_dut.show()
+            # edit_width = edit_dut.document().size().width()
+            # edit_height = edit_dut.document().size().height()
+            # edit_dut.setFixedSize(edit_width, edit_height)
+            # self.setCellWidget(row, self.column_labels.index('Path'), edit_dut)
+
             path_item = QtWidgets.QTableWidgetItem()
             path_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             path_item.setTextAlignment(QtCore.Qt.AlignLeft)
@@ -265,6 +324,8 @@ class DataTable(QtWidgets.QTableWidget):
         new = []
         try:
             for row in range(self.rowCount()):
+                # FIXME: replace with QTextEdit to show full text if needed
+                # new.append(self.cellWidget(row, self.column_labels.index('Path')).toPlainText())
                 new.append(self.item(row, self.column_labels.index('Path')).text())
         except AttributeError:
             pass
@@ -327,18 +388,6 @@ class DataTable(QtWidgets.QTableWidget):
         self.update_data()
         self.handle_data()
 #        self.update_dut_names()
-
-    def save_config(self):
-        """
-        Save configuration from table and get parent QMainWindow and ShowMessage
-        """
-        self.update_setup()
-        self.dut_data['input_files'] = self.input_files
-        self.dut_data['dut_names'] = self.dut_names
-
-        if self.parent_window is not None:
-            self.parent_window.statusBar().showMessage("Configuration for %d DUT(s) saved" %
-                                                       (len(self.input_files)), 2000)
 
     def clear_table(self):
         """
