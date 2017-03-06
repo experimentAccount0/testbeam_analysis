@@ -1,0 +1,1 @@
+{"FE-I4": {"pitch_col": 250.0, "n_rows": 336, "pitch_row": 50.0, "n_cols": 80, "thickness": 300.0}, "Mimosa26": {"pitch_col": 18.4, "n_rows": 576, "pitch_row": 18.4, "n_cols": 1152, "thickness": 50.0}}
