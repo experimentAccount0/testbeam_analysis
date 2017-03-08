@@ -86,7 +86,6 @@ class SettingsWindow(QtWidgets.QMainWindow):
             palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
             self.edit_chunk.setPalette(palette)
             if self.options['chunk_size'] != n:
-                old_cs = self.options['chunk_size']
                 self.options['chunk_size'] = n
 
         except (TypeError, ValueError):
