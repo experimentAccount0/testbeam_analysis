@@ -30,8 +30,8 @@ class SetupTab(QtWidgets.QWidget):
         # Make dict for all dut type setting/handling widgets
         self._type_widgets = {}
 
-        # Make dict for all create dut type widgets
-        self._create_widgets = {}
+        # Make dict for all handle dut type widgets
+        self._handle_widgets = {}
 
         # Make dict for buttons for deleting props or setting globally
         self._buttons = {}
@@ -67,7 +67,7 @@ class SetupTab(QtWidgets.QWidget):
 
         # Proceed button
         self.button_ok = QtWidgets.QPushButton('OK')
-        self.button_ok.clicked.connect(lambda: self._get_properties())
+        self.button_ok.clicked.connect(lambda: self._handle_input())
         self.button_ok.setDisabled(True)
         layout_right.addWidget(self.button_ok)
         right_widget = QtWidgets.QWidget()
@@ -132,7 +132,7 @@ class SetupTab(QtWidgets.QWidget):
             l_pixels = QtWidgets.QHBoxLayout()
             l_pixels_sub = QtWidgets.QVBoxLayout()
             l_thickness = QtWidgets.QHBoxLayout()
-            l_create = QtWidgets.QHBoxLayout()
+            l_handle = QtWidgets.QHBoxLayout()
             l_buttons = QtWidgets.QHBoxLayout()
             l_z.addSpacing(10)
             l_rot.addSpacing(10)
@@ -140,7 +140,7 @@ class SetupTab(QtWidgets.QWidget):
             l_pitch.addSpacing(10)
             l_pixels.addSpacing(10)
             l_thickness.addSpacing(10)
-            l_create.addSpacing(10)
+            l_handle.addSpacing(10)
 
             # Make dut type selection layout
             label_type = QtWidgets.QLabel('Set DUT type')
@@ -154,15 +154,15 @@ class SetupTab(QtWidgets.QWidget):
             checkbox_type.setDisabled(True)
 
             # Make dut type creation layout
-            label_create = QtWidgets.QLabel('Create DUT type')
-            edit_create = QtWidgets.QLineEdit()
-            edit_create.setPlaceholderText('Enter name')
-            button_create = QtWidgets.QPushButton('Create')
-            checkbox_create = QtWidgets.QCheckBox()
-            checkbox_create.setToolTip('Permanently create custom DUT type')
-            label_create.setDisabled(True)
-            button_create.setDisabled(True)
-            edit_create.setDisabled(True)
+            label_handle = QtWidgets.QLabel('Create DUT type')
+            edit_handle = QtWidgets.QLineEdit()
+            edit_handle.setPlaceholderText('Enter name')
+            button_handle = QtWidgets.QPushButton('Create')
+            checkbox_handle = QtWidgets.QCheckBox()
+            checkbox_handle.setToolTip('Create or remove (:type) custom DUT type')
+            label_handle.setDisabled(True)
+            button_handle.setDisabled(True)
+            edit_handle.setDisabled(True)
 
             # Make widgets for input parameters
             label_z = QtWidgets.QLabel('z-Position / ' + u'\u03BC' + 'm :')
@@ -230,11 +230,11 @@ class SetupTab(QtWidgets.QWidget):
             l_thickness.addWidget(label_thickness)
             l_thickness.addStretch(1)
             l_thickness.addWidget(edit_thickness)
-            l_create.addWidget(checkbox_create)
-            l_create.addWidget(label_create)
-            l_create.addStretch(1)
-            l_create.addWidget(edit_create)
-            l_create.addWidget(button_create)
+            l_handle.addWidget(checkbox_handle)
+            l_handle.addWidget(label_handle)
+            l_handle.addStretch(1)
+            l_handle.addWidget(edit_handle)
+            l_handle.addWidget(button_handle)
             l_buttons.addWidget(button_glob)
             l_buttons.addWidget(button_clear)
 
@@ -245,7 +245,7 @@ class SetupTab(QtWidgets.QWidget):
             l_2.addLayout(l_pitch)
             l_2.addLayout(l_pixels)
             l_2.addLayout(l_thickness)
-            l_2.addLayout(l_create)
+            l_2.addLayout(l_handle)
             l_2.addStretch(0)
             l_2.addLayout(l_buttons)
 
@@ -270,8 +270,8 @@ class SetupTab(QtWidgets.QWidget):
                                        'combo_t': cb_type, 'button_t': button_type}
 
             # Add all dut type creating related widgets to a dict with respective dut as key
-            self._create_widgets[dut] = {'label_c': label_create, 'check_c': checkbox_create,
-                                         'edit_c': edit_create, 'button_c': button_create}
+            self._handle_widgets[dut] = {'label_h': label_handle, 'check_h': checkbox_handle,
+                                         'edit_h': edit_handle, 'button_h': button_handle}
 
             # Add all button widgets to a dict with respective dut as key
             self._buttons[dut] = {'global': button_glob, 'clear': button_clear}
@@ -295,16 +295,16 @@ class SetupTab(QtWidgets.QWidget):
             self._type_widgets[dut]['check_t'].toggled.connect(
                 lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()]))
 
-            # Connect create type checkbox
-            self._create_widgets[dut]['check_c'].toggled.connect(
+            # Connect handle type checkbox
+            self._handle_widgets[dut]['check_h'].toggled.connect(
                 lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()]))
 
-            # Connect create type edit
-            self._create_widgets[dut]['edit_c'].textChanged.connect(
+            # Connect handle type edit
+            self._handle_widgets[dut]['edit_h'].textChanged.connect(
                 lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()]))
 
-            # Connect create type button
-            self._create_widgets[dut]['button_c'].clicked.connect(
+            # Connect handle type button
+            self._handle_widgets[dut]['button_h'].clicked.connect(
                 lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()], 'c'))
 
             # Connect clear buttons
@@ -321,7 +321,7 @@ class SetupTab(QtWidgets.QWidget):
                           lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()])]:
                     self._dut_widgets[dut][prop].textChanged.connect(x)
 
-    def _get_properties(self, custom=None):
+    def _handle_input(self, custom=None):
         """
         Method to read input parameters of each dut from the UI. If custom is not None, only the specific
         dut properties of the custom dut type "custom" are read. The dut type "custom" is added to self._dut_types
@@ -345,29 +345,44 @@ class SetupTab(QtWidgets.QWidget):
                     else:
                         self.dut_data[dut][prop] = float(self._dut_widgets[dut][prop].text())
 
-        # Read only dut properties of custom dut type
+        # Read only dut properties of custom dut type or remove/overwrite predefined type
         else:
-
-            self._dut_types[custom] = {}
             current_dut = self.data['dut_names'][self.tabs.currentIndex()]
+            remove = False
 
-            for prop in self._dut_props:
+            if custom[0] == ':':
+                print custom
+                custom = custom.split(':')[1]
+                print custom
+                self._dut_types.pop(custom)
+                remove = True
 
-                # Exclude reading of non-specific dut properties
-                if prop not in ['z_pos', 'rotation']:
-                    if prop in ['n_cols', 'n_rows']:
-                        self._dut_types[custom][prop] = int(self._dut_widgets[current_dut][prop].text())
-                    else:
-                        self._dut_types[custom][prop] = float(self._dut_widgets[current_dut][prop].text())
+            else:
+                self._dut_types[custom] = {}
+                for prop in self._dut_props:
 
-            # Clear QLineEdit of tab where the custom dut was created
-            self._create_widgets[current_dut]['edit_c'].clear()
+                    # Exclude reading of non-specific dut properties
+                    if prop not in ['z_pos', 'rotation']:
+                        if prop in ['n_cols', 'n_rows']:
+                            self._dut_types[custom][prop] = int(self._dut_widgets[current_dut][prop].text())
+                        else:
+                            self._dut_types[custom][prop] = float(self._dut_widgets[current_dut][prop].text())
+
+            # Clear QLineEdit of tab where the custom dut was created or removed
+            self._handle_widgets[current_dut]['edit_h'].clear()
+
+            if remove:
+                self._handle_widgets[current_dut]['button_h'].setText('Create')
+                self._handle_widgets[current_dut]['label_h'].setText('Create DUT type')
 
             # Safe updated self._dut_types dict to file and reload
             try:
                 json.dump(self._dut_types, open('dut_types.txt', 'wb'))
                 self._dut_types = json.load(open('dut_types.txt'))
-                message = 'Successfully created DUT type "%s" and added to predefined DUT types' % custom
+                if remove:
+                    message = 'Successfully removed DUT type "%s" from predefined DUT types' % custom
+                else:
+                    message = 'Successfully created DUT type "%s" and added to predefined DUT types' % custom
                 self._emit_message(message)
 
                 # Update selection of dut types in each dut tabs combobox
@@ -404,31 +419,52 @@ class SetupTab(QtWidgets.QWidget):
                         if key is not 'check_t':
                             self._type_widgets[dut][key].setDisabled(True)
 
-                if self._create_widgets[dut]['check_c'].isChecked():
-                    new_type = self._create_widgets[dut]['edit_c'].text()
-                    for key in self._create_widgets[dut].keys():
-                        if key is 'button_c':
+                if self._handle_widgets[dut]['check_h'].isChecked():
+
+                    new_type = self._handle_widgets[dut]['edit_h'].text()
+
+                    for key in self._handle_widgets[dut].keys():
+
+                        if key is 'button_h':
+
+                            self._handle_widgets[dut][key].setText('Create')
+                            self._handle_widgets[dut]['label_h'].setText('Create DUT type')
+
                             if len(new_type) > 0:
-                                if new_type not in self._dut_types.keys():
+
+                                if new_type[0] == ':':
+                                    self._handle_widgets[dut][key].setText('Remove')
+                                    self._handle_widgets[dut]['label_h'].setText('Remove DUT type')
+                                    if new_type.split(':')[1] in self._dut_types.keys():
+                                        self._handle_widgets[dut][key].setDisabled(False)
+                                    else:
+                                        self._handle_widgets[dut][key].setDisabled(True)
+
+                                elif new_type not in self._dut_types.keys():
                                     self._check_input(['z_pos', 'rotation'])
-                                    self._create_widgets[dut][key].setText('Create')
+
                                 else:
-                                    self._create_widgets[dut][key].setText('Overwrite')
+                                    self._check_input(['z_pos', 'rotation'])
+                                    self._handle_widgets[dut][key].setText('Overwrite')
+                                    self._handle_widgets[dut]['label_h'].setText('Overwrite DUT type')
                                     message = 'Predefined DUT type "%s" will be overwritten!' % new_type
                                     self._emit_message(message)
                             else:
-                                self._create_widgets[dut][key].setDisabled(True)
+                                self._handle_widgets[dut][key].setDisabled(True)
+                                self._handle_widgets[dut]['label_h'].setText('Create DUT type')
                         else:
-                            self._create_widgets[dut][key].setDisabled(False)
+                            self._handle_widgets[dut][key].setDisabled(False)
                 else:
-                    for key in self._create_widgets[dut].keys():
-                        if key is not 'check_c':
-                            self._create_widgets[dut][key].setDisabled(True)
-                            if key is 'edit_c':
-                                self._create_widgets[dut][key].clear()
+                    self._handle_widgets[dut]['button_h'].setText('Create')
+                    self._handle_widgets[dut]['label_h'].setText('Create DUT type')
+                    for key in self._handle_widgets[dut].keys():
+                        if key is not 'check_h':
+                            self._handle_widgets[dut][key].setDisabled(True)
+                            if key is 'edit_h':
+                                self._handle_widgets[dut][key].clear()
             if mode is 'c':
-                new_dut = self._create_widgets[dut]['edit_c'].text()
-                self._get_properties(new_dut)
+                new_dut = self._handle_widgets[dut]['edit_h'].text()
+                self._handle_input(new_dut)
 
     def _set_properties(self, dut, dut_type=None):
         """
@@ -450,7 +486,7 @@ class SetupTab(QtWidgets.QWidget):
                                  for i in range(self._type_widgets[dut]['combo_t'].count())]
 
                     # If type is predefined
-                    if dut_type in dut_types :
+                    if dut_type in dut_types:
                         self._dut_widgets[dut][prop].setText(str(self._dut_types[dut_type][prop]))
 
                     # If global, current properties are set for all duts
@@ -534,14 +570,13 @@ class SetupTab(QtWidgets.QWidget):
                     self.tabs.setTabIcon(self.data['dut_names'].index(dut), icon)
                     self.tabs.setTabToolTip(self.data['dut_names'].index(dut), 'Ready')
 
-                self._create_widgets[dut]['button_c'].setDisabled(broken)
+                self._handle_widgets[dut]['button_h'].setDisabled(broken)
 
             else:
                 if dut in broken_input:
-                    self._create_widgets[dut]['button_c'].setDisabled(True)
+                    self._handle_widgets[dut]['button_h'].setDisabled(True)
                 else:
-                    self._create_widgets[dut]['button_c'].setDisabled(False)
-
+                    self._handle_widgets[dut]['button_h'].setDisabled(False)
 
         # Set the status of the proceed button
         if skip_props is None:
