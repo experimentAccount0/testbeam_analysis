@@ -68,10 +68,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
                                                      setup=self.setup,
                                                      options=self.options)
-            elif name == 'Correlations':
-                widget = tab_widget.CorrelateClusterTab(parent=self.tabs,
-                                                        setup=self.setup,
-                                                        options=self.options)
             elif name == 'Pre-alignment':
                 widget = tab_widget.PrealignmentTab(parent=self.tabs,
                                                     setup=self.setup,
