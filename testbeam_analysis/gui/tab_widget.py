@@ -17,7 +17,7 @@ class NoisyPixelsTab(AnalysisWidget):
         super(NoisyPixelsTab, self).__init__(
             parent, setup, options, input_file=None)
 
-        self.set_function(func=generate_pixel_mask)
+        self.add_function(func=generate_pixel_mask)
 
 
 class ClusterPixelsTab(AnalysisWidget):
@@ -27,17 +27,7 @@ class ClusterPixelsTab(AnalysisWidget):
         super(ClusterPixelsTab, self).__init__(
             parent, setup, options, input_file=None)
 
-        self.set_function(func=cluster_hits)
-
-
-class CorrelateClusterTab(AnalysisWidget):
-    ''' Implements the cluster correlation gui'''
-
-    def __init__(self, parent, setup, options):
-        super(CorrelateClusterTab, self).__init__(
-            parent, setup, options, input_file=None)
-
-        self.set_function(func=correlate_cluster)
+        self.add_function(func=cluster_hits)
 
 
 class PrealignmentTab(AnalysisWidget):
@@ -47,7 +37,8 @@ class PrealignmentTab(AnalysisWidget):
         super(PrealignmentTab, self).__init__(
             parent, setup, options, input_file=None)
 
-        self.set_function(func=prealignment)
+        self.add_function(func=correlate_cluster)
+        self.add_function(func=prealignment)
 
 
 class TrackFindingTab(AnalysisWidget):
@@ -57,7 +48,7 @@ class TrackFindingTab(AnalysisWidget):
         super(TrackFindingTab, self).__init__(
             parent, setup, options, input_file=None)
 
-        self.set_function(func=find_tracks)
+        self.add_function(func=find_tracks)
 
 
 class AlignmentTab(AnalysisWidget):
@@ -67,8 +58,9 @@ class AlignmentTab(AnalysisWidget):
         super(AlignmentTab, self).__init__(
             parent, setup, options, input_file=None)
 
-        self.add_option(option='TEST', dtype='bool', name='HAMMA', optional=False, default_value=True)
-        self.set_function(func=alignment)
+        self.add_function(func=alignment)
+        self.add_option(option='TEST', func=alignment, dtype='bool',
+                        name='HAMMA', optional=False, default_value=True)
 
 
 class TrackFittingTab(AnalysisWidget):
@@ -78,4 +70,4 @@ class TrackFittingTab(AnalysisWidget):
         super(TrackFittingTab, self).__init__(
             parent, setup, options, input_file=None)
 
-        self.set_function(func=fit_tracks)
+        self.add_function(func=fit_tracks)
