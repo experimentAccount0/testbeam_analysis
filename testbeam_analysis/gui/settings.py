@@ -6,17 +6,21 @@ window_title = 'Global settings'
 class DefaultSettings(object):
 
     def __init__(self):
-        super(DefaultSettings, self).__init__()
-
-        self.setup = {'n_pixel': (10, 10),
-                      'pixel_size': (100, 100),
-                      'dut_name': 'myDUT'}
+        self.setup = {'n_duts': 2,
+                      'n_pixels': [(10, 10)],
+                      'pixel_size': [(100, 100)],
+                      'dut_name': 'myDUT',
+                      'z_positions': (0, 10000),
+                      'dut_names': ('First DUT', 'SCD DUT')}
 
         self.options = {'working_directory': '',
                         'input_hits_file': 'test_DUT0.h5',
                         'output_mask_file': 'tt',
                         'chunk_size': 1000000,
                         'plot': False}
+
+        self.options['input_cluster_files'] = 'test.h5'
+        self.options['output_correlation_file'] = 'tt.h5'
 
 
 class SettingsWindow(QtWidgets.QMainWindow):
@@ -25,7 +29,8 @@ class SettingsWindow(QtWidgets.QMainWindow):
 
     def __init__(self, parent=None):
         """
-        Create window to set global settings for analysis such as n_pixels, output_folder etc.
+        Create window to set global settings for analysis such as n_pixels,
+        output_folder etc.
         """
 
         super(SettingsWindow, self).__init__(parent)
