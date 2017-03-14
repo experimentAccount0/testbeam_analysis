@@ -53,7 +53,8 @@ class PrealignmentTab(AnalysisWidget):
         self.add_function(func=merge_cluster_data)
         self.add_function(func=apply_alignment)
         # Fix options that should not be changed
-        self.add_option(option='use_duts', func=apply_alignment, default_value=[1] * setup['n_duts'], fixed=True)
+        self.add_option(option='use_duts', func=apply_alignment, default_value=[
+                        1] * setup['n_duts'], fixed=True)
         self.add_option(option='inverse', func=apply_alignment, fixed=True)
         self.add_option(option='force_prealignment', func=apply_alignment,
                         default_value=True, fixed=True)
@@ -88,6 +89,17 @@ class TrackFittingTab(AnalysisWidget):
             parent, setup, options, input_file=None)
 
         self.add_function(func=fit_tracks)
+        # Set and fix options
+        self.add_option(option='fit_duts', func=fit_tracks,
+                        default_value=[0] * setup['n_duts'], optional=True)
+        self.add_option(option='force_prealignment', func=fit_tracks,
+                        default_value=False, fixed=True)
+        self.add_option(option='exclude_dut_hit', func=fit_tracks,
+                        default_value=False, fixed=True)
+        self.add_option(option='use_correlated', func=fit_tracks,
+                        default_value=False, fixed=True)
+        self.add_option(option='min_track_distance', func=fit_tracks,
+                        default_value=[200] * setup['n_duts'], optional=False)
 
 
 class ResultTab(AnalysisWidget):
