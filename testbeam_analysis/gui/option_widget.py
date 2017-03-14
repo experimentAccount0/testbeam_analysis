@@ -282,3 +282,102 @@ class OptionMultiSlider(QtWidgets.QWidget):
         else:
             values = [None]
         self.valueChanged.emit(values)
+
+
+class OptionMultiBox(QtWidgets.QWidget):
+    ''' Option boxes in 2 dimensions
+    '''
+
+    valueChanged = QtCore.pyqtSignal(list)
+
+    def __init__(self, name, labels, default_value, optional, tooltip, parent=None):
+        super(OptionMultiBox, self).__init__(parent)
+        # Check default value
+        if default_value is None:  # None is only supported for all values
+            default_value = 0.
+        if not isinstance(default_value, collections.Iterable):
+            default_value = [default_value] * len(labels)
+        if len(labels) != len(default_value):
+            raise ValueError('Number of default values does not match number of parameters')
+
+        max_val = max((max(default_value) * 2, 1))
+
+        # Option name with sliders below
+        layout = QtWidgets.QVBoxLayout(self)
+        text = QtWidgets.QLabel(name)
+        if tooltip:
+            text.setToolTip(tooltip)
+        if optional:  # Values can be unset
+            layout_1 = QtWidgets.QHBoxLayout()
+            layout_1.addWidget(text)
+            layout_1.addStretch(0)
+            check_box = QtWidgets.QCheckBox()
+            layout_1.addWidget(check_box)
+            layout.addLayout(layout_1)
+        else:
+            layout.addWidget(text)
+
+        self.edits = []
+
+        for i, label in enumerate(labels):  # Create one slider per label
+            # Slider with textbox to the right
+            layout_label = QtWidgets.QHBoxLayout()
+            slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+            # Text edit
+            edit = QtWidgets.QLineEdit()
+            edit.setAlignment(QtCore.Qt.AlignCenter)
+            edit.setValidator(QtGui.QDoubleValidator())
+            edit.setMaxLength(3)
+            size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                                                QtWidgets.QSizePolicy.Preferred)
+            edit.setSizePolicy(size_policy)
+            layout_label.addWidget(QtWidgets.QLabel('  ' + label))
+            layout_label.addWidget(slider)
+            layout_label.addWidget(edit)
+
+            # Crazy shit: lambda late binding has to be prevented here
+            # http://docs.python-guide.org/en/latest/writing/gotchas/
+            slider.valueChanged.connect(lambda v, edit=edit: edit.setText(str(v)))
+            slider.valueChanged.connect(lambda _: self._emit_value())
+            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setMaximum(max(float(edit.text()) * 2, 1)))
+            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setValue(float(edit.text())))
+
+            slider.setMaximum(max_val)
+            slider.setValue(default_value[i])
+            # Needed because set value does not issue a value changed
+            # if value stays constant
+            edit.setText(str(slider.value()))
+
+            self.edits.append(edit)
+
+            layout.addLayout(layout_label)
+
+        if optional:
+            check_box.stateChanged.connect(
+                lambda v: self._set_readonly(v == 0))
+            self._set_readonly()
+
+    def _set_readonly(self, value=True):
+        if value:
+            palette = QtGui.QPalette()
+            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.gray)
+            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
+            for edit in self.edits:
+                edit.setPalette(palette)
+                edit.setReadOnly(True)
+            self._emit_value()
+        else:
+            palette = QtGui.QPalette()
+            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.white)
+            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+            for edit in self.edits:
+                edit.setPalette(palette)
+                edit.setReadOnly(False)
+            self._emit_value()
+
+    def _emit_value(self):
+        if not any([edit.isReadOnly() for edit in self.edits]):
+            values = [int(edit.text()) for edit in self.edits]
+        else:
+            values = [None]
+        self.valueChanged.emit(values)
