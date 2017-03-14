@@ -58,7 +58,8 @@ class OptionSlider(QtWidgets.QWidget):  # FIXME: steps size != 1 not supported
         slider.valueChanged.connect(lambda _: self._emit_value())
         self.edit.returnPressed.connect(
             lambda: slider.setMaximum(max((float(self.edit.text()) * 2), 1)))
-        self.edit.returnPressed.connect(lambda: slider.setValue(float(self.edit.text())))
+        self.edit.returnPressed.connect(
+            lambda: slider.setValue(float(self.edit.text())))
 
         if default_value is not None:
             slider.setMaximum(max((default_value * 2, 1)))
@@ -199,7 +200,8 @@ class OptionMultiSlider(QtWidgets.QWidget):
         if not isinstance(default_value, collections.Iterable):
             default_value = [default_value] * len(labels)
         if len(labels) != len(default_value):
-            raise ValueError('Number of default values does not match number of parameters')
+            raise ValueError(
+                'Number of default values does not match number of parameters')
 
         max_val = max((max(default_value) * 2, 1))
 
@@ -238,10 +240,13 @@ class OptionMultiSlider(QtWidgets.QWidget):
 
             # Crazy shit: lambda late binding has to be prevented here
             # http://docs.python-guide.org/en/latest/writing/gotchas/
-            slider.valueChanged.connect(lambda v, edit=edit: edit.setText(str(v)))
+            slider.valueChanged.connect(
+                lambda v, edit=edit: edit.setText(str(v)))
             slider.valueChanged.connect(lambda _: self._emit_value())
-            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setMaximum(max(float(edit.text()) * 2, 1)))
-            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setValue(float(edit.text())))
+            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setMaximum(
+                max(float(edit.text()) * 2, 1)))
+            edit.returnPressed.connect(
+                lambda slider=slider, edit=edit: slider.setValue(float(edit.text())))
 
             slider.setMaximum(max_val)
             slider.setValue(default_value[i])
@@ -290,17 +295,24 @@ class OptionMultiBox(QtWidgets.QWidget):
 
     valueChanged = QtCore.pyqtSignal(list)
 
-    def __init__(self, name, labels, default_value, optional, tooltip, parent=None):
+    def __init__(self, name, labels_x, default_value, optional, tooltip,
+                 labels_y=None, parent=None):
         super(OptionMultiBox, self).__init__(parent)
+
+        nx = len(labels_x)
+        ny = len(labels_y) if labels_y else 1
+
         # Check default value
         if default_value is None:  # None is only supported for all values
             default_value = 0.
         if not isinstance(default_value, collections.Iterable):
-            default_value = [default_value] * len(labels)
-        if len(labels) != len(default_value):
-            raise ValueError('Number of default values does not match number of parameters')
+            default_value = [default_value] * ny
+        if not isinstance(default_value[0], collections.Iterable):
+            default_value = [default_value * nx for i in range(len(labels_x))]
 
-        max_val = max((max(default_value) * 2, 1))
+        if nx != len(default_value):
+            raise ValueError(
+                'Number of default values does not match number of parameters')
 
         # Option name with sliders below
         layout = QtWidgets.QVBoxLayout(self)
@@ -317,45 +329,28 @@ class OptionMultiBox(QtWidgets.QWidget):
         else:
             layout.addWidget(text)
 
-        self.edits = []
+        layout_iter = QtWidgets.QGridLayout()
+        offset = 0
+        if labels_y:
+            offset = 1
+            for j, label in enumerate(labels_y):
+                layout_iter.addWidget(QtWidgets.QLabel(label), 0, j + 1,
+                                      alignment=QtCore.Qt.AlignCenter)
 
-        for i, label in enumerate(labels):  # Create one slider per label
+        for i, label in enumerate(labels_x):  # Create one slider per label
             # Slider with textbox to the right
-            layout_label = QtWidgets.QHBoxLayout()
-            slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-            # Text edit
-            edit = QtWidgets.QLineEdit()
-            edit.setAlignment(QtCore.Qt.AlignCenter)
-            edit.setValidator(QtGui.QDoubleValidator())
-            edit.setMaxLength(3)
-            size_policy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred,
-                                                QtWidgets.QSizePolicy.Preferred)
-            edit.setSizePolicy(size_policy)
-            layout_label.addWidget(QtWidgets.QLabel('  ' + label))
-            layout_label.addWidget(slider)
-            layout_label.addWidget(edit)
+            layout_iter.addWidget(QtWidgets.QLabel('  ' + label), i + offset, 0)
+            for j in range(ny):
+                check_box = QtWidgets.QCheckBox()
+                layout_iter.addWidget(check_box, i + offset, j + 1,
+                                      alignment=QtCore.Qt.AlignCenter)
 
-            # Crazy shit: lambda late binding has to be prevented here
-            # http://docs.python-guide.org/en/latest/writing/gotchas/
-            slider.valueChanged.connect(lambda v, edit=edit: edit.setText(str(v)))
-            slider.valueChanged.connect(lambda _: self._emit_value())
-            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setMaximum(max(float(edit.text()) * 2, 1)))
-            edit.returnPressed.connect(lambda slider=slider, edit=edit: slider.setValue(float(edit.text())))
+        layout.addLayout(layout_iter)
 
-            slider.setMaximum(max_val)
-            slider.setValue(default_value[i])
-            # Needed because set value does not issue a value changed
-            # if value stays constant
-            edit.setText(str(slider.value()))
-
-            self.edits.append(edit)
-
-            layout.addLayout(layout_label)
-
-        if optional:
-            check_box.stateChanged.connect(
-                lambda v: self._set_readonly(v == 0))
-            self._set_readonly()
+#         if optional:
+#             check_box.stateChanged.connect(
+#                 lambda v: self._set_readonly(v == 0))
+#             self._set_readonly()
 
     def _set_readonly(self, value=True):
         if value:

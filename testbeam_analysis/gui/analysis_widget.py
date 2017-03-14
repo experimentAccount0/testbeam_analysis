@@ -228,9 +228,9 @@ class AnalysisWidget(QtWidgets.QWidget):
                 optional=optional, tooltip=tooltip, parent=self)
         elif 'iterable of iterable' in dtype:
             widget = option_widget.OptionMultiBox(
-                name=name, labels=self.setup['dut_names'],
+                name=name, labels_x=self.setup['dut_names'],
                 default_value=default_value,
-                optional=optional, tooltip=tooltip, parent=self)
+                optional=optional, tooltip=tooltip, labels_y=self.setup['dut_names'], parent=self)
         elif 'str' in dtype:
             widget = option_widget.OptionText(
                 name, default_value, optional, tooltip, parent=self)
