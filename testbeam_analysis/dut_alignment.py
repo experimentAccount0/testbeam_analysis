@@ -793,7 +793,7 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
     max_iterations : uint
         Maximum number of iterations of calc residuals, apply rotation refit loop until constant result is expected.
         Usually the procedure converges rather fast (< 5 iterations)
-    use_n_tracks: uint
+    use_n_tracks : uint
         Defines the amount of tracks to be used for the alignment. More tracks can potentially make the result
         more precise, but will also increase the calculation time.
     plot : bool

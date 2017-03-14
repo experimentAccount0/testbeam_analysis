@@ -640,8 +640,10 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
         Use only distances (between DUT hit and track hit) smaller than cut_distance.
     max_distance : int
         Defines binnig of distance values.
-    col_range, row_range : iterable
-        Column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).
+    col_range : iterable
+        Column value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).
+    row_range : iterable
+        Row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).
     plot : bool
         If True, create additional output plots.
     chunk_size : int
