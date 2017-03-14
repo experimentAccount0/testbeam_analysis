@@ -185,30 +185,13 @@ class AnalysisWidget(QtWidgets.QWidget):
             optional = True
 
         if not fixed:  # Option value can be changed
-            # Create widget according to data type
-            if 'str' in dtype:
-                widget = option_widget.OptionText(
-                    name, default_value, optional, tooltip, parent=self)
-            elif 'int' in dtype:
-                widget = option_widget.OptionSlider(
-                    name, default_value, optional, tooltip, parent=self)
-            elif 'float' in dtype:
-                widget = option_widget.OptionSlider(
-                    name, default_value, optional, tooltip, parent=self)
-            elif 'bool' in dtype:
-                widget = option_widget.OptionBool(
-                    name, default_value, optional, tooltip, parent=self)
-            elif ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
-                  ('iterable' in dtype and 'iterable of iterable' not in dtype)):
-                widget = option_widget.OptionMultiSlider(
-                    name=name, labels=self.setup[
-                        'dut_names'], default_value=default_value,
-                    optional=optional, tooltip=tooltip, parent=self)
-            else:
-                logging.warning(
-                    'Cannot create option %s for dtype "%s" for function %s', option, dtype, func.__name__)
+            try:
+                widget = self._select_widget(dtype, name, default_value,
+                                             optional, tooltip)
+            except NotImplementedError:
+                logging.warning('Cannot create option %s for dtype "%s" for function %s',
+                                option, dtype, func.__name__)
                 return
-    #             raise NotImplementedError('Cannot use type %s', dtype)
 
             self._set_argument(
                 func, option, default_value if not optional else None)
@@ -233,6 +216,37 @@ class AnalysisWidget(QtWidgets.QWidget):
             text.setText(name + ': ' + str(default_value))
             self.opt_fixed.addWidget(text)
             self.calls[func][option] = default_value
+
+    def _select_widget(self, dtype, name, default_value, optional, tooltip):
+        # Create widget according to data type
+        if ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
+              'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
+              ('iterable' in dtype and 'iterable of iterable' not in dtype)):
+            widget = option_widget.OptionMultiSlider(
+                name=name, labels=self.setup['dut_names'],
+                default_value=default_value,
+                optional=optional, tooltip=tooltip, parent=self)
+        elif 'iterable of iterable' in dtype:
+            widget = option_widget.OptionMultiBox(
+                name=name, labels=self.setup['dut_names'],
+                default_value=default_value,
+                optional=optional, tooltip=tooltip, parent=self)
+        elif 'str' in dtype:
+            widget = option_widget.OptionText(
+                name, default_value, optional, tooltip, parent=self)
+        elif 'int' in dtype:
+            widget = option_widget.OptionSlider(
+                name, default_value, optional, tooltip, parent=self)
+        elif 'float' in dtype:
+            widget = option_widget.OptionSlider(
+                name, default_value, optional, tooltip, parent=self)
+        elif 'bool' in dtype:
+            widget = option_widget.OptionBool(
+                name, default_value, optional, tooltip, parent=self)
+        else:
+            raise NotImplementedError('Cannot use type %s', dtype)
+
+        return widget
 
     def _delete_option(self, option, func):
         ''' Delete existing option. Needed if option is set manually.
