@@ -6,12 +6,12 @@ window_title = 'Global settings'
 class DefaultSettings(object):
 
     def __init__(self):
-        self.setup = {'n_duts': 2,
+        self.setup = {'n_duts': 3,
                       'n_pixels': [(10, 10)],
                       'pixel_size': [(100, 100)],
                       'dut_name': 'myDUT',
                       'z_positions': (0, 10000),
-                      'dut_names': ('First DUT', 'SCD DUT')}
+                      'dut_names': ('First DUT', '2nd DUT', '3rd DUT')}
 
         self.options = {'working_directory': '',
                         'input_hits_file': 'test_DUT0.h5',
