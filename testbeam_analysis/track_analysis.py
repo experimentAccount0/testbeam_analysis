@@ -43,6 +43,8 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
         e.g.: For two devices: min_cluster_distance = (50, 250)
         If false the cluster distance is not considered.
         The events where any plane does have hits < min_cluster_distance is flagged with n_tracks = -1
+    chunk_size : uint
+        Chunk size of the data when reading from file.
     '''
     logging.info('=== Finding tracks ===')
 
@@ -142,7 +144,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         e.g. require hits in DUT0, DUT1, DUT3, DUT4 but do not use DUT3 in the fit:
         selection_hit_duts = (0, 1, 3, 4)
         selection_fit_duts = (0, 1, 4)
-    exclude_dut_hit: bool
+    exclude_dut_hit : bool
         Set to not require a hit in the actual fit DUT (e.g.: for unconstrained residuals).
         False: Just use all devices as specified in selection_hit_duts.
         True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts.
@@ -168,6 +170,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
         e.g.: For two devices: min_track_distance = (50, 250)
         If False, the minimum track distance is not considered.
+    chunk_size : uint
+        Chunk size of the data when reading from file.
     '''
     logging.info('=== Fitting tracks ===')
 
