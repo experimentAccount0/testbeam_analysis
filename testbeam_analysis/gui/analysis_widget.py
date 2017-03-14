@@ -2,6 +2,7 @@ import os
 import inspect
 import logging
 import math
+from collections import OrderedDict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
@@ -56,12 +57,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.option_widgets = {}
         self.multi = multi
         self._setup()
-        # Holds pairs of function with kwargs
-        self.calls = {}
+        # Holds functions with kwargs
+        self.calls = OrderedDict()
 
     def _setup(self):
         # Plot area
-        left_widget = QtWidgets.QWidget()
+        left_widget = QtWidgets.QWidget(parent=self)
         self.plt = QtWidgets.QHBoxLayout()
         left_widget.setLayout(self.plt)
         # Options
@@ -80,7 +81,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         button_ok = QtWidgets.QPushButton('OK')
         button_ok.clicked.connect(self._call_funcs)
         layout_options.addWidget(button_ok)
-        right_widget = QtWidgets.QWidget()
+        right_widget = QtWidgets.QWidget(parent=self)
         right_widget.setLayout(layout_options)
         # Split plot and option area
         widget_splitter = QtWidgets.QSplitter()
@@ -94,22 +95,37 @@ class AnalysisWidget(QtWidgets.QWidget):
         layout_widget.addWidget(widget_splitter)
         self.setLayout(layout_widget)
 
+    def _option_exists(self, option):
+        ''' Check if option is already defined
+        '''
+        for call in self.calls.values():
+            for kwarg in call:
+                if option == kwarg:
+                    return True
+        return False
+
     def add_options_auto(self, func):
-        ''' Inspect a function to create options from kwargs
-            and doc strings.
+        ''' Inspect a function to create options for kwargs
         '''
         for name in get_default_args(func):
             # Only add as function parameter if the info is not
             # given in setup/option data structures
-            # if name in self.calls[-1][1]:  # Option already defines manually
             if name in self.setup:
-                self._add_fixed_option(option=name, value=self.setup[name])
+                if not self._option_exists(option=name):
+                    self.add_option(option=name, default_value=self.setup[name],
+                                    func=func, fixed=True)
+                else:
+                    self.calls[func][name] = self.setup[name]
             elif name in self.options:
-                self._add_fixed_option(option=name, value=self.options[name])
+                if not self._option_exists(option=name):
+                    self.add_option(option=name, default_value=self.options[name],
+                                    func=func, fixed=True)
+                else:
+                    self.calls[func][name] = self.options[name]
             else:
                 self.add_option(func=func, option=name)
 
-    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None):
+    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, fixed=False, tooltip=None):
         ''' Add an option to the gui to set function arguments
 
             option: str
@@ -123,127 +139,121 @@ class AnalysisWidget(QtWidgets.QWidget):
             optional: bool
                 Show as optional option, If optional is not defined all parameters with default value
                 None are set as optional. The common behavior is that None deactivates a parameter
-            default_value :
+            default_value : object
+                Default value for option
+            fixed : boolean
+                Fix option value  default value
         '''
-
+        # Check if option exists already
         if option in self.calls[func]:
-            logging.warning(
-                'Attemped to add already existing option %s for function %s', option, func.__name__)
-            return
+            self._delete_option(option=option, func=func)
 
         # Get name from argument name
         if not name:
             name = option.replace("_", " ").capitalize()
 
         # Get default argument value
-        if not default_value and func:
+        if default_value is None:
             default_value = get_default_args(func)[option]
 
         # Get parameter description from numpy style docstring
-        try:
-            if func:
+        if not tooltip:
+            try:
                 tooltip = get_parameter_doc(func)[option]
-        except KeyError:  # No parameter docu available or no function defined
-            tooltip = None
+            except KeyError:  # No parameter docu available
+                logging.warning(
+                    'Parameter %s in function %s not documented', option, func.__name__)
+                tooltip = None
 
         # Get parameter dtype from numpy style docstring
         if not dtype:
             try:
-                if func:
-                    dtype = get_parameter_doc(func, dtype=True)[option]
+                dtype = get_parameter_doc(func, dtype=True)[option]
             except KeyError:  # No parameter docu available
                 pass
 
         # Get dtype from default arg
         if not dtype:
-            if default_value:
+            if default_value is not None:
                 dtype = str(type(default_value).__name__)
             else:
                 raise RuntimeError(
-                    'Cannot deduce data type for %s, because no default parameter exists', option)
+                    'Cannot deduce data type for %s in function %s, because no default parameter exists', option, func.__name__)
 
         # Get optional argument from default function argument
         if optional is None and default_value is None:
             optional = True
-        else:
-            optional = False
 
-        # Create widget according to data type
-        if 'str' in dtype:
-            widget = option_widget.OptionText(
-                name, default_value, optional, tooltip)
-        elif 'int' in dtype:
-            widget = option_widget.OptionSlider(
-                name, default_value, optional, tooltip)
-        elif 'float' in dtype:
-            widget = option_widget.OptionSlider(
-                name, default_value, optional, tooltip)
-        elif 'bool' in dtype:
-            widget = option_widget.OptionBool(
-                name, default_value, optional, tooltip)
-        elif 'scalar' in dtype and 'tuple' in dtype:
-            widget = option_widget.OptionMultiSlider(
-                name=name, n_values=self.setup['n_duts'], default_value=default_value, optional=optional, tooltip=tooltip)
-        else:
-            logging.warning(
-                'Cannot create option %s for dtype %s', option, dtype)
-            return
-#             raise NotImplementedError('Cannot use type %s', dtype)
+        if not fixed:  # Option value can be changed
+            # Create widget according to data type
+            if 'str' in dtype:
+                widget = option_widget.OptionText(
+                    name, default_value, optional, tooltip, parent=self)
+            elif 'int' in dtype:
+                widget = option_widget.OptionSlider(
+                    name, default_value, optional, tooltip, parent=self)
+            elif 'float' in dtype:
+                widget = option_widget.OptionSlider(
+                    name, default_value, optional, tooltip, parent=self)
+            elif 'bool' in dtype:
+                widget = option_widget.OptionBool(
+                    name, default_value, optional, tooltip, parent=self)
+            elif ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
+                  ('iterable' in dtype and 'iterable of iterable' not in dtype)):
+                widget = option_widget.OptionMultiSlider(
+                    name=name, labels=self.setup[
+                        'dut_names'], default_value=default_value,
+                    optional=optional, tooltip=tooltip, parent=self)
+            else:
+                logging.warning(
+                    'Cannot create option %s for dtype "%s" for function %s', option, dtype, func.__name__)
+                return
+    #             raise NotImplementedError('Cannot use type %s', dtype)
 
-        self._set_argument(func, option, default_value)
+            self._set_argument(
+                func, option, default_value if not optional else None)
+            self.option_widgets[option] = widget
+            self.option_widgets[option].valueChanged.connect(
+                lambda value: self._set_argument(func, option, value))
 
-        self.option_widgets[option] = widget
+            if optional:
+                self.opt_optional.addWidget(self.option_widgets[option])
+            else:
+                self.opt_needed.addWidget(self.option_widgets[option])
+        else:  # Fixed value
+            if default_value is None:
+                raise RuntimeError(
+                    'Cannot create fixed option without default value')
+            text = QtWidgets.QLabel()
+            # Fixed options cannot be changed --> grey color
+            palette = QtGui.QPalette()
+            palette.setColor(QtGui.QPalette.Foreground, QtCore.Qt.darkGray)
+            text.setPalette(palette)
+            text.setToolTip(tooltip)
+            text.setText(name + ': ' + str(default_value))
+            self.opt_fixed.addWidget(text)
+            self.calls[func][option] = default_value
 
-        self.option_widgets[option].valueChanged.connect(
-            lambda value: self._set_argument(func, option, value))
-
-        if optional:
-            self.opt_optional.addWidget(self.option_widgets[option])
-        else:
-            self.opt_needed.addWidget(self.option_widgets[option])
-
-    def set_option(self, option, dtype=None, name=None, optional=None):
-        ''' Change existing option. Needed if automation fails.
-
-            For parameters see add_option()
+    def _delete_option(self, option, func):
+        ''' Delete existing option. Needed if option is set manually.
         '''
         # Delete option widget
         self.option_widgets[option].close()
         del self.option_widgets[option]
-        del self.keywords[option]
         # Update widgets
         self.opt_optional.update()
         self.opt_needed.update()
-        # Set new widget
-        self.add_option(option=option, dtype=dtype,
-                        name=name, optional=optional)
-
-    def _add_fixed_option(self, option, value, func=None, name=None):
-        # Get name from argument name
-        if not name:
-            name = option.replace("_", " ").capitalize()
-        text = QtWidgets.QLabel()
-        # Fixed options cannot be changed --> grey color
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Foreground, QtCore.Qt.darkGray)
-        text.setPalette(palette)
-        try:
-            if func:
-                tooltip = get_parameter_doc(func)[option]
-                text.setToolTip(tooltip)
-        except KeyError:  # No parameter docu available
-            pass
-        text.setText(name + ': ' + str(value))
-        self.opt_fixed.addWidget(text)
+        # Delete kwarg
+        del self.calls[func][option]
 
     def add_function(self, func):
         ''' Add an analysis function'''
         self.calls[func] = {}
         # Add tooltip from function docstring
         doc = FunctionDoc(func)
-        label_option = ''  # self.label_option.getToolTip()
-        self.label_option.setToolTip(
-            label_option + '\n' + '\n'.join(doc['Summary']))
+        label_option = self.label_option.toolTip()
+        self.label_option.setToolTip(label_option +
+                                     '\n'.join(doc['Summary']))
         # Add function options to gui
         self.add_options_auto(func)
 
@@ -253,6 +263,8 @@ class AnalysisWidget(QtWidgets.QWidget):
         if type(value) == str and 'None' in value:
             value = None
         if type(value) == float and math.isnan(value):
+            value = None
+        if type(value) == list and None in value:
             value = None
         self.calls[func][name] = value
 
@@ -288,4 +300,5 @@ class AnalysisWidget(QtWidgets.QWidget):
         '''
 
         for func, kwargs in self.calls.iteritems():
-            self._call_func(func, kwargs)
+            print func.__name__, kwargs
+            #self._call_func(func, kwargs)
