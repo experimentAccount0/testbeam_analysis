@@ -7,13 +7,15 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 
 from data import DataTab
 from setup import SetupTab
-from settings import SettingsWindow, DefaultSettings
+from settings import SettingsWindow
 
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
 
 PROJECT_NAME = 'Testbeam Analysis'
 GUI_AUTHORS = 'Pascal Wolf, David-Leon Pohl'
+MINIMUM_RESOLUTION = (1366, 768)
+
 try:
     pkgInfo = get_distribution(
         'testbeam_analysis').get_metadata('PKG-INFO')
@@ -31,8 +33,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         super(AnalysisWindow, self).__init__(parent)
 
         # Get default settings
-        self.setup = DefaultSettings().setup
-        self.options = DefaultSettings().options
+        self.setup = SettingsWindow().default_setup
+        self.options = SettingsWindow().default_options
 
         # Make variable for SettingsWindow
         self.sw = None
@@ -48,6 +50,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Main window settings
         self.setWindowTitle(PROJECT_NAME)
         self.screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.setMinimumSize(MINIMUM_RESOLUTION[0], MINIMUM_RESOLUTION[1])
         self.resize(0.75 * self.screen.width(), 0.75 * self.screen.height())
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
@@ -55,13 +58,12 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self._init_menu()
         self._init_tabs()
 
-        self.handle_messages(
-            "Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
+        self.handle_messages("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
 
     def _init_tabs(self):
         # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering',
-                          'Correlations', 'Prealignment', 'Track finding',
+                          'Correlations', 'Pre-alignment', 'Track finding',
                           'Alignment', 'Track fitting', 'Analysis', 'Result')
 
         # Add QTabWidget for tab_widget
@@ -82,7 +84,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
                                                      setup=self.setup,
                                                      options=self.options)
-            elif name == 'Prealignment':
+            elif name == 'Pre-alignment':
                 widget = tab_widget.PrealignmentTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options)
@@ -109,9 +111,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             self.tw[name] = widget
             self.tabs.addTab(self.tw[name], name)
 
-#             # Disable all tabs but DataTab. Enable tabs later via self.enable_tabs()
-#             if i > 0:
-#                 self.tabs.setTabEnabled(i, False)
+            # Disable all tabs but DataTab. Enable tabs later via self.enable_tabs()
+            if i > 0:
+                self.tabs.setTabEnabled(i, False)
 
             # Disable all widgets of all tabs but DataTab
             # if name != 'Files':
@@ -119,19 +121,19 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Connect signals in between tabs and main window
 
-        # Connect statusMessage signal of all tabs
+        # Connect DataTab
+        self.tw['Files'].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
+
+        # Connect SetupTab
+        self.tw['Setup'].proceedAnalysis.connect(lambda: self.update_data(self.tw['Setup'].data))
+
+        # Connect statusMessage and proceedAnalysis signal of all tabs
         for name in self.tab_order:
             try:
-                self.tw[name].statusMessage.connect(
-                    lambda message: self.handle_messages(message, 4000))
+                self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
+                self.tw[name].proceedAnalysis.connect(lambda tabs: self.handle_tabs(tabs))
             except (AttributeError, KeyError):
                 pass
-
-        # Connect DataTab
-        self.tw['Files'].proceedAnalysis.connect(
-            lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
-        self.tw['Files'].proceedAnalysis.connect(
-            lambda: self.handle_tabs('Setup'))
 
     def _init_menu(self):
         self.file_menu = QtWidgets.QMenu('&File', self)
@@ -168,15 +170,36 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Enables/Disables a specific tab with name 'names' or loops over list of tab names to en/disable them
         """
 
-        if type(names) is str:
+        if type(names) is unicode:
             # self.tw[names].setDisabled(enable)
-            self.tabs.setTabEnabled(self.tab_order.index(names), enable)
+            if names in self.tab_order:
+                self.tabs.setTabEnabled(self.tab_order.index(names), enable)
         else:
             for name in names:
                 # self.tw[name].setDisabled(enable)
-                self.tabs.setTabEnabled(self.tab_order.index(name), enable)
+                if name in self.tab_order:
+                    self.tabs.setTabEnabled(self.tab_order.index(name), enable)
 
-    def update_settings(self):
+    def update_data(self, data):
+        """
+        Updates the setup and options with data from the SetupTab
+
+        :param data: dict with all information necessary to perform analysis
+        """
+        print data
+        for key in data:
+
+            if key in self.setup.keys():
+                self.setup[key] = data[key]
+
+            elif key in self.options.keys():
+                self.options[key] = data[key]
+
+    def update_globals(self):
+        """
+        Updates the global settings which are applied in the SettingsWindow()
+        """
+
         self.setup = self.sw.setup
         self.options = self.sw.options
 
@@ -190,7 +213,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
     def global_settings(self):
         self.sw = SettingsWindow(self)
         self.sw.show()
-        self.sw.settingsUpdated.connect(lambda: self.update_settings())
+        self.sw.settingsUpdated.connect(lambda: self.update_globals())
 
     def closeEvent(self, _):
         self.file_quit()
@@ -198,7 +221,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     font = QtGui.QFont()
-#    font.setFamily(font.defaultFamily())
     font.setPointSize(11)
     app.setFont(font)
     aw = AnalysisWindow()

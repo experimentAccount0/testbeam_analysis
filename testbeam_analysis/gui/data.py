@@ -9,8 +9,8 @@ class DataTab(QtWidgets.QWidget):
     Implements the tab content for data file handling
     """
 
-    statusMessage = QtCore.pyqtSignal(['QString'])
-    proceedAnalysis = QtCore.pyqtSignal()
+    statusMessage = QtCore.pyqtSignal('QString')
+    proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent=None):
         super(DataTab, self).__init__(parent)
@@ -103,6 +103,7 @@ class DataTab(QtWidgets.QWidget):
                   lambda: self._update_data(),
                   lambda: self._emit_message(message_ok % (len(self._data_table.input_files)))]:
             self.button_ok.clicked.connect(x)
+
         self._data_table.inputFilesChanged.connect(lambda: self._analysis_check())
 
         # Add to main layout
@@ -131,8 +132,8 @@ class DataTab(QtWidgets.QWidget):
         Get output folder and display path in QTextEdit
         """
         caption = 'Select output folder'
-        path = QtWidgets.QFileDialog.getExistingDirectory(caption=caption,
-                                                                      directory='./')
+        path = QtWidgets.QFileDialog.getExistingDirectory(caption=caption, directory='./')
+
         if path != self.output_path and len(path) != 0:
             self.output_path = path
             self.edit_output.setText(self.output_path)
@@ -142,7 +143,7 @@ class DataTab(QtWidgets.QWidget):
         Handles  whether the proceed 'OK' button is clickable or not in regard to the input data.
         If not, respective messages are shown in QMainWindows statusBar
         """
-        if len(self._data_table.input_files) > 0 and len(self._data_table.incompatible_data) == 0:
+        if self._data_table.input_files and not self._data_table.incompatible_data:
             self.button_ok.setDisabled(False)
             self.button_ok.setToolTip('Proceed')
 
@@ -150,14 +151,14 @@ class DataTab(QtWidgets.QWidget):
             self.button_ok.setDisabled(True)
             self.button_ok.setToolTip('Select data of DUTs')
 
-            if len(self._data_table.incompatible_data) != 0:
+            if self._data_table.incompatible_data:
                 broken = []
                 for key in self._data_table.incompatible_data.keys():
                     broken.append(self._data_table.dut_names[key])
                 message = "Data of %s is broken. Analysis impossible." % str(',').join(broken)
                 self._emit_message(message)
 
-            if len(self._data_table.input_files) == 0:
+            if not self._data_table.input_files:
                 message = "No data. Analysis impossible."
                 self._emit_message(message)
 
@@ -175,8 +176,9 @@ class DataTab(QtWidgets.QWidget):
         self.data['output_path'] = self.output_path
         self.data['input_files'] = self._data_table.input_files
         self.data['dut_names'] = self._data_table.dut_names
+        self.data['n_duts'] = len(self._data_table.dut_names)
 
-        self.proceedAnalysis.emit()
+        self.proceedAnalysis.emit('Setup')
 
 
 class DataTable(QtWidgets.QTableWidget):
