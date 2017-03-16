@@ -16,12 +16,13 @@ PROJECT_NAME = 'Testbeam Analysis'
 GUI_AUTHORS = 'Pascal Wolf, David-Leon Pohl'
 MINIMUM_RESOLUTION = (1366, 768)
 
+# Create all tabs at start up for debugging purpose
+_DEBUG = False
+
 try:
     pkgInfo = get_distribution('testbeam_analysis').get_metadata('PKG-INFO')
-    for value in message_from_string(pkgInfo).items():
-        if value[0] == 'Author':
-            AUTHORS = value[1]
-except DistributionNotFound:
+    AUTHORS = message_from_string(pkgInfo)['Author']
+except (DistributionNotFound, KeyError):
     AUTHORS = 'Not defined'
 
 
@@ -91,7 +92,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             self.tabs.addTab(self.tw[name], name)
 
         # Disable all tabs but DataTab. Enable tabs later via self.enable_tabs()
-        self.handle_tabs(enable=False)
+        if not _DEBUG:
+            self.handle_tabs(enable=False)
+        else:
+            self.update_tabs()
 
         # Connect signals in between tabs and main window
 
@@ -136,6 +140,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Enables/Disables a specific tab with name 'names' or loops over list of tab names to en/disable them
         """
 
+        if _DEBUG:
+            return
         # Dis/enable all tabs but Files
         if tabs is None:
             for i in range(self.tabs.count()):
