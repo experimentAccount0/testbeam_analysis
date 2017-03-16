@@ -62,7 +62,7 @@ class AnalysisWidget(QtWidgets.QWidget):
 
     def _setup(self):
         # Plot area
-        left_widget = QtWidgets.QWidget(parent=self)
+        left_widget = QtWidgets.QWidget()
         self.plt = QtWidgets.QHBoxLayout()
         left_widget.setLayout(self.plt)
         # Options
@@ -70,6 +70,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.opt_optional = QtWidgets.QVBoxLayout()
         self.opt_fixed = QtWidgets.QVBoxLayout()
         # Option area
+
         layout_options = QtWidgets.QVBoxLayout()
         self.label_option = QtWidgets.QLabel('Options')
         layout_options.addWidget(self.label_option)
@@ -77,16 +78,25 @@ class AnalysisWidget(QtWidgets.QWidget):
         layout_options.addLayout(self.opt_optional)
         layout_options.addLayout(self.opt_fixed)
         layout_options.addStretch(0)
+
         # Proceed button
         button_ok = QtWidgets.QPushButton('OK')
         button_ok.clicked.connect(self._call_funcs)
         layout_options.addWidget(button_ok)
-        right_widget = QtWidgets.QWidget(parent=self)
+
+        right_widget = QtWidgets.QWidget()
         right_widget.setLayout(layout_options)
+
+        # Make right widget scroll able
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setBackgroundRole(QtGui.QPalette.Light)
+        scroll.setWidget(right_widget)
+
         # Split plot and option area
-        widget_splitter = QtWidgets.QSplitter()
+        widget_splitter = QtWidgets.QSplitter(parent=self)
         widget_splitter.addWidget(left_widget)
-        widget_splitter.addWidget(right_widget)
+        widget_splitter.addWidget(scroll)
         widget_splitter.setStretchFactor(0, 10)
         widget_splitter.setStretchFactor(1, 2.5)
         widget_splitter.setChildrenCollapsible(False)
