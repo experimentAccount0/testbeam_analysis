@@ -18,7 +18,7 @@ class SetupTab(QtWidgets.QWidget):
 
         # Make list of tabs that will be enabled after proceedAnalysis signal of this class
         self.tab_list = ['Noisy Pixel', 'Clustering', 'Correlations', 'Pre-alignment',
-                         'Track finding', 'Alignment', 'Track fitting', 'Analysis']
+                         'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result']
 
         # Make tuple of properties of each dut
         self._dut_props = ('z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma',
@@ -130,6 +130,7 @@ class SetupTab(QtWidgets.QWidget):
         # Spacing related numbers
         h_space = 10
         v_space = 30
+        label_width = 175  # Fixed width for alignment
 
         for i, dut in enumerate(self.data['dut_names']):
 
@@ -159,6 +160,7 @@ class SetupTab(QtWidgets.QWidget):
             checkbox_type = QtWidgets.QCheckBox()
             checkbox_type.setText('Set DUT type')
             checkbox_type.setDisabled(True)
+            checkbox_type.setFixedWidth(label_width)
             cb_type = QtWidgets.QComboBox()
             cb_type.addItems(self._dut_types.keys())
             cb_type.setDisabled(True)
@@ -168,6 +170,7 @@ class SetupTab(QtWidgets.QWidget):
             # Make dut type creation layout
             checkbox_handle = QtWidgets.QCheckBox()
             checkbox_handle.setText('Create DUT type')
+            checkbox_handle.setFixedWidth(label_width)
             checkbox_handle.setToolTip('Create or remove (:type) custom DUT type')
             edit_handle = QtWidgets.QLineEdit()
             edit_handle.setPlaceholderText('Enter name')
@@ -177,6 +180,7 @@ class SetupTab(QtWidgets.QWidget):
 
             # Make widgets for input parameters
             label_z = QtWidgets.QLabel('z-Position / ' + u'\u03BC' + 'm :')
+            label_z.setFixedWidth(label_width)
             edit_z = QtWidgets.QLineEdit()
 
             # z_pos of 1. DUT is origin and set to 0
@@ -187,6 +191,7 @@ class SetupTab(QtWidgets.QWidget):
                 edit_z.setToolTip('First DUT defines origin of coordinate system')
 
             label_rot = QtWidgets.QLabel('Rotation / mRad:')
+            label_rot.setFixedWidth(label_width)
             edit_alpha = QtWidgets.QLineEdit()
             edit_alpha.setPlaceholderText(u'\u03B1' + ' = 0')
             edit_beta = QtWidgets.QLineEdit()
@@ -194,23 +199,26 @@ class SetupTab(QtWidgets.QWidget):
             edit_gamma = QtWidgets.QLineEdit()
             edit_gamma.setPlaceholderText(u'\u03B3' + ' = 0')
             label_pitch = QtWidgets.QLabel('Pixel pitch / ' + u'\u03BC' + 'm :')
+            label_pitch.setFixedWidth(label_width)
             edit_pitch_col = QtWidgets.QLineEdit()
             edit_pitch_col.setPlaceholderText('Column')
             edit_pitch_row = QtWidgets.QLineEdit()
             edit_pitch_row.setPlaceholderText('Row')
             label_pixels = QtWidgets.QLabel('Number of pixels :')
+            label_pixels.setFixedWidth(label_width)
             edit_pixels_col = QtWidgets.QLineEdit()
             edit_pixels_col.setPlaceholderText('Column')
             edit_pixels_row = QtWidgets.QLineEdit()
             edit_pixels_row.setPlaceholderText('Row')
             label_thickness = QtWidgets.QLabel('Thickness / ' + u'\u03BC' + 'm :')
+            label_thickness.setFixedWidth(label_width)
             edit_thickness = QtWidgets.QLineEdit()
 
             # Make buttons at the bottom to clear input and apply
             button_clear = QtWidgets.QPushButton('Clear properties')
             button_clear.setToolTip('Clear current set of properties')
             button_glob = QtWidgets.QPushButton('Set properties for all DUTs')
-            button_glob.setToolTip('Set current set of input parameters for all DUTs')
+            button_glob.setToolTip('Set current set of properties for all DUTs')
 
             # Disable globalise button in case of only 1 dut
             if len(self.data['dut_names']) == 1:
@@ -220,37 +228,36 @@ class SetupTab(QtWidgets.QWidget):
             # Add widgets to layouts
             # Setup layout
             layout_setup.addWidget(label_z, 0, 0, 1, 1)
-            layout_setup.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 2)
-            layout_setup.addWidget(edit_z, 0, 3, 1, 3)
+            layout_setup.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 1)
+            layout_setup.addWidget(edit_z, 0, 2, 1, 3)
             layout_setup.addWidget(label_rot, 1, 0, 1, 1)
-            layout_setup.addItem(QtWidgets.QSpacerItem(h_space, v_space), 1, 1, 1, 2)
-            layout_setup.addWidget(edit_alpha, 1, 3, 1, 1)
-            layout_setup.addWidget(edit_beta, 1, 4, 1, 1)
-            layout_setup.addWidget(edit_gamma, 1, 5, 1, 1)
+            layout_setup.addItem(QtWidgets.QSpacerItem(h_space, v_space), 1, 1, 1, 1)
+            layout_setup.addWidget(edit_alpha, 1, 2, 1, 1)
+            layout_setup.addWidget(edit_beta, 1, 3, 1, 1)
+            layout_setup.addWidget(edit_gamma, 1, 4, 1, 1)
             # Properties layout
             layout_props.addWidget(checkbox_type, 0, 0, 1, 1)
-            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 2)
-            layout_props.addWidget(cb_type, 0, 3, 1, 1)
-            layout_props.addWidget(button_type, 0, 4, 1, 1)
+            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 1)
+            layout_props.addWidget(cb_type, 0, 2, 1, 1)
+            layout_props.addWidget(button_type, 0, 3, 1, 1)
             layout_props.addWidget(label_pitch, 1, 0, 1, 1)
-            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 1, 1, 1, 2)
-            layout_props.addWidget(edit_pitch_col, 1, 3, 1, 1)
-            layout_props.addWidget(edit_pitch_row, 1, 4, 1, 1)
+            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 1, 1, 1, 1)
+            layout_props.addWidget(edit_pitch_col, 1, 2, 1, 1)
+            layout_props.addWidget(edit_pitch_row, 1, 3, 1, 1)
             layout_props.addWidget(label_pixels, 2, 0, 1, 1)
-            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 2, 1, 1, 2)
-            layout_props.addWidget(edit_pixels_col, 2, 3, 1, 1)
-            layout_props.addWidget(edit_pixels_row, 2, 4, 1, 1)
+            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 2, 1, 1, 1)
+            layout_props.addWidget(edit_pixels_col, 2, 2, 1, 1)
+            layout_props.addWidget(edit_pixels_row, 2, 3, 1, 1)
             layout_props.addWidget(label_thickness, 3, 0, 1, 1)
-            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 3, 1, 1, 2)
-            layout_props.addWidget(edit_thickness, 3, 3, 1, 2)
+            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 3, 1, 1, 1)
+            layout_props.addWidget(edit_thickness, 3, 2, 1, 2)
             layout_props.addWidget(checkbox_handle, 4, 0, 1, 1)
-            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 4, 1, 1, 2)
-            layout_props.addWidget(edit_handle, 4, 3, 1, 1)
-            layout_props.addWidget(button_handle, 4, 4, 1, 1)
+            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 4, 1, 1, 1)
+            layout_props.addWidget(edit_handle, 4, 2, 1, 1)
+            layout_props.addWidget(button_handle, 4, 3, 1, 1)
             # Button layout
             layout_buttons.addWidget(button_glob)
             layout_buttons.addWidget(button_clear)
-
 
             # Add sub layouts to main layout
             layout.addWidget(QtWidgets.QLabel('Setup'))

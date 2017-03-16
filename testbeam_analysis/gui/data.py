@@ -53,7 +53,7 @@ class DataTab(QtWidgets.QWidget):
         button_select.clicked.connect(lambda: self._data_table.get_data())
 
         # Make button to reset dut names and connect
-        button_names = QtWidgets.QPushButton('Set DUT names')
+        button_names = QtWidgets.QPushButton('Reset names')
         button_names.setToolTip('Set default DUT names')
         button_names.clicked.connect(lambda: self._data_table.set_dut_names())
 
@@ -80,7 +80,7 @@ class DataTab(QtWidgets.QWidget):
         height = self.edit_output.document().size().height()
         self.edit_output.setFixedHeight(height)
         self.edit_output.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
-        button_out = QtWidgets.QPushButton('Update output folder')
+        button_out = QtWidgets.QPushButton('Set output folder')
         button_out.setToolTip('Set output older')
         button_out.clicked.connect(lambda: self._get_output_folder())
         layout_out.addWidget(self.edit_output)
@@ -235,7 +235,7 @@ class DataTable(QtWidgets.QTableWidget):
 #        self.clear()
 
         self.row_labels = [('DUT ' + '%d' % i) for i, _ in enumerate(self.input_files)]
-        self.column_labels = ['Path', 'DUT name', 'Status', 'Navigation']
+        self.column_labels = ['Path', 'Name', 'Status', 'Navigation']
 
         self.setColumnCount(len(self.column_labels))
         self.setRowCount(len(self.row_labels))
@@ -352,7 +352,7 @@ class DataTable(QtWidgets.QTableWidget):
                 font.setUnderline(True)
                 dut_item.setFont(font)
                 dut_item.setForeground(QtGui.QColor('red'))
-            self.setItem(row, self.column_labels.index('DUT name'), dut_item)
+            self.setItem(row, self.column_labels.index('Name'), dut_item)
             self.dut_names.append(dut_name)
 
     def update_dut_names(self, name='Tel'):
@@ -364,20 +364,20 @@ class DataTable(QtWidgets.QTableWidget):
         try:
             for row in range(self.rowCount()):
                 try:
-                    new.append(self.item(row, self.column_labels.index('DUT name')).text())
+                    new.append(self.item(row, self.column_labels.index('Name')).text())
                 except AttributeError: # no QTableWidgetItem for new input data
                     add_dut_item = QtWidgets.QTableWidgetItem()
                     add_dut_item.setTextAlignment(QtCore.Qt.AlignCenter)
                     add_dut_item.setText(name + '_%d' % row)
-                    self.setItem(row, self.column_labels.index('DUT name'), add_dut_item)
-                    new.append(self.item(row, self.column_labels.index('DUT name')).text())
+                    self.setItem(row, self.column_labels.index('Name'), add_dut_item)
+                    new.append(self.item(row, self.column_labels.index('Name')).text())
         except AttributeError: # no QTableWidgetItem has been created at all
             self.set_dut_names()
 
         if new != self.dut_names:  # and len(new) != 0:
             self.dut_names = new
             for row in range(self.rowCount()):
-                self.item(row, self.column_labels.index('DUT name')).setText(self.dut_names[row])
+                self.item(row, self.column_labels.index('Name')).setText(self.dut_names[row])
 
 #        self.resizeRowsToContents()
 #        self.resizeColumnsToContents()

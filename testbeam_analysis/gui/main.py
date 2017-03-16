@@ -17,8 +17,7 @@ GUI_AUTHORS = 'Pascal Wolf, David-Leon Pohl'
 MINIMUM_RESOLUTION = (1366, 768)
 
 try:
-    pkgInfo = get_distribution(
-        'testbeam_analysis').get_metadata('PKG-INFO')
+    pkgInfo = get_distribution('testbeam_analysis').get_metadata('PKG-INFO')
     for value in message_from_string(pkgInfo).items():
         if value[0] == 'Author':
             AUTHORS = value[1]
@@ -29,7 +28,9 @@ except DistributionNotFound:
 class AnalysisWindow(QtWidgets.QMainWindow):
 
     def __init__(self, parent=None):
-        """ TODO: DOCSTRING"""
+        """
+        Initializes the analysis window
+        """
         super(AnalysisWindow, self).__init__(parent)
 
         # Get default settings
@@ -45,7 +46,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self._init_UI()
 
     def _init_UI(self):
-        """ TODO: DOCSTRING"""
+        """
+        Initializes the user interface and displays "Hello"-message
+        """
 
         # Main window settings
         self.setWindowTitle(PROJECT_NAME)
@@ -57,67 +60,38 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Add widgets to main window
         self._init_menu()
         self._init_tabs()
+        self.connect_tabs()
 
         self.handle_messages("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
 
     def _init_tabs(self):
+        """
+        Initializes the tabs for the analysis window
+        """
+
         # Add tab_widget and widgets for the different analysis steps
-        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering',
-                          'Correlations', 'Pre-alignment', 'Track finding',
-                          'Alignment', 'Track fitting', 'Analysis', 'Result')
+        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment',
+                          'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result')
 
         # Add QTabWidget for tab_widget
         self.tabs = QtWidgets.QTabWidget()
         self.setCentralWidget(self.tabs)
 
         # Initialize each tab
-        for i, name in enumerate(self.tab_order):
+        for name in self.tab_order:
             if name == 'Files':
                 widget = DataTab(parent=self.tabs)
             elif name == 'Setup':
                 widget = SetupTab(parent=self.tabs)
-            elif name == 'Noisy Pixel':
-                widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
-                                                   setup=self.setup,
-                                                   options=self.options)
-            elif name == 'Clustering':
-                widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
-                                                     setup=self.setup,
-                                                     options=self.options)
-            elif name == 'Pre-alignment':
-                widget = tab_widget.PrealignmentTab(parent=self.tabs,
-                                                    setup=self.setup,
-                                                    options=self.options)
-            elif name == 'Track finding':
-                widget = tab_widget.TrackFindingTab(parent=self.tabs,
-                                                    setup=self.setup,
-                                                    options=self.options)
-            elif name == 'Alignment':
-                widget = tab_widget.AlignmentTab(parent=self.tabs,
-                                                 setup=self.setup,
-                                                 options=self.options)
-            elif name == 'Track fitting':
-                widget = tab_widget.TrackFittingTab(parent=self.tabs,
-                                                    setup=self.setup,
-                                                    options=self.options)
-            elif name == 'Result':
-                widget = tab_widget.ResultTab(parent=self.tabs,
-                                              setup=self.setup,
-                                              options=self.options)
             else:
-                logging.info('GUI for %s not implemented yet', name)
-                continue
+                # Add dummy widget
+                widget = QtWidgets.QWidget(parent=self.tabs)
 
             self.tw[name] = widget
             self.tabs.addTab(self.tw[name], name)
 
-            # Disable all tabs but DataTab. Enable tabs later via self.enable_tabs()
-            if i > 0:
-                self.tabs.setTabEnabled(i, False)
-
-            # Disable all widgets of all tabs but DataTab
-            # if name != 'Files':
-            # self.tw[name].setDisabled(True)
+        # Disable all tabs but DataTab. Enable tabs later via self.enable_tabs()
+        self.handle_tabs(enable=False)
 
         # Connect signals in between tabs and main window
 
@@ -125,15 +99,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.tw['Files'].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
 
         # Connect SetupTab
-        self.tw['Setup'].proceedAnalysis.connect(lambda: self.update_data(self.tw['Setup'].data))
-
-        # Connect statusMessage and proceedAnalysis signal of all tabs
-        for name in self.tab_order:
-            try:
-                self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
-                self.tw[name].proceedAnalysis.connect(lambda tabs: self.handle_tabs(tabs))
-            except (AttributeError, KeyError):
-                pass
+        self.tw['Setup'].proceedAnalysis.connect(lambda: self.update_tabs(self.tw['Setup'].data))
 
     def _init_menu(self):
         self.file_menu = QtWidgets.QMenu('&File', self)
@@ -165,55 +131,141 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         self.statusBar().showMessage(message, ms)
 
-    def handle_tabs(self, names, enable=True):
+    def handle_tabs(self, tabs=None, enable=True):
         """
         Enables/Disables a specific tab with name 'names' or loops over list of tab names to en/disable them
         """
 
-        if type(names) is unicode:
-            # self.tw[names].setDisabled(enable)
-            if names in self.tab_order:
-                self.tabs.setTabEnabled(self.tab_order.index(names), enable)
+        # Dis/enable all tabs but Files
+        if tabs is None:
+            for i in range(self.tabs.count()):
+                if self.tabs.tabText(i) != 'Files':
+                    self.tabs.setTabEnabled(i, enable)
+
+        # Dis/enable specific tab
+        elif type(tabs) is unicode:
+            if tabs in self.tab_order:
+                self.tabs.setTabEnabled(self.tab_order.index(tabs), enable)
+
+        # Dis/enable several tabs
         else:
-            for name in names:
-                # self.tw[name].setDisabled(enable)
-                if name in self.tab_order:
-                    self.tabs.setTabEnabled(self.tab_order.index(name), enable)
+            for tab in tabs:
+                if tab in self.tab_order:
+                    self.tabs.setTabEnabled(self.tab_order.index(tab), enable)
 
-    def update_data(self, data):
+    def connect_tabs(self):
         """
-        Updates the setup and options with data from the SetupTab
-
-        :param data: dict with all information necessary to perform analysis
+        Connect statusMessage and proceedAnalysis signal of all tabs
         """
-        print data
-        for key in data:
 
-            if key in self.setup.keys():
-                self.setup[key] = data[key]
+        for name in self.tab_order:
+            try:
+                self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
+                self.tw[name].proceedAnalysis.connect(lambda tabs: self.handle_tabs(tabs=tabs))
+            except (AttributeError, KeyError):
+                pass
 
-            elif key in self.options.keys():
-                self.options[key] = data[key]
+    def update_tabs(self, data=None, tabs=None):
+        """
+        Updates the setup and options with data from the SetupTab and then updates the tabs
+
+        :param tabs: list of strings with tab names that should be updated, if None update all
+        :param data: dict with all information necessary to perform analysis, if None only update settings/options
+        """
+
+        # Save users current tab position
+        current_tab = self.tabs.currentIndex()
+
+        if data is not None:
+
+            for key in data:
+
+                if key in self.setup.keys():
+                    self.setup[key] = data[key]
+
+                elif key in self.options.keys():
+                    self.options[key] = data[key]
+
+        # Make temporary dict for updated tabs
+        tmp_tw = {}
+        for name in self.tab_order:
+
+            if name == 'Noisy Pixel':
+                widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
+                                                   setup=self.setup,
+                                                   options=self.options)
+            elif name == 'Clustering':
+                widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
+                                                     setup=self.setup,
+                                                     options=self.options)
+
+            elif name == 'Pre-alignment':
+                widget = tab_widget.PrealignmentTab(parent=self.tabs,
+                                                    setup=self.setup,
+                                                    options=self.options)
+
+            elif name == 'Track finding':
+                widget = tab_widget.TrackFindingTab(parent=self.tabs,
+                                                    setup=self.setup,
+                                                    options=self.options)
+            elif name == 'Alignment':
+                widget = tab_widget.AlignmentTab(parent=self.tabs,
+                                                 setup=self.setup,
+                                                 options=self.options)
+            elif name == 'Track fitting':
+                widget = tab_widget.TrackFittingTab(parent=self.tabs,
+                                                    setup=self.setup,
+                                                    options=self.options)
+            elif name == 'Result':
+                widget = tab_widget.ResultTab(parent=self.tabs,
+                                              setup=self.setup,
+                                              options=self.options)
+            else:
+                logging.info('Gui for %s not implemented yet!' % name)
+                continue
+
+            tmp_tw[name] = widget
+
+        for tab in self.tab_order:
+            if tab in tmp_tw.keys():
+
+                # Replace tabs in self.tw with updated tabs
+                self.tw[tab] = tmp_tw[tab]
+
+                # Get tab status of tab which is updated to set status of updated tab
+                enable = self.tabs.isTabEnabled(self.tab_order.index(tab))
+
+                # Remove old tab, insert updated tab at same index and set status
+                self.tabs.removeTab(self.tab_order.index(tab))
+                self.tabs.insertTab(self.tab_order.index(tab), self.tw[tab], tab)
+                self.tabs.setTabEnabled(self.tab_order.index(tab), enable)
+
+        # Set the tab index to stay at the same tab after replacing old tabs
+        self.tabs.setCurrentIndex(current_tab)
+
+        # Connect updated tabs
+        self.connect_tabs()
+
+    def global_settings(self):
+        """
+        Creates a child SettingsWindow of the analysis window to change global settings
+        """
+        self.sw = SettingsWindow(self.setup, self.options, parent=self)
+        self.sw.show()
+        self.sw.settingsUpdated.connect(lambda: self.update_globals())
 
     def update_globals(self):
         """
-        Updates the global settings which are applied in the SettingsWindow()
+        Updates the global settings which are applied in the SettingsWindow
         """
 
         self.setup = self.sw.setup
         self.options = self.sw.options
 
-        for i in range(self.tabs.count()):
-            # FIXME: We need update settings/options method for tabs
-            print self.tabs.widget(i)
+        self.update_tabs()
 
     def file_quit(self):
         self.close()
-
-    def global_settings(self):
-        self.sw = SettingsWindow(self)
-        self.sw.show()
-        self.sw.settingsUpdated.connect(lambda: self.update_globals())
 
     def closeEvent(self, _):
         self.file_quit()

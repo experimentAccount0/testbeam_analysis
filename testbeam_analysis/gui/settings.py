@@ -8,7 +8,7 @@ class SettingsWindow(QtWidgets.QMainWindow):
 
     settingsUpdated = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, setup=None, options=None, parent=None):
         """
         Create window to set global settings for analysis such as n_pixels, output_folder etc.
         """
@@ -37,8 +37,15 @@ class SettingsWindow(QtWidgets.QMainWindow):
 #                                'plot': False}
 
         # Make copy of defaults to change values but dont change defaults
-        self.setup = deepcopy(self.default_setup)
-        self.options = deepcopy(self.default_options)
+        if setup is None:
+            self.setup = deepcopy(self.default_setup)
+        else:
+            self.setup = setup
+
+        if options is None:
+            self.options = deepcopy(self.default_options)
+        else:
+            self.options = options
 
         self._init_UI()
 
