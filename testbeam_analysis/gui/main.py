@@ -39,7 +39,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.options = SettingsWindow().default_options
 
         # Make variable for SettingsWindow
-        self.sw = None
+        self.settings_window = None
 
         # Make dict to access tab widgets
         self.tw = {}
@@ -101,6 +101,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Connect DataTab
         self.tw['Files'].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
+        # self.tw['Files'].newAnalysis.connect(lambda: self.new_analysis())
 
         # Connect SetupTab
         self.tw['Setup'].proceedAnalysis.connect(lambda: self.update_tabs(self.tw['Setup'].data))
@@ -114,6 +115,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.settings_menu = QtWidgets.QMenu('&Settings', self)
         self.settings_menu.addAction('&Global', self.global_settings)
         self.menuBar().addMenu(self.settings_menu)
+
+        self.session_menu = QtWidgets.QMenu('&Session', self)
+        self.session_menu.addAction('&Save', self.save_session, QtCore.Qt.CTRL + QtCore.Qt.Key_S)
+        self.session_menu.addAction('&Load', self.load_session, QtCore.Qt.CTRL + QtCore.Qt.Key_O)
+        self.menuBar().addMenu(self.session_menu)
 
         self.help_menu = QtWidgets.QMenu('&Help', self)
         self.menuBar().addSeparator()
@@ -168,6 +174,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             try:
                 self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
                 self.tw[name].proceedAnalysis.connect(lambda tabs: self.handle_tabs(tabs=tabs))
+                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
             except (AttributeError, KeyError):
                 pass
 
@@ -176,7 +183,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Updates the setup and options with data from the SetupTab and then updates the tabs
 
         :param tabs: list of strings with tab names that should be updated, if None update all
-        :param data: dict with all information necessary to perform analysis, if None only update settings/options
+        :param data: dict with all information necessary to perform analysis, if None only update tabs
         """
 
         # Save users current tab position
@@ -186,15 +193,20 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
             for key in data:
 
+                # Store setup data in self.setup and everything else in self.options
                 if key in self.setup.keys():
                     self.setup[key] = data[key]
-
-                elif key in self.options.keys():
+                else:
                     self.options[key] = data[key]
+
+        if tabs is None:
+            update_tabs = self.tab_order
+        else:
+            update_tabs = [tabs]
 
         # Make temporary dict for updated tabs
         tmp_tw = {}
-        for name in self.tab_order:
+        for name in update_tabs:
 
             if name == 'Noisy Pixel':
                 widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
@@ -256,19 +268,45 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         """
         Creates a child SettingsWindow of the analysis window to change global settings
         """
-        self.sw = SettingsWindow(self.setup, self.options, parent=self)
-        self.sw.show()
-        self.sw.settingsUpdated.connect(lambda: self.update_globals())
+        self.settings_window = SettingsWindow(self.setup, self.options, parent=self)
+        self.settings_window.show()
+        self.settings_window.settingsUpdated.connect(lambda: self.update_globals())
 
     def update_globals(self):
         """
         Updates the global settings which are applied in the SettingsWindow
         """
 
-        self.setup = self.sw.setup
-        self.options = self.sw.options
+        self.setup = self.settings_window.setup
+        self.options = self.settings_window.options
 
         self.update_tabs()
+
+#    def new_analysis(self):
+#        self._init_tabs()
+#        self.connect_tabs()
+
+    def save_session(self):
+        """
+        Creates a child SessionWindow of the analysis window to save current session
+        """
+        caption = 'Save session'
+        session = QtWidgets.QFileDialog.getSaveFileName(parent=self,
+                                                        caption=caption,
+                                                        directory='./sessions',
+                                                        filter='*.yaml')[0]
+        pass
+
+    def load_session(self):
+        """
+        Opens dialog to select previously saved session. Must be yaml-file and lie in ./sessions
+        """
+        caption = 'Load session'
+        session = QtWidgets.QFileDialog.getOpenFileName(parent=self,
+                                                        caption=caption,
+                                                        directory='./sessions',
+                                                        filter='*.yaml')[0]
+        pass
 
     def file_quit(self):
         self.close()

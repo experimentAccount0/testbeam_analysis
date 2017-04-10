@@ -1,8 +1,6 @@
 from PyQt5 import QtCore, QtWidgets, QtGui
 from copy import deepcopy
 
-window_title = 'Global settings'
-
 
 class SettingsWindow(QtWidgets.QMainWindow):
 
@@ -10,9 +8,12 @@ class SettingsWindow(QtWidgets.QMainWindow):
 
     def __init__(self, setup=None, options=None, parent=None):
         """
-        Create window to set global settings for analysis such as n_pixels, output_folder etc.
+        Create window to set global settings for analysis
         """
+
         super(SettingsWindow, self).__init__(parent)
+
+        self.window_title = 'Global settings'
 
         self.default_setup = {'n_duts': 3,
                               'n_pixels': [(10, 10)],
@@ -21,20 +22,10 @@ class SettingsWindow(QtWidgets.QMainWindow):
                               'z_positions': (0, 10000),
                               'dut_names': ('First DUT', '2nd DUT', '3rd DUT')}
 
-        self.default_options = {'working_directory': '', 'input_hits_file': 'test_DUT0.h5', 'output_mask_file': 'tt',
-                                'chunk_size': 1000000, 'plot': False, 'input_cluster_files': 'test.h5',
-                                'output_correlation_file': 'tt.h5'}
-
-#        # Make defaults for setup and options
-#        self.default_setup = {'n_pixel': (10, 10),
-#                              'pixel_size': (100, 100),
-#                              'dut_names': 'myDUT'}
-#
-#        self.default_options = {'output_folder': '',
-#                                'input_files': 'test_DUT0.h5',
-#                                'output_mask_file': 'tt',
-#                                'chunk_size': 1000000,
-#                                'plot': False}
+        self.default_options = {'input_files': '', 'output_path': '', 'input_hits_file': 'test_DUT0.h5',
+                                'output_mask_file': 'tt', 'chunk_size': 1000000, 'plot': False,
+                                'input_cluster_files': 'test.h5', 'output_correlation_file': 'tt.h5',
+                                'noisy_suffix': '_noisy.h5', 'cluster_suffix': '_clustered.h5'}
 
         # Make copy of defaults to change values but dont change defaults
         if setup is None:
@@ -55,9 +46,9 @@ class SettingsWindow(QtWidgets.QMainWindow):
         """
 
         # Settings window
-        self.setWindowTitle(window_title)
+        self.setWindowTitle(self.window_title)
         self.screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.resize(0.25 * self.screen.width(), 0.25 * self.screen.height())
+        self.resize(0.5 * self.screen.width(), 0.5 * self.screen.height())
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         # Widgets and layout
@@ -93,6 +84,13 @@ class SettingsWindow(QtWidgets.QMainWindow):
         self.edit_chunk.setValidator(valid_chunk)
         self.edit_chunk.setText(str(self.options['chunk_size']))
 
+        # Make widgets for input file suffixes
+        label_suffix = QtWidgets.QLabel('Input file suffixes:')
+        self.edit_noisy = QtWidgets.QLineEdit()
+        self.edit_noisy.setPlaceholderText('NoisyPixelSuffix = %s' % self.options['noisy_suffix'])
+        self.edit_cluster = QtWidgets.QLineEdit()
+        self.edit_cluster.setPlaceholderText('ClusterSuffix = %s' % self.options['cluster_suffix'])
+
         # Add all  option widgets to layout_options, add spacers
         layout_options.addWidget(label_plot, 0, 0, 1, 1)
         layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 0, 1, 1, 1)
@@ -101,6 +99,10 @@ class SettingsWindow(QtWidgets.QMainWindow):
         layout_options.addWidget(label_chunk, 1, 0, 1, 1)
         layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 1, 1, 1, 1)
         layout_options.addWidget(self.edit_chunk, 1, 2, 1, 2)
+        layout_options.addWidget(label_suffix, 2, 0, 1, 1)
+        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
+        layout_options.addWidget(self.edit_noisy, 2, 2, 1, 2)
+        layout_options.addWidget(self.edit_cluster, 3, 2, 1, 2)
 
         # Make buttons for apply settings and cancel and button layout
         layout_buttons = QtWidgets.QHBoxLayout()

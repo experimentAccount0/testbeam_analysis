@@ -11,6 +11,7 @@ class DataTab(QtWidgets.QWidget):
 
     statusMessage = QtCore.pyqtSignal('QString')
     proceedAnalysis = QtCore.pyqtSignal('QString')
+#    newAnalysis = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super(DataTab, self).__init__(parent)
@@ -18,6 +19,9 @@ class DataTab(QtWidgets.QWidget):
         # Add output data
         self.data = {}
         self.output_path = os.getcwd()
+
+#        # Bool to store whether to start new analysis
+#        self.new = False
 
         self._setup()
 
@@ -126,6 +130,15 @@ class DataTab(QtWidgets.QWidget):
         layout_widget = QtWidgets.QVBoxLayout()
         layout_widget.addWidget(widget_splitter)
         self.setLayout(layout_widget)
+
+#    def new_analysis(self):
+#
+#        if self.new:
+#            self.newAnalysis.emit()
+#        else:
+#            self.new = True
+#            self.button_ok.setText('New analysis')
+#            self.button_ok.setToolTip('Select new files and start new analysis')
 
     def _get_output_folder(self):
         """
@@ -353,7 +366,7 @@ class DataTable(QtWidgets.QTableWidget):
                 dut_item.setFont(font)
                 dut_item.setForeground(QtGui.QColor('red'))
             self.setItem(row, self.column_labels.index('Name'), dut_item)
-            self.dut_names.append(dut_name)
+            self.dut_names.append(str(dut_name))
 
     def update_dut_names(self, name='Tel'):
         """
@@ -364,13 +377,13 @@ class DataTable(QtWidgets.QTableWidget):
         try:
             for row in range(self.rowCount()):
                 try:
-                    new.append(self.item(row, self.column_labels.index('Name')).text())
+                    new.append(str(self.item(row, self.column_labels.index('Name')).text()))
                 except AttributeError: # no QTableWidgetItem for new input data
                     add_dut_item = QtWidgets.QTableWidgetItem()
                     add_dut_item.setTextAlignment(QtCore.Qt.AlignCenter)
                     add_dut_item.setText(name + '_%d' % row)
                     self.setItem(row, self.column_labels.index('Name'), add_dut_item)
-                    new.append(self.item(row, self.column_labels.index('Name')).text())
+                    new.append(str(self.item(row, self.column_labels.index('Name')).text()))
         except AttributeError: # no QTableWidgetItem has been created at all
             self.set_dut_names()
 

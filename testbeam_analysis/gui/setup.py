@@ -1,4 +1,4 @@
-import json
+import yaml
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 
@@ -45,7 +45,8 @@ class SetupTab(QtWidgets.QWidget):
 
         # Load predefined dut types from file
         try:
-            self._dut_types = json.load(open('dut_types.txt'))
+            with open('dut_types.yaml', 'r') as f_read:
+                self._dut_types = yaml.load(f_read)
         except IOError:
             pass
 
@@ -425,8 +426,10 @@ class SetupTab(QtWidgets.QWidget):
 
             # Safe updated self._dut_types dict to file and reload
             try:
-                json.dump(self._dut_types, open('dut_types.txt', 'wb'))
-                self._dut_types = json.load(open('dut_types.txt'))
+                with open('dut_types.yaml', 'w') as f_write:
+                    yaml.dump(self._dut_types, f_write, default_flow_style=False)
+                with open('dut_types.yaml', 'r') as f_read:
+                    self._dut_types = yaml.load(f_read)
                 if remove:
                     message = 'Successfully removed DUT type "%s" from predefined DUT types' % custom
                 else:
