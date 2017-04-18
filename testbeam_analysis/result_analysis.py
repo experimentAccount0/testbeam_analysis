@@ -884,8 +884,6 @@ def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bin
     if output_track_angle_file is None:
         output_track_angle_file = os.path.splitext(input_tracks_file)[0] + '_track_angles.h5'
 
-    x_angle_hist = None
-    y_angle_hist = None
     with tb.open_file(input_tracks_file, 'r') as in_file_h5:
         with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
             n_duts = len(in_file_h5.list_nodes("/"))  # determine number of max DUTs
@@ -896,6 +894,8 @@ def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bin
                 use_duts = use_duts
 
             for node in in_file_h5.root:  # loop through all DUTs in track table
+                x_angle_hist = None
+                y_angle_hist = None
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
@@ -920,7 +920,7 @@ def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bin
                 track_angle_y = out_file_h5.create_carray(where=out_file_h5.root,
                                                           name='Track_Angle_Hist_y_DUT%s' % (actual_dut),
                                                           title='Track angle distribution in y-direction for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(x_angle_hist.dtype),
+                                                          atom=tb.Atom.from_dtype(y_angle_hist.dtype),
                                                           shape=x_angle_hist.shape,
                                                           filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
