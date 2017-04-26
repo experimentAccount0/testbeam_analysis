@@ -4,7 +4,7 @@
     gui options and plotting outputs
 '''
 
-from testbeam_analysis.gui.analysis_widget import AnalysisWidget
+from testbeam_analysis.gui.analysis_widget import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
 from testbeam_analysis.dut_alignment import correlate_cluster, prealignment, merge_cluster_data, apply_alignment, alignment
 from testbeam_analysis.track_analysis import find_tracks, fit_tracks
@@ -31,6 +31,9 @@ class ClusterPixelsTab(AnalysisWidget):
             parent, setup, options, input_file=None)
 
         self.add_function(func=cluster_hits)
+        self.add_option(option='output_cluster_file', func=cluster_hits,
+                        default_value=options['output_path'] + setup['dut_names'][0] + '_clustered.h5' ,
+                        fixed=True)
         self.add_option(option='create_cluster_hits_table', func=cluster_hits,
                         fixed=True)
 
@@ -52,9 +55,17 @@ class PrealignmentTab(AnalysisWidget):
         self.add_function(func=prealignment)
         self.add_function(func=merge_cluster_data)
         self.add_function(func=apply_alignment)
+
         # Fix options that should not be changed
-        self.add_option(option='use_duts', func=apply_alignment, default_value=[
-                        1] * setup['n_duts'], fixed=True)
+        self.add_option(option='input_cluster_files', func=correlate_cluster,
+                        default_value=[options['output_path'] + name + '_clustered.h5' for name in setup['dut_names']],
+                        fixed=True)
+
+#         self.add_option(option='initial_rotation', func=alignment,
+#                         default_value=sdf['rotations'], fixed=True)
+
+        self.add_option(option='use_duts', func=apply_alignment,
+                        default_value=[1] * setup['n_duts'], fixed=True)
         self.add_option(option='inverse', func=apply_alignment, fixed=True)
         self.add_option(option='force_prealignment', func=apply_alignment,
                         default_value=True, fixed=True)
@@ -79,6 +90,13 @@ class AlignmentTab(AnalysisWidget):
             parent, setup, options, input_file=None)
 
         self.add_function(func=alignment)
+
+
+class TestParallel(ParallelAnalysisWidget):
+    def __init__(self, parent, setup, options, n_tabs):
+        super(TestParallel, self).__init__(parent, setup, options, input_file=None, n_tabs=n_tabs)
+
+        self.add_parallel_function(func=alignment)
 
 
 class TrackFittingTab(AnalysisWidget):

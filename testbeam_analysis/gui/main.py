@@ -17,7 +17,7 @@ GUI_AUTHORS = 'Pascal Wolf, David-Leon Pohl'
 MINIMUM_RESOLUTION = (1366, 768)
 
 # Create all tabs at start up for debugging purpose
-_DEBUG = False
+_DEBUG = True
 
 try:
     pkgInfo = get_distribution('testbeam_analysis').get_metadata('PKG-INFO')
@@ -71,7 +71,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         """
 
         # Add tab_widget and widgets for the different analysis steps
-        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment',
+        self.tab_order = ('TestParallelWidget', 'Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment',
                           'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result')
 
         # Add QTabWidget for tab_widget
@@ -238,6 +238,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.ResultTab(parent=self.tabs,
                                               setup=self.setup,
                                               options=self.options)
+            elif name == 'TestParallelWidget':
+                widget = tab_widget.TestParallel(parent=self.tabs,
+                                                  setup=self.setup,
+                                                  options=self.options,
+                                                  n_tabs=3)
             else:
                 logging.info('Gui for %s not implemented yet!' % name)
                 continue

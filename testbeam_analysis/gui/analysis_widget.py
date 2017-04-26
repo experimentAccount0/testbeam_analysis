@@ -49,13 +49,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         documentation from the function implementation automatically.
     '''
 
-    def __init__(self, parent, setup, options, input_file, multi=False):
+    def __init__(self, parent, setup, options, input_file):
         super(AnalysisWidget, self).__init__(parent)
         self.setup = setup
         self.options = options
         self.input_file = input_file
         self.option_widgets = {}
-        self.multi = multi
         self._setup()
         # Holds functions with kwargs
         self.calls = OrderedDict()
@@ -230,8 +229,8 @@ class AnalysisWidget(QtWidgets.QWidget):
     def _select_widget(self, dtype, name, default_value, optional, tooltip):
         # Create widget according to data type
         if ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
-              'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
-              ('iterable' in dtype and 'iterable of iterable' not in dtype)):
+                'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
+                ('iterable' in dtype and 'iterable of iterable' not in dtype)):
             widget = option_widget.OptionMultiSlider(
                 name=name, labels=self.setup['dut_names'],
                 default_value=default_value,
@@ -316,7 +315,7 @@ class AnalysisWidget(QtWidgets.QWidget):
                             'File I/O %s not defined in settings', arg)
                 else:
                     raise RuntimeError('Function argument %s not defined', arg)
-        print func.__name__, kwargs
+        print(func.__name__, kwargs)
         func(**kwargs)
 
     def _call_funcs(self):
@@ -324,5 +323,20 @@ class AnalysisWidget(QtWidgets.QWidget):
         '''
 
         for func, kwargs in self.calls.iteritems():
-            print func.__name__, kwargs
+            print(func.__name__, kwargs)
             #self._call_func(func, kwargs)
+
+
+class ParallelAnalysisWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent, setup, options, input_file, n_tabs):
+        super(ParallelAnalysisWidget, self).__init__(parent)
+        self.tabs = QtWidgets.QTabWidget(parent)
+        print 'n_tabs', n_tabs
+        for i in range(n_tabs):
+            widget = AnalysisWidget(parent=self.tabs, setup=setup, options=options, input_file='Quark')
+            self.tabs.addTab(widget, 'DUT%d' % i)
+
+    def add_parallel_function(self, func):
+        for i in range(self.tabs.count()):
+            self.tabs.widget(i).add_function(func)

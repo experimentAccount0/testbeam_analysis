@@ -393,6 +393,8 @@ class SetupTab(QtWidgets.QWidget):
             for key in self.dut_data.keys():
                 if key not in ['n_cols', 'n_rows', 'pitch_col', 'pitch_row', 'rot_alpha', 'rot_beta', 'rot_gamma']:
                     self.data[key] = self.dut_data[key]
+                    
+            print self.data
 
             self.proceedAnalysis.emit(self.tab_list)
 
