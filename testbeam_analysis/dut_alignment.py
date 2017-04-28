@@ -773,8 +773,8 @@ def alignment(input_track_candidates_file, input_alignment_file, n_pixels, pixel
         The combination of duts that are algined at once. One should always align the high resolution planes first.
         E.g. for a telesope (first and last 3 planes) with 2 devices in the center (3, 4):
         align_duts=[[0, 1, 2, 5, 6, 7],  # align the telescope planes first
-                    [4],  # Align first DUT
-                    [3]],  # Align second DUT
+        [4],  # Align first DUT
+        [3]],  # Align second DUT
     selection_fit_duts : iterable or iterable of iterable
         Defines for each align_duts combination wich devices to use in the track fit.
         E.g. To use only the telescope planes (first and last 3 planes) but not the 2 center devices
