@@ -17,7 +17,7 @@ GUI_AUTHORS = 'Pascal Wolf, David-Leon Pohl'
 MINIMUM_RESOLUTION = (1366, 768)
 
 # Create all tabs at start up for debugging purpose
-_DEBUG = True
+_DEBUG = False
 
 try:
     pkgInfo = get_distribution('testbeam_analysis').get_metadata('PKG-INFO')
@@ -71,8 +71,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         """
 
         # Add tab_widget and widgets for the different analysis steps
-        self.tab_order = ('TestParallelWidget', 'Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment',
-                          'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result')
+        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'TestParallelWidget',
+                          'Pre-alignment', 'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result')
 
         # Add QTabWidget for tab_widget
         self.tabs = QtWidgets.QTabWidget()
@@ -82,8 +82,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         for name in self.tab_order:
             if name == 'Files':
                 widget = DataTab(parent=self.tabs)
-            elif name == 'Setup':
-                widget = SetupTab(parent=self.tabs)
             else:
                 # Add dummy widget
                 widget = QtWidgets.QWidget(parent=self.tabs)
@@ -95,16 +93,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         if not _DEBUG:
             self.handle_tabs(enable=False)
         else:
-            self.update_tabs()
-
-        # Connect signals in between tabs and main window
-
-        # Connect DataTab
-        self.tw['Files'].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
-        # self.tw['Files'].newAnalysis.connect(lambda: self.new_analysis())
-
-        # Connect SetupTab
-        self.tw['Setup'].proceedAnalysis.connect(lambda: self.update_tabs(self.tw['Setup'].data))
+            self.handle_tabs(enable=True)
+            #self.update_tabs()
 
     def _init_menu(self):
         self.file_menu = QtWidgets.QMenu('&File', self)
@@ -165,25 +155,40 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 if tab in self.tab_order:
                     self.tabs.setTabEnabled(self.tab_order.index(tab), enable)
 
-    def connect_tabs(self):
+    def connect_tabs(self, tabs=None):
         """
         Connect statusMessage and proceedAnalysis signal of all tabs
         """
 
-        for name in self.tab_order:
+        if tabs is None:
+            tab_list = self.tab_order
+        else:
+            tab_list = [tabs]
+
+        for name in tab_list:
             try:
+                if name == 'Files':
+                    self.tw[name].proceedAnalysis.connect(lambda: self.update_tabs(tabs='Setup'))
+                    self.tw[name].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
+
+                if name == 'Setup':
+                    self.tw[name].proceedAnalysis.connect(lambda: self.update_tabs(data=self.tw['Setup'].data,
+                                                                                   skip='Setup'))
+
                 self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
-                self.tw[name].proceedAnalysis.connect(lambda tabs: self.handle_tabs(tabs=tabs))
-                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
+                self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
+#                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
+
             except (AttributeError, KeyError):
                 pass
 
-    def update_tabs(self, data=None, tabs=None):
+    def update_tabs(self, data=None, tabs=None, skip=None):
         """
         Updates the setup and options with data from the SetupTab and then updates the tabs
 
         :param tabs: list of strings with tab names that should be updated, if None update all
         :param data: dict with all information necessary to perform analysis, if None only update tabs
+        :param skip: str or list of tab names which should be skipped when updating tabs
         """
 
         # Save users current tab position
@@ -200,15 +205,26 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.options[key] = data[key]
 
         if tabs is None:
-            update_tabs = self.tab_order
+            update_tabs = list(self.tab_order)
         else:
             update_tabs = [tabs]
+
+        if skip is not None:
+            if isinstance(skip, list):
+                for tab in skip:
+                    if tab in update_tabs:
+                        update_tabs.remove(tab)
+            else:
+                update_tabs.remove(skip)
 
         # Make temporary dict for updated tabs
         tmp_tw = {}
         for name in update_tabs:
 
-            if name == 'Noisy Pixel':
+            if name == 'Setup':
+                widget = SetupTab(parent=self.tabs)
+
+            elif name == 'Noisy Pixel':
                 widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
                                                    setup=self.setup,
                                                    options=self.options)
@@ -240,9 +256,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                               options=self.options)
             elif name == 'TestParallelWidget':
                 widget = tab_widget.TestParallel(parent=self.tabs,
-                                                  setup=self.setup,
-                                                  options=self.options,
-                                                  n_tabs=3)
+                                                 setup=self.setup,
+                                                 options=self.options)
             else:
                 logging.info('Gui for %s not implemented yet!' % name)
                 continue
@@ -267,7 +282,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.tabs.setCurrentIndex(current_tab)
 
         # Connect updated tabs
-        self.connect_tabs()
+        self.connect_tabs(tabs)
 
     def global_settings(self):
         """
@@ -285,11 +300,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.setup = self.settings_window.setup
         self.options = self.settings_window.options
 
-        self.update_tabs()
-
-#    def new_analysis(self):
-#        self._init_tabs()
-#        self.connect_tabs()
+        self.update_tabs(skip='Setup')
 
     def save_session(self):
         """

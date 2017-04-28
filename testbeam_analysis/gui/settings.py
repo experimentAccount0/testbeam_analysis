@@ -15,17 +15,19 @@ class SettingsWindow(QtWidgets.QMainWindow):
 
         self.window_title = 'Global settings'
 
-        self.default_setup = {'n_duts': 3,
-                              'n_pixels': [(10, 10)],
-                              'pixel_size': [(100, 100)],
-                              'dut_name': 'myDUT',
-                              'z_positions': (0, 10000),
-                              'dut_names': ('First DUT', '2nd DUT', '3rd DUT')}
+        self.default_setup = {'dut_names': None,
+                              'n_duts': None,
+                              'n_pixels': None,
+                              'pixel_size': None,
+                              'z_positions': None,
+                              'rotations': None}
 
-        self.default_options = {'input_files': '', 'output_path': '', 'input_hits_file': 'test_DUT0.h5',
-                                'output_mask_file': 'tt', 'chunk_size': 1000000, 'plot': False,
-                                'input_cluster_files': 'test.h5', 'output_correlation_file': 'tt.h5',
-                                'noisy_suffix': '_noisy.h5', 'cluster_suffix': '_clustered.h5'}
+        self.default_options = {'input_files': None,
+                                'output_path': None,
+                                'chunk_size': 1000000,
+                                'plot': False,
+                                'noisy_suffix': '_noisy.h5',  # fixed since fixed in function
+                                'cluster_suffix': '_clustered.h5'}  # fixed since fixed in function
 
         # Make copy of defaults to change values but dont change defaults
         if setup is None:
@@ -48,7 +50,7 @@ class SettingsWindow(QtWidgets.QMainWindow):
         # Settings window
         self.setWindowTitle(self.window_title)
         self.screen = QtWidgets.QDesktopWidget().screenGeometry()
-        self.resize(0.5 * self.screen.width(), 0.5 * self.screen.height())
+        self.resize(0.25 * self.screen.width(), 0.25 * self.screen.height())
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         # Widgets and layout
@@ -84,12 +86,12 @@ class SettingsWindow(QtWidgets.QMainWindow):
         self.edit_chunk.setValidator(valid_chunk)
         self.edit_chunk.setText(str(self.options['chunk_size']))
 
-        # Make widgets for input file suffixes
-        label_suffix = QtWidgets.QLabel('Input file suffixes:')
-        self.edit_noisy = QtWidgets.QLineEdit()
-        self.edit_noisy.setPlaceholderText('NoisyPixelSuffix = %s' % self.options['noisy_suffix'])
-        self.edit_cluster = QtWidgets.QLineEdit()
-        self.edit_cluster.setPlaceholderText('ClusterSuffix = %s' % self.options['cluster_suffix'])
+#        # Make widgets for input file suffixes
+#        label_suffix = QtWidgets.QLabel('Input file suffixes:')
+#        self.edit_noisy = QtWidgets.QLineEdit()
+#        self.edit_noisy.setPlaceholderText('NoisyPixelSuffix = %s' % self.options['noisy_suffix'])
+#        self.edit_cluster = QtWidgets.QLineEdit()
+#        self.edit_cluster.setPlaceholderText('ClusterSuffix = %s' % self.options['cluster_suffix'])
 
         # Add all  option widgets to layout_options, add spacers
         layout_options.addWidget(label_plot, 0, 0, 1, 1)
@@ -99,10 +101,10 @@ class SettingsWindow(QtWidgets.QMainWindow):
         layout_options.addWidget(label_chunk, 1, 0, 1, 1)
         layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 1, 1, 1, 1)
         layout_options.addWidget(self.edit_chunk, 1, 2, 1, 2)
-        layout_options.addWidget(label_suffix, 2, 0, 1, 1)
-        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
-        layout_options.addWidget(self.edit_noisy, 2, 2, 1, 2)
-        layout_options.addWidget(self.edit_cluster, 3, 2, 1, 2)
+#        layout_options.addWidget(label_suffix, 2, 0, 1, 1)
+#        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
+#        layout_options.addWidget(self.edit_noisy, 2, 2, 1, 2)
+#        layout_options.addWidget(self.edit_cluster, 3, 2, 1, 2)
 
         # Make buttons for apply settings and cancel and button layout
         layout_buttons = QtWidgets.QHBoxLayout()
@@ -139,5 +141,6 @@ class SettingsWindow(QtWidgets.QMainWindow):
             return
 
         self.options['plot'] = self.rb_t.isChecked()
+
         self.settingsUpdated.emit()
         self.close()

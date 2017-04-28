@@ -17,11 +17,10 @@ class SetupTab(QtWidgets.QWidget):
         self.data = None
 
         # Make list of tabs that will be enabled after proceedAnalysis signal of this class
-        self.tab_list = ['Noisy Pixel', 'Clustering', 'Correlations', 'Pre-alignment',
-                         'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result']
+        self.tab_list = ['Noisy Pixel', 'Clustering', 'TestParallelWidget']
 
         # Make tuple of properties of each dut
-        self._dut_props = ('z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma',
+        self._dut_props = ('z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma',
                            'pitch_col', 'pitch_row', 'n_cols', 'n_rows', 'thickness')
 
         # Make dict for properties of each dut
@@ -184,7 +183,7 @@ class SetupTab(QtWidgets.QWidget):
             label_z.setFixedWidth(label_width)
             edit_z = QtWidgets.QLineEdit()
 
-            # z_pos of 1. DUT is origin and set to 0
+            # z_positions of 1. DUT is origin and set to 0
             if i == 0:
                 edit_z.setText('0')
                 # edit_z.setReadOnly(True)
@@ -335,7 +334,7 @@ class SetupTab(QtWidgets.QWidget):
             # Connect all input QLineEdit widgets
             for prop in self._dut_props:
 
-                if prop in ['z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma']:
+                if prop in ['z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma']:
                     self._dut_widgets[dut][prop].textChanged.connect(
                         lambda text: self.setup_painter.update_setup(
                             self.data['dut_names'][self.tabs.currentIndex()], self.tabs.currentIndex(), text))
@@ -357,7 +356,7 @@ class SetupTab(QtWidgets.QWidget):
         if custom is None:
 
             # Clear dut data dict before reading
-            self.dut_data = {'rotation': [], 'n_pixel': [], 'pixel_size': []}
+            self.dut_data = {'rotations': [], 'n_pixels': [], 'pixel_size': []}
 
             # make tmp dict for pixel_size and n_pixel to add tuple of (n_cols, n_rows) etc. to output data
             tmp_rotation = {}
@@ -384,17 +383,15 @@ class SetupTab(QtWidgets.QWidget):
                     else:
                         self.dut_data[prop].append(float(self._dut_widgets[dut][prop].text()))
 
-                self.dut_data['rotation'].append((tmp_rotation['rot_alpha'], tmp_rotation['rot_beta'],
+                self.dut_data['rotations'].append((tmp_rotation['rot_alpha'], tmp_rotation['rot_beta'],
                                                   tmp_rotation['rot_gamma']))
-                self.dut_data['n_pixel'].append((tmp_n_pixel['n_cols'], tmp_n_pixel['n_rows']))
+                self.dut_data['n_pixels'].append((tmp_n_pixel['n_cols'], tmp_n_pixel['n_rows']))
                 self.dut_data['pixel_size'].append((tmp_pixel_size['pitch_col'], tmp_pixel_size['pitch_row']))
 
             # Add property lists to output data dict
             for key in self.dut_data.keys():
                 if key not in ['n_cols', 'n_rows', 'pitch_col', 'pitch_row', 'rot_alpha', 'rot_beta', 'rot_gamma']:
                     self.data[key] = self.dut_data[key]
-                    
-            print self.data
 
             self.proceedAnalysis.emit(self.tab_list)
 
@@ -413,7 +410,7 @@ class SetupTab(QtWidgets.QWidget):
                 for prop in self._dut_props:
 
                     # Exclude reading of non-specific dut properties
-                    if prop not in ['z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma']:
+                    if prop not in ['z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma']:
                         if prop in ['n_cols', 'n_rows']:
                             self._dut_types[custom][prop] = int(self._dut_widgets[current_dut][prop].text())
                         else:
@@ -494,10 +491,10 @@ class SetupTab(QtWidgets.QWidget):
                                         self._handle_widgets[dut][key].setDisabled(True)
 
                                 elif new_type not in self._dut_types.keys():
-                                    self._check_input(['z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma'])
+                                    self._check_input(['z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma'])
 
                                 else:
-                                    self._check_input(['z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma'])
+                                    self._check_input(['z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma'])
                                     self._handle_widgets[dut][key].setText('Overwrite')
                                     self._handle_widgets[dut]['check_h'].setText('Overwrite DUT type')
                                     message = 'Predefined DUT type "%s" will be overwritten!' % new_type
@@ -531,7 +528,7 @@ class SetupTab(QtWidgets.QWidget):
         for prop in self._dut_props:
 
             # Loop over properties, only set dut specific props
-            if prop not in ['z_pos', 'rot_alpha', 'rot_beta', 'rot_gamma']:
+            if prop not in ['z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma']:
 
                 if dut_type is not None:
                     # List of all dut types in duts combobox

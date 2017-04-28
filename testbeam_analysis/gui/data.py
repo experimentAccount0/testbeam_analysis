@@ -20,9 +20,6 @@ class DataTab(QtWidgets.QWidget):
         self.data = {}
         self.output_path = os.getcwd()
 
-#        # Bool to store whether to start new analysis
-#        self.new = False
-
         self._setup()
 
     def _setup(self):
@@ -130,15 +127,6 @@ class DataTab(QtWidgets.QWidget):
         layout_widget = QtWidgets.QVBoxLayout()
         layout_widget.addWidget(widget_splitter)
         self.setLayout(layout_widget)
-
-#    def new_analysis(self):
-#
-#        if self.new:
-#            self.newAnalysis.emit()
-#        else:
-#            self.new = True
-#            self.button_ok.setText('New analysis')
-#            self.button_ok.setToolTip('Select new files and start new analysis')
 
     def _get_output_folder(self):
         """

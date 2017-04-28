@@ -329,14 +329,46 @@ class AnalysisWidget(QtWidgets.QWidget):
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent, setup, options, input_file, n_tabs):
+    def __init__(self, parent, setup, options):
+        global key_2
         super(ParallelAnalysisWidget, self).__init__(parent)
-        self.tabs = QtWidgets.QTabWidget(parent)
-        print 'n_tabs', n_tabs
-        for i in range(n_tabs):
-            widget = AnalysisWidget(parent=self.tabs, setup=setup, options=options, input_file='Quark')
-            self.tabs.addTab(widget, 'DUT%d' % i)
+
+        main_layout = QtWidgets.QHBoxLayout()
+        self.setLayout(main_layout)
+        self.tabs = QtWidgets.QTabWidget()
+        self.tw = {}
+        self.duts = setup['dut_names']
+        self.n = len(self.duts)
+
+        for i in range(self.n):
+
+            tmp_setup = {}
+            tmp_options = {}
+
+            for key in setup.keys():
+
+                if isinstance(setup[key], list) or isinstance(setup[key], tuple):
+                    tmp_setup[key] = [setup[key][i]]
+                elif isinstance(setup[key], int) or isinstance(setup[key], str):
+                    tmp_setup[key] = setup[key]
+
+            print tmp_setup
+
+            for key_2 in options.keys():
+
+                if isinstance(options[key_2], list) or isinstance(options[key_2], tuple):
+                    tmp_options[key_2] = [options[key_2][i]]
+                elif isinstance(options[key_2], int) or isinstance(options[key_2], str):
+                    tmp_options[key_2] = options[key_2]
+
+            print tmp_options
+
+            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, input_file=None)
+            self.tw[self.duts[i]] = widget
+            self.tabs.addTab(self.tw[self.duts[i]], 'DUT %d' % i)
+
+        main_layout.addWidget(self.tabs)
 
     def add_parallel_function(self, func):
-        for i in range(self.tabs.count()):
-            self.tabs.widget(i).add_function(func)
+        for i in range(self.n):
+            self.tw[self.duts[i]].add_function(func)
