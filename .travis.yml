@@ -32,7 +32,7 @@ before_install:
   - conda info -a
   - conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov
   - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pykalman pylandau pytest
-  - pip install sphinxcontrib-versioning sphinx_rtd_theme
+  - pip install sphinx sphinxcontrib-versioning sphinx_rtd_theme sphinxcontrib-napoleon sphinx-git
   - python setup.py develop
 
 # Run test
