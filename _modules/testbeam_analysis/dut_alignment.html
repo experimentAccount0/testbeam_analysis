@@ -15,6 +15,8 @@
   
     <link rel="shortcut icon" href="../../_static/silab.ico"/>
   
+  
+  
 
   
 
@@ -47,6 +49,7 @@
 
 <body class="wy-body-for-nav" role="document">
 
+   
   <div class="wy-grid-for-nav">
 
     
@@ -87,7 +90,10 @@
           
             
             
-                <ul>
+              
+            
+            
+              <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../TBA.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../Examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../API.html">API</a></li>
@@ -103,8 +109,10 @@
 
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
-        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="../../index.html">Testbeam Analysis</a>
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Testbeam Analysis</a>
+        
       </nav>
 
 
@@ -117,19 +125,36 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-    <li><a href="../../index.html">Docs</a> &raquo;</li>
-      
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
           <li><a href="../index.html">Module code</a> &raquo;</li>
-      
-    <li>testbeam_analysis.dut_alignment</li>
+        
+      <li>testbeam_analysis.dut_alignment</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
         
-          
+            
         
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
@@ -414,7 +439,7 @@
         <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;z&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_positions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
             <span class="n">table_prefix</span> <span class="o">=</span> <span class="s1">&#39;column&#39;</span> <span class="k">if</span> <span class="s1">&#39;column&#39;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">else</span> <span class="s1">&#39;row&#39;</span>
-            <span class="n">indices</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">r&#39;\d+&#39;</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\d+&#39;</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
             <span class="n">dut_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">indices</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
             <span class="n">ref_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">indices</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
             <span class="n">result</span><span class="p">[</span><span class="n">dut_idx</span><span class="p">][</span><span class="s1">&#39;DUT&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dut_idx</span>
@@ -1385,7 +1410,7 @@
         <span class="n">basis_global</span> <span class="o">=</span> <span class="n">rotation_matrix</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
         <span class="n">dut_plane_normal</span> <span class="o">=</span> <span class="n">basis_global</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
         <span class="n">actual_dut_position</span> <span class="o">=</span> <span class="n">dut_position</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">actual_dut_position</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">align</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1</span><span class="n">e6</span>  <span class="c1"># Convert z position from m to um</span>
+        <span class="n">actual_dut_position</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">align</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="mf">1e6</span>  <span class="c1"># Convert z position from m to um</span>
         <span class="n">intersections</span> <span class="o">=</span> <span class="n">geometry_utils</span><span class="o">.</span><span class="n">get_line_intersections_with_plane</span><span class="p">(</span><span class="n">line_origins</span><span class="o">=</span><span class="n">offsets</span><span class="p">,</span>
                                                                          <span class="n">line_directions</span><span class="o">=</span><span class="n">slopes</span><span class="p">,</span>
                                                                          <span class="n">position_plane</span><span class="o">=</span><span class="n">actual_dut_position</span><span class="p">,</span>
@@ -1418,7 +1443,7 @@
         <span class="n">residuals_before</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">residuals_after</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
-            <span class="n">actual_dut</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">r&#39;\d+&#39;</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">actual_dut</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\d+&#39;</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
             <span class="n">dut_position</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">alignment_last_iteration</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;translation_x&#39;</span><span class="p">],</span> <span class="n">alignment_last_iteration</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;translation_y&#39;</span><span class="p">],</span> <span class="n">alignment_last_iteration</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;translation_z&#39;</span><span class="p">]])</span>
 
             <span class="c1"># Hits with the actual alignment</span>
@@ -1444,7 +1469,7 @@
 
             <span class="c1"># Trick to have the same order of magnitue of variation for angles and position, otherwise scipy minimizers</span>
             <span class="c1"># do not converge if step size of parameters is very different</span>
-            <span class="n">z_position_in_m</span> <span class="o">=</span> <span class="n">z_position</span> <span class="o">/</span> <span class="mi">1</span><span class="n">e6</span>
+            <span class="n">z_position_in_m</span> <span class="o">=</span> <span class="n">z_position</span> <span class="o">/</span> <span class="mf">1e6</span>
 
             <span class="n">residual</span> <span class="o">=</span> <span class="n">_minimize_me</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">z_position_in_m</span><span class="p">]),</span>
                                     <span class="n">dut_position</span><span class="p">,</span>
@@ -1459,12 +1484,12 @@
                                                                                                                                              <span class="n">alpha</span><span class="p">,</span>
                                                                                                                                              <span class="n">beta</span><span class="p">,</span>
                                                                                                                                              <span class="n">gamma</span><span class="p">,</span>
-                                                                                                                                             <span class="n">z_position_in_m</span> <span class="o">*</span> <span class="mi">1</span><span class="n">e6</span><span class="p">,</span>
+                                                                                                                                             <span class="n">z_position_in_m</span> <span class="o">*</span> <span class="mf">1e6</span><span class="p">,</span>
                                                                                                                                              <span class="n">residual</span><span class="p">))</span>
 
             <span class="c1"># FIXME:</span>
             <span class="c1"># Has to be heavily restricted otherwise converges to unphysical solutions since the scoring with residuals is not really working well</span>
-            <span class="n">bounds</span> <span class="o">=</span> <span class="p">[(</span><span class="n">alpha</span> <span class="o">-</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">alpha</span> <span class="o">+</span> <span class="mf">0.01</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span> <span class="o">-</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">beta</span> <span class="o">+</span> <span class="mf">0.01</span><span class="p">),</span> <span class="p">(</span><span class="n">gamma</span> <span class="o">-</span> <span class="mf">0.001</span><span class="p">,</span> <span class="n">gamma</span> <span class="o">+</span> <span class="mf">0.001</span><span class="p">),</span> <span class="p">(</span><span class="n">z_position_in_m</span> <span class="o">-</span> <span class="mi">10</span><span class="n">e</span><span class="o">-</span><span class="mi">6</span><span class="p">,</span> <span class="n">z_position_in_m</span> <span class="o">+</span> <span class="mi">10</span><span class="n">e</span><span class="o">-</span><span class="mi">6</span><span class="p">)]</span>
+            <span class="n">bounds</span> <span class="o">=</span> <span class="p">[(</span><span class="n">alpha</span> <span class="o">-</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">alpha</span> <span class="o">+</span> <span class="mf">0.01</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span> <span class="o">-</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">beta</span> <span class="o">+</span> <span class="mf">0.01</span><span class="p">),</span> <span class="p">(</span><span class="n">gamma</span> <span class="o">-</span> <span class="mf">0.001</span><span class="p">,</span> <span class="n">gamma</span> <span class="o">+</span> <span class="mf">0.001</span><span class="p">),</span> <span class="p">(</span><span class="n">z_position_in_m</span> <span class="o">-</span> <span class="mf">10e-6</span><span class="p">,</span> <span class="n">z_position_in_m</span> <span class="o">+</span> <span class="mf">10e-6</span><span class="p">)]</span>
 
             <span class="n">result</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span><span class="n">fun</span><span class="o">=</span><span class="n">_minimize_me</span><span class="p">,</span>
                               <span class="n">x0</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">z_position_in_m</span><span class="p">]),</span>  <span class="c1"># Start values from residual fit</span>
@@ -1487,13 +1512,13 @@
                                                                                                                                  <span class="n">alpha</span><span class="p">,</span>
                                                                                                                                  <span class="n">beta</span><span class="p">,</span>
                                                                                                                                  <span class="n">gamma</span><span class="p">,</span>
-                                                                                                                                 <span class="n">z_position_in_m</span> <span class="o">*</span> <span class="mi">1</span><span class="n">e6</span><span class="p">,</span>
+                                                                                                                                 <span class="n">z_position_in_m</span> <span class="o">*</span> <span class="mf">1e6</span><span class="p">,</span>
                                                                                                                                  <span class="n">residual</span><span class="p">))</span>
             <span class="c1"># Rotation start values of minimizer</span>
             <span class="n">alignment_result</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha</span>
             <span class="n">alignment_result</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;beta&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">beta</span>
             <span class="n">alignment_result</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;gamma&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">gamma</span>
-            <span class="n">alignment_result</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;translation_z&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_position_in_m</span> <span class="o">*</span> <span class="mi">1</span><span class="n">e6</span>  <span class="c1"># convert z position from m to um</span>
+            <span class="n">alignment_result</span><span class="p">[</span><span class="n">actual_dut</span><span class="p">][</span><span class="s1">&#39;translation_z&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">z_position_in_m</span> <span class="o">*</span> <span class="mf">1e6</span>  <span class="c1"># convert z position from m to um</span>
 
     <span class="n">total_residuals_before</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">residuals_before</span><span class="p">))))</span>
     <span class="n">total_residuals_after</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">residuals_after</span><span class="p">))))</span>
@@ -1517,6 +1542,9 @@
     <span class="k">return</span> <span class="n">start_index</span><span class="p">,</span> <span class="n">column_correlation</span><span class="p">,</span> <span class="n">row_correlation</span>
 </pre></div>
 
+           </div>
+           <div class="articleComments">
+            
            </div>
           </div>
           <footer>
@@ -1569,13 +1597,14 @@
             VERSION:'0.0.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
         };
     </script>
       <script type="text/javascript" src="../../_static/jquery.js"></script>
       <script type="text/javascript" src="../../_static/underscore.js"></script>
       <script type="text/javascript" src="../../_static/doctools.js"></script>
-      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
   
 
