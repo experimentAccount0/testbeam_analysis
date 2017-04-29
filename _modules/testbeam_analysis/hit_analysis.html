@@ -1,0 +1,391 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>testbeam_analysis.hit_analysis &mdash; Testbeam Analysis 0.0.1 documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../../_static/silab.ico"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="stylesheet" href="../../_static/banner.css" type="text/css" />
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="Testbeam Analysis 0.0.1 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Testbeam Analysis
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../TBA.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../Examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../API.html">API</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">Testbeam Analysis</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>testbeam_analysis.hit_analysis</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  
+
+
+    
+    
+
+
+
+    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
+<h1>Source code for testbeam_analysis.hit_analysis</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39; All functions acting on the hits of one DUT are listed here&#39;&#39;&#39;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os.path</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">tables</span> <span class="k">as</span> <span class="nn">tb</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.ndimage</span> <span class="k">import</span> <span class="n">median_filter</span>
+
+<span class="kn">from</span> <span class="nn">pixel_clusterizer.clusterizer</span> <span class="k">import</span> <span class="n">HitClusterizer</span>
+<span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">analysis_utils</span>
+<span class="kn">from</span> <span class="nn">testbeam_analysis.tools.plot_utils</span> <span class="k">import</span> <span class="n">plot_masked_pixels</span><span class="p">,</span> <span class="n">plot_cluster_size</span>
+
+
+<span class="k">def</span> <span class="nf">generate_pixel_mask</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="n">n_pixel</span><span class="p">,</span> <span class="n">pixel_mask_name</span><span class="o">=</span><span class="s2">&quot;NoisyPixelMask&quot;</span><span class="p">,</span> <span class="n">output_mask_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">filter_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">dut_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Generating pixel mask from the hit table.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_hits_file : string</span>
+<span class="sd">        File name of the hit table.</span>
+<span class="sd">    n_pixel : tuple</span>
+<span class="sd">        Tuple of the total number of pixels (column/row).</span>
+<span class="sd">    pixel_mask_name : string</span>
+<span class="sd">        Name of the node containing the mask inside the output file.</span>
+<span class="sd">    output_mask_file : string</span>
+<span class="sd">        File name of the output mask file.</span>
+<span class="sd">    pixel_size : tuple</span>
+<span class="sd">        Tuple of the pixel size (column/row). If None, assuming square pixels.</span>
+<span class="sd">    threshold : float</span>
+<span class="sd">        The threshold for pixel masking. The threshold is given in units of</span>
+<span class="sd">        sigma of the pixel noise (background subtracted). The lower the value</span>
+<span class="sd">        the more pixels are masked.</span>
+<span class="sd">    filter_size : scalar or tuple</span>
+<span class="sd">        Adjust the median filter size by giving the number of columns and rows.</span>
+<span class="sd">        The higher the value the more the background is smoothed and more</span>
+<span class="sd">        pixels are masked.</span>
+<span class="sd">    dut_name : string</span>
+<span class="sd">        Name of the DUT. If None, file name of the hit table will be printed.</span>
+<span class="sd">    plot : bool</span>
+<span class="sd">        If True, create additional output plots.</span>
+<span class="sd">    chunk_size : int</span>
+<span class="sd">        Chunk size of the data when reading from file.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Generating </span><span class="si">%s</span><span class="s1"> for </span><span class="si">%s</span><span class="s1"> ===&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;[A-Z][^A-Z]*&#39;</span><span class="p">,</span> <span class="n">pixel_mask_name</span><span class="p">)),</span> <span class="n">input_hits_file</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_mask_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">output_mask_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;[A-Z][^A-Z]*&#39;</span><span class="p">,</span> <span class="n">pixel_mask_name</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39;.h5&#39;</span>
+
+    <span class="n">occupancy</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># Calculating occupancy array</span>
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_file_h5</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">hits</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">data_aligned_at_events</span><span class="p">(</span><span class="n">input_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Hits</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
+            <span class="n">col</span><span class="p">,</span> <span class="n">row</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="s1">&#39;column&#39;</span><span class="p">],</span> <span class="n">hits</span><span class="p">[</span><span class="s1">&#39;row&#39;</span><span class="p">]</span>
+            <span class="n">chunk_occ</span> <span class="o">=</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">hist_2d_index</span><span class="p">(</span><span class="n">col</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">row</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="n">n_pixel</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">occupancy</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">occupancy</span> <span class="o">=</span> <span class="n">chunk_occ</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">occupancy</span> <span class="o">=</span> <span class="n">occupancy</span> <span class="o">+</span> <span class="n">chunk_occ</span>
+
+    <span class="c1"># Run median filter across data, assuming 0 filling past the edges to get expected occupancy</span>
+    <span class="n">blurred</span> <span class="o">=</span> <span class="n">median_filter</span><span class="p">(</span><span class="n">occupancy</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">filter_size</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="n">cval</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="c1"># Spot noisy pixels maxima by substracting expected occupancy</span>
+    <span class="n">difference</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">masked_array</span><span class="p">(</span><span class="n">occupancy</span> <span class="o">-</span> <span class="n">blurred</span><span class="p">)</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">difference</span><span class="p">)</span>
+    <span class="n">abs_occ_threshold</span> <span class="o">=</span> <span class="n">threshold</span> <span class="o">*</span> <span class="n">std</span>
+    <span class="n">occupancy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">masked_where</span><span class="p">(</span><span class="n">difference</span> <span class="o">&gt;</span> <span class="n">abs_occ_threshold</span><span class="p">,</span> <span class="n">occupancy</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Masked </span><span class="si">%d</span><span class="s1"> pixels at threshold </span><span class="si">%.1f</span><span class="s1"> in </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">count_masked</span><span class="p">(</span><span class="n">occupancy</span><span class="p">),</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">input_hits_file</span><span class="p">)</span>
+    <span class="c1"># Generate tuple col / row array of hot pixels, do not use getmask()</span>
+    <span class="n">pixel_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">getmaskarray</span><span class="p">(</span><span class="n">occupancy</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_mask_file</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_file_h5</span><span class="p">:</span>
+        <span class="c1"># Create occupancy array without masking pixels</span>
+        <span class="n">occupancy_array_table</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;HistOcc&#39;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Occupancy Histogram&#39;</span><span class="p">,</span> <span class="n">atom</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Atom</span><span class="o">.</span><span class="n">from_dtype</span><span class="p">(</span><span class="n">occupancy</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="n">shape</span><span class="o">=</span><span class="n">occupancy</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+        <span class="n">occupancy_array_table</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="n">occupancy</span><span class="p">)</span>
+
+        <span class="c1"># Create masked pixels array</span>
+        <span class="n">masked_pixel_table</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">pixel_mask_name</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Pixel Mask&#39;</span><span class="p">,</span> <span class="n">atom</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Atom</span><span class="o">.</span><span class="n">from_dtype</span><span class="p">(</span><span class="n">pixel_mask</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="n">shape</span><span class="o">=</span><span class="n">pixel_mask</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+        <span class="n">masked_pixel_table</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">pixel_mask</span>
+
+    <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+        <span class="n">plot_masked_pixels</span><span class="p">(</span><span class="n">input_mask_file</span><span class="o">=</span><span class="n">output_mask_file</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">=</span><span class="n">pixel_size</span><span class="p">,</span> <span class="n">dut_name</span><span class="o">=</span><span class="n">dut_name</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output_mask_file</span>
+
+
+<div class="viewcode-block" id="cluster_hits"><a class="viewcode-back" href="../../hit_analysis.html#testbeam_analysis.hit_analysis.cluster_hits">[docs]</a><span class="k">def</span> <span class="nf">cluster_hits</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="n">output_cluster_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">create_cluster_hits_table</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">input_disabled_pixel_mask_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">input_noisy_pixel_mask_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_hit_charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_hit_charge</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">column_cluster_distance</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">row_cluster_distance</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">frame_cluster_distance</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dut_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Clusters the hits in the data file containing the hit table.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_hits_file : string</span>
+<span class="sd">        Filename of the input hits file.</span>
+<span class="sd">    output_cluster_file : string</span>
+<span class="sd">        Filename of the output cluster file. If None, the filename will be derived from the input hits file.</span>
+<span class="sd">    create_cluster_hits_table : bool</span>
+<span class="sd">        If True, additionally create cluster hits table.</span>
+<span class="sd">    input_disabled_pixel_mask_file : string</span>
+<span class="sd">        Filename of the input disabled mask file.</span>
+<span class="sd">    input_noisy_pixel_mask_file : string</span>
+<span class="sd">        Filename of the input disabled mask file.</span>
+<span class="sd">    min_hit_charge : uint</span>
+<span class="sd">        Minimum hit charge. Minimum possible hit charge must be given in order to correcly calculate the cluster coordinates.</span>
+<span class="sd">    max_hit_charge : uint</span>
+<span class="sd">        Maximum hit charge. Hits wit charge above the limit will be ignored.</span>
+<span class="sd">    column_cluster_distance : uint</span>
+<span class="sd">        Maximum column distance between hist so that they are assigned to the same cluster. Value of 0 effectively disables the clusterizer in column direction.</span>
+<span class="sd">    row_cluster_distance : uint</span>
+<span class="sd">        Maximum row distance between hist so that they are assigned to the same cluster. Value of 0 effectively disables the clusterizer in row direction.</span>
+<span class="sd">    frame_cluster_distance : uint</span>
+<span class="sd">        Sometimes an event has additional timing information (e.g. bunch crossing ID, frame ID). Value of 0 effectively disables the clusterization in time.</span>
+<span class="sd">    dut_name : string</span>
+<span class="sd">        Name of the DUT. If None, filename of the output cluster file will be used.</span>
+<span class="sd">    plot : bool</span>
+<span class="sd">        If True, create additional output plots.</span>
+<span class="sd">    chunk_size : int</span>
+<span class="sd">        Chunk size of the data when reading from file.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Clustering hits in </span><span class="si">%s</span><span class="s1"> ===&#39;</span><span class="p">,</span> <span class="n">input_hits_file</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_cluster_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">output_cluster_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_clustered.h5&#39;</span>
+
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_file_h5</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output_file_h5</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">input_disabled_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_disabled_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
+                     <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+                     <span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="o">.</span><span class="n">_f_copy</span><span class="p">(</span><span class="n">newparent</span><span class="o">=</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">input_noisy_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_noisy_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
+                     <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+                     <span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="o">.</span><span class="n">_f_copy</span><span class="p">(</span><span class="n">newparent</span><span class="o">=</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="n">clusterizer</span> <span class="o">=</span> <span class="n">HitClusterizer</span><span class="p">(</span><span class="n">column_cluster_distance</span><span class="o">=</span><span class="n">column_cluster_distance</span><span class="p">,</span> <span class="n">row_cluster_distance</span><span class="o">=</span><span class="n">row_cluster_distance</span><span class="p">,</span> <span class="n">frame_cluster_distance</span><span class="o">=</span><span class="n">frame_cluster_distance</span><span class="p">,</span> <span class="n">min_hit_charge</span><span class="o">=</span><span class="n">min_hit_charge</span><span class="p">,</span> <span class="n">max_hit_charge</span><span class="o">=</span><span class="n">max_hit_charge</span><span class="p">)</span>
+            <span class="n">cluster_hits_table</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">cluster_table</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">hits</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">data_aligned_at_events</span><span class="p">(</span><span class="n">input_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Hits</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">hits</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;The event number does not always increase. The hits cannot be used like this!&#39;</span><span class="p">)</span>
+                <span class="n">cluster_hits</span><span class="p">,</span> <span class="n">clusters</span> <span class="o">=</span> <span class="n">clusterizer</span><span class="o">.</span><span class="n">cluster_hits</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="n">noisy_pixels</span><span class="o">=</span><span class="n">noisy_pixels</span><span class="p">,</span> <span class="n">disabled_pixels</span><span class="o">=</span><span class="n">disabled_pixels</span><span class="p">)</span>  <span class="c1"># Cluster hits</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">clusters</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">])</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;The event number does not always increase. The cluster cannot be used like this!&#39;</span><span class="p">)</span>
+                <span class="c1"># create cluster hits table dynamically</span>
+                <span class="k">if</span> <span class="n">create_cluster_hits_table</span> <span class="ow">and</span> <span class="n">cluster_hits_table</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cluster_hits_table</span> <span class="o">=</span> <span class="n">output_file_h5</span><span class="o">.</span><span class="n">create_table</span><span class="p">(</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ClusterHits&#39;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">cluster_hits</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Cluster hits table&#39;</span><span class="p">,</span> <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+                <span class="c1"># create cluster table dynamically</span>
+                <span class="k">if</span> <span class="n">cluster_table</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cluster_table</span> <span class="o">=</span> <span class="n">output_file_h5</span><span class="o">.</span><span class="n">create_table</span><span class="p">(</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Cluster&#39;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">clusters</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Cluster table&#39;</span><span class="p">,</span> <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+
+                <span class="k">if</span> <span class="n">create_cluster_hits_table</span><span class="p">:</span>
+                    <span class="n">cluster_hits_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cluster_hits</span><span class="p">)</span>
+                <span class="n">cluster_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">clusters</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+        <span class="n">plot_cluster_size</span><span class="p">(</span><span class="n">input_cluster_file</span><span class="o">=</span><span class="n">output_cluster_file</span><span class="p">,</span> <span class="n">dut_name</span><span class="o">=</span><span class="n">dut_name</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output_cluster_file</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, David-Leon Pohl.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Other Versions</span>
+        v: development
+        <span class="fa fa-caret-down"></span>
+    </span>
+    <div class="rst-other-versions">
+        <dl>
+            <dt>Tags</dt>
+            <dd><a href="../../0.0.1/index.html">0.0.1</a></dd>
+        </dl>
+        <dl>
+            <dt>Branches</dt>
+            <dd><a href="../../development/_modules/testbeam_analysis/hit_analysis.html">development</a></dd>
+            <dd><a href="../../master/index.html">master</a></dd>
+        </dl>
+    </div>
+</div>
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

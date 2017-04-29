@@ -1,0 +1,944 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>testbeam_analysis.track_analysis &mdash; Testbeam Analysis 0.0.1 documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../../_static/silab.ico"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="stylesheet" href="../../_static/banner.css" type="text/css" />
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="Testbeam Analysis 0.0.1 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Testbeam Analysis
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../TBA.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../Examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../API.html">API</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">Testbeam Analysis</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>testbeam_analysis.track_analysis</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  
+
+
+    
+    
+
+
+
+    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
+<h1>Source code for testbeam_analysis.track_analysis</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39; Track finding and fitting functions are listed here.&#39;&#39;&#39;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="k">import</span> <span class="n">Pool</span><span class="p">,</span> <span class="n">cpu_count</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="k">import</span> <span class="n">sqrt</span>
+<span class="kn">import</span> <span class="nn">progressbar</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">Iterable</span>
+
+<span class="kn">import</span> <span class="nn">tables</span> <span class="k">as</span> <span class="nn">tb</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numba</span> <span class="k">import</span> <span class="n">njit</span>
+<span class="kn">from</span> <span class="nn">matplotlib.backends.backend_pdf</span> <span class="k">import</span> <span class="n">PdfPages</span>
+
+<span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">plot_utils</span>
+<span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">analysis_utils</span>
+<span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">geometry_utils</span>
+
+
+<div class="viewcode-block" id="find_tracks"><a class="viewcode-back" href="../../track_analysis.html#testbeam_analysis.track_analysis.find_tracks">[docs]</a><span class="k">def</span> <span class="nf">find_tracks</span><span class="p">(</span><span class="n">input_tracklets_file</span><span class="p">,</span> <span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">output_track_candidates_file</span><span class="p">,</span> <span class="n">min_cluster_distance</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Takes first DUT track hit and tries to find matching hits in subsequent DUTs.</span>
+<span class="sd">    The output is the same array with resorted hits into tracks. A track quality is set to</span>
+<span class="sd">    be able to cut on good (less scattered) tracks.</span>
+<span class="sd">    This function is uses numba to increase the speed on the inner loop (_find_tracks_loop()).</span>
+
+<span class="sd">    This function can also be called on TrackCandidates arrays. That is usefull if an additional alignment step</span>
+<span class="sd">    was done and the track finding has to be repeated.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_tracklets_file : string</span>
+<span class="sd">        Input file name with merged cluster hit table from all DUTs (tracklets file)</span>
+<span class="sd">        Or track candidates file.</span>
+<span class="sd">    input_alignment_file : string</span>
+<span class="sd">        File containing the alignment information</span>
+<span class="sd">    output_track_candidates_file : string</span>
+<span class="sd">        Output file name for track candidate array</span>
+<span class="sd">    min_cluster_distance : iterable, boolean</span>
+<span class="sd">        A minimum distance all track cluster have to be apart, otherwise the complete event is flagged to have merged tracks (n_tracks = -1).</span>
+<span class="sd">        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is not implemented and error prone.</span>
+<span class="sd">        If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.</span>
+<span class="sd">        e.g.: For two devices: min_cluster_distance = (50, 250)</span>
+<span class="sd">        If false the cluster distance is not considered.</span>
+<span class="sd">        The events where any plane does have hits &lt; min_cluster_distance is flagged with n_tracks = -1</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Finding tracks ===&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Get alignment errors from file</span>
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">in_file_h5</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">tb</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NoSuchNodeError</span>  <span class="c1"># FIXME: sigma is to small after alignment, track finding with tracks instead of correlation needed</span>
+            <span class="n">correlations</span> <span class="o">=</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Alignment</span><span class="p">[:]</span>
+            <span class="n">n_duts</span> <span class="o">=</span> <span class="n">correlations</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Taking correlation cut values from alignment&#39;</span><span class="p">)</span>
+            <span class="n">column_sigma</span> <span class="o">=</span> <span class="n">correlations</span><span class="p">[</span><span class="s1">&#39;correlation_x&#39;</span><span class="p">]</span>
+            <span class="n">row_sigma</span> <span class="o">=</span> <span class="n">correlations</span><span class="p">[</span><span class="s1">&#39;correlation_y&#39;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="n">tb</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NoSuchNodeError</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Taking correlation cut values from pre-alignment&#39;</span><span class="p">)</span>
+            <span class="n">correlations</span> <span class="o">=</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">PreAlignment</span><span class="p">[:]</span>
+            <span class="n">n_duts</span> <span class="o">=</span> <span class="n">correlations</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">min_cluster_distance</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">min_cluster_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mf">200.</span><span class="p">)]</span> <span class="o">*</span> <span class="n">n_duts</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">min_cluster_distance</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                <span class="n">min_cluster_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_duts</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">min_cluster_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">min_cluster_distance</span><span class="p">)</span>
+            <span class="n">column_sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">n_duts</span><span class="p">)</span>
+            <span class="n">row_sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">n_duts</span><span class="p">)</span>
+            <span class="n">column_sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">row_sigma</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span>  <span class="c1"># DUT0 has no correlation error</span>
+            <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_duts</span><span class="p">):</span>
+                <span class="n">column_sigma</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">correlations</span><span class="p">[</span><span class="n">index</span><span class="p">][</span><span class="s1">&#39;column_sigma&#39;</span><span class="p">]</span>
+                <span class="n">row_sigma</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">correlations</span><span class="p">[</span><span class="n">index</span><span class="p">][</span><span class="s1">&#39;row_sigma&#39;</span><span class="p">]</span>
+
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_tracklets_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">in_file_h5</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>  <span class="c1"># First try:  normal tracklets assumed</span>
+            <span class="n">tracklets_node</span> <span class="o">=</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Tracklets</span>
+        <span class="k">except</span> <span class="n">tb</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NoSuchNodeError</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>  <span class="c1"># Second try: normal track candidates assumed</span>
+                <span class="n">tracklets_node</span> <span class="o">=</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">TrackCandidates</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Additional find track run on track candidates file </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">input_tracklets_file</span><span class="p">)</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Output file with new track candidates file </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">output_track_candidates_file</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">tb</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NoSuchNodeError</span><span class="p">:</span>  <span class="c1"># Last try: not used yet</span>
+                <span class="k">raise</span>
+        <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_track_candidates_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_file_h5</span><span class="p">:</span>
+            <span class="n">track_candidates</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_table</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;TrackCandidates&#39;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">tracklets_node</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Track candidates&#39;</span><span class="p">,</span> <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+
+            <span class="n">progress_bar</span> <span class="o">=</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">ProgressBar</span><span class="p">(</span><span class="n">widgets</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Percentage</span><span class="p">(),</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="s1">&#39;|&#39;</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="s1">&#39;|&#39;</span><span class="p">),</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">AdaptiveETA</span><span class="p">()],</span> <span class="n">maxval</span><span class="o">=</span><span class="n">tracklets_node</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">term_width</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+            <span class="n">progress_bar</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+            <span class="k">for</span> <span class="n">tracklets_data_chunk</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">data_aligned_at_events</span><span class="p">(</span><span class="n">tracklets_node</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
+                <span class="c1"># Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data</span>
+                <span class="c1"># This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format</span>
+                <span class="n">tr_x</span> <span class="o">=</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;x_dut_0&#39;</span><span class="p">]</span>
+                <span class="n">tr_y</span> <span class="o">=</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;y_dut_0&#39;</span><span class="p">]</span>
+                <span class="n">tr_z</span> <span class="o">=</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;z_dut_0&#39;</span><span class="p">]</span>
+                <span class="n">tr_charge</span> <span class="o">=</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;charge_dut_0&#39;</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">dut_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_duts</span><span class="p">):</span>
+                    <span class="n">tr_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">tr_x</span><span class="p">,</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;x_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_index</span><span class="p">)]))</span>
+                    <span class="n">tr_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">tr_y</span><span class="p">,</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;y_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_index</span><span class="p">)]))</span>
+                    <span class="n">tr_z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">tr_z</span><span class="p">,</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;z_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_index</span><span class="p">)]))</span>
+                    <span class="n">tr_charge</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">tr_charge</span><span class="p">,</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;charge_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_index</span><span class="p">)]))</span>
+
+                <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">tracklets_data_chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># If find tracks is called on already found tracks the track quality has to be reset</span>
+
+                <span class="c1"># Perform the track finding with jitted loop</span>
+                <span class="n">_find_tracks_loop</span><span class="p">(</span><span class="n">tracklets_data_chunk</span><span class="p">,</span> <span class="n">tr_x</span><span class="p">,</span> <span class="n">tr_y</span><span class="p">,</span> <span class="n">tr_z</span><span class="p">,</span> <span class="n">tr_charge</span><span class="p">,</span> <span class="n">column_sigma</span><span class="p">,</span> <span class="n">row_sigma</span><span class="p">,</span> <span class="n">min_cluster_distance</span><span class="p">)</span>
+
+                <span class="c1"># Merge result data from arrays into one recarray</span>
+                <span class="n">combined</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">],</span> <span class="n">tr_x</span><span class="p">,</span> <span class="n">tr_y</span><span class="p">,</span> <span class="n">tr_z</span><span class="p">,</span> <span class="n">tr_charge</span><span class="p">,</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">],</span> <span class="n">tracklets_data_chunk</span><span class="p">[</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]))</span>
+                <span class="n">combined</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">records</span><span class="o">.</span><span class="n">fromarrays</span><span class="p">(</span><span class="n">combined</span><span class="o">.</span><span class="n">transpose</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">tracklets_data_chunk</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+                <span class="n">track_candidates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">combined</span><span class="p">)</span>
+                <span class="n">progress_bar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+            <span class="n">progress_bar</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="fit_tracks"><a class="viewcode-back" href="../../track_analysis.html#testbeam_analysis.track_analysis.fit_tracks">[docs]</a><span class="k">def</span> <span class="nf">fit_tracks</span><span class="p">(</span><span class="n">input_track_candidates_file</span><span class="p">,</span> <span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">output_tracks_file</span><span class="p">,</span> <span class="n">fit_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">selection_hit_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">selection_fit_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_dut_hit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">selection_track_quality</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_tracks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_prealignment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_correlated</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">min_track_distance</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.</span>
+<span class="sd">    The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_track_candidates_file : string</span>
+<span class="sd">        Filename of the input track candidate file.</span>
+<span class="sd">    input_alignment_file : string</span>
+<span class="sd">        Filename of the input alignment file.</span>
+<span class="sd">    output_tracks_file : string</span>
+<span class="sd">        Filename of the output tracks file.</span>
+<span class="sd">    fit_duts : iterable</span>
+<span class="sd">        Specify DUTs for which tracks will be fitted. A track table will be generated for each fit DUT.</span>
+<span class="sd">        If None, all existing DUTs are used.</span>
+<span class="sd">    selection_hit_duts : iterable, or iterable of iterable</span>
+<span class="sd">        The duts that are required to have a hit with the given track quality. Otherwise the track is omitted.</span>
+<span class="sd">        If None: require all DUTs to have a hit, but if exclude_dut_hit = True do not use actual fit_dut.</span>
+<span class="sd">        If iterable: use selection for all devices, e.g.: Require hit in DUT 0, and 3: selection_hit_duts = (0, 3).</span>
+<span class="sd">        If iterable of iterable: define dut with hits for all devices seperately,</span>
+<span class="sd">        e.g. for 3 devices: selection_hit_duts = ((1, 2), (0, 1, 2), (0, 1))</span>
+<span class="sd">    selection_fit_duts : iterable, or iterable of iterable or None</span>
+<span class="sd">        If None, selection_hit_duts are used for fitting.</span>
+<span class="sd">        Cannot define DUTs that are not in selection_hit_duts,</span>
+<span class="sd">        e.g. require hits in DUT0, DUT1, DUT3, DUT4 but do not use DUT3 in the fit:</span>
+<span class="sd">        selection_hit_duts = (0, 1, 3, 4)</span>
+<span class="sd">        selection_fit_duts = (0, 1, 4)</span>
+<span class="sd">    exclude_dut_hit: bool</span>
+<span class="sd">        Set to not require a hit in the actual fit DUT (e.g.: for unconstrained residuals).</span>
+<span class="sd">        False: Just use all devices as specified in selection_hit_duts.</span>
+<span class="sd">        True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts.</span>
+<span class="sd">    max_tracks : uint</span>
+<span class="sd">        Take only events with tracks &lt;= max_tracks. If None, take any event.</span>
+<span class="sd">    selection_track_quality : uint, iterable</span>
+<span class="sd">        One number valid for all DUTs or an iterable with a number for each DUT.</span>
+<span class="sd">        0: All tracks with hits in DUT and references are taken</span>
+<span class="sd">        1: The track hits in DUT and reference are within 2-sigma of the correlation</span>
+<span class="sd">        2: The track hits in DUT and reference are within 1-sigma of the correlation</span>
+<span class="sd">        Track quality is saved for each DUT as boolean in binary representation. 8-bit integer for each &#39;quality stage&#39;, one digit per DUT.</span>
+<span class="sd">        E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.</span>
+<span class="sd">    pixel_size : iterable of tuples</span>
+<span class="sd">        One tuple per DUT describing the pixel dimension (column/row),</span>
+<span class="sd">        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].</span>
+<span class="sd">    use_correlated : bool</span>
+<span class="sd">        Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.</span>
+<span class="sd">    min_track_distance : iterable, boolean</span>
+<span class="sd">        A minimum distance all track intersection at the DUT have to be apart, otherwise these tracks are deleted.</span>
+<span class="sd">        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone and will not be implemented.</span>
+<span class="sd">        If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.</span>
+<span class="sd">        e.g.: For two devices: min_track_distance = (50, 250)</span>
+<span class="sd">        If False, the minimum track distance is not considered.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Fitting tracks ===&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Load alignment data</span>
+    <span class="n">use_prealignment</span> <span class="o">=</span> <span class="kc">True</span> <span class="k">if</span> <span class="n">force_prealignment</span> <span class="k">else</span> <span class="kc">False</span>
+
+    <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">in_file_h5</span><span class="p">:</span>  <span class="c1"># Open file with alignment data</span>
+        <span class="k">if</span> <span class="n">use_prealignment</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Use pre-alignment data&#39;</span><span class="p">)</span>
+            <span class="n">prealignment</span> <span class="o">=</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">PreAlignment</span><span class="p">[:]</span>
+            <span class="n">n_duts</span> <span class="o">=</span> <span class="n">prealignment</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Use alignment data&#39;</span><span class="p">)</span>
+            <span class="n">alignment</span> <span class="o">=</span> <span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Alignment</span><span class="p">[:]</span>
+            <span class="n">n_duts</span> <span class="o">=</span> <span class="n">alignment</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">fit_duts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">fit_duts</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">)</span>  <span class="c1"># standard setting: fit tracks for all DUTs</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="n">fit_duts</span> <span class="o">=</span> <span class="p">[</span><span class="n">fit_duts</span><span class="p">]</span>
+    <span class="c1"># Check for duplicates</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;found douplicate in fit_duts&quot;</span><span class="p">)</span>
+    <span class="c1"># Check if any iterable in iterable</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">fit_duts</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;item in fit_duts is iterable&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create track, hit selection</span>
+    <span class="k">if</span> <span class="n">selection_hit_duts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># If None: use all DUTs</span>
+        <span class="n">selection_hit_duts</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">)</span>
+    <span class="c1"># Check iterable and length</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">selection_hit_duts</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_hit_duts is no iterable&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">selection_hit_duts</span><span class="p">:</span>  <span class="c1"># empty iterable</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_hit_duts has no items&quot;</span><span class="p">)</span>
+    <span class="c1"># Check if only non-iterable in iterable</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">selection_hit_duts</span><span class="p">)):</span>
+        <span class="n">selection_hit_duts</span> <span class="o">=</span> <span class="p">[</span><span class="n">selection_hit_duts</span><span class="p">[:]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fit_duts</span><span class="p">]</span>
+    <span class="c1"># Check if only iterable in iterable</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">selection_hit_duts</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;not all items in selection_hit_duts are iterable&quot;</span><span class="p">)</span>
+    <span class="c1"># Finally check length of all arrays</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">selection_hit_duts</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">):</span>  <span class="c1"># empty iterable</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_hit_duts has the wrong length&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">hit_dut</span> <span class="ow">in</span> <span class="n">selection_hit_duts</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hit_dut</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># check the length of the items</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;item in selection_hit_duts has length &lt; 2&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create track, hit selection</span>
+    <span class="k">if</span> <span class="n">selection_fit_duts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># If None: use all DUTs</span>
+        <span class="n">selection_fit_duts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># copy each item</span>
+        <span class="k">for</span> <span class="n">hit_duts</span> <span class="ow">in</span> <span class="n">selection_hit_duts</span><span class="p">:</span>
+            <span class="n">selection_fit_duts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hit_duts</span><span class="p">[:])</span>  <span class="c1"># require a hit for each fit DUT</span>
+    <span class="c1"># Check iterable and length</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">selection_fit_duts</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_fit_duts is no iterable&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">selection_fit_duts</span><span class="p">:</span>  <span class="c1"># empty iterable</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_fit_duts has no items&quot;</span><span class="p">)</span>
+    <span class="c1"># Check if only non-iterable in iterable</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">selection_fit_duts</span><span class="p">)):</span>
+        <span class="n">selection_fit_duts</span> <span class="o">=</span> <span class="p">[</span><span class="n">selection_fit_duts</span><span class="p">[:]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fit_duts</span><span class="p">]</span>
+    <span class="c1"># Check if only iterable in iterable</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">selection_fit_duts</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;not all items in selection_fit_duts are iterable&quot;</span><span class="p">)</span>
+    <span class="c1"># Finally check length of all arrays</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">selection_fit_duts</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">):</span>  <span class="c1"># empty iterable</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_fit_duts has the wrong length&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">fit_dut</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">selection_fit_duts</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_dut</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># check the length of the items</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;item in selection_fit_duts has length &lt; 2&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">fit_dut</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">selection_hit_duts</span><span class="p">[</span><span class="n">index</span><span class="p">]):</span>  <span class="c1"># fit DUTs are required to have a hit</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;DUT in selection_fit_duts is not in selection_hit_duts&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create track, hit selection</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">selection_track_quality</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>  <span class="c1"># all items the same, special case for selection_track_quality</span>
+        <span class="n">selection_track_quality</span> <span class="o">=</span> <span class="p">[[</span><span class="n">selection_track_quality</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">hit_duts</span><span class="p">)</span> <span class="k">for</span> <span class="n">hit_duts</span> <span class="ow">in</span> <span class="n">selection_hit_duts</span><span class="p">]</span>  <span class="c1"># every hit DUTs require a track quality value</span>
+    <span class="c1"># Check iterable and length</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">selection_track_quality</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_track_quality is no iterable&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">selection_track_quality</span><span class="p">:</span>  <span class="c1"># empty iterable</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_track_quality has no items&quot;</span><span class="p">)</span>
+    <span class="c1"># Check if only non-iterable in iterable</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">selection_track_quality</span><span class="p">)):</span>
+        <span class="n">selection_track_quality</span> <span class="o">=</span> <span class="p">[</span><span class="n">selection_track_quality</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fit_duts</span><span class="p">]</span>
+    <span class="c1"># Check if only iterable in iterable</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">val</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">),</span> <span class="n">selection_track_quality</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;not all items in selection_track_quality are iterable&quot;</span><span class="p">)</span>
+    <span class="c1"># Finally check length of all arrays</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">selection_track_quality</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">):</span>  <span class="c1"># empty iterable</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;selection_track_quality has the wrong length&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">track_quality</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">selection_track_quality</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">track_quality</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">selection_hit_duts</span><span class="p">[</span><span class="n">index</span><span class="p">]):</span>  <span class="c1"># check the length of each items</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;item in selection_track_quality and selection_hit_duts does not have the same length&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Special mode: use all DUTs in the fit and the selections are all the same --&gt; the data does only have to be fitted once</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">exclude_dut_hit</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">selection_hit_duts</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">selection_hit_duts</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">selection_fit_duts</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">selection_fit_duts</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="nb">list</span><span class="p">(</span><span class="n">selection_track_quality</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">selection_track_quality</span><span class="p">):</span>
+        <span class="n">same_tracks_for_all_duts</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;All fit DUTs uses the same parameters, generate single output table&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">same_tracks_for_all_duts</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">create_results_array</span><span class="p">(</span><span class="n">good_track_candidates</span><span class="p">,</span> <span class="n">slopes</span><span class="p">,</span> <span class="n">offsets</span><span class="p">,</span> <span class="n">chi2s</span><span class="p">,</span> <span class="n">n_duts</span><span class="p">):</span>
+        <span class="c1"># Define description</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;event_number&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>
+            <span class="n">description</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;x_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>
+            <span class="n">description</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;y_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>
+            <span class="n">description</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;z_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>
+            <span class="n">description</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;charge_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="n">description</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;offset_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="n">description</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s1">&#39;slope_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+        <span class="n">description</span><span class="o">.</span><span class="n">extend</span><span class="p">([(</span><span class="s1">&#39;track_chi2&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;track_quality&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)])</span>
+
+        <span class="c1"># Define structure of track_array</span>
+        <span class="n">tracks_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_tracks</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">description</span><span class="p">)</span>
+        <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span>
+        <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span>
+        <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>
+            <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;x_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;x_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span>
+            <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;y_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;y_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span>
+            <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;z_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;z_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span>
+            <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;charge_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;charge_dut_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;offset_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dimension</span><span class="p">]</span> <span class="o">=</span> <span class="n">offsets</span><span class="p">[:,</span> <span class="n">dimension</span><span class="p">]</span>
+            <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;slope_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dimension</span><span class="p">]</span> <span class="o">=</span> <span class="n">slopes</span><span class="p">[:,</span> <span class="n">dimension</span><span class="p">]</span>
+        <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;track_chi2&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">chi2s</span>
+
+        <span class="k">return</span> <span class="n">tracks_array</span>
+
+    <span class="k">def</span> <span class="nf">store_track_data</span><span class="p">(</span><span class="n">fit_dut</span><span class="p">,</span> <span class="n">min_track_distance</span><span class="p">):</span>  <span class="c1"># Set the offset to the track intersection with the tilted plane and store the data</span>
+        <span class="k">if</span> <span class="n">use_prealignment</span><span class="p">:</span>  <span class="c1"># Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)</span>
+            <span class="n">dut_position</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="n">prealignment</span><span class="p">[</span><span class="s1">&#39;z&#39;</span><span class="p">][</span><span class="n">fit_dut</span><span class="p">]])</span>
+            <span class="n">dut_plane_normal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)</span>
+            <span class="n">dut_position</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">alignment</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">][</span><span class="s1">&#39;translation_x&#39;</span><span class="p">],</span> <span class="n">alignment</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">][</span><span class="s1">&#39;translation_y&#39;</span><span class="p">],</span> <span class="n">alignment</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">][</span><span class="s1">&#39;translation_z&#39;</span><span class="p">]])</span>
+            <span class="n">rotation_matrix</span> <span class="o">=</span> <span class="n">geometry_utils</span><span class="o">.</span><span class="n">rotation_matrix</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="n">alignment</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">][</span><span class="s1">&#39;alpha&#39;</span><span class="p">],</span>
+                                                             <span class="n">beta</span><span class="o">=</span><span class="n">alignment</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">][</span><span class="s1">&#39;beta&#39;</span><span class="p">],</span>
+                                                             <span class="n">gamma</span><span class="o">=</span><span class="n">alignment</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">][</span><span class="s1">&#39;gamma&#39;</span><span class="p">])</span>
+            <span class="n">basis_global</span> <span class="o">=</span> <span class="n">rotation_matrix</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>  <span class="c1"># TODO: why transposed?</span>
+            <span class="n">dut_plane_normal</span> <span class="o">=</span> <span class="n">basis_global</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+        <span class="c1"># Set the offset to the track intersection with the tilted plane</span>
+        <span class="n">actual_offsets</span> <span class="o">=</span> <span class="n">geometry_utils</span><span class="o">.</span><span class="n">get_line_intersections_with_plane</span><span class="p">(</span><span class="n">line_origins</span><span class="o">=</span><span class="n">offsets</span><span class="p">,</span>
+                                                                          <span class="n">line_directions</span><span class="o">=</span><span class="n">slopes</span><span class="p">,</span>
+                                                                          <span class="n">position_plane</span><span class="o">=</span><span class="n">dut_position</span><span class="p">,</span>
+                                                                          <span class="n">normal_plane</span><span class="o">=</span><span class="n">dut_plane_normal</span><span class="p">)</span>
+
+        <span class="n">tracks_array</span> <span class="o">=</span> <span class="n">create_results_array</span><span class="p">(</span><span class="n">good_track_candidates</span><span class="p">,</span> <span class="n">slopes</span><span class="p">,</span> <span class="n">actual_offsets</span><span class="p">,</span> <span class="n">chi2s</span><span class="p">,</span> <span class="n">n_duts</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>  <span class="c1"># Check if table exists already, than append data</span>
+            <span class="n">tracklets_table</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="s1">&#39;/Tracks_DUT_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">fit_dut</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">tb</span><span class="o">.</span><span class="n">NoSuchNodeError</span><span class="p">:</span>  <span class="c1"># Table does not exist, thus create new</span>
+            <span class="n">tracklets_table</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_table</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;Tracks_DUT_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">fit_dut</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">tracks_array</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Tracks fitted for DUT_</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">fit_dut</span><span class="p">,</span> <span class="n">filters</span><span class="o">=</span><span class="n">tb</span><span class="o">.</span><span class="n">Filters</span><span class="p">(</span><span class="n">complib</span><span class="o">=</span><span class="s1">&#39;blosc&#39;</span><span class="p">,</span> <span class="n">complevel</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">fletcher32</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+
+        <span class="c1"># Remove tracks that are too close when extrapolated to the actual DUT</span>
+        <span class="c1"># All merged track are signaled by n_tracks = -1</span>
+        <span class="n">actual_min_track_distance</span> <span class="o">=</span> <span class="n">min_track_distance</span><span class="p">[</span><span class="n">fit_dut</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">actual_min_track_distance</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">_find_merged_tracks</span><span class="p">(</span><span class="n">tracks_array</span><span class="p">,</span> <span class="n">actual_min_track_distance</span><span class="p">)</span>
+            <span class="n">selection</span> <span class="o">=</span> <span class="n">tracks_array</span><span class="p">[</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Removed </span><span class="si">%d</span><span class="s1"> merged tracks (</span><span class="si">%1.1f%%</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="o">~</span><span class="n">selection</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="o">~</span><span class="n">selection</span><span class="p">))</span> <span class="o">/</span> <span class="n">selection</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="mf">100.</span><span class="p">)</span>
+            <span class="n">tracks_array</span> <span class="o">=</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">selection</span><span class="p">]</span>
+
+        <span class="n">tracklets_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tracks_array</span><span class="p">)</span>
+
+        <span class="c1"># Plot chi2 distribution</span>
+        <span class="n">plot_utils</span><span class="o">.</span><span class="n">plot_track_chi2</span><span class="p">(</span><span class="n">chi2s</span><span class="o">=</span><span class="n">chi2s</span><span class="p">,</span> <span class="n">fit_dut</span><span class="o">=</span><span class="n">fit_dut</span><span class="p">,</span> <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">select_data</span><span class="p">(</span><span class="n">dut_index</span><span class="p">):</span>  <span class="c1"># Select track by and DUT hits to use</span>
+
+        <span class="n">dut_selection</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># DUTs to be used in the fit</span>
+        <span class="n">dut_fit_selection</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># DUT to use in fit</span>
+        <span class="n">info_str_hit</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># For info output</span>
+        <span class="n">info_str_fit</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># For info output</span>
+
+        <span class="k">for</span> <span class="n">hit_dut</span> <span class="ow">in</span> <span class="n">selection_hit_duts</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">exclude_dut_hit</span> <span class="ow">and</span> <span class="n">hit_dut</span> <span class="o">==</span> <span class="n">fit_duts</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="n">dut_selection</span> <span class="o">|=</span> <span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">hit_dut</span><span class="p">))</span>
+            <span class="n">info_str_hit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">hit_dut</span><span class="p">)</span>
+        <span class="n">n_slection_duts</span> <span class="o">=</span> <span class="nb">bin</span><span class="p">(</span><span class="n">dut_selection</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Use </span><span class="si">%d</span><span class="s1"> DUTs for track selection: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">n_slection_duts</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">info_str_hit</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">selected_fit_dut</span> <span class="ow">in</span> <span class="n">selection_fit_duts</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">exclude_dut_hit</span> <span class="ow">and</span> <span class="n">selected_fit_dut</span> <span class="o">==</span> <span class="n">fit_duts</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="n">dut_fit_selection</span> <span class="o">|=</span> <span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">selected_fit_dut</span><span class="p">))</span>
+            <span class="n">info_str_fit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">selected_fit_dut</span><span class="p">)</span>
+        <span class="n">n_fit_duts</span> <span class="o">=</span> <span class="nb">bin</span><span class="p">(</span><span class="n">dut_fit_selection</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Use </span><span class="si">%d</span><span class="s2"> DUTs for track fit: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">n_fit_duts</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">info_str_fit</span><span class="p">))</span>
+
+        <span class="n">track_quality_mask</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">quality_index</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">info_quality</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;no hit&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_slection_duts</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">dut</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">selection_hit_duts</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="n">exclude_dut_hit</span> <span class="ow">and</span> <span class="n">dut</span> <span class="o">==</span> <span class="n">fit_duts</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">quality</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">quality</span> <span class="o">&lt;=</span> <span class="n">selection_track_quality</span><span class="p">[</span><span class="n">dut_index</span><span class="p">][</span><span class="n">index</span><span class="p">]:</span>
+                    <span class="n">track_quality_mask</span> <span class="o">|=</span> <span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">dut</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="n">quality</span> <span class="o">*</span> <span class="mi">8</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">quality</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">info_quality</span><span class="p">[</span><span class="n">quality_index</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;only hit&#39;</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">info_quality</span><span class="p">[</span><span class="n">quality_index</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">quality</span><span class="p">)</span>
+            <span class="n">quality_index</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Use track quality for track selection: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">info_quality</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">dut_selection</span><span class="p">,</span> <span class="n">dut_fit_selection</span><span class="p">,</span> <span class="n">track_quality_mask</span><span class="p">,</span> <span class="n">same_tracks_for_all_duts</span>
+
+    <span class="n">pool</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">PdfPages</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_tracks_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.pdf&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output_pdf</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_track_candidates_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">in_file_h5</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>  <span class="c1"># If file exists already delete it first</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">output_tracks_file</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_tracks_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_file_h5</span><span class="p">:</span>  <span class="c1"># Append mode to be able to append to existing tables; file is created here since old file is deleted</span>
+                <span class="k">if</span> <span class="n">min_track_distance</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                    <span class="n">min_track_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="mf">200.</span><span class="p">)]</span> <span class="o">*</span> <span class="n">n_duts</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">min_track_distance</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                    <span class="n">min_track_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_duts</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">min_track_distance</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+                    <span class="n">min_track_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">min_track_distance</span><span class="p">)]</span> <span class="o">*</span> <span class="n">n_duts</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">min_track_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">min_track_distance</span><span class="p">)</span>
+
+                <span class="k">for</span> <span class="n">fit_dut_index</span><span class="p">,</span> <span class="n">actual_fit_dut</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fit_duts</span><span class="p">):</span>  <span class="c1"># Loop over the DUTs where tracks shall be fitted for</span>
+                    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Fit tracks for DUT</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">actual_fit_dut</span><span class="p">)</span>
+                    <span class="n">dut_selection</span><span class="p">,</span> <span class="n">dut_fit_selection</span><span class="p">,</span> <span class="n">track_quality_mask</span><span class="p">,</span> <span class="n">same_tracks_for_all_duts</span> <span class="o">=</span> <span class="n">select_data</span><span class="p">(</span><span class="n">fit_dut_index</span><span class="p">)</span>
+                    <span class="n">n_fit_duts</span> <span class="o">=</span> <span class="nb">bin</span><span class="p">(</span><span class="n">dut_fit_selection</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">n_fit_duts</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Insufficient track hits to do the fit (&lt; 2). Omit DUT</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">actual_fit_dut</span><span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">progress_bar</span> <span class="o">=</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">ProgressBar</span><span class="p">(</span><span class="n">widgets</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Percentage</span><span class="p">(),</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="s1">&#39;|&#39;</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="s1">&#39;|&#39;</span><span class="p">),</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">.</span><span class="n">AdaptiveETA</span><span class="p">()],</span> <span class="n">maxval</span><span class="o">=</span><span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">TrackCandidates</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">term_width</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+                    <span class="n">progress_bar</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+                    <span class="k">for</span> <span class="n">track_candidates_chunk</span><span class="p">,</span> <span class="n">index_candidates</span> <span class="ow">in</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">data_aligned_at_events</span><span class="p">(</span><span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">TrackCandidates</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
+
+                        <span class="c1"># Select tracks based on the dut that are required to have a hit (dut_selection) with a certain quality (track_quality)</span>
+                        <span class="n">n_tracks</span> <span class="o">=</span> <span class="n">track_candidates_chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="n">good_track_selection</span> <span class="o">=</span> <span class="p">(</span><span class="n">track_candidates_chunk</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">track_quality_mask</span><span class="p">)</span> <span class="o">==</span> <span class="n">track_quality_mask</span>
+                        <span class="n">n_tracks_quality</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">good_track_selection</span><span class="p">)</span>
+                        <span class="n">removed_n_tracks_quality</span> <span class="o">=</span> <span class="n">n_tracks</span> <span class="o">-</span> <span class="n">n_tracks_quality</span>
+                        <span class="c1"># remove merged clusters</span>
+                        <span class="n">good_track_selection</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">good_track_selection</span><span class="p">,</span> <span class="n">track_candidates_chunk</span><span class="p">[</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># n_tracks &lt; 0 means merged cluster, omit these to allow valid efficiency calculation</span>
+                        <span class="n">n_tracks_not_merged</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">good_track_selection</span><span class="p">)</span>
+                        <span class="n">removed_n_tracks_merged</span> <span class="o">=</span> <span class="n">n_tracks_quality</span> <span class="o">-</span> <span class="n">n_tracks_not_merged</span>
+
+                        <span class="k">if</span> <span class="n">max_tracks</span><span class="p">:</span>  <span class="c1"># Option to neglect events with too many hits</span>
+                            <span class="n">good_track_selection</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">good_track_selection</span><span class="p">,</span> <span class="n">track_candidates_chunk</span><span class="p">[</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">max_tracks</span><span class="p">)</span>
+                            <span class="n">n_tracks_max_tracks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">good_track_selection</span><span class="p">)</span>
+                            <span class="n">removed_n_tracks_max_tracks</span> <span class="o">=</span> <span class="n">n_tracks_not_merged</span> <span class="o">-</span> <span class="n">n_tracks_max_tracks</span>
+                            <span class="n">removed_n_tracks</span> <span class="o">=</span> <span class="n">removed_n_tracks_quality</span> <span class="o">+</span> <span class="n">removed_n_tracks_merged</span> <span class="o">+</span> <span class="n">removed_n_tracks_max_tracks</span>
+                            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Removed </span><span class="si">%d</span><span class="s1"> of </span><span class="si">%d</span><span class="s1"> (</span><span class="si">%.1f%%</span><span class="s1">) track candidates (quality: </span><span class="si">%d</span><span class="s1"> tracks, merged clusters: </span><span class="si">%d</span><span class="s1"> tracks, max tracks: </span><span class="si">%d</span><span class="s1"> tracks)&#39;</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks</span><span class="p">,</span>
+                                         <span class="n">n_tracks</span><span class="p">,</span>
+                                         <span class="mf">100.0</span> <span class="o">*</span> <span class="n">removed_n_tracks</span> <span class="o">/</span> <span class="n">n_tracks</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks_quality</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks_merged</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks_max_tracks</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">removed_n_tracks</span> <span class="o">=</span> <span class="n">removed_n_tracks_quality</span> <span class="o">+</span> <span class="n">removed_n_tracks_merged</span>
+                            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Removed </span><span class="si">%d</span><span class="s1"> of </span><span class="si">%d</span><span class="s1"> (</span><span class="si">%.1f%%</span><span class="s1">) track candidates (quality: </span><span class="si">%d</span><span class="s1"> tracks, merged clusters: </span><span class="si">%d</span><span class="s1"> tracks)&#39;</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks</span><span class="p">,</span>
+                                         <span class="n">n_tracks</span><span class="p">,</span>
+                                         <span class="mf">100.0</span> <span class="o">*</span> <span class="n">removed_n_tracks</span> <span class="o">/</span> <span class="n">n_tracks</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks_quality</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks_merged</span><span class="p">)</span>
+
+                        <span class="k">if</span> <span class="n">use_correlated</span><span class="p">:</span>  <span class="c1"># Reduce track selection to correlated DUTs only</span>
+                            <span class="n">good_track_selection</span> <span class="o">&amp;=</span> <span class="p">(</span><span class="n">track_candidates_chunk</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">dut_selection</span> <span class="o">&lt;&lt;</span> <span class="mi">24</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="n">dut_selection</span> <span class="o">&lt;&lt;</span> <span class="mi">24</span><span class="p">))</span>
+                            <span class="n">n_tracks_correlated</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">count_nonzero</span><span class="p">(</span><span class="n">good_track_selection</span><span class="p">)</span>
+                            <span class="n">removed_n_tracks_correlated</span> <span class="o">=</span> <span class="n">n_tracks</span> <span class="o">-</span> <span class="n">n_tracks_correlated</span> <span class="o">-</span> <span class="n">removed_n_tracks</span>
+                            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Removed </span><span class="si">%d</span><span class="s1"> of </span><span class="si">%d</span><span class="s1"> (</span><span class="si">%.1f%%</span><span class="s1">) track candidates due to correlated cuts&#39;</span><span class="p">,</span>
+                                         <span class="n">removed_n_tracks_correlated</span><span class="p">,</span>
+                                         <span class="n">n_tracks</span><span class="p">,</span>
+                                         <span class="mf">100.0</span> <span class="o">*</span> <span class="n">removed_n_tracks_correlated</span> <span class="o">/</span> <span class="n">n_tracks</span><span class="p">)</span>
+
+                        <span class="n">good_track_candidates</span> <span class="o">=</span> <span class="n">track_candidates_chunk</span><span class="p">[</span><span class="n">good_track_selection</span><span class="p">]</span>
+
+                        <span class="c1"># Prepare track hits array to be fitted</span>
+                        <span class="n">index</span><span class="p">,</span> <span class="n">n_tracks</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Index of tmp track hits array</span>
+                        <span class="n">track_hits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">n_tracks</span><span class="p">,</span> <span class="n">n_fit_duts</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+
+                        <span class="k">for</span> <span class="n">dut_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_duts</span><span class="p">):</span>  <span class="c1"># Fill index loop of new array</span>
+                            <span class="k">if</span> <span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">dut_fit_selection</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">):</span>  <span class="c1"># True if DUT is used in fit</span>
+                                <span class="n">xyz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;x_dut_</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dut_index</span><span class="p">],</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;y_dut_</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dut_index</span><span class="p">],</span> <span class="n">good_track_candidates</span><span class="p">[</span><span class="s1">&#39;z_dut_</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">dut_index</span><span class="p">]))</span>
+                                <span class="n">track_hits</span><span class="p">[:,</span> <span class="n">index</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">xyz</span>
+                                <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                        <span class="c1"># Split data and fit on all available cores</span>
+                        <span class="n">n_slices</span> <span class="o">=</span> <span class="n">cpu_count</span><span class="p">()</span>
+                        <span class="n">slices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">track_hits</span><span class="p">,</span> <span class="n">n_slices</span><span class="p">)</span>
+                        <span class="n">results</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_fit_tracks_loop</span><span class="p">,</span> <span class="n">slices</span><span class="p">)</span>
+                        <span class="k">del</span> <span class="n">track_hits</span>
+
+                        <span class="c1"># Store results</span>
+                        <span class="n">offsets</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">results</span><span class="p">])</span>  <span class="c1"># Merge offsets from all cores in results</span>
+                        <span class="n">slopes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">results</span><span class="p">])</span>  <span class="c1"># Merge slopes from all cores in results</span>
+                        <span class="n">chi2s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">results</span><span class="p">])</span>  <span class="c1"># Merge chi2 from all cores in results</span>
+
+                        <span class="c1"># Store the data</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">same_tracks_for_all_duts</span><span class="p">:</span>  <span class="c1"># Check if all DUTs were fitted at once</span>
+                            <span class="n">store_track_data</span><span class="p">(</span><span class="n">actual_fit_dut</span><span class="p">,</span> <span class="n">min_track_distance</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="n">dut_index</span> <span class="ow">in</span> <span class="n">fit_duts</span><span class="p">:</span>
+                                <span class="n">store_track_data</span><span class="p">(</span><span class="n">dut_index</span><span class="p">,</span> <span class="n">min_track_distance</span><span class="p">)</span>
+
+                        <span class="n">progress_bar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">index_candidates</span><span class="p">)</span>
+                    <span class="n">progress_bar</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">same_tracks_for_all_duts</span><span class="p">:</span>  <span class="c1"># Stop fit Dut loop since all DUTs were fitted at once</span>
+                        <span class="k">break</span>
+    <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span></div>
+
+
+<span class="c1"># Helper functions that are not meant to be called during analysis</span>
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_set_dut_track_quality</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">dut_index</span><span class="p">,</span> <span class="n">actual_track</span><span class="p">,</span> <span class="n">actual_track_column</span><span class="p">,</span> <span class="n">actual_track_row</span><span class="p">,</span> <span class="n">actual_column_sigma</span><span class="p">,</span> <span class="n">actual_row_sigma</span><span class="p">):</span>
+    <span class="c1"># Set track quality of actual DUT from actual DUT hit</span>
+    <span class="n">column</span><span class="p">,</span> <span class="n">row</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>  <span class="c1"># column = nan is no hit</span>
+        <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>  <span class="c1"># Set track with hit</span>
+        <span class="n">column_distance</span><span class="p">,</span> <span class="n">row_distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">column</span> <span class="o">-</span> <span class="n">actual_track_column</span><span class="p">),</span> <span class="nb">abs</span><span class="p">(</span><span class="n">row</span> <span class="o">-</span> <span class="n">actual_track_row</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">column_distance</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">actual_column_sigma</span> <span class="ow">and</span> <span class="n">row_distance</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">actual_row_sigma</span><span class="p">:</span>  <span class="c1"># High quality track hits</span>
+            <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">65793</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">column_distance</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">actual_column_sigma</span> <span class="ow">and</span> <span class="n">row_distance</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">actual_row_sigma</span><span class="p">:</span>  <span class="c1"># Low quality track hits</span>
+            <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">257</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">&amp;=</span> <span class="p">(</span><span class="o">~</span><span class="p">(</span><span class="mi">65793</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">))</span>  <span class="c1"># Unset track quality</span>
+
+
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_reset_dut_track_quality</span><span class="p">(</span><span class="n">tracklets</span><span class="p">,</span> <span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">dut_index</span><span class="p">,</span> <span class="n">hit_index</span><span class="p">,</span> <span class="n">actual_column_sigma</span><span class="p">,</span> <span class="n">actual_row_sigma</span><span class="p">):</span>
+    <span class="c1"># Recalculate track quality of already assigned hit, needed if hits are swapped</span>
+    <span class="n">first_dut_index</span> <span class="o">=</span> <span class="n">_get_first_dut_index</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">hit_index</span><span class="p">)</span>
+
+    <span class="n">actual_track_column</span><span class="p">,</span> <span class="n">actual_track_row</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">first_dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">first_dut_index</span><span class="p">]</span>
+    <span class="n">actual_track</span> <span class="o">=</span> <span class="n">tracklets</span><span class="p">[</span><span class="n">hit_index</span><span class="p">]</span>
+    <span class="n">column</span><span class="p">,</span> <span class="n">row</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span>
+
+    <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">&amp;=</span> <span class="o">~</span><span class="p">(</span><span class="mi">65793</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>  <span class="c1"># Reset track quality to zero</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>  <span class="c1"># column = nan is no hit</span>
+        <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>  <span class="c1"># Set track with hit</span>
+        <span class="n">column_distance</span><span class="p">,</span> <span class="n">row_distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">column</span> <span class="o">-</span> <span class="n">actual_track_column</span><span class="p">),</span> <span class="nb">abs</span><span class="p">(</span><span class="n">row</span> <span class="o">-</span> <span class="n">actual_track_row</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">column_distance</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">actual_column_sigma</span> <span class="ow">and</span> <span class="n">row_distance</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">actual_row_sigma</span><span class="p">:</span>  <span class="c1"># High quality track hits</span>
+            <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">65793</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">column_distance</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">actual_column_sigma</span> <span class="ow">and</span> <span class="n">row_distance</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">actual_row_sigma</span><span class="p">:</span>  <span class="c1"># Low quality track hits</span>
+            <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">257</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>
+
+
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_get_first_dut_index</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Returns the first DUT that has a hit for the track at index &#39;&#39;&#39;</span>
+    <span class="n">dut_index</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">dut_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">tr_column</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>  <span class="c1"># Loop over duts, to get first DUT hit of track</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">tr_column</span><span class="p">[</span><span class="n">index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]):</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">dut_index</span>
+
+
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_swap_hits</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">tr_z</span><span class="p">,</span> <span class="n">tr_charge</span><span class="p">,</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">dut_index</span><span class="p">,</span> <span class="n">hit_index</span><span class="p">,</span> <span class="n">column</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">charge</span><span class="p">):</span>
+    <span class="c1">#     print &#39;Swap hits&#39;, tr_column[track_index][dut_index], tr_column[hit_index][dut_index]</span>
+    <span class="n">tmp_column</span><span class="p">,</span> <span class="n">tmp_row</span><span class="p">,</span> <span class="n">tmp_z</span><span class="p">,</span> <span class="n">tmp_charge</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_z</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_charge</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span>
+    <span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_z</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_charge</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">column</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">charge</span>
+    <span class="n">tr_column</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_z</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_charge</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">tmp_column</span><span class="p">,</span> <span class="n">tmp_row</span><span class="p">,</span> <span class="n">tmp_z</span><span class="p">,</span> <span class="n">tmp_charge</span>
+
+
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_set_n_tracks</span><span class="p">(</span><span class="n">start_index</span><span class="p">,</span> <span class="n">stop_index</span><span class="p">,</span> <span class="n">tracklets</span><span class="p">,</span> <span class="n">n_actual_tracks</span><span class="p">,</span> <span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">min_cluster_distance</span><span class="p">,</span> <span class="n">n_duts</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">start_index</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">start_index</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="n">n_actual_tracks</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># Only if the event has more than one track check the min_cluster_distance</span>
+        <span class="k">for</span> <span class="n">dut_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">min_cluster_distance</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Check if minimum track distance evaluation is set, 0 is no mimimum track distance cut</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_index</span><span class="p">,</span> <span class="n">stop_index</span><span class="p">):</span>  <span class="c1"># Loop over all event hits</span>
+                    <span class="n">actual_column</span><span class="p">,</span> <span class="n">actual_row</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">actual_column</span><span class="p">):</span>  <span class="c1"># Omit virtual hit</span>
+                        <span class="k">continue</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">stop_index</span><span class="p">):</span>  <span class="c1"># Loop over other event hits</span>
+                        <span class="k">if</span> <span class="n">sqrt</span><span class="p">((</span><span class="n">actual_column</span> <span class="o">-</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">dut_index</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">actual_column</span> <span class="o">-</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">dut_index</span><span class="p">])</span> <span class="o">+</span> <span class="p">(</span><span class="n">actual_row</span> <span class="o">-</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">dut_index</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">actual_row</span> <span class="o">-</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="n">min_cluster_distance</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]:</span>
+                            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_index</span><span class="p">,</span> <span class="n">stop_index</span><span class="p">):</span>  <span class="c1"># Set number of tracks of this event to -1 to signal merged hits, thus merged tracks</span>
+                                <span class="n">tracklets</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+                            <span class="k">return</span>
+
+    <span class="c1"># Called if no merged track is found</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_index</span><span class="p">,</span> <span class="n">stop_index</span><span class="p">):</span>  <span class="c1"># Set number of tracks of previous event</span>
+        <span class="n">tracklets</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">n_actual_tracks</span>
+
+
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_find_tracks_loop</span><span class="p">(</span><span class="n">tracklets</span><span class="p">,</span> <span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">tr_z</span><span class="p">,</span> <span class="n">tr_charge</span><span class="p">,</span> <span class="n">column_sigma</span><span class="p">,</span> <span class="n">row_sigma</span><span class="p">,</span> <span class="n">min_cluster_distance</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate</span>
+<span class="sd">    is given a quality identifier. Each hit is put to the best fitting track. Tracks are assumed to have</span>
+<span class="sd">    no big angle, otherwise this approach does not work.</span>
+<span class="sd">    Optimizations included to make it compile with numba. Can be called from</span>
+<span class="sd">    several real threads if they work on different areas of the array&#39;&#39;&#39;</span>
+    <span class="n">n_duts</span> <span class="o">=</span> <span class="n">tr_column</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">actual_event_number</span> <span class="o">=</span> <span class="n">tracklets</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span>
+
+    <span class="c1"># Numba uses c scopes, thus define all used variables here</span>
+    <span class="n">n_actual_tracks</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">track_index</span><span class="p">,</span> <span class="n">actual_hit_track_index</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>  <span class="c1"># Track index of table and first track index of actual event</span>
+
+    <span class="k">for</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">actual_track</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">tracklets</span><span class="p">):</span>  <span class="c1"># Loop over all possible tracks</span>
+        <span class="c1">#         print &#39;== ACTUAL TRACK  ==&#39;, track_index</span>
+        <span class="c1"># Set variables for new event</span>
+        <span class="k">if</span> <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">actual_event_number</span><span class="p">:</span>  <span class="c1"># Detect new event</span>
+            <span class="n">actual_event_number</span> <span class="o">=</span> <span class="n">actual_track</span><span class="p">[</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span>
+<span class="c1"># for i in range(n_actual_tracks):  # Set number of tracks of previous event</span>
+<span class="c1">#                 print &#39;old&#39;, track_index - 1 - i</span>
+<span class="c1"># print &#39;track_index&#39;, track_index</span>
+<span class="c1">#             tracklets[track_index - 1 - i][&#39;n_tracks&#39;] = n_actual_tracks</span>
+            <span class="n">_set_n_tracks</span><span class="p">(</span><span class="n">start_index</span><span class="o">=</span><span class="n">track_index</span> <span class="o">-</span> <span class="n">n_actual_tracks</span><span class="p">,</span>
+                          <span class="n">stop_index</span><span class="o">=</span><span class="n">track_index</span><span class="p">,</span> <span class="n">tracklets</span><span class="o">=</span><span class="n">tracklets</span><span class="p">,</span>
+                          <span class="n">n_actual_tracks</span><span class="o">=</span><span class="n">n_actual_tracks</span><span class="p">,</span>
+                          <span class="n">tr_column</span><span class="o">=</span><span class="n">tr_column</span><span class="p">,</span>
+                          <span class="n">tr_row</span><span class="o">=</span><span class="n">tr_row</span><span class="p">,</span>
+                          <span class="n">min_cluster_distance</span><span class="o">=</span><span class="n">min_cluster_distance</span><span class="p">,</span>
+                          <span class="n">n_duts</span><span class="o">=</span><span class="n">n_duts</span><span class="p">)</span>
+            <span class="n">n_actual_tracks</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">actual_hit_track_index</span> <span class="o">=</span> <span class="n">track_index</span>
+
+        <span class="n">n_actual_tracks</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">reference_hit_set</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># The first real hit (column, row != nan) is the reference hit of the actual track</span>
+        <span class="n">n_track_hits</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">dut_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duts</span><span class="p">):</span>  <span class="c1"># loop over all DUTs in the actual track</span>
+<span class="c1">#             print &#39;== ACTUAL DUT ==&#39;, dut_index</span>
+            <span class="n">actual_column_sigma</span><span class="p">,</span> <span class="n">actual_row_sigma</span> <span class="o">=</span> <span class="n">column_sigma</span><span class="p">[</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">row_sigma</span><span class="p">[</span><span class="n">dut_index</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">reference_hit_set</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]):</span>  <span class="c1"># Search for first DUT that registered a hit</span>
+                <span class="n">actual_track_column</span><span class="p">,</span> <span class="n">actual_track_row</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span>
+                <span class="n">reference_hit_set</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">tracklets</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="s1">&#39;track_quality&#39;</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">65793</span> <span class="o">&lt;&lt;</span> <span class="n">dut_index</span><span class="p">)</span>  <span class="c1"># First track hit has best quality by definition</span>
+                <span class="n">n_track_hits</span> <span class="o">+=</span> <span class="mi">1</span>
+<span class="c1">#                 print &#39;ACTUAL REFERENCE HIT&#39;, actual_track_column, actual_track_row</span>
+            <span class="k">elif</span> <span class="n">reference_hit_set</span><span class="p">:</span>  <span class="c1"># First hit found, now find best (closest) DUT hit</span>
+                <span class="c1"># Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit</span>
+                <span class="n">current_column_distance</span><span class="p">,</span> <span class="n">current_row_distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span> <span class="o">-</span> <span class="n">actual_track_column</span><span class="p">),</span> <span class="nb">abs</span><span class="p">(</span><span class="n">tr_row</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span> <span class="o">-</span> <span class="n">actual_track_row</span><span class="p">)</span>
+                <span class="n">current_hit_distance</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">current_column_distance</span> <span class="o">*</span> <span class="n">current_column_distance</span> <span class="o">+</span> <span class="n">current_row_distance</span> <span class="o">*</span> <span class="n">current_row_distance</span><span class="p">)</span>  <span class="c1"># The hit distance of the actual assigned hit</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">tr_column</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]):</span>
+                    <span class="n">current_hit_distance</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Signal no hit</span>
+                <span class="n">shortest_hit_distance</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># The shortest hit distance to the actual hit; -1 means not assigned</span>
+                <span class="k">for</span> <span class="n">hit_index</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">actual_hit_track_index</span><span class="p">,</span> <span class="n">tracklets</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>  <span class="c1"># Loop over all not sorted hits of actual DUT</span>
+                    <span class="k">if</span> <span class="n">tracklets</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">actual_event_number</span><span class="p">:</span>  <span class="c1"># Abort condition</span>
+                        <span class="k">break</span>
+                    <span class="n">column</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">charge</span> <span class="o">=</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_z</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">],</span> <span class="n">tr_charge</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">dut_index</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>  <span class="c1"># column = nan is no hit</span>
+                        <span class="c1"># Calculate the hit distance of the actual DUT hit towards the actual reference hit</span>
+                        <span class="n">column_distance</span><span class="p">,</span> <span class="n">row_distance</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">column</span> <span class="o">-</span> <span class="n">actual_track_column</span><span class="p">),</span> <span class="nb">abs</span><span class="p">(</span><span class="n">row</span> <span class="o">-</span> <span class="n">actual_track_row</span><span class="p">)</span>
+                        <span class="n">hit_distance</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">column_distance</span> <span class="o">*</span> <span class="n">column_distance</span> <span class="o">+</span> <span class="n">row_distance</span> <span class="o">*</span> <span class="n">row_distance</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">shortest_hit_distance</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">hit_distance</span> <span class="o">&lt;</span> <span class="n">shortest_hit_distance</span><span class="p">:</span>  <span class="c1"># Check if the hit is closer to reference hit</span>
+                            <span class="c1">#                             print &#39;FOUND MATCHING HIT&#39;, column, row</span>
+                            <span class="k">if</span> <span class="n">track_index</span> <span class="o">!=</span> <span class="n">hit_index</span><span class="p">:</span>  <span class="c1"># Check if hit swapping is needed</span>
+                                <span class="k">if</span> <span class="n">track_index</span> <span class="o">&gt;</span> <span class="n">hit_index</span><span class="p">:</span>  <span class="c1"># Check if hit is already assigned to other track</span>
+                                    <span class="c1">#                                     print &#39;BUT HIT ALREADY ASSIGNED TO TRACK&#39;, hit_index</span>
+                                    <span class="n">first_dut_index</span> <span class="o">=</span> <span class="n">_get_first_dut_index</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">hit_index</span><span class="p">)</span>  <span class="c1"># Get reference DUT index of other track</span>
+                                    <span class="c1"># Calculate hit distance to reference hit of other track</span>
+                                    <span class="n">column_distance_old</span><span class="p">,</span> <span class="n">row_distance_old</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">column</span> <span class="o">-</span> <span class="n">tr_column</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">first_dut_index</span><span class="p">]),</span> <span class="nb">abs</span><span class="p">(</span><span class="n">row</span> <span class="o">-</span> <span class="n">tr_row</span><span class="p">[</span><span class="n">hit_index</span><span class="p">][</span><span class="n">first_dut_index</span><span class="p">])</span>
+                                    <span class="n">hit_distance_old</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">column_distance_old</span> <span class="o">*</span> <span class="n">column_distance_old</span> <span class="o">+</span> <span class="n">row_distance_old</span> <span class="o">*</span> <span class="n">row_distance_old</span><span class="p">)</span>
+                                    <span class="k">if</span> <span class="n">current_hit_distance</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">current_hit_distance</span> <span class="o">&lt;</span> <span class="n">hit_distance</span><span class="p">:</span>  <span class="c1"># Check if actual assigned hit is better</span>
+                                        <span class="c1">#                                         print &#39;CURRENT ASSIGNED HIT FITS BETTER, DO NOT SWAP&#39;, hit_index</span>
+                                        <span class="k">continue</span>
+                                    <span class="k">if</span> <span class="n">hit_distance</span> <span class="o">&gt;</span> <span class="n">hit_distance_old</span><span class="p">:</span>  <span class="c1"># Only take hit if it fits better to actual track; otherwise leave it with other track</span>
+                                        <span class="c1">#                                         print &#39;IT FIT BETTER WITH OLD TRACK, DO NOT SWAP&#39;, hit_index</span>
+                                        <span class="k">continue</span>
+<span class="c1">#                                 print &#39;SWAP HIT&#39;</span>
+                                <span class="n">_swap_hits</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">tr_z</span><span class="p">,</span> <span class="n">tr_charge</span><span class="p">,</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">dut_index</span><span class="p">,</span> <span class="n">hit_index</span><span class="p">,</span> <span class="n">column</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">charge</span><span class="p">)</span>
+                                <span class="k">if</span> <span class="n">track_index</span> <span class="o">&gt;</span> <span class="n">hit_index</span><span class="p">:</span>  <span class="c1"># Check if hit is already assigned to other track</span>
+                                    <span class="c1">#                                     print &#39;RESET DUT TRACK QUALITY&#39;</span>
+                                    <span class="n">_reset_dut_track_quality</span><span class="p">(</span><span class="n">tracklets</span><span class="p">,</span> <span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">dut_index</span><span class="p">,</span> <span class="n">hit_index</span><span class="p">,</span> <span class="n">actual_column_sigma</span><span class="p">,</span> <span class="n">actual_row_sigma</span><span class="p">)</span>
+                            <span class="n">shortest_hit_distance</span> <span class="o">=</span> <span class="n">hit_distance</span>
+                            <span class="n">n_track_hits</span> <span class="o">+=</span> <span class="mi">1</span>
+
+<span class="c1"># if reference_dut_index == n_duts - 1:  # Special case: If there is only one hit in the last DUT, check if this hit fits better to any other track of this event</span>
+<span class="c1">#                 pass</span>
+<span class="c1">#             print &#39;SET DUT TRACK QUALITY&#39;</span>
+            <span class="n">_set_dut_track_quality</span><span class="p">(</span><span class="n">tr_column</span><span class="p">,</span> <span class="n">tr_row</span><span class="p">,</span> <span class="n">track_index</span><span class="p">,</span> <span class="n">dut_index</span><span class="p">,</span> <span class="n">actual_track</span><span class="p">,</span> <span class="n">actual_track_column</span><span class="p">,</span> <span class="n">actual_track_row</span><span class="p">,</span> <span class="n">actual_column_sigma</span><span class="p">,</span> <span class="n">actual_row_sigma</span><span class="p">)</span>
+
+<span class="c1">#         print &#39;TRACK&#39;, track_index</span>
+<span class="c1">#         for dut_index in range(n_duts):</span>
+<span class="c1">#             print tr_row[track_index][dut_index],</span>
+<span class="c1">#         print</span>
+        <span class="c1"># Set number of tracks of last event</span>
+        <span class="n">_set_n_tracks</span><span class="p">(</span><span class="n">start_index</span><span class="o">=</span><span class="n">track_index</span> <span class="o">-</span> <span class="n">n_actual_tracks</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                      <span class="n">stop_index</span><span class="o">=</span><span class="n">track_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tracklets</span><span class="o">=</span><span class="n">tracklets</span><span class="p">,</span>
+                      <span class="n">n_actual_tracks</span><span class="o">=</span><span class="n">n_actual_tracks</span><span class="p">,</span>
+                      <span class="n">tr_column</span><span class="o">=</span><span class="n">tr_column</span><span class="p">,</span>
+                      <span class="n">tr_row</span><span class="o">=</span><span class="n">tr_row</span><span class="p">,</span>
+                      <span class="n">min_cluster_distance</span><span class="o">=</span><span class="n">min_cluster_distance</span><span class="p">,</span>
+                      <span class="n">n_duts</span><span class="o">=</span><span class="n">n_duts</span><span class="p">)</span>
+
+<span class="nd">@njit</span>
+<span class="k">def</span> <span class="nf">_find_merged_tracks</span><span class="p">(</span><span class="n">tracks_array</span><span class="p">,</span> <span class="n">min_track_distance</span><span class="p">):</span>  <span class="c1"># Check if several tracks are less than min_track_distance apart. Then exclude these tracks (set n_tracks = -1)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">tracks_array</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="n">track_index</span> <span class="o">=</span> <span class="n">i</span>
+        <span class="k">if</span> <span class="n">track_index</span> <span class="o">&gt;=</span> <span class="n">tracks_array</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">break</span>
+        <span class="n">actual_event</span> <span class="o">=</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">track_index</span><span class="p">][</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">track_index</span><span class="p">,</span> <span class="n">tracks_array</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>  <span class="c1"># Loop over event hits</span>
+            <span class="k">if</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">actual_event</span><span class="p">:</span>  <span class="c1"># Next event reached, break loop</span>
+                <span class="k">break</span>
+            <span class="k">if</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># Only if the event has more than one track check the min_track_distance</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">break</span>
+            <span class="n">offset_x</span><span class="p">,</span> <span class="n">offset_y</span> <span class="o">=</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;offset_0&#39;</span><span class="p">],</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;offset_1&#39;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tracks_array</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>  <span class="c1"># Loop over other event hits</span>
+                <span class="k">if</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="s1">&#39;event_number&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">actual_event</span><span class="p">:</span>  <span class="c1"># Next event reached, break loop</span>
+                    <span class="k">break</span>
+                <span class="k">if</span> <span class="n">sqrt</span><span class="p">((</span><span class="n">offset_x</span> <span class="o">-</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="s1">&#39;offset_0&#39;</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">offset_x</span> <span class="o">-</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="s1">&#39;offset_0&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="p">(</span><span class="n">offset_y</span> <span class="o">-</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="s1">&#39;offset_1&#39;</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">offset_y</span> <span class="o">-</span> <span class="n">tracks_array</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="s1">&#39;offset_1&#39;</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="n">min_track_distance</span><span class="p">:</span>
+                    <span class="n">tracks_array</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+                    <span class="n">tracks_array</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="s1">&#39;n_tracks&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+
+<span class="k">def</span> <span class="nf">_fit_tracks_loop</span><span class="p">(</span><span class="n">track_hits</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Do 3d line fit and calculate chi2 for each fit. &#39;&#39;&#39;</span>
+    <span class="k">def</span> <span class="nf">line_fit_3d</span><span class="p">(</span><span class="n">hits</span><span class="p">):</span>
+        <span class="c1"># subtract mean for each component (x,y,z) for SVD calculation</span>
+        <span class="n">datamean</span> <span class="o">=</span> <span class="n">hits</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">offset</span><span class="p">,</span> <span class="n">slope</span> <span class="o">=</span> <span class="n">datamean</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">hits</span> <span class="o">-</span> <span class="n">datamean</span><span class="p">,</span> <span class="n">full_matrices</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># http://stackoverflow.com/questions/2298390/fitting-a-line-in-3d</span>
+        <span class="n">slope_mag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">slope</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">slope</span><span class="p">))</span>
+        <span class="n">intersections</span> <span class="o">=</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">slope</span> <span class="o">/</span> <span class="n">slope</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">hits</span><span class="o">.</span><span class="n">T</span><span class="p">[</span><span class="mi">2</span><span class="p">][:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span> <span class="o">-</span> <span class="n">offset</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>  <span class="c1"># Fitted line and DUT plane intersections (here: points)</span>
+        <span class="n">chi2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">hits</span> <span class="o">-</span> <span class="n">intersections</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">)</span>  <span class="c1"># Chi2 of the fit in um</span>
+        <span class="k">return</span> <span class="n">datamean</span><span class="p">,</span> <span class="n">slope</span> <span class="o">/</span> <span class="n">slope_mag</span><span class="p">,</span> <span class="n">chi2</span>
+
+    <span class="n">slope</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">track_hits</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">)</span>
+    <span class="n">offset</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">track_hits</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">)</span>
+    <span class="n">chi2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">track_hits</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">actual_hits</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">track_hits</span><span class="p">):</span>  <span class="c1"># Loop over selected track candidate hits and fit</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">offset</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="n">slope</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="n">chi2</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">line_fit_3d</span><span class="p">(</span><span class="n">actual_hits</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">:</span>
+            <span class="n">offset</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="n">slope</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="n">chi2</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+    <span class="k">return</span> <span class="n">offset</span><span class="p">,</span> <span class="n">slope</span><span class="p">,</span> <span class="n">chi2</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, David-Leon Pohl.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Other Versions</span>
+        v: development
+        <span class="fa fa-caret-down"></span>
+    </span>
+    <div class="rst-other-versions">
+        <dl>
+            <dt>Tags</dt>
+            <dd><a href="../../0.0.1/index.html">0.0.1</a></dd>
+        </dl>
+        <dl>
+            <dt>Branches</dt>
+            <dd><a href="../../development/_modules/testbeam_analysis/track_analysis.html">development</a></dd>
+            <dd><a href="../../master/index.html">master</a></dd>
+        </dl>
+    </div>
+</div>
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

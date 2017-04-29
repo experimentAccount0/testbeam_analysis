@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>result_analysis &mdash; Testbeam Analysis 0.0.1 documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/silab.ico"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="stylesheet" href="_static/banner.css" type="text/css" />
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="Testbeam Analysis 0.0.1 documentation" href="index.html"/>
+        <link rel="up" title="API" href="API.html"/>
+        <link rel="prev" title="track_analysis" href="track_analysis.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Testbeam Analysis
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="TBA.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="API.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="hit_analysis.html">hit_analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dut_alignment.html">dut_alignment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="track_analysis.html">track_analysis</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">result_analysis</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#methods">Methods</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Testbeam Analysis</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="API.html">API</a> &raquo;</li>
+      
+    <li>result_analysis</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/result_analysis.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  
+
+
+    
+    
+
+
+
+    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
+<div class="section" id="module-testbeam_analysis.result_analysis">
+<span id="result-analysis"></span><h1>result_analysis<a class="headerlink" href="#module-testbeam_analysis.result_analysis" title="Permalink to this headline">¶</a></h1>
+<p>All functions creating results (e.g. efficiency, residuals, track density) from fitted tracks are listed here.</p>
+<div class="section" id="methods">
+<h2>Methods<a class="headerlink" href="#methods" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="testbeam_analysis.result_analysis.calculate_residuals">
+<code class="descclassname">testbeam_analysis.result_analysis.</code><code class="descname">calculate_residuals</code><span class="sig-paren">(</span><em>input_tracks_file</em>, <em>input_alignment_file</em>, <em>n_pixels</em>, <em>pixel_size</em>, <em>output_residuals_file=None</em>, <em>dut_names=None</em>, <em>use_duts=None</em>, <em>max_chi2=None</em>, <em>nbins_per_pixel=None</em>, <em>npixels_per_bin=None</em>, <em>force_prealignment=False</em>, <em>plot=True</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/result_analysis.html#calculate_residuals"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.result_analysis.calculate_residuals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes the tracks and calculates residuals for selected DUTs in col, row direction.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>input_tracks_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Filename of the input tracks file.</li>
+<li><strong>input_alignment_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Filename of the input aligment file.</li>
+<li><strong>n_pixels</strong> (<em>iterable of tuples</em>) &#8211; One tuple per DUT describing the number of pixels in column, row direction
+e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]</li>
+<li><strong>pixel_size</strong> (<em>iterable of tuples</em>) &#8211; One tuple per DUT describing the pixel dimension in um in column, row direction
+e.g. for 2 DUTs: pixel_size = [(250, 50), (250, 50)]</li>
+<li><strong>output_residuals_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Filename of the output residuals file. If None, the filename will be derived from the input hits file.</li>
+<li><strong>dut_names</strong> (<em>iterable</em>) &#8211; Name of the DUTs. If None, DUT numbers will be used.</li>
+<li><strong>use_duts</strong> (<em>iterable</em>) &#8211; The duts to calculate residuals for. If None all duts in the input_tracks_file are used</li>
+<li><strong>max_chi2</strong> (<em>uint</em><em>, </em><em>iterable</em>) &#8211; Use only not heavily scattered tracks to increase track pointing resolution (cut on chi2).
+Cut can be a number and is used then for all DUTS or a list with a chi 2 cut for each DUT.
+If None, no cut is applied.</li>
+<li><strong>nbins_per_pixel</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Number of bins per pixel along the residual axis. Number is a positive integer or None to automatically set the binning.</li>
+<li><strong>npixels_per_bin</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Number of pixels per bin along the position axis. Number is a positive integer or None to automatically set the binning.</li>
+<li><strong>force_prealignment</strong> (<em>boolean</em>) &#8211; Take the prealignment, although if a coarse alignment is availale.</li>
+<li><strong>plot</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, create additional output plots.</li>
+<li><strong>chunk_size</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Chunk size of the data when reading from file.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="testbeam_analysis.result_analysis.calculate_efficiency">
+<code class="descclassname">testbeam_analysis.result_analysis.</code><code class="descname">calculate_efficiency</code><span class="sig-paren">(</span><em>input_tracks_file</em>, <em>input_alignment_file</em>, <em>bin_size</em>, <em>sensor_size</em>, <em>output_efficiency_file=None</em>, <em>pixel_size=None</em>, <em>n_pixels=None</em>, <em>minimum_track_density=1</em>, <em>max_distance=500</em>, <em>use_duts=None</em>, <em>max_chi2=None</em>, <em>force_prealignment=False</em>, <em>cut_distance=None</em>, <em>col_range=None</em>, <em>row_range=None</em>, <em>show_inefficient_events=False</em>, <em>plot=True</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/result_analysis.html#calculate_efficiency"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.result_analysis.calculate_efficiency" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>input_tracks_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Filename of the input tracks file.</li>
+<li><strong>input_alignment_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Filename of the input alignment file.</li>
+<li><strong>bin_size</strong> (<em>iterable</em>) &#8211; Sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes.</li>
+<li><strong>sensor_size</strong> (<em>Tuple</em><em> or </em><em>list of tuples</em>) &#8211; Describes the sensor size for each DUT. If one tuple is given it is (size x, size y)
+If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...]</li>
+<li><strong>output_efficiency_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Filename of the output efficiency file. If None, the filename will be derived from the input hits file.</li>
+<li><strong>minimum_track_density</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Minimum track density required to consider bin for efficiency calculation.</li>
+<li><strong>use_duts</strong> (<em>iterable</em>) &#8211; Calculate the efficiency for selected DUTs. If None, all duts are selected.</li>
+<li><strong>max_chi2</strong> (<em>uint</em>) &#8211; Only use tracks with a chi2 &lt;= max_chi2.</li>
+<li><strong>force_prealignment</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; Take the prealignment, although if a coarse alignment is availale.</li>
+<li><strong>cut_distance</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Use only distances (between DUT hit and track hit) smaller than cut_distance.</li>
+<li><strong>max_distance</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Defines binnig of distance values.</li>
+<li><strong>row_range</strong> (<em>col_range</em><em>,</em><em></em>) &#8211; Column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</li>
+<li><strong>plot</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, create additional output plots.</li>
+<li><strong>chunk_size</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Chunk size of the data when reading from file.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="track_analysis.html" class="btn btn-neutral" title="track_analysis" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, David-Leon Pohl.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Other Versions</span>
+        v: development
+        <span class="fa fa-caret-down"></span>
+    </span>
+    <div class="rst-other-versions">
+        <dl>
+            <dt>Tags</dt>
+            <dd><a href="0.0.1/index.html">0.0.1</a></dd>
+        </dl>
+        <dl>
+            <dt>Branches</dt>
+            <dd><a href="development/result_analysis.html">development</a></dd>
+            <dd><a href="master/index.html">master</a></dd>
+        </dl>
+    </div>
+</div>
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
