@@ -56,8 +56,5 @@ after_success:
   - git config --global user.name "Travis CI"
   - git remote set-url --push origin "git@github.com:$TRAVIS_REPO_SLUG"
   - export ${!TRAVIS*} 
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      sphinx-versioning push -r development -w master -w development -b docs gh-pages .
-    fi
-
-
+  - sphinx-versioning push -r development -w master -w development -b docs gh-pages .
+  
