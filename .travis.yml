@@ -32,7 +32,7 @@ before_install:
   - conda info -a
   - conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov
   - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pykalman pylandau pytest
-  - pip install sphinxcontrib-versioning
+  - pip install sphinxcontrib-versioning sphinx_rtd_theme
   - python setup.py develop
 
 # Run test
@@ -45,6 +45,7 @@ script:
       touch $HOME/miniconda/lib/python3.6/site-packages/converage.pth && printf "import coverage; coverage.process_startup()" > $HOME/miniconda/lib/python3.6/site-packages/converage.pth;
     fi
   - py.test --cov=testbeam_analysis
+  - sphinx-build docs docs/_build/html
   
 after_success:
   - coveralls --data_file .coverage.*  
@@ -55,6 +56,8 @@ after_success:
   - git config --global user.name "Travis CI"
   - git remote set-url --push origin "git@github.com:$TRAVIS_REPO_SLUG"
   - export ${!TRAVIS*} 
-  - sphinx-versioning push docs gh-pages .
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      sphinx-versioning push -r development -w master -w development -b docs gh-pages .
+    fi
 
 
