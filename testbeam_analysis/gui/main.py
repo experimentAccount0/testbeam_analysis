@@ -71,8 +71,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         """
 
         # Add tab_widget and widgets for the different analysis steps
-        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'TestParallelWidget',
-                          'Pre-alignment', 'Track finding', 'Alignment', 'Track fitting', 'Analysis', 'Result')
+        self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment', 'Track finding',
+                          'Alignment', 'Track fitting', 'Analysis', 'Result')
 
         # Add QTabWidget for tab_widget
         self.tabs = QtWidgets.QTabWidget()
@@ -254,10 +254,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.ResultTab(parent=self.tabs,
                                               setup=self.setup,
                                               options=self.options)
-            elif name == 'TestParallelWidget':
-                widget = tab_widget.TestParallel(parent=self.tabs,
-                                                 setup=self.setup,
-                                                 options=self.options)
             else:
                 logging.info('Gui for %s not implemented yet!' % name)
                 continue

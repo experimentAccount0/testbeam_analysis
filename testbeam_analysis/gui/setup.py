@@ -157,10 +157,12 @@ class SetupTab(QtWidgets.QWidget):
             sl_2.addLayout(layout_props)
 
             # Make dut type selection layout
-            checkbox_type = QtWidgets.QCheckBox()
-            checkbox_type.setText('Set DUT type')
-            checkbox_type.setDisabled(True)
-            checkbox_type.setFixedWidth(label_width)
+#            checkbox_type = QtWidgets.QCheckBox()
+#            checkbox_type.setText('Set DUT type')
+#            checkbox_type.setDisabled(True)
+#            checkbox_type.setFixedWidth(label_width)
+            label_type = QtWidgets.QLabel('Set DUT type')
+            label_type.setFixedWidth(label_width)
             cb_type = QtWidgets.QComboBox()
             cb_type.addItems(self._dut_types.keys())
             cb_type.setDisabled(True)
@@ -236,7 +238,8 @@ class SetupTab(QtWidgets.QWidget):
             layout_setup.addWidget(edit_beta, 1, 3, 1, 1)
             layout_setup.addWidget(edit_gamma, 1, 4, 1, 1)
             # Properties layout
-            layout_props.addWidget(checkbox_type, 0, 0, 1, 1)
+#            layout_props.addWidget(checkbox_type, 0, 0, 1, 1)
+            layout_props.addWidget(label_type, 0, 0, 1, 1)
             layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 1)
             layout_props.addWidget(cb_type, 0, 2, 1, 1)
             layout_props.addWidget(button_type, 0, 3, 1, 1)
@@ -284,7 +287,8 @@ class SetupTab(QtWidgets.QWidget):
                 self._dut_widgets[dut][prop] = edit_widgets[j]
 
             # Add all dut type setting/handling related widgets to a dict with respective dut as key
-            self._type_widgets[dut] = {'check_t': checkbox_type, 'combo_t': cb_type, 'button_t': button_type}
+#            self._type_widgets[dut] = {'check_t': checkbox_type, 'combo_t': cb_type, 'button_t': button_type}
+            self._type_widgets[dut] = {'combo_t': cb_type, 'button_t': button_type}
 
             # Add all dut type creating related widgets to a dict with respective dut as key
             self._handle_widgets[dut] = {'check_h': checkbox_handle, 'edit_h': edit_handle, 'button_h': button_handle}
@@ -307,9 +311,9 @@ class SetupTab(QtWidgets.QWidget):
                     self.data['dut_names'][self.tabs.currentIndex()],
                     self._type_widgets[self.data['dut_names'][self.tabs.currentIndex()]]['combo_t'].currentText()))
 
-            # Connect set type checkbox
-            self._type_widgets[dut]['check_t'].toggled.connect(
-                lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()]))
+#            # Connect set type checkbox
+#            self._type_widgets[dut]['check_t'].toggled.connect(
+#                lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()]))
 
             # Connect handle type checkbox
             self._handle_widgets[dut]['check_h'].toggled.connect(
@@ -454,20 +458,28 @@ class SetupTab(QtWidgets.QWidget):
         """
 
         # Check if dut types selectable and enable respective widgets
-        if self._dut_types:
-            for dut_name in self.data['dut_names']:
-                self._type_widgets[dut_name]['check_t'].setDisabled(False)
+        if dut is None:
+            if self._dut_types:
+                for dut_name in self.data['dut_names']:
+                    for key in self._type_widgets[dut_name].keys():
+                        self._type_widgets[dut_name][key].setDisabled(False)
+            else:
+                for dut_name in self.data['dut_names']:
+                    for key in self._type_widgets[dut_name].keys():
+                        self._type_widgets[dut_name][key].setToolTip('No predefined DUT types found!')
 
-        if dut is not None:
+        elif dut is not None:
+
             # Go through widgets of respective dut tab and handle behavior
             if mode is 'h':
-                if self._type_widgets[dut]['check_t'].isChecked():
-                    for key in self._type_widgets[dut].keys():
-                        self._type_widgets[dut][key].setDisabled(False)
-                else:
-                    for key in self._type_widgets[dut].keys():
-                        if key is not 'check_t':
-                            self._type_widgets[dut][key].setDisabled(True)
+
+                #  if self._type_widgets[dut]['check_t'].isChecked():
+                    #  for key in self._type_widgets[dut].keys():
+                        #  self._type_widgets[dut][key].setDisabled(False)
+                #  else:
+                    #  for key in self._type_widgets[dut].keys():
+                        #  if key is not 'check_t':
+                            #  self._type_widgets[dut][key].setDisabled(True)
 
                 if self._handle_widgets[dut]['check_h'].isChecked():
 

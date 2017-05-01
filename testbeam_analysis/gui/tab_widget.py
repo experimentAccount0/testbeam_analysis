@@ -3,6 +3,7 @@
     Each tab is for one analysis function and has function
     gui options and plotting outputs
 '''
+import os
 from PyQt5 import QtCore
 from testbeam_analysis.gui.analysis_widget import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
@@ -11,23 +12,38 @@ from testbeam_analysis.track_analysis import find_tracks, fit_tracks
 from testbeam_analysis.result_analysis import calculate_efficiency, calculate_residuals
 
 
-class NoisyPixelsTab(AnalysisWidget):
+class NoisyPixelsTab(ParallelAnalysisWidget):
     """ Implements the noisy pixel analysis gui"""
 
     proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent, setup, options):
-        super(NoisyPixelsTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(NoisyPixelsTab, self).__init__(parent, setup, options)
 
-        self.add_function(func=generate_pixel_mask)
+        self.add_parallel_function(func=generate_pixel_mask)
 
-        self.add_option(option='Output path',
-                        default_value=options['output_path'], func=generate_pixel_mask, fixed=True)
-        self.add_option(option='Noisy suffix',
-                        default_value=options['noisy_suffix'], func=generate_pixel_mask, fixed=True)
+        folder = os.path.split(options['input_files'][0])[0]
 
-        self.add_option(option='pixel_mask_name', func=generate_pixel_mask, fixed=True)
+        self.add_parallel_option(option='input_hits_file',
+                                 default_value=options['input_files'],
+                                 #default_name=[name.replace(folder, '') for name in options['input_files']],
+                                 func=generate_pixel_mask,
+                                 fixed=True)
+        self.add_parallel_option(option='output_mask_file',
+                                 default_value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']],
+                                 #default_name=[dut + options['noisy_suffix'] for dut in setup['dut_names']],
+                                 func=generate_pixel_mask,
+                                 fixed=True)
+        self.add_parallel_option(option='n_pixel',
+                                 default_value=setup['n_pixels'],
+                                 #default_name=[None] * setup['n_duts'],
+                                 func=generate_pixel_mask,
+                                 fixed=True)
+        self.add_parallel_option(option='dut_name',
+                                 default_value=setup['dut_names'],
+                                 #default_name=[None] * setup['n_duts'],
+                                 func=generate_pixel_mask,
+                                 fixed=False)
 
 
 class ClusterPixelsTab(AnalysisWidget):
@@ -36,8 +52,7 @@ class ClusterPixelsTab(AnalysisWidget):
     proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent, setup, options):
-        super(ClusterPixelsTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(ClusterPixelsTab, self).__init__(parent, setup, options)
 
         self.add_function(func=cluster_hits)
 
@@ -63,8 +78,7 @@ class PrealignmentTab(AnalysisWidget):
     proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent, setup, options):
-        super(PrealignmentTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(PrealignmentTab, self).__init__(parent, setup, options)
 
         self.add_function(func=correlate_cluster)
         self.add_function(func=prealignment)
@@ -93,8 +107,7 @@ class TrackFindingTab(AnalysisWidget):
     proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent, setup, options):
-        super(TrackFindingTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(TrackFindingTab, self).__init__(parent, setup, options)
 
         self.add_function(func=find_tracks)
 
@@ -105,20 +118,9 @@ class AlignmentTab(AnalysisWidget):
     proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent, setup, options):
-        super(AlignmentTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(AlignmentTab, self).__init__(parent, setup, options)
 
         self.add_function(func=alignment)
-
-
-class TestParallel(ParallelAnalysisWidget):
-
-    proceedAnalysis = QtCore.pyqtSignal('QString')
-
-    def __init__(self, parent, setup, options):
-        super(TestParallel, self).__init__(parent, setup, options)
-
-        self.add_parallel_function(func=generate_pixel_mask)
 
 
 class TrackFittingTab(AnalysisWidget):
@@ -127,8 +129,7 @@ class TrackFittingTab(AnalysisWidget):
     proceedAnalysis = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent, setup, options):
-        super(TrackFittingTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(TrackFittingTab, self).__init__(parent, setup, options)
 
         self.add_function(func=fit_tracks)
         # Set and fix options
@@ -148,8 +149,7 @@ class ResultTab(AnalysisWidget):
     ''' Implements the result analysis gui'''
 
     def __init__(self, parent, setup, options):
-        super(ResultTab, self).__init__(
-            parent, setup, options, input_file=None)
+        super(ResultTab, self).__init__(parent, setup, options)
 
         self.add_function(func=calculate_efficiency)
         self.add_function(func=calculate_residuals)

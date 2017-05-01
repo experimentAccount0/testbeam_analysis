@@ -49,11 +49,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         documentation from the function implementation automatically.
     '''
 
-    def __init__(self, parent, setup, options, input_file):
+    def __init__(self, parent, setup, options):
         super(AnalysisWidget, self).__init__(parent)
         self.setup = setup
         self.options = options
-        self.input_file = input_file
         self.option_widgets = {}
         self._setup()
         # Holds functions with kwargs
@@ -134,7 +133,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             else:
                 self.add_option(func=func, option=name)
 
-    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, fixed=False, tooltip=None):
+    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, default_name=None, fixed=False, tooltip=None):
         ''' Add an option to the gui to set function arguments
 
             option: str
@@ -150,6 +149,8 @@ class AnalysisWidget(QtWidgets.QWidget):
                 None are set as optional. The common behavior is that None deactivates a parameter
             default_value : object
                 Default value for option
+            default_name: str
+                Name shown in gui instead of default_value
             fixed : boolean
                 Fix option value  default value
         '''
@@ -324,13 +325,13 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         for func, kwargs in self.calls.iteritems():
             print(func.__name__, kwargs)
-            #self._call_func(func, kwargs)
+            self._call_func(func, kwargs)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
 
     def __init__(self, parent, setup, options):
-        global key_2
+
         super(ParallelAnalysisWidget, self).__init__(parent)
 
         main_layout = QtWidgets.QHBoxLayout()
@@ -338,37 +339,37 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.tabs = QtWidgets.QTabWidget()
         self.tw = {}
         self.duts = setup['dut_names']
-        self.n = len(self.duts)
+        self.n = setup['n_duts']
 
         for i in range(self.n):
 
             tmp_setup = {}
             tmp_options = {}
 
-            for key in setup.keys():
+            for s_key in setup.keys():
 
-                if isinstance(setup[key], list) or isinstance(setup[key], tuple):
-                    tmp_setup[key] = [setup[key][i]]
-                elif isinstance(setup[key], int) or isinstance(setup[key], str):
-                    tmp_setup[key] = setup[key]
+                if isinstance(setup[s_key], list) or isinstance(setup[s_key], tuple):
+                    tmp_setup[s_key] = [setup[s_key][i]]
+                elif isinstance(setup[s_key], int) or isinstance(setup[s_key], str):
+                    tmp_setup[s_key] = setup[s_key]
 
-            print tmp_setup
+            for o_key in options.keys():
 
-            for key_2 in options.keys():
+                if isinstance(options[o_key], list) or isinstance(options[o_key], tuple):
+                    tmp_options[o_key] = [options[o_key][i]]
+                elif isinstance(options[o_key], int) or isinstance(options[o_key], str):
+                    tmp_options[o_key] = options[o_key]
 
-                if isinstance(options[key_2], list) or isinstance(options[key_2], tuple):
-                    tmp_options[key_2] = [options[key_2][i]]
-                elif isinstance(options[key_2], int) or isinstance(options[key_2], str):
-                    tmp_options[key_2] = options[key_2]
-
-            print tmp_options
-
-            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, input_file=None)
+            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options)
             self.tw[self.duts[i]] = widget
-            self.tabs.addTab(self.tw[self.duts[i]], 'DUT %d' % i)
+            self.tabs.addTab(self.tw[self.duts[i]], self.duts[i])  # 'DUT %d' % i)
 
         main_layout.addWidget(self.tabs)
 
     def add_parallel_function(self, func):
         for i in range(self.n):
             self.tw[self.duts[i]].add_function(func)
+
+    def add_parallel_option(self, option, default_value, func, default_name=None, name=None, dtype=None, optional=None, fixed=False, tooltip=None):
+        for i in range(self.n):
+            self.tw[self.duts[i]].add_option(option, func, dtype, name, optional, default_value[i], default_name, fixed, tooltip)
