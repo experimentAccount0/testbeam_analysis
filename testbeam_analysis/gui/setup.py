@@ -8,7 +8,7 @@ class SetupTab(QtWidgets.QWidget):
     """
 
     statusMessage = QtCore.pyqtSignal('QString')
-    proceedAnalysis = QtCore.pyqtSignal([list])
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
     def __init__(self, parent=None, input_files=None, dut_names=None):
         super(SetupTab, self).__init__(parent)
@@ -17,7 +17,8 @@ class SetupTab(QtWidgets.QWidget):
         self.data = None
 
         # Make list of tabs that will be enabled after proceedAnalysis signal of this class
-        self.tab_list = ['Noisy Pixel', 'Clustering', 'TestParallelWidget']
+        self.tab_list = ['Noisy Pixel', 'Clustering', 'Pre-alignment', 'Track finding',
+                         'Alignment', 'Track fitting', 'Analysis', 'Result']
 
         # Make tuple of properties of each dut
         self._dut_props = ('z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma',

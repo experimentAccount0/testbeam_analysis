@@ -145,7 +145,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.tabs.setTabEnabled(i, enable)
 
         # Dis/enable specific tab
-        elif type(tabs) is unicode:
+        elif type(tabs) is unicode or type(tabs) is str:
             if tabs in self.tab_order:
                 self.tabs.setTabEnabled(self.tab_order.index(tabs), enable)
 
@@ -180,6 +180,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 #                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
 
             except (AttributeError, KeyError):
+                print name, AttributeError, KeyError
                 pass
 
     def update_tabs(self, data=None, tabs=None, skip=None):
@@ -231,7 +232,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             elif name == 'Clustering':
                 widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
                                                      setup=self.setup,
-                                                     options=self.options)
+                                                     options=self.options,
+                                                     tab_list='Pre-alignment')
 
             elif name == 'Pre-alignment':
                 widget = tab_widget.PrealignmentTab(parent=self.tabs,

@@ -3,7 +3,7 @@
     Each tab is for one analysis function and has function
     gui options and plotting outputs
 '''
-import os
+
 from PyQt5 import QtCore
 from testbeam_analysis.gui.analysis_widget import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
@@ -15,55 +15,68 @@ from testbeam_analysis.result_analysis import calculate_efficiency, calculate_re
 class NoisyPixelsTab(ParallelAnalysisWidget):
     """ Implements the noisy pixel analysis gui"""
 
-    proceedAnalysis = QtCore.pyqtSignal('QString')
-
     def __init__(self, parent, setup, options):
         super(NoisyPixelsTab, self).__init__(parent, setup, options)
 
         self.add_parallel_function(func=generate_pixel_mask)
 
-        folder = os.path.split(options['input_files'][0])[0]
-
         self.add_parallel_option(option='input_hits_file',
                                  default_value=options['input_files'],
-                                 #default_name=[name.replace(folder, '') for name in options['input_files']],
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='output_mask_file',
                                  default_value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']],
-                                 #default_name=[dut + options['noisy_suffix'] for dut in setup['dut_names']],
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='n_pixel',
                                  default_value=setup['n_pixels'],
-                                 #default_name=[None] * setup['n_duts'],
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='dut_name',
                                  default_value=setup['dut_names'],
-                                 #default_name=[None] * setup['n_duts'],
                                  func=generate_pixel_mask,
                                  fixed=False)
 
+#        self.update_options(key='input_hits_file',
+#                            value=options['input_files'])
+#        self.update_options(key='output_mask_file',
+#                            value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']])
+#
+#        self.update_setup(key='n_pixel',
+#                          value=setup['n_pixels'])
+#        self.update_setup(key='dut_name',
+#                          value=setup['dut_names'])
+#
+#        self.add_parallel_function(func=generate_pixel_mask)
 
-class ClusterPixelsTab(AnalysisWidget):
+
+class ClusterPixelsTab(ParallelAnalysisWidget):
     ''' Implements the pixel clustering gui'''
 
-    proceedAnalysis = QtCore.pyqtSignal('QString')
+    def __init__(self, parent, setup, options, tab_list):
+        super(ClusterPixelsTab, self).__init__(parent, setup, options, tab_list)
 
-    def __init__(self, parent, setup, options):
-        super(ClusterPixelsTab, self).__init__(parent, setup, options)
+        self.add_parallel_function(func=cluster_hits)
 
-        self.add_function(func=cluster_hits)
+        self.add_parallel_option(option='input_hits_file',
+                                 default_value=options['input_files'],
+                                 func=cluster_hits,
+                                 fixed=True)
 
-        self.add_option(option='Output path', default_value=options['output_path'], func=cluster_hits, fixed=True)
-#        self.add_option(option='output_cluster_file', default_value='TEEEEEST.h5', func=cluster_hits, fixed=True)
-        self.add_option(option='Cluster suffix', default_value=options['cluster_suffix'], func=cluster_hits, fixed=True)
-        self.add_option(option='create_cluster_hits_table', func=cluster_hits, fixed=True)
+        self.add_parallel_option(option='input_noisy_pixel_mask_file',
+                                 default_value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']],
+                                 func=cluster_hits,
+                                 fixed=True)
 
-        for dut in setup['dut_names']:
-            self.add_option(option='output_cluster_file_%s' % dut, func=cluster_hits,
-                            default_value=dut + options['cluster_suffix'], fixed=True)
+        self.add_parallel_option(option='output_cluster_file',
+                                 default_value=[options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']],
+                                 func=cluster_hits,
+                                 fixed=True)
+
+        self.add_parallel_option(option='dut_name',
+                                 default_value=setup['dut_names'],
+                                 func=cluster_hits,
+                                 fixed=False)
 
 
 class PrealignmentTab(AnalysisWidget):

@@ -18,11 +18,10 @@ def get_default_args(func):
 
 
 def get_parameter_doc(func, dtype=False):
-    ''' Returns a dictionary of paramerter:pardoc for the input function
-
-        Pardoc is either the parameter description (dtype=False) or the
-        data type (dtype=False)
-    '''
+    """ 
+    Returns a dictionary of paramerter:pardoc for the input function
+    Pardoc is either the parameter description (dtype=False) or the data type (dtype=False)
+    """
     doc = FunctionDoc(func)
     pars = {}
     for par, datatype, descr in doc['Parameters']:
@@ -34,22 +33,26 @@ def get_parameter_doc(func, dtype=False):
 
 
 class AnalysisWidget(QtWidgets.QWidget):
-    ''' Implements a generic analysis gui.
+    """
+    Implements a generic analysis gui.
 
-        There are two seperated widget areas. One the left one for plotting
-        and on the right for function parameter options.
-        There are 3 kind of options:
-          - needed ones on top
-          - optional options that can be deactivated below
-          - fixed option that cannot be changed
-        Below this is a button to call the underlying function with given
-        keyword arguments from the options.
+    There are two seperated widget areas. One the left one for plotting
+    and on the right for function parameter options.
+    There are 3 kind of options:
+      - needed ones on top
+      - optional options that can be deactivated below
+      - fixed option that cannot be changed
+    Below this is a button to call the underlying function with given
+    keyword arguments from the options.
 
-        Introprospection is used to determine function argument types and
-        documentation from the function implementation automatically.
-    '''
+    Introprospection is used to determine function argument types and
+    documentation from the function implementation automatically.
+    """
 
-    def __init__(self, parent, setup, options):
+    # Signal emitted after all funcs are called
+    AnalysisSignal = QtCore.pyqtSignal(list)
+
+    def __init__(self, parent, setup, options, tab_list=None):
         super(AnalysisWidget, self).__init__(parent)
         self.setup = setup
         self.options = options
@@ -57,6 +60,11 @@ class AnalysisWidget(QtWidgets.QWidget):
         self._setup()
         # Holds functions with kwargs
         self.calls = OrderedDict()
+        # List of tabs which will be enabled after analysis
+        if isinstance(tab_list, list):
+            self.tab_list = tab_list
+        else:
+            self.tab_list = [tab_list]
 
     def _setup(self):
         # Plot area
@@ -104,8 +112,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.setLayout(layout_widget)
 
     def _option_exists(self, option):
-        ''' Check if option is already defined
-        '''
+        """
+        Check if option is already defined
+        """
         for call in self.calls.values():
             for kwarg in call:
                 if option == kwarg:
@@ -113,8 +122,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         return False
 
     def add_options_auto(self, func):
-        ''' Inspect a function to create options for kwargs
-        '''
+        """
+        Inspect a function to create options for kwargs
+        """
+
         for name in get_default_args(func):
             # Only add as function parameter if the info is not
             # given in setup/option data structures
@@ -133,27 +144,27 @@ class AnalysisWidget(QtWidgets.QWidget):
             else:
                 self.add_option(func=func, option=name)
 
-    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, default_name=None, fixed=False, tooltip=None):
-        ''' Add an option to the gui to set function arguments
+    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, fixed=False, tooltip=None):
+        """
+        Add an option to the gui to set function arguments
 
-            option: str
-                Function argument name
-            func: function
-                Function to be used for the option
-            dtype: str
-                Type string to select proper input method, if None determined from default parameter type
-            name: str
-                Name shown in gui
-            optional: bool
-                Show as optional option, If optional is not defined all parameters with default value
-                None are set as optional. The common behavior is that None deactivates a parameter
-            default_value : object
-                Default value for option
-            default_name: str
-                Name shown in gui instead of default_value
-            fixed : boolean
-                Fix option value  default value
-        '''
+        option: str
+            Function argument name
+        func: function
+            Function to be used for the option
+        dtype: str
+            Type string to select proper input method, if None determined from default parameter type
+        name: str
+            Name shown in gui
+        optional: bool
+            Show as optional option, If optional is not defined all parameters with default value
+            None are set as optional. The common behavior is that None deactivates a parameter
+        default_value : object
+            Default value for option
+        fixed : boolean
+            Fix option value  default value
+        """
+
         # Check if option exists already
         if option in self.calls[func]:
             self._delete_option(option=option, func=func)
@@ -218,11 +229,14 @@ class AnalysisWidget(QtWidgets.QWidget):
                 raise RuntimeError(
                     'Cannot create fixed option without default value')
             text = QtWidgets.QLabel()
+            text.setWordWrap(True)
             # Fixed options cannot be changed --> grey color
             palette = QtGui.QPalette()
             palette.setColor(QtGui.QPalette.Foreground, QtCore.Qt.darkGray)
             text.setPalette(palette)
             text.setToolTip(tooltip)
+#            metrics = QtGui.QFontMetrics(self.font())
+#            elided_text = metrics.elidedText(str(default_value), QtCore.Qt.ElideMiddle, 500)
             text.setText(name + ': ' + str(default_value))
             self.opt_fixed.addWidget(text)
             self.calls[func][option] = default_value
@@ -259,8 +273,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         return widget
 
     def _delete_option(self, option, func):
-        ''' Delete existing option. Needed if option is set manually.
-        '''
+        """
+        Delete existing option. Needed if option is set manually.
+        """
+
         # Delete option widget
         self.option_widgets[option].close()
         del self.option_widgets[option]
@@ -271,7 +287,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         del self.calls[func][option]
 
     def add_function(self, func):
-        ''' Add an analysis function'''
+        """
+        Add an analysis function
+        """
+
         self.calls[func] = {}
         # Add tooltip from function docstring
         doc = FunctionDoc(func)
@@ -293,10 +312,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.calls[func][name] = value
 
     def _call_func(self, func, kwargs):
-        ''' Call an analysis function with given kwargs
-
-            Setup info and generic options are added if needed.
-        '''
+        """
+        Call an analysis function with given kwargs
+        Setup info and generic options are added if needed.
+        """
 
         # Set missing kwargs from setting data structures
         args = inspect.getargspec(func)[0]
@@ -317,59 +336,96 @@ class AnalysisWidget(QtWidgets.QWidget):
                 else:
                     raise RuntimeError('Function argument %s not defined', arg)
         print(func.__name__, kwargs)
-        func(**kwargs)
+        # func(**kwargs)
 
     def _call_funcs(self):
-        ''' Call all functions in a row
-        '''
+        """ 
+        Call all functions in a row
+        """
 
         for func, kwargs in self.calls.iteritems():
             print(func.__name__, kwargs)
-            self._call_func(func, kwargs)
+            # self._call_func(func, kwargs)
+
+        # Emit signal to indicate end of analysis
+        self.AnalysisSignal.emit(self.tab_list)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
+    """
+    AnalysisWidget for functions that need to run for every input data file.
+    Creates UI with one tab widget per respective input file
+    """
 
-    def __init__(self, parent, setup, options):
+    ParallelAnalysisSignal = QtCore.pyqtSignal(list)
+
+    def __init__(self, parent, setup, options, tab_list=None):
 
         super(ParallelAnalysisWidget, self).__init__(parent)
 
-        main_layout = QtWidgets.QHBoxLayout()
-        self.setLayout(main_layout)
+        # Make widgets for gui
+        self.main_layout = QtWidgets.QHBoxLayout()
+        self.setLayout(self.main_layout)
+
+        # Tab related widgets
         self.tabs = QtWidgets.QTabWidget()
         self.tw = {}
-        self.duts = setup['dut_names']
-        self.n = setup['n_duts']
+        self.main_layout.addWidget(self.tabs)
 
-        for i in range(self.n):
+        # Initialize options and setup
+        self.setup = setup
+        self.options = options
+
+        self.tab_list=tab_list
+
+        self._init_tabs()
+
+    def _init_tabs(self):
+
+        # Clear widgets
+        self.tabs.clear()
+        self.tw = {}
+
+        for i in range(self.setup['n_duts']):
 
             tmp_setup = {}
             tmp_options = {}
 
-            for s_key in setup.keys():
+            for s_key in self.setup.keys():
 
-                if isinstance(setup[s_key], list) or isinstance(setup[s_key], tuple):
-                    tmp_setup[s_key] = [setup[s_key][i]]
-                elif isinstance(setup[s_key], int) or isinstance(setup[s_key], str):
-                    tmp_setup[s_key] = setup[s_key]
+                if isinstance(self.setup[s_key], list) or isinstance(self.setup[s_key], tuple):
+                    tmp_setup[s_key] = [self.setup[s_key][i]]  # FIXME: Does not work properly without list
+                elif isinstance(self.setup[s_key], int) or isinstance(self.setup[s_key], str):
+                    tmp_setup[s_key] = self.setup[s_key]
 
-            for o_key in options.keys():
+            for o_key in self.options.keys():
 
-                if isinstance(options[o_key], list) or isinstance(options[o_key], tuple):
-                    tmp_options[o_key] = [options[o_key][i]]
-                elif isinstance(options[o_key], int) or isinstance(options[o_key], str):
-                    tmp_options[o_key] = options[o_key]
+                if isinstance(self.options[o_key], list) or isinstance(self.options[o_key], tuple):
+                    tmp_options[o_key] = [self.options[o_key][i]]  # FIXME: Does not work properly without list
+                elif isinstance(self.options[o_key], int) or isinstance(self.options[o_key], str):
+                    tmp_options[o_key] = self.options[o_key]
 
-            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options)
-            self.tw[self.duts[i]] = widget
-            self.tabs.addTab(self.tw[self.duts[i]], self.duts[i])  # 'DUT %d' % i)
+            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, tab_list=self.tab_list)
 
-        main_layout.addWidget(self.tabs)
+            self.tw[self.setup['dut_names'][i]] = widget
+            self.tabs.addTab(self.tw[self.setup['dut_names'][i]], self.setup['dut_names'][i])
 
     def add_parallel_function(self, func):
-        for i in range(self.n):
-            self.tw[self.duts[i]].add_function(func)
+        for i in range(self.setup['n_duts']):
+            self.tw[self.setup['dut_names'][i]].add_function(func=func)
 
-    def add_parallel_option(self, option, default_value, func, default_name=None, name=None, dtype=None, optional=None, fixed=False, tooltip=None):
-        for i in range(self.n):
-            self.tw[self.duts[i]].add_option(option, func, dtype, name, optional, default_value[i], default_name, fixed, tooltip)
+    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False, tooltip=None):
+
+        for i in range(self.setup['n_duts']):
+            self.tw[self.setup['dut_names'][i]].add_option(option=option, func=func, dtype=dtype, name=name,
+                                                           optional=optional, default_value=default_value[i],
+                                                           fixed=fixed, tooltip=tooltip)
+
+    def update_setup(self, key, value):
+        self.setup[key] = value
+        self._init_tabs()
+
+    def update_options(self, key, value):
+        self.options[key] = value
+        self._init_tabs()
+
