@@ -648,6 +648,12 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
         If True, create additional output plots.
     chunk_size : int
         Chunk size of the data when reading from file.
+    pixel_size : iterable
+        tuple or list of col/row pixel dimension
+    n_pixels : iterable
+        tuple or list of amount of pixel in col/row dimension
+    show_inefficient_events : bool
+        Whether to log inefficient events
     '''
     logging.info('=== Calculating efficiency ===')
 

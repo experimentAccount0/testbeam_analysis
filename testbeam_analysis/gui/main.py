@@ -8,6 +8,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from data import DataTab
 from setup import SetupTab
 from settings import SettingsWindow
+from analysis_widgets import AnalysisLogger
 
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
@@ -55,12 +56,18 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(PROJECT_NAME)
         self.screen = QtWidgets.QDesktopWidget().screenGeometry()
         self.setMinimumSize(MINIMUM_RESOLUTION[0], MINIMUM_RESOLUTION[1])
-        self.resize(0.75 * self.screen.width(), 0.75 * self.screen.height())
+        self.resize(0.8 * self.screen.width(), 0.8 * self.screen.height())
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
-        # Add widgets to main window
+        # Create main layout
+        self.main_widget = QtWidgets.QWidget()
+        self.main_layout = QtWidgets.QVBoxLayout(self.main_widget)
+        self.setCentralWidget(self.main_widget)
+
+        # Init widgets and add to main window
         self._init_menu()
         self._init_tabs()
+        self._init_logger()
         self.connect_tabs()
 
         self.handle_messages("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
@@ -72,11 +79,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment', 'Track finding',
-                          'Alignment', 'Track fitting', 'Analysis', 'Result')
+                          'Alignment', 'Track fitting', 'Result')  # 'Analysis' missing
 
         # Add QTabWidget for tab_widget
         self.tabs = QtWidgets.QTabWidget()
-        self.setCentralWidget(self.tabs)
 
         # Initialize each tab
         for name in self.tab_order:
@@ -96,7 +102,37 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             self.handle_tabs(enable=True)
             #self.update_tabs()
 
+        # Add to main layout
+        self.main_layout.addWidget(self.tabs)
+
+    def _init_logger(self):
+        """
+        Initializes a custom logging handler for analysis and set its
+        visibility to False. The logger can be shown/hidden via the 
+        appearance menu in the GUI or closed button
+        """
+
+        # Create logger instance
+        self.logger = AnalysisLogger(self)
+        self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+        # Add custom logger
+        logging.getLogger().addHandler(self.logger)
+        logging.getLogger().setLevel(logging.INFO)
+
+        # Set visibility to false at init
+        self.logger.dock.setVisible(False)
+
+        self.logger.dock.setMaximumHeight(0.25*self.height())
+
+        # Add to main layout
+        self.main_layout.addWidget(self.logger.dock)
+
     def _init_menu(self):
+        """
+        Initialize the menubar of the AnalysisWindow
+        """
+
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.file_quit,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
@@ -105,6 +141,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.settings_menu = QtWidgets.QMenu('&Settings', self)
         self.settings_menu.addAction('&Global', self.global_settings)
         self.menuBar().addMenu(self.settings_menu)
+
+        self.appearance_menu = QtWidgets.QMenu('&Appearance', self)
+        self.appearance_menu.addAction('&Show/hide logger', self.handle_logger, QtCore.Qt.CTRL + QtCore.Qt.Key_L)
+        self.menuBar().addMenu(self.appearance_menu)
 
         self.session_menu = QtWidgets.QMenu('&Session', self)
         self.session_menu.addAction('&Save', self.save_session, QtCore.Qt.CTRL + QtCore.Qt.Key_S)
@@ -131,6 +171,16 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         self.statusBar().showMessage(message, ms)
 
+    def handle_logger(self):
+        """
+        Handle whether logger is visible or not
+        """
+
+        if self.logger.dock.isVisible():
+            self.logger.dock.setVisible(False)
+        else:
+            self.logger.dock.setVisible(True)
+
     def handle_tabs(self, tabs=None, enable=True):
         """
         Enables/Disables a specific tab with name 'names' or loops over list of tab names to en/disable them
@@ -138,6 +188,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         if _DEBUG:
             return
+
         # Dis/enable all tabs but Files
         if tabs is None:
             for i in range(self.tabs.count()):
@@ -145,7 +196,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.tabs.setTabEnabled(i, enable)
 
         # Dis/enable specific tab
-        elif type(tabs) is unicode or type(tabs) is str:
+        elif type(tabs) is unicode:
             if tabs in self.tab_order:
                 self.tabs.setTabEnabled(self.tab_order.index(tabs), enable)
 
@@ -175,12 +226,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.tw[name].proceedAnalysis.connect(lambda: self.update_tabs(data=self.tw['Setup'].data,
                                                                                    skip='Setup'))
 
-                self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
-#                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
+                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
+                self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
             except (AttributeError, KeyError):
-                print name, AttributeError, KeyError
                 pass
 
     def update_tabs(self, data=None, tabs=None, skip=None):
@@ -216,7 +266,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     if tab in update_tabs:
                         update_tabs.remove(tab)
             else:
-                update_tabs.remove(skip)
+                if skip in update_tabs:
+                    update_tabs.remove(skip)
 
         # Make temporary dict for updated tabs
         tmp_tw = {}
@@ -238,26 +289,30 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             elif name == 'Pre-alignment':
                 widget = tab_widget.PrealignmentTab(parent=self.tabs,
                                                     setup=self.setup,
-                                                    options=self.options)
+                                                    options=self.options,
+                                                    tab_list='Track finding')
 
             elif name == 'Track finding':
                 widget = tab_widget.TrackFindingTab(parent=self.tabs,
                                                     setup=self.setup,
-                                                    options=self.options)
+                                                    options=self.options,
+                                                    tab_list='Alignment')
             elif name == 'Alignment':
                 widget = tab_widget.AlignmentTab(parent=self.tabs,
                                                  setup=self.setup,
-                                                 options=self.options)
+                                                 options=self.options,
+                                                 tab_list='Track fitting')
             elif name == 'Track fitting':
                 widget = tab_widget.TrackFittingTab(parent=self.tabs,
                                                     setup=self.setup,
-                                                    options=self.options)
+                                                    options=self.options,
+                                                    tab_list='Result')
             elif name == 'Result':
                 widget = tab_widget.ResultTab(parent=self.tabs,
                                               setup=self.setup,
                                               options=self.options)
             else:
-                logging.info('Gui for %s not implemented yet!' % name)
+                # logging.info('Gui for %s not implemented yet!' % name)
                 continue
 
             tmp_tw[name] = widget
@@ -309,6 +364,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                                         caption=caption,
                                                         directory='./sessions',
                                                         filter='*.yaml')[0]
+
+        message = 'Congratulations! Your session would have been saved in %s' \
+                  ' ...if we had implemented saving sessions, which we have not.' % session
+        logging.info(message)
         pass
 
     def load_session(self):
@@ -320,6 +379,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                                         caption=caption,
                                                         directory='./sessions',
                                                         filter='*.yaml')[0]
+
+        message = 'Congratulations! Your session would have been loaded from %s' \
+                  ' ...if we had implemented loading sessions, which we have not.' % session
+        logging.info(message)
         pass
 
     def file_quit(self):

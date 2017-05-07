@@ -36,7 +36,7 @@ class AnalysisWidget(QtWidgets.QWidget):
     """
     Implements a generic analysis gui.
 
-    There are two seperated widget areas. One the left one for plotting
+    There are two separated widget areas. One the left one for plotting
     and on the right for function parameter options.
     There are 3 kind of options:
       - needed ones on top
@@ -50,7 +50,7 @@ class AnalysisWidget(QtWidgets.QWidget):
     """
 
     # Signal emitted after all funcs are called
-    AnalysisSignal = QtCore.pyqtSignal(list)
+    analysisDone = QtCore.pyqtSignal(list)
 
     def __init__(self, parent, setup, options, tab_list=None):
         super(AnalysisWidget, self).__init__(parent)
@@ -68,47 +68,47 @@ class AnalysisWidget(QtWidgets.QWidget):
 
     def _setup(self):
         # Plot area
-        left_widget = QtWidgets.QWidget()
+        self.left_widget = QtWidgets.QWidget()
         self.plt = QtWidgets.QHBoxLayout()
-        left_widget.setLayout(self.plt)
+        self.left_widget.setLayout(self.plt)
         # Options
         self.opt_needed = QtWidgets.QVBoxLayout()
         self.opt_optional = QtWidgets.QVBoxLayout()
         self.opt_fixed = QtWidgets.QVBoxLayout()
         # Option area
 
-        layout_options = QtWidgets.QVBoxLayout()
+        self.layout_options = QtWidgets.QVBoxLayout()
         self.label_option = QtWidgets.QLabel('Options')
-        layout_options.addWidget(self.label_option)
-        layout_options.addLayout(self.opt_needed)
-        layout_options.addLayout(self.opt_optional)
-        layout_options.addLayout(self.opt_fixed)
-        layout_options.addStretch(0)
+        self.layout_options.addWidget(self.label_option)
+        self.layout_options.addLayout(self.opt_needed)
+        self.layout_options.addLayout(self.opt_optional)
+        self.layout_options.addLayout(self.opt_fixed)
+        self.layout_options.addStretch(0)
 
         # Proceed button
-        button_ok = QtWidgets.QPushButton('OK')
-        button_ok.clicked.connect(self._call_funcs)
-        layout_options.addWidget(button_ok)
+        self.button_ok = QtWidgets.QPushButton('OK')
+        self.button_ok.clicked.connect(self._call_funcs)
+        self.layout_options.addWidget(self.button_ok)
 
-        right_widget = QtWidgets.QWidget()
-        right_widget.setLayout(layout_options)
+        self.right_widget = QtWidgets.QWidget()
+        self.right_widget.setLayout(self.layout_options)
 
         # Make right widget scroll able
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setBackgroundRole(QtGui.QPalette.Light)
-        scroll.setWidget(right_widget)
+        scroll.setWidget(self.right_widget)
 
         # Split plot and option area
-        widget_splitter = QtWidgets.QSplitter(parent=self)
-        widget_splitter.addWidget(left_widget)
-        widget_splitter.addWidget(scroll)
-        widget_splitter.setStretchFactor(0, 10)
-        widget_splitter.setStretchFactor(1, 2.5)
-        widget_splitter.setChildrenCollapsible(False)
+        self.widget_splitter = QtWidgets.QSplitter(parent=self)
+        self.widget_splitter.addWidget(self.left_widget)
+        self.widget_splitter.addWidget(scroll)
+        self.widget_splitter.setStretchFactor(0, 10)
+        self.widget_splitter.setStretchFactor(1, 2.5)
+        self.widget_splitter.setChildrenCollapsible(False)
         # Add complete layout to this widget
         layout_widget = QtWidgets.QVBoxLayout()
-        layout_widget.addWidget(widget_splitter)
+        layout_widget.addWidget(self.widget_splitter)
         self.setLayout(layout_widget)
 
     def _option_exists(self, option):
@@ -335,8 +335,8 @@ class AnalysisWidget(QtWidgets.QWidget):
                             'File I/O %s not defined in settings', arg)
                 else:
                     raise RuntimeError('Function argument %s not defined', arg)
-        print(func.__name__, kwargs)
-        # func(**kwargs)
+        # print(func.__name__, kwargs)
+        func(**kwargs)
 
     def _call_funcs(self):
         """ 
@@ -345,10 +345,11 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         for func, kwargs in self.calls.iteritems():
             print(func.__name__, kwargs)
-            # self._call_func(func, kwargs)
+            #self._call_func(func, kwargs)
 
         # Emit signal to indicate end of analysis
-        self.AnalysisSignal.emit(self.tab_list)
+        if self.tab_list is not None:
+            self.analysisDone.emit(self.tab_list)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
@@ -357,28 +358,49 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
     Creates UI with one tab widget per respective input file
     """
 
-    ParallelAnalysisSignal = QtCore.pyqtSignal(list)
+    parallelAnalysisDone = QtCore.pyqtSignal(list)
 
     def __init__(self, parent, setup, options, tab_list=None):
 
         super(ParallelAnalysisWidget, self).__init__(parent)
 
-        # Make widgets for gui
-        self.main_layout = QtWidgets.QHBoxLayout()
+        # Make main layout
+        self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
+
+        # Add sub-layout and ok button and progressbar
+        self.sub_layout = QtWidgets.QHBoxLayout()
+        self.btn_ok = QtWidgets.QPushButton('Ok')
+        self.btn_ok.clicked.connect(lambda: self._call_parallel_funcs())
+        self.p_bar = QtWidgets.QProgressBar()
+        self.p_bar.setVisible(False)
+
+        # Set alignment in sub-layout
+        self.sub_layout.addWidget(self.p_bar)
+        self.sub_layout.addWidget(self.btn_ok)
+        self.sub_layout.setAlignment(self.p_bar, QtCore.Qt.AlignLeading)
+        self.sub_layout.setAlignment(self.btn_ok, QtCore.Qt.AlignTrailing)
 
         # Tab related widgets
         self.tabs = QtWidgets.QTabWidget()
         self.tw = {}
+
+        # Add to main layout
         self.main_layout.addWidget(self.tabs)
+        self.main_layout.addLayout(self.sub_layout)
 
         # Initialize options and setup
         self.setup = setup
         self.options = options
 
-        self.tab_list=tab_list
+        # List of tabs which will be enabled after analysis
+        if isinstance(tab_list, list):
+            self.tab_list = tab_list
+        else:
+            self.tab_list = [tab_list]
 
         self._init_tabs()
+        self.connect_tabs()
 
     def _init_tabs(self):
 
@@ -394,21 +416,50 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             for s_key in self.setup.keys():
 
                 if isinstance(self.setup[s_key], list) or isinstance(self.setup[s_key], tuple):
-                    tmp_setup[s_key] = [self.setup[s_key][i]]  # FIXME: Does not work properly without list
+                    if isinstance(self.setup[s_key][i], str):
+                        tmp_setup[s_key] = [self.setup[s_key][i]]  # FIXME: Does not work properly without list
+                    else:
+                        tmp_setup[s_key] = self.setup[s_key][i]
                 elif isinstance(self.setup[s_key], int) or isinstance(self.setup[s_key], str):
                     tmp_setup[s_key] = self.setup[s_key]
 
             for o_key in self.options.keys():
 
                 if isinstance(self.options[o_key], list) or isinstance(self.options[o_key], tuple):
-                    tmp_options[o_key] = [self.options[o_key][i]]  # FIXME: Does not work properly without list
+                    if isinstance(self.options[o_key][i], str):
+                        tmp_options[o_key] = [self.options[o_key][i]]  # FIXME: Does not work properly without list
+                    else:
+                        tmp_options[o_key] = self.options[o_key][i]
                 elif isinstance(self.options[o_key], int) or isinstance(self.options[o_key], str):
                     tmp_options[o_key] = self.options[o_key]
 
             widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, tab_list=self.tab_list)
+            widget.button_ok.deleteLater()
 
             self.tw[self.setup['dut_names'][i]] = widget
             self.tabs.addTab(self.tw[self.setup['dut_names'][i]], self.setup['dut_names'][i])
+
+    def connect_tabs(self):
+
+        self.tabs.currentChanged.connect(lambda tab: self.handle_sub_layout(tab=tab))
+
+        for tab_name in self.tw.keys():
+            self.tw[tab_name].widget_splitter.splitterMoved.connect(
+                lambda: self.handle_sub_layout(tab=self.tabs.currentIndex()))
+
+    def resizeEvent(self, QResizeEvent):
+        self.handle_sub_layout(tab=self.tabs.currentIndex())
+
+    def showEvent(self, QShowEvent):
+        self.handle_sub_layout(tab=self.tabs.currentIndex())
+
+    def handle_sub_layout(self, tab):
+
+        offset = 10
+        sub_widths = self.tw[self.tabs.tabText(tab)].widget_splitter.sizes()
+
+        self.p_bar.setFixedWidth(sub_widths[0] + offset)
+        self.btn_ok.setFixedWidth(sub_widths[1] + offset)
 
     def add_parallel_function(self, func):
         for i in range(self.setup['n_duts']):
@@ -421,11 +472,46 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                            optional=optional, default_value=default_value[i],
                                                            fixed=fixed, tooltip=tooltip)
 
-    def update_setup(self, key, value):
-        self.setup[key] = value
-        self._init_tabs()
+    def _call_parallel_funcs(self):
 
-    def update_options(self, key, value):
-        self.options[key] = value
-        self._init_tabs()
+        self.btn_ok.setDisabled(True)
+
+        self.p_bar.setRange(0, len(self.tw.keys()))
+        self.p_bar.setVisible(True)
+
+        for i, tab in enumerate(self.tw.keys()):
+            # QtCore.QCoreApplication.processEvents()  # FIXME: Multi-threading probably needed here
+            self.tw[tab]._call_funcs()
+            self.p_bar.setValue(i+1)
+
+        if self.tab_list is not None:
+            self.parallelAnalysisDone.emit(self.tab_list)
+
+        self.btn_ok.setDisabled(False)
+
+
+class AnalysisLogger(logging.Handler):
+    """
+    Implements a logging handler which allows redirecting log
+    into QPlainTextEdit to display in AnalysisWindow
+    """
+
+    def __init__(self, parent):
+
+        super(AnalysisLogger, self).__init__()
+
+        # Widget to display log in, we only want to read log
+        self.widget = QtWidgets.QPlainTextEdit(parent)
+        self.widget.setReadOnly(True)
+
+        # Dock in which text widget is placed to make it closable without losing log content
+        self.dock = QtWidgets.QDockWidget(parent)
+        self.dock.setWidget(self.widget)
+        self.dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
+        self.dock.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable)
+        self.dock.setWindowTitle('Logger')
+
+    def emit(self, record):
+        msg = self.format(record)
+        self.widget.appendPlainText(msg)
 

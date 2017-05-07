@@ -4,8 +4,8 @@
     gui options and plotting outputs
 '''
 
-from PyQt5 import QtCore
-from testbeam_analysis.gui.analysis_widget import AnalysisWidget, ParallelAnalysisWidget
+from PyQt5 import QtCore, QtWidgets
+from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
 from testbeam_analysis.dut_alignment import correlate_cluster, prealignment, merge_cluster_data, apply_alignment, alignment
 from testbeam_analysis.track_analysis import find_tracks, fit_tracks
@@ -14,6 +14,8 @@ from testbeam_analysis.result_analysis import calculate_efficiency, calculate_re
 
 class NoisyPixelsTab(ParallelAnalysisWidget):
     """ Implements the noisy pixel analysis gui"""
+
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
     def __init__(self, parent, setup, options):
         super(NoisyPixelsTab, self).__init__(parent, setup, options)
@@ -37,21 +39,13 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=False)
 
-#        self.update_options(key='input_hits_file',
-#                            value=options['input_files'])
-#        self.update_options(key='output_mask_file',
-#                            value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']])
-#
-#        self.update_setup(key='n_pixel',
-#                          value=setup['n_pixels'])
-#        self.update_setup(key='dut_name',
-#                          value=setup['dut_names'])
-#
-#        self.add_parallel_function(func=generate_pixel_mask)
+        self.parallelAnalysisDone.connect(lambda: self.proceedAnalysis.emit([]))
 
 
 class ClusterPixelsTab(ParallelAnalysisWidget):
     ''' Implements the pixel clustering gui'''
+
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
     def __init__(self, parent, setup, options, tab_list):
         super(ClusterPixelsTab, self).__init__(parent, setup, options, tab_list)
@@ -78,6 +72,8 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
                                  func=cluster_hits,
                                  fixed=False)
 
+        self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+
 
 class PrealignmentTab(AnalysisWidget):
     ''' Implements the prealignment gui. Prealignment uses
@@ -88,10 +84,10 @@ class PrealignmentTab(AnalysisWidget):
         - apply prealignment
     '''
 
-    proceedAnalysis = QtCore.pyqtSignal('QString')
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(PrealignmentTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(PrealignmentTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=correlate_cluster)
         self.add_function(func=prealignment)
@@ -113,36 +109,42 @@ class PrealignmentTab(AnalysisWidget):
                         default_value=True, fixed=True)
         self.add_option(option='no_z', func=apply_alignment, fixed=True)
 
+        self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+
 
 class TrackFindingTab(AnalysisWidget):
     ''' Implements the track finding gui'''
 
-    proceedAnalysis = QtCore.pyqtSignal('QString')
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(TrackFindingTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(TrackFindingTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=find_tracks)
+
+        self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
 
 
 class AlignmentTab(AnalysisWidget):
     ''' Implements the alignment gui'''
 
-    proceedAnalysis = QtCore.pyqtSignal('QString')
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(AlignmentTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(AlignmentTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=alignment)
+
+        self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
 
 
 class TrackFittingTab(AnalysisWidget):
     ''' Implements the track fitting gui'''
 
-    proceedAnalysis = QtCore.pyqtSignal('QString')
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(TrackFittingTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(TrackFittingTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=fit_tracks)
         # Set and fix options
@@ -156,6 +158,8 @@ class TrackFittingTab(AnalysisWidget):
                         default_value=False, fixed=True)
         self.add_option(option='min_track_distance', func=fit_tracks,
                         default_value=[200] * setup['n_duts'], optional=False)
+
+        self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
 
 
 class ResultTab(AnalysisWidget):
