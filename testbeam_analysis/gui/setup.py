@@ -17,7 +17,7 @@ class SetupTab(QtWidgets.QWidget):
         self.data = None
 
         # Make list of tabs that will be enabled after proceedAnalysis signal of this class
-        self.tab_list = ['Noisy Pixel', 'Clustering']
+        self.tab_list = ['Noisy Pixel']
 
         # Make tuple of properties of each dut
         self._dut_props = ('z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma',

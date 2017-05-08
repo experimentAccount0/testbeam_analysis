@@ -17,8 +17,8 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(NoisyPixelsTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(NoisyPixelsTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_parallel_function(func=generate_pixel_mask)
 
@@ -39,7 +39,7 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=False)
 
-        self.parallelAnalysisDone.connect(lambda: self.proceedAnalysis.emit([]))
+        self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
 
 
 class ClusterPixelsTab(ParallelAnalysisWidget):
@@ -94,14 +94,52 @@ class PrealignmentTab(AnalysisWidget):
         self.add_function(func=merge_cluster_data)
         self.add_function(func=apply_alignment)
 
-        # Fix options that should not be changed
-        self.add_option(option='input_cluster_files', func=correlate_cluster,
-                        default_value=[options['output_path'] + name + '_clustered.h5' for name in setup['dut_names']],
+        self.add_option(option='input_cluster_files',
+                        default_value=[options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']],
+                        func=correlate_cluster,
                         fixed=True)
 
-#         self.add_option(option='initial_rotation', func=alignment,
-#                         default_value=sdf['rotations'], fixed=True)
+        self.add_option(option='output_correlation_file',
+                        default_value=options['output_path'] + '/Correlation.h5',
+                        func=correlate_cluster,
+                        fixed=True)
 
+        self.add_option(option='input_correlation_file',
+                        default_value=options['output_path'] + '/Correlation.h5',
+                        func=prealignment,
+                        fixed=True)
+
+        self.add_option(option='output_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=prealignment,
+                        fixed=True)
+
+        self.add_option(option='input_cluster_files',
+                        default_value=[options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']],
+                        func=merge_cluster_data,
+                        fixed=True)
+
+        self.add_option(option='output_merged_file',
+                        default_value=options['output_path'] + '/Merged.h5',
+                        func=merge_cluster_data,
+                        fixed=True)
+
+        self.add_option(option='input_hit_file',
+                        default_value=options['output_path'] + '/Merged.h5',
+                        func=apply_alignment,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=apply_alignment,
+                        fixed=True)
+
+        self.add_option(option='output_hit_file',
+                        default_value=options['output_path'] + '/Tracklets_prealigned.h5',
+                        func=apply_alignment,
+                        fixed=True)
+
+        # Fix options that should not be changed
         self.add_option(option='use_duts', func=apply_alignment,
                         default_value=[1] * setup['n_duts'], fixed=True)
         self.add_option(option='inverse', func=apply_alignment, fixed=True)
@@ -122,6 +160,21 @@ class TrackFindingTab(AnalysisWidget):
 
         self.add_function(func=find_tracks)
 
+        self.add_option(option='input_tracklets_file',
+                        default_value=options['output_path'] + '/Tracklets_prealigned.h5',
+                        func=find_tracks,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=find_tracks,
+                        fixed=True)
+
+        self.add_option(option='output_track_candidates_file',
+                        default_value=options['output_path'] + '/TrackCandidates_prealignment.h5',
+                        func=find_tracks,
+                        fixed=True)
+
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
 
 
@@ -134,6 +187,32 @@ class AlignmentTab(AnalysisWidget):
         super(AlignmentTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=alignment)
+        self.add_function(func=apply_alignment)
+
+        self.add_option(option='input_track_candidates_file',
+                        default_value=options['output_path'] + '/TrackCandidates_prealignment.h5',
+                        func=alignment,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=alignment,
+                        fixed=True)
+
+        self.add_option(option='input_hit_file',
+                        default_value=options['output_path'] + '/Merged.h5',
+                        func=apply_alignment,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=apply_alignment,
+                        fixed=True)
+
+        self.add_option(option='output_hit_file',
+                        default_value=options['output_path'] + '/Tracklets.h5',
+                        func=alignment,
+                        fixed=True)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
 
@@ -146,7 +225,24 @@ class TrackFittingTab(AnalysisWidget):
     def __init__(self, parent, setup, options, tab_list):
         super(TrackFittingTab, self).__init__(parent, setup, options, tab_list)
 
+        self.add_function(func=find_tracks)
         self.add_function(func=fit_tracks)
+
+        self.add_option(option='input_tracklets_file',
+                        default_value=options['output_path'] + '/Tracklets.h5',
+                        func=find_tracks,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=find_tracks,
+                        fixed=True)
+
+        self.add_option(option='output_track_candidates_file',
+                        default_value=options['output_path'] + '/TrackCandidates.h5',
+                        func=find_tracks,
+                        fixed=True)
+
         # Set and fix options
         self.add_option(option='fit_duts', func=fit_tracks,
                         default_value=[0] * setup['n_duts'], optional=True)

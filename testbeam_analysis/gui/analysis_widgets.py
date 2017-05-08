@@ -2,6 +2,7 @@ import os
 import inspect
 import logging
 import math
+from multiprocessing import Pool
 from collections import OrderedDict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -90,6 +91,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.button_ok.clicked.connect(self._call_funcs)
         self.layout_options.addWidget(self.button_ok)
 
+        # Right widget
         self.right_widget = QtWidgets.QWidget()
         self.right_widget.setLayout(self.layout_options)
 
@@ -343,9 +345,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         Call all functions in a row
         """
 
+        pool = Pool()
         for func, kwargs in self.calls.iteritems():
-            print(func.__name__, kwargs)
-            #self._call_func(func, kwargs)
+            # print(func.__name__, kwargs)
+            pool.apply_async(self._call_func(func, kwargs))
+        pool.close()
+        pool.join()
 
         # Emit signal to indicate end of analysis
         if self.tab_list is not None:
@@ -480,9 +485,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.p_bar.setVisible(True)
 
         for i, tab in enumerate(self.tw.keys()):
-            # QtCore.QCoreApplication.processEvents()  # FIXME: Multi-threading probably needed here
-            self.tw[tab]._call_funcs()
             self.p_bar.setValue(i+1)
+            self.tw[tab]._call_funcs()
+            # QtCore.QCoreApplication.processEvents()  # FIXME: Multi-threading probably needed here
 
         if self.tab_list is not None:
             self.parallelAnalysisDone.emit(self.tab_list)

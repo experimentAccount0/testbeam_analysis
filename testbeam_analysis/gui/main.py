@@ -279,7 +279,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             elif name == 'Noisy Pixel':
                 widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
                                                    setup=self.setup,
-                                                   options=self.options)
+                                                   options=self.options,
+                                                   tab_list='Clustering')
             elif name == 'Clustering':
                 widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
                                                      setup=self.setup,
