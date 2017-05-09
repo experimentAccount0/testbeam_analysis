@@ -1,7 +1,5 @@
-sphinx>=1.3.5
+sphinx
+sphinxcontrib-versioning
 sphinx_rtd_theme
 sphinxcontrib-napoleon
 sphinx-git
-numpy
-matplotlib
-cython

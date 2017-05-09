@@ -2,26 +2,24 @@
 Introduction
 ===============================================
 
-|travis-status|  |appveyor-status|  |rtd-status|  |coverage|
+|travis-status|  |appveyor-status|  |doc|  |coverage|
 
-Testbeam analysis is a simple analysis of pixel-sensor data in particle beams. All steps of a complete analysis
-are implemented with a few independent python functions. If you want to understand the basics of telescope data
-reconstruction this code might help. 
-If you want to have something fancy to account for thick devices in combination with low energetic beams
-use e.g. _EUTelescope_. Depending on the setup a resolution that is only ~ 15% worse can be archieved with this code.
-For a quick first impression check the examples in the documentation.
+Testbeam analysis is a simple to use software to analyse pixel-sensor data taken in a particle-beam telescope-setup. All steps of a complete analysis
+are implemented with a few independent python functions. For a quick first impression check the examples in the documentation.
 
-In future releases it is forseen to make the code more readable and to implement a Kalman Filter to have the best
-possible track fit results.
+In future releases it is forseen to:
+  - Implement a Kalman Filter
+  - Enhance the alignments
+  - Add a GUI
 
 Installation
 ============
 You have to have Python 2/3 with the following modules installed:
-- cython
-- tables
-- scipy
-- matplotlib
-- numba
+  - cython
+  - tables
+  - scipy
+  - matplotlib
+  - numba
 
 If you are new to Python please look at the installation guide in the wiki.
 Since it is recommended to change example files according to your needs you should install the module with
@@ -57,8 +55,8 @@ In the examples folder type e.g.:
     :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis
     :alt: Build status
 
-.. |rtd-status| image:: https://readthedocs.org/projects/testbeam_analysis/badge/?version=latest
-    :target: http://testbeam_analysis.rtfd.org
+.. |doc| image:: https://img.shields.io/badge/documentation--green.svg
+    :target: http://silab-bonn.github.io/testbeam_analysis
     :alt: Documentation
     
 .. |coverage| image:: https://coveralls.io/repos/SiLab-Bonn/testbeam_analysis/badge.svg?branch=development

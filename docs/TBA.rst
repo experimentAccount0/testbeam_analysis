@@ -3,4 +3,4 @@
 Latest commits
 ==============
 
-.. git_changelog::
+#.. git_changelog::

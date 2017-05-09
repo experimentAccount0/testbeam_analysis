@@ -1,39 +1,40 @@
-'''Example script to run a full analysis on telescope data. The original data
-can be found in the example folder of the EUTelescope framework.
+''' Example script to run a full analysis on telescope data. The original data
+    can be found in the example folder of the EUTelescope framework.
 
-The residuals are calculated with different cuts on prealigned and aligned data
-for demonstration purpose:
+    The residuals are calculated with different cuts on prealigned and aligned data
+    for demonstration purpose:
 
-When only prealigning the DUTs and using all DUT hits and cutting on the chi2:
-The residuals are very dependent if the prealignment is sufficient. Residuals
-are usually rather high (several 10 um)
+    - When only prealigning the DUTs and using all DUT hits and cutting on the chi2:
+      The residuals are very dependent if the prealignment is sufficient. Residuals
+      are usually rather high (several 10 um)
 
-When aligning the DUTs and only interpolating the tracks from 2 DUTs:
-The residual for the planes 2 - 4 (DUT 1 - DUT 3) are about 6.5 um in x/y and
-comparable to the residuals from the EuTelescope software (6 um).
+    - When aligning the DUTs and only interpolating the tracks from 2 DUTs:
+      The residual for the planes 2 - 4 (DUT 1 - DUT 3) are about 6.5 um in x/y and
+      comparable to the residuals from the EuTelescope software (6 um).
 
-When aligning the DUTs and using all DUT hits and cutting on the chi2:
-The residuals and selected number of tracks are highly dependent on the
-chi2 cut and are at least 6 um and usually < 10 um depending on the
-plane position. This is an effect of multiple scattering. The outer most plans
-have a rather high residual (~ 18 um)
+    - When aligning the DUTs and using all DUT hits and cutting on the chi2:
+      The residuals and selected number of tracks are highly dependent on the
+      chi2 cut and are at least 6 um and usually < 10 um depending on the
+      plane position. This is an effect of multiple scattering. The outer most plans
+      have a rather high residual (~ 18 um)
 
 
-SETUP:
+    Setup
+    -----
 
-The telescope consists of 6 planes with 15 cm clearance between the planes.
-The data was taken at Desy with ~ 3-4 GeV/c (to be checked).
+    The telescope consists of 6 planes with 15 cm clearance between the planes.
+    The data was taken at Desy with ~ 3-4 GeV/c (to be checked).
 
-The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix
-consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
-The total size of the chip is 21.5mm x 13.7mm x 0.036mm
-(radiation length 9.3660734)
+    The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix
+    consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
+    The total size of the chip is 21.5mm x 13.7mm x 0.036mm
+    (radiation length 9.3660734)
 
-The matrix is divided into 4 areas. For each area the threshold can be set up
-individually. The quartes are from column 0-287, 288-575, 576-863 and 864-1151.
+    The matrix is divided into 4 areas. For each area the threshold can be set up
+    individually. The quartes are from column 0-287, 288-575, 576-863 and 864-1151.
 
-The Mimosa26 detects ionizing particle with a density of up to
-10^6 hits / cm^2 / s. The hit rate for a beam telescope is ~5 hits / frame.
+    The Mimosa26 detects ionizing particle with a density of up to
+    10^6 hits / cm^2 / s. The hit rate for a beam telescope is ~5 hits / frame.
 '''
 
 import os
