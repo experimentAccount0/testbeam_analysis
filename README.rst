@@ -4,22 +4,22 @@ Introduction
 
 |travis-status|  |appveyor-status|  |doc|  |coverage|
 
-Testbeam analysis is a simple to use software to analyse pixel-sensor data in a particle-beam telescope-setup. All steps of a complete analysis
+Testbeam analysis is a simple to use software to analyse pixel-sensor data taken in a particle-beam telescope-setup. All steps of a complete analysis
 are implemented with a few independent python functions. For a quick first impression check the examples in the documentation.
 
 In future releases it is forseen to:
-- Implement a Kalman Filter
-- Enhance the alignments
-- Add a GUI
+  - Implement a Kalman Filter
+  - Enhance the alignments
+  - Add a GUI
 
 Installation
 ============
 You have to have Python 2/3 with the following modules installed:
-- cython
-- tables
-- scipy
-- matplotlib
-- numba
+  - cython
+  - tables
+  - scipy
+  - matplotlib
+  - numba
 
 If you are new to Python please look at the installation guide in the wiki.
 Since it is recommended to change example files according to your needs you should install the module with
