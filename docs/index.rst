@@ -6,6 +6,7 @@ Contents:
    TBA
    installation
    Examples
+   GUI
    API
 
  
