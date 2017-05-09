@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Installation guide &mdash; Testbeam Analysis 0.0.1 documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/silab.ico"/>
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+    <link rel="stylesheet" href="_static/banner.css" type="text/css" />
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="Testbeam Analysis 0.0.1 documentation" href="index.html"/>
+        <link rel="next" title="Examples" href="Examples.html"/>
+        <link rel="prev" title="Introduction" href="TBA.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Testbeam Analysis
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="TBA.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installing-miniconda-python">Installing Miniconda Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="API.html">API</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Testbeam Analysis</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Installation guide</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  
+
+
+    
+    
+
+
+
+    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
+<div class="section" id="installation-guide">
+<h1>Installation guide<a class="headerlink" href="#installation-guide" title="Permalink to this headline">¶</a></h1>
+<p>The following step-by-step installation guide explains in more details how you can setup <em>testbeam analysis</em>
+under Windows, Linux or OS X operating system. A decent PC with at least 8 Gb of RAM is recommended!</p>
+<div class="section" id="installing-miniconda-python">
+<h2>Installing Miniconda Python<a class="headerlink" href="#installing-miniconda-python" title="Permalink to this headline">¶</a></h2>
+<p>Miniconda Python is a Python distribution providing a simple to use package manager to install lots of Python packages for data analysis, plotting and I/O.
+These packages are heavily used in <em>testbeam analysis</em>. Download and install Miniconda by following this link: &#8220;Continuum Miniconda&#8221;:<a class="reference external" href="http://conda.pydata.org/miniconda.html">http://conda.pydata.org/miniconda.html</a>. Choose Python 2.7.x according to your operating system architecture (e.g. 64-bit Python on 64-bit operating system)
+&amp;nbsp;
+# <em>Installing C++ Compiler</em>
+<em>Linux:</em> Install gcc via package manager, e.g. on Ubuntu run: &lt;pre&gt;sudo apt-get install build-essential&lt;/pre&gt;*Windows:* Install &#8220;Microsoft Visual C++ Compiler for Python 2.7&#8221;:<a class="reference external" href="http://aka.ms/vcpython27">http://aka.ms/vcpython27</a>
+<em>OS X:</em> Install &#8220;Xcode&#8221;:<a class="reference external" href="https://itunes.apple.com/us/app/xcode/id497799835">https://itunes.apple.com/us/app/xcode/id497799835</a> from App Store and install Xcode Command Line Tools by running: &lt;pre&gt;xcode-select &amp;#45;&amp;#45;install&lt;/pre&gt;
+# <em>Installing Eclipse with PyDev</em>
+Eclipse is a state of the art Integrated Development Environment (IDE) for almost every important software programming language (JAVA, C++, Python, Fortran, Ruby, Mathematica). It has a plug in system to extend the development environment. PyDev is the Python IDE plugin for Eclipse.
+## Eclipse needs a Java runtime environmet (JRE) and will not start if this is not installed. <em>Windows:</em> It is recommend to use the Eclipse 32-bit version, even on a 64-bit machine. Since Eclipse 64-bit needs JRE 64-bit and Oracle JRE 64-bit does not provide automatic updates. This puts the PC at risk of viruses.
+## Download the Eclipse from &#8220;Eclipse Homepage&#8221;:<a class="reference external" href="http://www.eclipse.org/downloads">http://www.eclipse.org/downloads</a>. Eclipse does not need to be installed, the archive has to be extracted to a folder of your choice. Eclipse can be executed by double clicking on the executable.
+## Eclipse asks for a workspace path where the projects will be located on your harddrive. Standard settings are sufficient.
+## Close the welcome screen.
+## Install the PyDev plugin by clicking on _Help -&gt; Install New <a href="#id1"><span class="problematic" id="id2">Software_</span></a> . Press add and fill the form (_name = <a href="#id3"><span class="problematic" id="id4">PyDev_</span></a>, _location = <a class="reference external" href="http://pydev.org/">http://pydev.org/</a><a href="#id5"><span class="problematic" id="id6">updates_</span></a>):
+&amp;nbsp;
+!{width:400px}PyDev.jpg!
+&amp;nbsp;
+Select PyDev and install (accept license agreement and trust the certificate).
+<em>Linux:</em> PyDev 3 is out and it needs Java 7, otherwise it will not show up in Eclipse without any error message. Please install java 7 and activate it. In Ubuntu activate it with &lt;pre&gt;sudo update-alternatives &amp;#45;&amp;#45;config java&lt;/pre&gt;
+## Add PyDev perspective to Eclipse and select it. The button is located in the upper rigth corner:
+&amp;nbsp;
+!{width:300px}Perspective.jpg!
+&amp;nbsp;
+## Goto _Window -&gt; Preferences -&gt; PyDev -&gt; Interpreters-&gt; Python <a href="#id7"><span class="problematic" id="id8">Interpreter_</span></a> and press new.
+&amp;nbsp;
+!{width:600px}AnacondaSetup1.jpg!
+&amp;nbsp;
+Select the Python executable in /home/&lt;username&gt;/anaconda/bin/ on <em>Linux</em> or c:Anacondaon <em>Windows</em> (optionally use the Anaconda/env/&lt;environment name&gt;/ folder if you are using Anaconda environments) and press the OK button. Everything is set up automatically.
+More details are given &#8220;here&#8221;:<a class="reference external" href="http://docs.continuum.io/anaconda/ide_integration.html">http://docs.continuum.io/anaconda/ide_integration.html</a>.
+&amp;nbsp;
+# <em>Installing Required Python Packages</em>
+Open a console and type one by one:
+&lt;pre&gt;conda update conda&lt;/pre&gt;&lt;pre&gt;conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml&lt;/pre&gt;&lt;pre&gt;pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock&lt;/pre&gt;On <em>Windows</em> additionally run:
+&lt;pre&gt;conda install pywin32&lt;/pre&gt;
+# <em>Installing pyTestbeamAnalysis</em>
+## Goto File-&gt;Import-&gt;Git and select Projects from Git
+## Click clone URI and type the pyTestbeamAnalysis repository (_URI: <a class="reference external" href="https://github.com/SiLab-Bonn/">https://github.com/SiLab-Bonn/</a><a href="#id9"><span class="problematic" id="id10">pyTestbeamAnalysis_</span></a>)
+## If you have a &#8220;GitHub&#8221;:<a class="reference external" href="https://github.com">https://github.com</a> account you can add the credentials here
+## Click next, select all branches, click next and specify the directory where pyBAR will be cloned to
+## Wait until the download of the code is finished and check _Check out as project configured using the New Project <a href="#id11"><span class="problematic" id="id12">Wizard_</span></a>
+## Select _PyDev -&gt; <a href="#id13"><span class="problematic" id="id14">PyDevProject_</span></a>
+## Give the project a name, select the folder where the pyBAR was cloned to (e.g. /home/username/git/pyBAR) and click finish
+## Open a shell and run the following command from the pyBar/host folder: &lt;pre&gt; python setup.py develop &lt;/pre&gt; This will compile and install pyTestbeamAnalysis to the environment.
+<em>Windows:</em> If the compilation fails use the Visual Studio Command promt to run the setup script. Because distutils sometimes cannot find VS due to multiple/old VS installation. It might also be needed to install and &#8220;activate the 64-bit compiler&#8221;:<a class="reference external" href="https://msdn.microsoft.com/en-us/library/x4d2c09s%28v=vs.90%29.aspx">https://msdn.microsoft.com/en-us/library/x4d2c09s%28v=vs.90%29.aspx</a> if you use 64-bit.</p>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="Examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="TBA.html" class="btn btn-neutral" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2017, David-Leon Pohl.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Other Versions</span>
+        v: development
+        <span class="fa fa-caret-down"></span>
+    </span>
+    <div class="rst-other-versions">
+        <dl>
+            <dt>Tags</dt>
+            <dd><a href="0.0.1/index.html">0.0.1</a></dd>
+        </dl>
+        <dl>
+            <dt>Branches</dt>
+            <dd><a href="development/installation.html">development</a></dd>
+            <dd><a href="master/index.html">master</a></dd>
+        </dl>
+    </div>
+</div>
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

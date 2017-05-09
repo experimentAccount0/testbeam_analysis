@@ -41,7 +41,7 @@
         <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="Testbeam Analysis 0.0.1 documentation" href="index.html"/>
         <link rel="next" title="API" href="API.html"/>
-        <link rel="prev" title="Introduction" href="TBA.html"/> 
+        <link rel="prev" title="Installation guide" href="installation.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -96,8 +96,13 @@
             
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="TBA.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation guide</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#module-testbeam_analysis.examples.fei4_telescope">ATLAS FE-I4 telescope</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-testbeam_analysis.examples.eutelescope">EU telescope</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup">Setup</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="API.html">API</a></li>
@@ -192,6 +197,7 @@ planes. Only the first two and last two planes were taken here. The
 first and last plane were IBL n-in-n planar sensors and the 2 devices in
 the center 3D CNM/FBK sensors.</p>
 </div>
+<p>The created plots after the consecutive analysis steps are shown here:</p>
 <img alt="_images/CorrelationColumn.png" src="_images/CorrelationColumn.png" />
 <img alt="_images/CorrelationRow.png" src="_images/CorrelationRow.png" />
 <p>Original correlation <a class="reference download internal" href="_downloads/Correlation.pdf" download=""><code class="xref download docutils literal"><span class="pre">pdf</span> <span class="pre">output</span></code></a></p>
@@ -204,6 +210,39 @@ the center 3D CNM/FBK sensors.</p>
 <p>Original event plot <a class="reference download internal" href="_downloads/Event.pdf" download=""><code class="xref download docutils literal"><span class="pre">pdf</span> <span class="pre">output</span></code></a></p>
 <img alt="_images/Efficiency.png" src="_images/Efficiency.png" />
 <p>Original efficiency <a class="reference download internal" href="_downloads/Efficiency.pdf" download=""><code class="xref download docutils literal"><span class="pre">pdf</span> <span class="pre">output</span></code></a></p>
+</div>
+<div class="section" id="module-testbeam_analysis.examples.eutelescope">
+<span id="eu-telescope"></span><h2>EU telescope<a class="headerlink" href="#module-testbeam_analysis.examples.eutelescope" title="Permalink to this headline">¶</a></h2>
+<p>Example script to run a full analysis on telescope data. The original data
+can be found in the example folder of the EUTelescope framework.</p>
+<p>The residuals are calculated with different cuts on prealigned and aligned data
+for demonstration purpose:</p>
+<ul class="simple">
+<li>When only prealigning the DUTs and using all DUT hits and cutting on the chi2:
+The residuals are very dependent if the prealignment is sufficient. Residuals
+are usually rather high (several 10 um)</li>
+<li>When aligning the DUTs and only interpolating the tracks from 2 DUTs:
+The residual for the planes 2 - 4 (DUT 1 - DUT 3) are about 6.5 um in x/y and
+comparable to the residuals from the EuTelescope software (6 um).</li>
+<li>When aligning the DUTs and using all DUT hits and cutting on the chi2:
+The residuals and selected number of tracks are highly dependent on the
+chi2 cut and are at least 6 um and usually &lt; 10 um depending on the
+plane position. This is an effect of multiple scattering. The outer most plans
+have a rather high residual (~ 18 um)</li>
+</ul>
+<div class="section" id="setup">
+<h3>Setup<a class="headerlink" href="#setup" title="Permalink to this headline">¶</a></h3>
+<p>The telescope consists of 6 planes with 15 cm clearance between the planes.
+The data was taken at Desy with ~ 3-4 GeV/c (to be checked).</p>
+<p>The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix
+consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
+The total size of the chip is 21.5mm x 13.7mm x 0.036mm
+(radiation length 9.3660734)</p>
+<p>The matrix is divided into 4 areas. For each area the threshold can be set up
+individually. The quartes are from column 0-287, 288-575, 576-863 and 864-1151.</p>
+<p>The Mimosa26 detects ionizing particle with a density of up to
+10^6 hits / cm^2 / s. The hit rate for a beam telescope is ~5 hits / frame.</p>
+</div>
 </div>
 </div>
 
@@ -220,7 +259,7 @@ the center 3D CNM/FBK sensors.</p>
         <a href="API.html" class="btn btn-neutral float-right" title="API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="TBA.html" class="btn btn-neutral" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="installation.html" class="btn btn-neutral" title="Installation guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

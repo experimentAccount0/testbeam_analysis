@@ -4,10 +4,11 @@ Contents:
    :maxdepth: 2
    
    TBA
+   installation
    Examples
    API
 
-
+ 
 
 Indices and tables
 ==================
