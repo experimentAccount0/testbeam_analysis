@@ -64,7 +64,7 @@ def run_analysis():
     pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
     n_pixels = [(1152, 576)] * 6  # Number of pixel on column, row
 
-    z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # z position in um
+    z_positions = [0., 150000, 300000, 450000, 600000, 750000]  # z position in um
     # Friendly names for plotting
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
 
