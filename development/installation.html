@@ -98,6 +98,9 @@
 <li class="toctree-l1"><a class="reference internal" href="TBA.html">Introduction</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation guide</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#installing-miniconda-python">Installing Miniconda Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-c-compiler">Installing C++ Compiler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-eclipse-with-pydev-plugin">Installing Eclipse with PyDev Plugin</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-required-python-packages">Installing Required Python Packages</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
@@ -177,49 +180,92 @@
 <div class="section" id="installation-guide">
 <h1>Installation guide<a class="headerlink" href="#installation-guide" title="Permalink to this headline">¶</a></h1>
 <p>The following step-by-step installation guide explains in more details how you can setup <em>testbeam analysis</em>
-under Windows, Linux or OS X operating system. A decent PC with at least 8 Gb of RAM is recommended!</p>
+under Windows, Linux or OS X operating system. A decent PC with at least 8 Gb of RAM is recommended! The Python
+distribution and editor chosen here are of cause not mandatory, but have been tested to work. Thus this guide is useful
+especially for Python beginners.</p>
 <div class="section" id="installing-miniconda-python">
 <h2>Installing Miniconda Python<a class="headerlink" href="#installing-miniconda-python" title="Permalink to this headline">¶</a></h2>
 <p>Miniconda Python is a Python distribution providing a simple to use package manager to install lots of Python packages for data analysis, plotting and I/O.
-These packages are heavily used in <em>testbeam analysis</em>. Download and install Miniconda by following this link: &#8220;Continuum Miniconda&#8221;:<a class="reference external" href="http://conda.pydata.org/miniconda.html">http://conda.pydata.org/miniconda.html</a>. Choose Python 2.7.x according to your operating system architecture (e.g. 64-bit Python on 64-bit operating system)
-&amp;nbsp;
-# <em>Installing C++ Compiler</em>
-<em>Linux:</em> Install gcc via package manager, e.g. on Ubuntu run: &lt;pre&gt;sudo apt-get install build-essential&lt;/pre&gt;*Windows:* Install &#8220;Microsoft Visual C++ Compiler for Python 2.7&#8221;:<a class="reference external" href="http://aka.ms/vcpython27">http://aka.ms/vcpython27</a>
-<em>OS X:</em> Install &#8220;Xcode&#8221;:<a class="reference external" href="https://itunes.apple.com/us/app/xcode/id497799835">https://itunes.apple.com/us/app/xcode/id497799835</a> from App Store and install Xcode Command Line Tools by running: &lt;pre&gt;xcode-select &amp;#45;&amp;#45;install&lt;/pre&gt;
-# <em>Installing Eclipse with PyDev</em>
-Eclipse is a state of the art Integrated Development Environment (IDE) for almost every important software programming language (JAVA, C++, Python, Fortran, Ruby, Mathematica). It has a plug in system to extend the development environment. PyDev is the Python IDE plugin for Eclipse.
-## Eclipse needs a Java runtime environmet (JRE) and will not start if this is not installed. <em>Windows:</em> It is recommend to use the Eclipse 32-bit version, even on a 64-bit machine. Since Eclipse 64-bit needs JRE 64-bit and Oracle JRE 64-bit does not provide automatic updates. This puts the PC at risk of viruses.
-## Download the Eclipse from &#8220;Eclipse Homepage&#8221;:<a class="reference external" href="http://www.eclipse.org/downloads">http://www.eclipse.org/downloads</a>. Eclipse does not need to be installed, the archive has to be extracted to a folder of your choice. Eclipse can be executed by double clicking on the executable.
-## Eclipse asks for a workspace path where the projects will be located on your harddrive. Standard settings are sufficient.
-## Close the welcome screen.
-## Install the PyDev plugin by clicking on _Help -&gt; Install New <a href="#id1"><span class="problematic" id="id2">Software_</span></a> . Press add and fill the form (_name = <a href="#id3"><span class="problematic" id="id4">PyDev_</span></a>, _location = <a class="reference external" href="http://pydev.org/">http://pydev.org/</a><a href="#id5"><span class="problematic" id="id6">updates_</span></a>):
-&amp;nbsp;
+These packages are heavily used in <em>testbeam analysis</em>. Download and install Miniconda by following this link: <a class="reference external" href="http://conda.pydata.org/miniconda.html">Continuum Miniconda</a>.
+Choose the 64-bit version of Python 2.7.x or Python 3.6.x.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Under Windows Python 2.7 is recommended, since there is no free or easy to install Python 3.6 compiler available.</p>
+</div>
+</div>
+<div class="section" id="installing-c-compiler">
+<h2>Installing C++ Compiler<a class="headerlink" href="#installing-c-compiler" title="Permalink to this headline">¶</a></h2>
+<ul>
+<li><p class="first">Linux
+Install <em>gcc</em> via package manager, e.g. on Ubuntu run:</p>
+<p><code class="code bash docutils literal"><span class="pre">sudo</span> <span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">build-essential</span></code></p>
+</li>
+<li><p class="first">Windows
+Install <a class="reference external" href="http://aka.ms/vcpython27">Microsoft Visual C++ Compiler for Python 2.7</a>.</p>
+</li>
+<li><p class="first">OS X
+Install <a class="reference external" href="https://itunes.apple.com/us/app/xcode/id497799835">Xcode</a> from App Store and install Xcode Command Line Tools by running
+<code class="code bash docutils literal"><span class="pre">xcode-select</span> <span class="pre">install</span></code></p>
+</li>
+</ul>
+</div>
+<div class="section" id="installing-eclipse-with-pydev-plugin">
+<h2>Installing Eclipse with PyDev Plugin<a class="headerlink" href="#installing-eclipse-with-pydev-plugin" title="Permalink to this headline">¶</a></h2>
+<p>Eclipse is a state of the art Integrated Development Environment (IDE) for almost every important software programming language
+(JAVA, C++, Python, Fortran, Ruby, Mathematica). It has a plug in system to extend the development environment. PyDev is the Python IDE plugin for Eclipse.
+Eclipse needs a Java runtime environmet (JRE) and will not start if this is not installed.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Under Windows it is recommend to use the Eclipse 32-bit version, even on a 64-bit machine. Since Eclipse 64-bit needs JRE 64-bit
+and Oracle JRE 64-bit does not provide automatic updates. This puts the PC at risk of viruses.</p>
+</div>
+<ol class="arabic">
+<li><p class="first">Download the Eclipse from <a class="reference external" href="http://www.eclipse.org/downloads">Eclipse Homepage</a>. Eclipse does not need to be installed, the archive has
+to be extracted to a folder of your choice. Eclipse can be executed by double clicking on the executable.</p>
+</li>
+<li><p class="first">Eclipse asks for a workspace path where the projects will be located on your harddrive. Standard settings are sufficient.</p>
+</li>
+<li><p class="first">Close the welcome screen.</p>
+</li>
+<li><p class="first">Install the PyDev plugin by clicking on _Help -&gt; Install New <a href="#id3"><span class="problematic" id="id4">Software_</span></a> . Press add and fill the form (_name = <a href="#id5"><span class="problematic" id="id6">PyDev_</span></a>, _location = <a class="reference external" href="http://pydev.org/">http://pydev.org/</a><a href="#id7"><span class="problematic" id="id8">updates_</span></a>):</p>
+<p>&amp;nbsp;
 !{width:400px}PyDev.jpg!
-&amp;nbsp;
-Select PyDev and install (accept license agreement and trust the certificate).
-<em>Linux:</em> PyDev 3 is out and it needs Java 7, otherwise it will not show up in Eclipse without any error message. Please install java 7 and activate it. In Ubuntu activate it with &lt;pre&gt;sudo update-alternatives &amp;#45;&amp;#45;config java&lt;/pre&gt;
-## Add PyDev perspective to Eclipse and select it. The button is located in the upper rigth corner:
-&amp;nbsp;
-!{width:300px}Perspective.jpg!
-&amp;nbsp;
-## Goto _Window -&gt; Preferences -&gt; PyDev -&gt; Interpreters-&gt; Python <a href="#id7"><span class="problematic" id="id8">Interpreter_</span></a> and press new.
-&amp;nbsp;
-!{width:600px}AnacondaSetup1.jpg!
-&amp;nbsp;
-Select the Python executable in /home/&lt;username&gt;/anaconda/bin/ on <em>Linux</em> or c:Anacondaon <em>Windows</em> (optionally use the Anaconda/env/&lt;environment name&gt;/ folder if you are using Anaconda environments) and press the OK button. Everything is set up automatically.
-More details are given &#8220;here&#8221;:<a class="reference external" href="http://docs.continuum.io/anaconda/ide_integration.html">http://docs.continuum.io/anaconda/ide_integration.html</a>.
-&amp;nbsp;
-# <em>Installing Required Python Packages</em>
-Open a console and type one by one:
-&lt;pre&gt;conda update conda&lt;/pre&gt;&lt;pre&gt;conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml&lt;/pre&gt;&lt;pre&gt;pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock&lt;/pre&gt;On <em>Windows</em> additionally run:
-&lt;pre&gt;conda install pywin32&lt;/pre&gt;
-# <em>Installing pyTestbeamAnalysis</em>
+&amp;nbsp;</p>
+<p>Select PyDev and install (accept license agreement and trust the certificate).</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Under Linux you need at least <em>Java 7</em>, otherwise <em>PyDev</em> will not show up in Eclipse without any error message. Please install <em>Java 7</em> and activate it.
+In Ubuntu activate it with
+<code class="code bash docutils literal"><span class="pre">sudo</span> <span class="pre">update-alternatives</span> <span class="pre">java</span></code></p>
+</div>
+</li>
+<li><p class="first">Add PyDev perspective to Eclipse and select it. The button is located in the upper rigth corner:</p>
+<p>!{width:300px}Perspective.jpg!</p>
+</li>
+<li><p class="first">Goto _Window -&gt; Preferences -&gt; PyDev -&gt; Interpreters-&gt; Python <a href="#id9"><span class="problematic" id="id10">Interpreter_</span></a> and press new.</p>
+<p>!{width:600px}AnacondaSetup1.jpg!</p>
+<p>Select the Python executable in /home/&lt;username&gt;/anaconda/bin/ on <em>Linux</em> or c:Anacondaon <em>Windows</em> (optionally use the Anaconda/env/&lt;environment name&gt;/ folder if you are using Anaconda environments) and press the OK button. Everything is set up automatically.
+More details are given &#8220;here&#8221;:<a class="reference external" href="http://docs.continuum.io/anaconda/ide_integration.html">http://docs.continuum.io/anaconda/ide_integration.html</a>.</p>
+</li>
+</ol>
+</div>
+<div class="section" id="installing-required-python-packages">
+<h2>Installing Required Python Packages<a class="headerlink" href="#installing-required-python-packages" title="Permalink to this headline">¶</a></h2>
+<p>Open a console and type one by one:
+:bash:<a href="#id1"><span class="problematic" id="id2">`</span></a>conda update conda</p>
+<blockquote>
+<div><p>conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml
+pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock`</p>
+<p>On <em>Windows</em> additionally run:
+<code class="code bash docutils literal"><span class="pre">conda</span> <span class="pre">install</span> <span class="pre">pywin32</span></code></p>
+</div></blockquote>
+<p># <em>Installing pyTestbeamAnalysis</em>
 ## Goto File-&gt;Import-&gt;Git and select Projects from Git
-## Click clone URI and type the pyTestbeamAnalysis repository (_URI: <a class="reference external" href="https://github.com/SiLab-Bonn/">https://github.com/SiLab-Bonn/</a><a href="#id9"><span class="problematic" id="id10">pyTestbeamAnalysis_</span></a>)
+## Click clone URI and type the pyTestbeamAnalysis repository (_URI: <a class="reference external" href="https://github.com/SiLab-Bonn/">https://github.com/SiLab-Bonn/</a><a href="#id11"><span class="problematic" id="id12">pyTestbeamAnalysis_</span></a>)
 ## If you have a &#8220;GitHub&#8221;:<a class="reference external" href="https://github.com">https://github.com</a> account you can add the credentials here
 ## Click next, select all branches, click next and specify the directory where pyBAR will be cloned to
-## Wait until the download of the code is finished and check _Check out as project configured using the New Project <a href="#id11"><span class="problematic" id="id12">Wizard_</span></a>
-## Select _PyDev -&gt; <a href="#id13"><span class="problematic" id="id14">PyDevProject_</span></a>
+## Wait until the download of the code is finished and check _Check out as project configured using the New Project <a href="#id13"><span class="problematic" id="id14">Wizard_</span></a>
+## Select _PyDev -&gt; <a href="#id15"><span class="problematic" id="id16">PyDevProject_</span></a>
 ## Give the project a name, select the folder where the pyBAR was cloned to (e.g. /home/username/git/pyBAR) and click finish
 ## Open a shell and run the following command from the pyBar/host folder: &lt;pre&gt; python setup.py develop &lt;/pre&gt; This will compile and install pyTestbeamAnalysis to the environment.
 <em>Windows:</em> If the compilation fails use the Visual Studio Command promt to run the setup script. Because distutils sometimes cannot find VS due to multiple/old VS installation. It might also be needed to install and &#8220;activate the 64-bit compiler&#8221;:<a class="reference external" href="https://msdn.microsoft.com/en-us/library/x4d2c09s%28v=vs.90%29.aspx">https://msdn.microsoft.com/en-us/library/x4d2c09s%28v=vs.90%29.aspx</a> if you use 64-bit.</p>
@@ -248,7 +294,7 @@ Open a console and type one by one:
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2017, David-Leon Pohl.
+        &copy; Copyright 2017, SiLab Bonn.
 
     </p>
   </div>
