@@ -70,8 +70,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Testbeam Analysis'
-copyright = u'2017, David-Leon Pohl'
-author = u'David-Leon Pohl, Christian Bespin, Jens Janssen, Luigi Vigani'
+copyright = u'2017, SiLab Bonn'
+author = u'David-Leon Pohl, Jens Janssen, Yannick Dieter, Christian Bespin, Luigi Vigani'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

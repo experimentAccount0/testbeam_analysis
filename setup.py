@@ -30,7 +30,7 @@ cpp_extension = cythonize([
     Extension('testbeam_analysis.analysis_functions', ['testbeam_analysis/cpp/analysis_functions.pyx'])
 ])
 
-author = 'David-Leon Pohl, Christian Bespin, Jens Janssen, Luigi Vigani'
+author = 'David-Leon Pohl, Jens Janssen, Yannick Dieter, Christian Bespin, Luigi Vigani'
 author_email = 'pohl@physik.uni-bonn.de'
 
 # requirements for core functionality from requirements.txt
