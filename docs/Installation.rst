@@ -15,23 +15,24 @@ Choose the 64-bit version of Python 2.7.x or Python 3.6.x.
 
 .. NOTE::
    Under Windows Python 2.7 is recommended, since there is no free or easy to install Python 3.6 compiler available.
-   
-.. role:: bash(code)
-   :language: bash
 
 Installing C++ Compiler
 ***********************
 - Linux:
   Install *gcc* via package manager, e.g. on Ubuntu run:
 
-  :bash:`sudo apt-get install build-essential`
+  .. code-block:: bash
+  
+  sudo apt-get install build-essential
 
 - Windows:
   Install `Microsoft Visual C++ Compiler for Python 2.7 <http://aka.ms/vcpython27>`_.
 
 - OS X:
   Install `Xcode <https://itunes.apple.com/us/app/xcode/id497799835>`_ from App Store and install Xcode Command Line Tools by running
-  :bash:`xcode-select install`
+  
+  .. code-block:: bash
+  xcode-select install
 
 Installing Eclipse with PyDev Plugin
 ************************************
@@ -56,7 +57,7 @@ Eclipse needs a Java runtime environmet (JRE) and will not start if this is not 
    .. NOTE::
       Under Linux you need at least *Java 7*, otherwise *PyDev* will not show up in Eclipse without any error message. Please install *Java 7* and activate it.
       In Ubuntu activate it with
-      :bash:`sudo update-alternatives --config java`
+      :code:`sudo update-alternatives --config java`
 
 5. Add PyDev perspective to Eclipse and select it. The button is located in the upper rigth corner:
 
@@ -66,8 +67,8 @@ Eclipse needs a Java runtime environmet (JRE) and will not start if this is not 
 
 	.. image:: _static/installation/AnacondaSetup1.jpg
 
-   Select the Python executable in :bash:`/home/<username>/anaconda/bin/` on *Linux* or :bash:`c:\Anaconda\`
-   on *Windows* (optionally use the :bash:`Anaconda/env/<environment name>/` folder if you are using Anaconda environments) and press the OK button.
+   Select the Python executable in :code:`/home/<username>/anaconda/bin/` on *Linux* or :code:`c:\Anaconda\`
+   on *Windows* (optionally use the :code:`Anaconda/env/<environment name>/` folder if you are using Anaconda environments) and press the OK button.
    Everything is set up automatically. More details are given `here <http://docs.continuum.io/anaconda/ide_integration.html>`_.
 
 Installing Required Python Packages
@@ -75,12 +76,17 @@ Installing Required Python Packages
 
 Open a console and type one by one:
 
-:bash:`conda update conda`
-:bash:`conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml`
-:bash:`pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock`
+.. code-block:: bash
+
+   conda update conda
+   conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml
+   pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock
 
 On *Windows* additionally run:
-:bash:`conda install pywin32`
+
+.. code-block:: bash
+   
+   conda install pywin32
 
 Installing testbeam analysis
 ****************************
@@ -91,9 +97,13 @@ Installing testbeam analysis
    Wait until the download of the code is finished.
 4. Check *Check out as project configured using the New Project Wizard*
 5. Select *PyDev -> PyDevProject*
-6. Give the project a name, select the folder where the *testbeam analysis* was cloned to (e.g. :bash:`/home/username/git/testbeam_analysis`) and click finish
+6. Give the project a name, select the folder where the *testbeam analysis* was cloned to (e.g. :code:`/home/username/git/testbeam_analysis`) and click finish
 7. Open a shell and run the following command from the *testbeam analysis* folder:
-   :bash:`python setup.py develop`
+
+   .. code-block:: bash
+   
+   python setup.py develop
+
    This will compile and install *testbeam analysis* to the environment.
    
    .. NOTE::
