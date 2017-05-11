@@ -82,10 +82,9 @@ def merge_on_event_number(data_1, data_2):
 
 @njit
 def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr_hist):
-    """
-    Merges the data_2 cluster index with data_1 cluster index on an event basis with all permutations
-    That means: merge all hits of every event in data_2 on all hits of the same event in data_1.
-    Then the cluster hits are used to fill a correlation histogram.
+    """Correlating the hit/cluster indices of two arrays on an event basis with all permutations.
+    In other words: correlate all hit/cluster indices of particular event in data_2 with all hit/cluster indices of the same event in data_1.
+    Then the hit/cluster indices are used to fill a correlation histograms.
 
     Does the same than the merge of the pandas package:
         df = data_1.merge(data_2, how='left', on='event_number')
@@ -97,9 +96,9 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
     Parameters
     ----------
     data_1, data_2: np.recarray
-        Has to have event_number / mean_column / mean_row columns
-    column_corr_hist, row_corr_hist: np.arrays
-        Holds correlation data. Has to be of sufficient size
+        Hit/cluster array. Must have event_number / mean_column / mean_row columns.
+    column_corr_hist, row_corr_hist: np.array
+        2D correlation array containing the correlation data. Has to be of sufficient size.
 
     """
     index_data_2 = 0
@@ -118,7 +117,8 @@ def correlate_cluster_on_event_number(data_1, data_2, column_corr_hist, row_corr
                 column_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_column'] - 0.5))
                 row_index_dut_2 = int(np.floor(data_2[event_index_data_2]['mean_row'] - 0.5))
 
-                assert column_index_dut_1 >= 0 and row_index_dut_1 >= 0 and column_index_dut_2 >= 0 and row_index_dut_2 >= 0
+                if not (column_index_dut_1 >= 0 and row_index_dut_1 >= 0 and column_index_dut_2 >= 0 and row_index_dut_2 >= 0):
+                    raise ValueError('Column and/or row index is smaller than 0.5')
 
                 # Add correlation to histogram
                 column_corr_hist[column_index_dut_2, column_index_dut_1] += 1
@@ -335,93 +335,167 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         return array[ne.evaluate('event_number >= event_start & event_number < event_stop')]
 
 
-def data_aligned_at_events(table, start_event_number=None, stop_event_number=None, start=None, stop=None, try_speedup=False, chunk_size=10000000):
-    '''Takes the table with a event_number column and returns chunks with the size up to chunk_size. The chunks are chosen in a way that the events are not splitted. Additional
-    parameters can be set to increase the readout speed. If only events between a certain event range are used one can specify this. Also the start and the
-    stop indices for the reading of the table can be specified for speed up.
-    It is important to index the event_number with pytables before using this function, otherwise the queries are very slow.
+def data_aligned_at_events(table, start_event_number=None, stop_event_number=None, start_index=None, stop_index=None, chunk_size=10000000, try_speedup=False, first_event_aligned=True, fail_on_missing_events=True):
+    '''Takes the table with a event_number column and returns chunks with the size up to chunk_size. The chunks are chosen in a way that the events are not splitted.
+    Additional parameters can be set to increase the readout speed. Events between a certain range can be selected.
+    Also the start and the stop indices limiting the table size can be specified to improve performance.
+    The event_number column must be sorted.
+    In case of try_speedup is True, it is important to create an index of event_number column with pytables before using this function. Otherwise the queries are slowed down.
 
     Parameters
     ----------
     table : pytables.table
+        The data.
     start_event_number : int
-        The data read is corrected that only data starting from the start_event number is returned. Lower event numbers are discarded.
+        The retruned data contains events with event number >= start_event_number. If None, no limit is set.
     stop_event_number : int
-        The data read is corrected that only data up to the stop_event number is returned. The stop_event number is not included.
+        The retruned data contains events with event number < stop_event_number. If None, no limit is set.
+    start_index : int
+        Start index of data. If None, no limit is set.
+    stop_index : int
+        Stop index of data. If None, no limit is set.
+    chunk_size : int
+        Maximum chunk size per read.
     try_speedup : bool
-        Try to reduce the index range to read by searching for the indices of start and stop event number. If these event numbers are usually
+        If True, try to reduce the index range to read by searching for the indices of start and stop event number. If these event numbers are usually
         not in the data this speedup can even slow down the function!
+
+    The following parameters are not used when try_speedup is True:
+
+    first_event_aligned : bool
+        If True, assuming that the first event is aligned to the data chunk and will be added. If False, the lowest event number of the first chunk will not be read out.
+    fail_on_missing_events : bool
+        If True, an error is given when start_event_number or stop_event_number is not part of the data.
+
     Returns
     -------
-    iterable to numpy.histogram
-        The data of the actual chunk.
-    stop_index: int
-        The index of the last table part already used. Can be used if data_aligned_at_events is called in a loop for speed up.
-        Example:
-        start_index = 0
-        for scan_parameter in scan_parameter_range:
-            start_event_number, stop_event_number = event_select_function(scan_parameter)
-            for data, start_index in data_aligned_at_events(table, start_event_number=start_event_number, stop_event_number=stop_event_number, start=start_index):
-                do_something(data)
+    Iterator of tuples
+        Data of the actual data chunk and start index for the next chunk.
+
     Example
     -------
+    start_index = 0
+    for scan_parameter in scan_parameter_range:
+        start_event_number, stop_event_number = event_select_function(scan_parameter)
+        for data, start_index in data_aligned_at_events(table, start_event_number=start_event_number, stop_event_number=stop_event_number, start_index=start_index):
+            do_something(data)
+
     for data, index in data_aligned_at_events(table):
         do_something(data)
     '''
-
     # initialize variables
     start_index_known = False
     stop_index_known = False
-    last_event_start_index = 0
-    start_index = 0 if start is None else start
-    stop_index = table.nrows if stop is None else stop
+    start_index = 0 if start_index is None else start_index
+    stop_index = table.nrows if stop_index is None else stop_index
+    if stop_index < start_index:
+        raise ValueError('Invalid start/stop index')
+    table_max_rows = table.nrows
+    if stop_event_number is not None and start_event_number is not None and stop_event_number < start_event_number:
+        raise ValueError('Invalid start/stop event number')
 
+    # set start stop indices from the event numbers for fast read if possible; not possible if the given event number does not exist in the data stream
     if try_speedup and table.colindexed["event_number"]:
         if start_event_number is not None:
             start_condition = 'event_number==' + str(start_event_number)
-            start_indeces = table.get_where_list(start_condition, start=start_index, stop=stop_index)
-            if start_indeces.shape[0] != 0:  # set start index if possible
-                start_index = start_indeces[0]
+            start_indices = table.get_where_list(start_condition, start=start_index, stop=stop_index)
+            if start_indices.shape[0] != 0:  # set start index if possible
+                start_index = start_indices[0]
                 start_index_known = True
 
         if stop_event_number is not None:
             stop_condition = 'event_number==' + str(stop_event_number)
-            stop_indeces = table.get_where_list(stop_condition, start=start_index, stop=stop_index)
-            if stop_indeces.shape[0] != 0:  # set the stop index if possible, stop index is excluded
-                stop_index = stop_indeces[0]
+            stop_indices = table.get_where_list(stop_condition, start=start_index, stop=stop_index)
+            if stop_indices.shape[0] != 0:  # set the stop index if possible, stop index is excluded
+                stop_index = stop_indices[0]
                 stop_index_known = True
 
-    if (start_index_known and stop_index_known) and (start_index + chunk_size >= stop_index):  # Special case, one read is enough, data not bigger than one chunk and the indices are known
+    if start_index_known and stop_index_known and start_index + chunk_size >= stop_index:  # special case, one read is enough, data not bigger than one chunk and the indices are known
         yield table.read(start=start_index, stop=stop_index), stop_index
-    else:  # Read data in chunks, chunks do not divide events, abort if stop_event_number is reached
-        while(start_index < stop_index):
-            src_array = table.read(start=start_index, stop=start_index + chunk_size + 1)  # Stop index is exclusive, so add 1
-            first_event = src_array["event_number"][0]
-            last_event = src_array["event_number"][-1]
-            if (start_event_number is not None and last_event < start_event_number):
-                start_index = start_index + src_array.shape[0]  # Events fully read, increase start index and continue reading
-                continue
+    else:  # read data in chunks, chunks do not divide events, abort if stop_event_number is reached
 
-            last_event_start_index = np.argmax(src_array["event_number"] == last_event)  # Get first index of last event
-            if last_event_start_index == 0:
-                nrows = src_array.shape[0]
-                if nrows != 1:
-                    logging.warning("Depreciated warning?! Buffer too small to fit event. Possible loss of data. Increase chunk size.")
-            else:
-                if start_index + chunk_size > stop_index:  # special case for the last chunk read, there read the table until its end
-                    nrows = src_array.shape[0]
+        # search for begin
+        current_start_index = start_index
+        if start_event_number is not None:
+            while current_start_index < stop_index:
+                current_stop_index = min(current_start_index + chunk_size, stop_index)
+                array_chunk = table.read(start=current_start_index, stop=current_stop_index)  # stop index is exclusive, so add 1
+                last_event_in_chunk = array_chunk["event_number"][-1]
+
+                if last_event_in_chunk < start_event_number:
+                    current_start_index = current_start_index + chunk_size  # not there yet, continue to next read (assuming sorted events)
                 else:
-                    nrows = last_event_start_index
+                    first_event_in_chunk = array_chunk["event_number"][0]
+#                     if stop_event_number is not None and first_event_in_chunk >= stop_event_number and start_index != 0 and start_index == current_start_index:
+#                         raise ValueError('The stop event %d is missing. Change stop_event_number.' % stop_event_number)
+                    if array_chunk.shape[0] == chunk_size and first_event_in_chunk == last_event_in_chunk:
+                        raise ValueError('Chunk size too small. Increase chunk size to fit full event.')
 
-            if (start_event_number is not None or stop_event_number is not None) and (last_event > stop_event_number or first_event < start_event_number):  # too many events read, get only the selected ones if specified
-                selected_rows = get_data_in_event_range(src_array[0:nrows], event_start=start_event_number, event_stop=stop_event_number, assume_sorted=True)
-                if len(selected_rows) != 0:  # only return non empty data
-                    yield selected_rows, start_index + len(selected_rows)
+                    if not first_event_aligned and first_event_in_chunk == start_event_number and start_index != 0 and start_index == current_start_index:  # first event in first chunk not aligned at index 0, so take next event
+                        if fail_on_missing_events:
+                            raise ValueError('The start event %d is missing. Change start_event_number.' % start_event_number)
+                        chunk_start_index = np.searchsorted(array_chunk["event_number"], start_event_number + 1, side='left')
+                    elif fail_on_missing_events and first_event_in_chunk > start_event_number and start_index == current_start_index:
+                        raise ValueError('The start event %d is missing. Change start_event_number.' % start_event_number)
+                    elif first_event_aligned and first_event_in_chunk == start_event_number and start_index == current_start_index:
+                        chunk_start_index = 0
+                    else:
+                        chunk_start_index = np.searchsorted(array_chunk["event_number"], start_event_number, side='left')
+                        if fail_on_missing_events and array_chunk["event_number"][chunk_start_index] != start_event_number and start_index == current_start_index:
+                            raise ValueError('The start event %d is missing. Change start_event_number.' % start_event_number)
+#                     if fail_on_missing_events and ((start_index == current_start_index and chunk_start_index == 0 and start_index != 0 and not first_event_aligned) or array_chunk["event_number"][chunk_start_index] != start_event_number):
+#                         raise ValueError('The start event %d is missing. Change start_event_number.' % start_event_number)
+                    current_start_index = current_start_index + chunk_start_index  # calculate index for next loop
+                    break
+        elif not first_event_aligned and start_index != 0:
+            while current_start_index < stop_index:
+                current_stop_index = min(current_start_index + chunk_size, stop_index)
+                array_chunk = table.read(start=current_start_index, stop=current_stop_index)  # stop index is exclusive, so add 1
+                first_event_in_chunk = array_chunk["event_number"][0]
+                last_event_in_chunk = array_chunk["event_number"][-1]
+
+                if array_chunk.shape[0] == chunk_size and first_event_in_chunk == last_event_in_chunk:
+                    raise ValueError('Chunk size too small. Increase chunk size to fit full event.')
+
+                chunk_start_index = np.searchsorted(array_chunk["event_number"], first_event_in_chunk + 1, side='left')
+                current_start_index = current_start_index + chunk_start_index
+                if not first_event_in_chunk == last_event_in_chunk:
+                    break
+
+        # data loop
+        while current_start_index < stop_index:
+            current_stop_index = min(current_start_index + chunk_size, stop_index)
+            array_chunk = table.read(start=current_start_index, stop=current_stop_index)  # stop index is exclusive, so add 1
+            first_event_in_chunk = array_chunk["event_number"][0]
+            last_event_in_chunk = array_chunk["event_number"][-1]
+
+            chunk_start_index = 0
+
+            if stop_event_number is None:
+                if current_stop_index == table_max_rows:
+                    chunk_stop_index = array_chunk.shape[0]
+                else:
+                    chunk_stop_index = np.searchsorted(array_chunk["event_number"], last_event_in_chunk, side='left')
             else:
-                yield src_array[0:nrows], start_index + nrows  # no events specified or selected event range is larger than read chunk, thus return the whole chunk minus the little part for event alignment
-            if stop_event_number is not None and last_event > stop_event_number:  # events are sorted, thus stop here to save time
-                break
-            start_index = start_index + nrows  # events fully read, increase start index and continue reading
+                if last_event_in_chunk >= stop_event_number:
+                    chunk_stop_index = np.searchsorted(array_chunk["event_number"], stop_event_number, side='left')
+                elif current_stop_index == table_max_rows:  # this will also add the last event of the table
+                    chunk_stop_index = array_chunk.shape[0]
+                else:
+                    chunk_stop_index = np.searchsorted(array_chunk["event_number"], last_event_in_chunk, side='left')
+
+            nrows = chunk_stop_index - chunk_start_index
+            if nrows == 0:
+                if array_chunk.shape[0] == chunk_size and first_event_in_chunk == last_event_in_chunk:
+                    raise ValueError('Chunk size too small to fit event. Data corruption possible. Increase chunk size to read full event.')
+                elif chunk_start_index == 0:  # not increasing current_start_index
+                    return
+                elif stop_event_number is not None and last_event_in_chunk >= stop_event_number:
+                    return
+            else:
+                yield array_chunk[chunk_start_index:chunk_stop_index], current_start_index + nrows + chunk_start_index
+
+            current_start_index = current_start_index + nrows + chunk_start_index  # events fully read, increase start index and continue reading
 
 
 def fix_event_alignment(event_numbers, ref_column, column, ref_row, row, ref_charge, charge, error=3., n_bad_events=5, n_good_events=3, correlation_search_range=2000, good_events_search_range=10):
@@ -649,60 +723,36 @@ def peak_detect(x, y):
 
 
 def simple_peak_detect(x, y):
+    y = np.array(y)
     half_maximum = np.max(y) * 0.5
     greater = (y > half_maximum)
     change_indices = np.where(greater[:-1] != greater[1:])[0]
     if np.all(greater == False) or greater[0] == True or greater[-1] == True:
         raise RuntimeError("Cannot determine peak")
-    fwhm_left_right = (x[change_indices[0]], x[change_indices[-1] + 1])
+    x = np.array(x)
+    # get center of indices for higher precision peak position and FWHM
+    x_center = (x[1:] + x[:-1]) / 2.0
+    fwhm_left_right = (x_center[change_indices[0]], x_center[change_indices[-1]])
     fwhm_value = fwhm_left_right[-1] - fwhm_left_right[0]
     max_position = x[np.argmax(y)]
     center = (fwhm_left_right[0] + fwhm_left_right[-1]) / 2.0
     return max_position, center, fwhm_value, fwhm_left_right
 
 
-def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, beta_inverted=None):
-    if np.abs(m_xy) > 1. or np.abs(m_yx) > 1.:
-        raise NotImplementedError('Device seems to be heavily tilted in gamma. This is not supported.')
-
-    # Detect device rotation around y-axis (beta angle)
-    if m_yy < -1. or alpha_inverted:
-        logging.info('Device most likely inverted in beam around the x axis (y coordinates switched)!')
-        alpha_inverted = True
-        m_yy = 2 + m_yy
-    else:
-        alpha_inverted = False
-
-    # Detect device rotation around y-axis (beta angle)
-    if m_xx < -1.:
-        logging.info('Device most likely inverted in beam around the y axis (x coordinates switched)!')
-        beta_inverted = True
-        m_xx = 2 + m_xx
-    else:
-        beta_inverted = False
-
-    # Sanity checks
-    if m_xx < -2:
-        raise
-        m_xx = -2.
-
-    if m_yy < -2:
-        raise
-        m_yy = -2.
-
+def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, mirror_x=1.0, mirror_y=1.0):
     # Deduce from reidual correlations the rotation matrix
     # gamma (rotation around z)
     # TODO: adding some weighting factor based on fit error
     factor_xy = 1.0
-    gamma = factor_xy * np.arctan2(m_xy, 1 - m_xx)
+    gamma = factor_xy * np.arctan(m_xy)
     factor_yx = 1.0
-    gamma -= factor_yx * np.arctan2(m_yx, 1 - m_yy)
-    gamma /= (factor_xy + factor_yx)
+    gamma -= factor_yx * np.arctan(m_yx)
+    gamma /= mirror_x * mirror_y * (factor_xy + factor_yx)
 
     # cos(gamma) = 1 - m_xx / cos(gamma) = (1 - m_xx) * sqrt(m_xy**2 / (1 - m_xx**2) + 1.) ?
     cosbeta = (1 - m_xx) * np.sqrt(np.square(m_xy) / np.square(1 - m_xx) + 1.)
 
-    # TODO: Why is this needed? Most likely stability reasons
+    # Arccos limited to [-1:1]
     if np.abs(cosbeta) > 1:
         cosbeta = 1 - (cosbeta - 1)
     beta = np.arccos(cosbeta)
@@ -710,57 +760,15 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
     # cos(alpha) = - myy - tan(gamma) * myx + 1 / (cos(gamma) + sin(gamma) * tan(gamma)) = - myy - m_xy / (1 - m_xx) * myx + 1 / (cos(gamma) + sin(gamma) * tan(gamma)) ?
     cosalpha = (-m_yy - m_xy / (1 - m_xx) * m_yx + 1) / (np.cos(gamma) + np.sin(gamma) * np.tan(gamma))
 
-    # TODO: Why is this needed? Most likely stability reasons
+    # Arccos limited to [-1:1]
     if np.abs(cosalpha) > 1:
         cosalpha = 1 - (cosalpha - 1)
     alpha = np.arccos(cosalpha)
 
-    if alpha_inverted:
-        alpha -= np.pi
-
-        # Try to deduce correct beta sign
-        value_1 = -m_xy / (1 + m_xx)
-        value_2 = (m_yx - np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy - np.sin(alpha) * np.sin(beta) * np.sin(gamma))
-        value_3 = (m_yx + np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy + np.sin(alpha) * np.sin(beta) * np.sin(gamma))
-
-        if np.abs(value_2 - value_1) > np.abs(value_3 - value_1):
-            beta *= -1.
-
-        alpha *= -1.
-
-    if beta_inverted:
-        beta -= np.pi
-
-        # Try to deduce correct alpha sign
-        value_1 = -m_xy / (1 + m_xx)
-        value_2 = (m_yx - np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy - np.sin(alpha) * np.sin(beta) * np.sin(gamma))
-        value_3 = (m_yx + np.sin(alpha) * np.sin(beta) * np.cos(gamma)) / (1 + m_yy + np.sin(alpha) * np.sin(beta) * np.sin(gamma))
-
-        if np.abs(value_2 - value_1) < np.abs(value_3 - value_1):
-            alpha *= -1.
-        beta *= -1.
-
     return alpha, beta, gamma
 
 
-def fit_residuals(positions, residuals, n_bins):
-    ''' Takes unhistogrammed residuals as a function of the position, histograms and fits these with errors'''
-    # calculating the data points
-    hist_position_residual = stats.binned_statistic(positions, residuals, statistic='mean', bins=n_bins)
-    # selecting data points to be included into fit
-    hist_position_residual_count = stats.binned_statistic(positions, residuals, statistic='count', bins=n_bins)
-    n_hits_threshold = np.percentile(hist_position_residual_count[0], 100 - 68.3)  # Simple threshold, take bins with 1 sigma of the data
-    selection = np.logical_and(hist_position_residual_count[0] >= n_hits_threshold, np.isfinite(hist_position_residual[0]))
-    position_residual_fit_x = hist_position_residual[1][:-1][selection]
-    position_residual_fit_y = hist_position_residual[0][selection]
-    position_residual_fit_y_err = hist_position_residual_count[0][selection].sum() / hist_position_residual_count[0][selection]   # Calculate relative statistical error
-
-    position_residual_fit_popt, position_residual_fit_pcov = curve_fit(linear, position_residual_fit_x, position_residual_fit_y, sigma=position_residual_fit_y_err, absolute_sigma=False)  # Fit straight line
-
-    return position_residual_fit_popt, position_residual_fit_pcov, position_residual_fit_x, position_residual_fit_y
-
-
-def fit_residuals(hist, edges, label="", title="", output_fig=None):
+def fit_residuals(hist, edges, label="", title="", output_pdf=None):
     bin_center = (edges[1:] + edges[:-1]) / 2.0
     hist_mean = get_mean_from_histogram(hist, bin_center)
     hist_std = get_rms_from_histogram(hist, bin_center)
@@ -769,48 +777,75 @@ def fit_residuals(hist, edges, label="", title="", output_fig=None):
     except RuntimeError:
         fit, cov = [np.amax(hist), hist_mean, hist_std], np.full((3, 3), np.nan)
 
-    if output_fig is not None:
-        testbeam_analysis.tools.plot_utils.plot_residuals(
-            histogram=hist,
-            edges=edges,
-            fit=fit,
-            fit_errors=cov,
-            x_label=label,
-            title=title,
-            output_fig=output_fig
-        )
+    testbeam_analysis.tools.plot_utils.plot_residuals(
+        histogram=hist,
+        edges=edges,
+        fit=fit,
+        fit_errors=cov,
+        x_label=label,
+        title=title,
+        output_pdf=output_pdf
+    )
 
     return fit, cov
 
 
-def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_fig=None):
+
+def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", fit_limit=None, output_pdf=None):
     xcenter = (xedges[1:] + xedges[:-1]) / 2.0
     ycenter = (yedges[1:] + yedges[:-1]) / 2.0
     y_sum = np.sum(hist, axis=1)
     x_sel = (y_sum > 0.0) & np.isfinite(y_sum)
     y_mean = np.full_like(y_sum, np.nan, dtype=np.float)
     y_mean[x_sel] = np.average(hist, axis=1, weights=ycenter)[x_sel] * np.sum(ycenter) / y_sum[x_sel]
-    n_hits_threshold = np.percentile(y_sum, 100 - 68)
-    x_sel = (y_sum > n_hits_threshold) & np.isfinite(y_sum)
+    n_hits_threshold = np.percentile(y_sum[np.isfinite(y_mean)], 100-68)
+    if fit_limit is None:
+        x_sel = np.logical_and(y_sum > n_hits_threshold, np.isfinite(y_mean))
+        # generate a contigous area
+        x_sel_left = np.where(x_sel == True)[0][0]
+        x_sel_right = np.where(x_sel == True)[0][-1] + 1
+    else:
+        fit_limit_left = fit_limit[0]
+        fit_limit_right = fit_limit[1]
+        x_sel = np.isfinite(y_mean)
+        if np.isfinite(fit_limit_left):
+            try:
+                x_sel_left = np.where(xcenter >= fit_limit_left)[0][0]
+            except IndexError:
+                x_sel_left = 0
+        else:
+            x_sel_left = 0
+        if np.isfinite(fit_limit_right):
+            try:
+                x_sel_right = np.where(xcenter <= fit_limit_right)[0][-1] + 1
+            except IndexError:
+                x_sel_right = x_sel.shape[0]
+        else:
+            x_sel_right = x_sel.shape[0]
+    range_sel = np.zeros_like(x_sel)
+    range_sel[x_sel_left:x_sel_right] = 1
+    x_sel = np.isfinite(y_mean)
+    x_sel = np.logical_and(x_sel, range_sel)
     y_rel_err = np.full_like(y_sum, np.nan, dtype=np.float)
     y_rel_err[x_sel] = np.sum(y_sum[x_sel]) / y_sum[x_sel]
     fit, cov = curve_fit(linear, xcenter[x_sel], y_mean[x_sel], sigma=y_rel_err[x_sel], absolute_sigma=False)
 
-    if output_fig is not False:
-        testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(
-            hist,
-            xedges=xedges,
-            yedges=yedges,
-            xlabel=xlabel,
-            ylabel=ylabel,
-            res_mean=y_mean,
-            res_pos=xcenter,
-            selection=x_sel,
-            fit=fit,
-            cov=cov,
-            title=title,
-            output_fig=output_fig
-        )
+    testbeam_analysis.tools.plot_utils.plot_residuals_vs_position(
+        hist,
+        xedges=xedges,
+        yedges=yedges,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        res_mean=y_mean,
+        res_mean_err=y_rel_err,
+        res_pos=xcenter,
+        selection=x_sel,
+        fit=fit,
+        cov=cov,
+        title=title,
+        fit_limit=fit_limit,
+        output_pdf=output_pdf
+    )
 
     return fit, cov
 

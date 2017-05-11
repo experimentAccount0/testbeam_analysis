@@ -36,3 +36,6 @@ class ClusterInfoTable(tb.IsDescription):
     seed_row = tb.UInt16Col(pos=5)
     mean_column = tb.Float32Col(pos=6)
     mean_row = tb.Float32Col(pos=7)
+    seed_charge = tb.UInt16Col(pos=8)
+    n_cols = tb.UInt16Col(pos=9)
+    n_rows = tb.UInt16Col(pos=10)

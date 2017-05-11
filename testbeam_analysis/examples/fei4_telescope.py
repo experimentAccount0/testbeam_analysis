@@ -30,7 +30,7 @@ def run_analysis():
     tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
 
     # The location of the data files, one file per DUT
-    data_files = [(os.path.join(tests_data_folder, 'TestBeamData_FEI4_DUT%d' % i + '.h5')) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
+    data_files = [(os.path.join(tests_data_folder, 'TestBeamData_FEI4_DUT%d.h5' % i)) for i in [0, 1, 4, 5]]  # The first device is the reference for the coordinate system
 
     # Dimensions
     pixel_size = [(250, 50)] * 4  # in um
@@ -46,21 +46,26 @@ def run_analysis():
     # The following shows a complete test beam analysis by calling the seperate function in correct order
 
     # Cluster hits off all DUTs
-    kwargs = [{  # Input parameters of the cluster function
+    kwargs = [{
         'input_hits_file': data_files[i],
-        'max_x_distance': 2,
-        'max_y_distance': 1,
-        'max_time_distance': 2,
-        'max_cluster_hits':1000,
-        'dut_name': dut_names[i]} for i in range(0, len(data_files))]
+        'min_hit_charge': 0,  # FEI4 ToT value
+        'max_hit_charge': 13,
+        'column_cluster_distance': 1,
+        'row_cluster_distance': 2,
+        'frame_cluster_distance': 2,  # BCID, recoreded by pyBAR
+        'dut_name': dut_names[i]} for i in range(len(data_files))]
     pool = Pool()
     for kwarg in kwargs:
-        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)  # Non blocking call of the cluster function, runs in seperate process
+        pool.apply_async(hit_analysis.cluster_hits, kwds=kwarg)
     pool.close()
     pool.join()
 
+    # Generate filenames for cluster data
+    input_cluster_files = [os.path.splitext(data_file)[0] + '_clustered.h5'
+                           for data_file in data_files]
+
     # Correlate the row / column of each DUT
-    dut_alignment.correlate_cluster(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+    dut_alignment.correlate_cluster(input_cluster_files=input_cluster_files,
                                     output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                     n_pixels=n_pixels,
                                     pixel_size=pixel_size,
@@ -68,7 +73,7 @@ def run_analysis():
                                     )
 
     # Correct all DUT hits via alignment information and merge the cluster tables to one tracklets table aligned at the event number
-    dut_alignment.merge_cluster_data(input_cluster_files=[data_file[:-3] + '_cluster.h5' for data_file in data_files],
+    dut_alignment.merge_cluster_data(input_cluster_files=input_cluster_files,
                                      n_pixels=n_pixels,
                                      output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      pixel_size=pixel_size)
@@ -85,8 +90,8 @@ def run_analysis():
                                non_interactive=True)  # Tries to find cuts automatically; deactivate to do this manualy
 
     dut_alignment.apply_alignment(input_hit_file=os.path.join(output_folder, 'Merged.h5'),
-                                  input_alignment=os.path.join(output_folder, 'Alignment.h5'),
-                                  output_hit_aligned_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
+                                  input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+                                  output_hit_file=os.path.join(output_folder, 'Tracklets_prealigned.h5'),
                                   force_prealignment=True)  # If there is already an alignment info in the alignment file this has to be set)
 
     # Find tracks from the tracklets and stores the with quality indicator into track candidates table
@@ -104,7 +109,7 @@ def run_analysis():
 
     # Optional: plot some tracks (or track candidates) of a selected event range
     plot_utils.plot_events(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
-                           output_pdf=os.path.join(output_folder, 'Event.pdf'),
+                           output_pdf_file=os.path.join(output_folder, 'Event.pdf'),
                            event_range=(0, 40),
                            dut=1)
 
@@ -120,8 +125,7 @@ def run_analysis():
     # When needed, set included column and row range for each DUT as list of tuples
     result_analysis.calculate_efficiency(input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
                                          input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-                                         output_file=os.path.join(output_folder, 'Efficiency.h5'),
-                                         output_pdf=os.path.join(output_folder, 'Efficiency.pdf'),
+                                         output_efficiency_file=os.path.join(output_folder, 'Efficiency.h5'),
                                          bin_size=[(250, 50)],
                                          sensor_size=[(250. * 80, 50. * 336)],
                                          minimum_track_density=2,

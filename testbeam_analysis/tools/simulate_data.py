@@ -1,13 +1,16 @@
-''' This module provides a class that is able to simulate data via Monte Carlo with a decend approximation of the reality. A random seed can be set.
+''' This module provides a class that is able to simulate data via Monte Carlo
+with a decend approximation of the reality. A random seed can be set.
 
-The deposited charge follows a Landau * Gaus function. Special processes like delta electrons
-are not simulated.
+The deposited charge follows a Landau * Gaus function. Special processes like
+delta electrons are not simulated.
 
-Multiple scattering is approximated with the assumption of gaussian distributed scattering angles theta. Scattering is
-only calculated at the planes and not in between (scattering in air).
+Multiple scattering is approximated with the assumption of gaussian distributed
+scattering angles theta. Scattering is only calculated at the planes and not in
+between (scattering in air).
 
-Charge sharing between pixels is approximated using Einsteins diffusion equation solved at the center z position within the sensor.
-Track angles within the sensor do not influence the charge sharing.
+Charge sharing between pixels is approximated using Einsteins diffusion
+equation solved at the center z position within the sensor. Track angles within
+the sensor do not influence the charge sharing.
 '''
 
 import numpy as np
@@ -21,7 +24,8 @@ import pylandau
 from testbeam_analysis.tools import geometry_utils
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
 # Jitted function for fast calculations
@@ -48,8 +52,11 @@ def _calc_sigma_diffusion(distance, temperature, bias):
 
 
 @njit()
-def _bivariante_normal_cdf_limits(a1, a2, b1, b2, mu1, mu2, sigma):
-    '''Calculates the integral of the bivariante normal distribution between x = [a1, a2], y = [b1, b2]. The normal distribution has two mu: mu1, mu2 but only one common sigma.
+def _bivariante_normal_cdf(a1, a2, b1, b2, mu1, mu2, sigma):
+    '''Calculates the integral of the bivariante normal distribution.
+
+    Integral between x = [a1, a2], y = [b1, b2].
+    The normal distribution has two mu: mu1, mu2 but only one common sigma.
 
     Parameters
     ----------
@@ -70,26 +77,35 @@ def _bivariante_normal_cdf_limits(a1, a2, b1, b2, mu1, mu2, sigma):
     number, array like
     '''
 
-    return 1 / (4.) * (math.erf((a2 - mu1) / np.sqrt(2 * sigma ** 2)) - math.erf((a1 - mu1) / np.sqrt(2 * sigma ** 2))) * (math.erf((b2 - mu2) / np.sqrt(2 * sigma ** 2)) - math.erf((b1 - mu2) / np.sqrt(2 * sigma ** 2)))
+    return 1 / 4. * ((math.erf((a2 - mu1) / np.sqrt(2 * sigma ** 2)) -
+                      math.erf((a1 - mu1) / np.sqrt(2 * sigma ** 2))) *
+                     (math.erf((b2 - mu2) / np.sqrt(2 * sigma ** 2)) -
+                      math.erf((b1 - mu2) / np.sqrt(2 * sigma ** 2))))
 
 
 @njit()
-def _calc_charge_fraction(position, position_z, pixel_index_x, pixel_index_y, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc):
-    ''' Calculates the fraction of charge [0, 1] within one rectangular pixel volume when diffusion is considered. The calculation is done within the local pixel coordinate system,
-        with the origin [x_pitch / 2, y_pitch / 2, 0]
+def _calc_charge_fraction(position, position_z, pixel_index_x, pixel_index_y,
+                          pixel_size_x, pixel_size_y, temperature, bias,
+                          digitization_sigma_cc):
+    ''' Calculates the fraction of charge [0, 1] within one rectangular pixel.
+
+        Diffusion is considered. The calculation is done within the local pixel
+        coordinate system, with the origin [x_pitch / 2, y_pitch / 2, 0]
 
         Parameters
         ----------
         position_i : array
             Position in x/y within the seed pixel where the charge is created
         pixel_index_x, pixel_index_y : number
-            Pixel index relative to seed (= 0/0) to  get the charge fraction for
+            Pixel index relative to seed (= 0/0) to get the charge fraction for
         temperature: number
             Temperature of the sensor
         bias: number
             Bias voltage of the sensor
         digitization_sigma_cc: number
-            The sigma is higher due to repulsion, so correct sigma with factor > 1, very simple approximation,  for further info see NIMA 606 (2009) 508-516
+            The sigma is higher due to repulsion, so correct sigma with
+            factor > 1, very simple approximation
+            for further info see NIMA 606 (2009) 508-516
         pixel_size_x, pixel_size_y : number
             Pixel dimensions in x/y in um
 
@@ -97,76 +113,151 @@ def _calc_charge_fraction(position, position_z, pixel_index_x, pixel_index_y, pi
         -------
         number
     '''
-    sigma = _calc_sigma_diffusion(distance=position_z, temperature=temperature, bias=bias) * digitization_sigma_cc
+    sigma = _calc_sigma_diffusion(distance=position_z,
+                                  temperature=temperature,
+                                  bias=bias) * digitization_sigma_cc
 
     if (sigma == 0):  # Tread not defined calculation input
         return 1.
-    return _bivariante_normal_cdf_limits(pixel_size_x * (pixel_index_x - 1. / 2.), pixel_size_x * (pixel_index_x + 1. / 2.), pixel_size_y * (pixel_index_y - 1. / 2.), pixel_size_y * (pixel_index_y + 1. / 2.), position[0], position[1], sigma)
+    return _bivariante_normal_cdf(pixel_size_x * (pixel_index_x - 1. / 2.),
+                                  pixel_size_x * (pixel_index_x + 1. / 2.),
+                                  pixel_size_y * (pixel_index_y - 1. / 2.),
+                                  pixel_size_y * (pixel_index_y + 1. / 2.),
+                                  position[0], position[1], sigma)
 
 
 @njit()
-def _create_charge_sharing_hits(relative_position, column, row, charge, max_column, max_row, thickness, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc, result_hits, index):
+def _create_cs_hits(relative_position, column, row, charge,
+                    max_column, max_row, thickness,
+                    pixel_size_x, pixel_size_y, temperature,
+                    bias, digitization_sigma_cc, result_hits,
+                    index):
     ''' Create additional hits due to charge sharing.
-    Run time optimized loops using an abort condition utilizing that the charge sharing always decreases for increased
-    distance to seed pixel and the fact that the total charge fraction sum is 1
+
+    Run time optimized loops using an abort condition utilizing that the charge
+    sharing always decreases for increased distance to seed pixel and the fact
+    that the total charge fraction sum is 1
     '''
 
-    total_fraction = 0.  # Charge fraction summed up for all pixels used; should be 1. if all pixels are considered
-    min_fraction = 1e-3
+    # Charge fraction summed up for all pixels used; should be 1. if all
+    # pixels are considered
+    total_fraction = 0.
+    min_fraction = 1e-2  # Distribute total charge with maximum 1% loss.
     n_hits = 0  # Total Number of hits created
 
-    position_z = thickness / 2  # FIXME: Charges are distributed along a track and not in the center z
-    for actual_column in range(int(column), max_column):  # Calc charge in pixels in + column direction
-        if total_fraction >= 1. - min_fraction or _calc_charge_fraction(relative_position, position_z, actual_column - column, 0, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc) < min_fraction:  # Omit row loop if charge fraction is already too low for seed row (=0)
+    # FIXME: Charges are distributed along a track and not in the center z
+    position_z = thickness / 2
+    # Calc charge in pixels in + column direction
+    for actual_column in range(int(column), max_column):
+        # Omit row loop if charge fraction is already too low for seed row (=0)
+        if (total_fraction >= 1. - min_fraction or
+            _calc_charge_fraction(relative_position, position_z,
+                                  actual_column - column, 0, pixel_size_x,
+                                  pixel_size_y, temperature, bias,
+                                  digitization_sigma_cc) < min_fraction):
             break
 
-        for actual_row in range(int(row), max_row):  # Calc charge in pixels in + row direction
-            fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
+        # Calc charge in pixels in + row direction
+        for actual_row in range(int(row), max_row):
+            fraction = _calc_charge_fraction(relative_position, position_z,
+                                             actual_column - column,
+                                             actual_row - row, pixel_size_x,
+                                             pixel_size_y, temperature, bias,
+                                             digitization_sigma_cc)
             total_fraction += fraction
-            if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
+            # Abort loop if fraction is too small, next pixel have even smaller
+            # fraction
+            if fraction < min_fraction:
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[
+                    index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError(
+                    'Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
                 break
 
-        for actual_row in range(int(row - 1), 0, -1):  # Calc charge in pixels in - row direction
-            fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
+        # Calc charge in pixels in - row direction
+        for actual_row in range(int(row - 1), 0, -1):
+            fraction = _calc_charge_fraction(relative_position, position_z,
+                                             actual_column - column,
+                                             actual_row - row, pixel_size_x,
+                                             pixel_size_y, temperature, bias,
+                                             digitization_sigma_cc)
             total_fraction += fraction
-            if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
+            # Abort loop if fraction is too small, next pixel have even smaller
+            # fraction
+            if fraction < min_fraction:
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[
+                    index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError(
+                    'Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
                 break
 
-    for actual_column in range(int(column - 1), 0, -1):  # Calc charge in pixels in + column direction
-        if total_fraction >= 1. - min_fraction or _calc_charge_fraction(relative_position, position_z, actual_column - column, 0, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc) < min_fraction:  # Omit row loop if charge fraction is already too low for seed row (=0)
+    # Calc charge in pixels in + column direction
+    for actual_column in range(int(column - 1), 0, -1):
+        # Omit row loop if charge fraction is already too low for seed row (=0)
+        if (total_fraction >= 1. - min_fraction or
+            _calc_charge_fraction(relative_position, position_z,
+                                  actual_column - column, 0, pixel_size_x,
+                                  pixel_size_y, temperature, bias,
+                                  digitization_sigma_cc) < min_fraction):
             break
 
-        for actual_row in range(int(row), max_row):  # Calc charge in pixels in + row direction
-            fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
+        # Calc charge in pixels in + row direction
+        for actual_row in range(int(row), max_row):
+            fraction = _calc_charge_fraction(relative_position, position_z,
+                                             actual_column - column,
+                                             actual_row - row, pixel_size_x,
+                                             pixel_size_y, temperature, bias,
+                                             digitization_sigma_cc)
             total_fraction += fraction
-            if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
+            # Abort loop if fraction is too small, next pixel have even smaller
+            # fraction
+            if fraction < min_fraction:
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[
+                    index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError(
+                    'Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
                 break
 
-        for actual_row in range(int(row - 1), 0, -1):  # Calc charge in pixels in - row direction
-            fraction = _calc_charge_fraction(relative_position, position_z, actual_column - column, actual_row - row, pixel_size_x, pixel_size_y, temperature, bias, digitization_sigma_cc)
+        # Calc charge in pixels in - row direction
+        for actual_row in range(int(row - 1), 0, -1):
+            fraction = _calc_charge_fraction(relative_position, position_z,
+                                             actual_column - column,
+                                             actual_row - row, pixel_size_x,
+                                             pixel_size_y, temperature, bias,
+                                             digitization_sigma_cc)
             total_fraction += fraction
-            if fraction < min_fraction:  # Abort loop if fraction is too small, next pixel have even smaller fraction
+            # Abort loop if fraction is too small, next pixel have even smaller
+            # fraction
+            if fraction < min_fraction:
                 break
             # ADD HIT
-            result_hits[index][0], result_hits[index][1], result_hits[index][2] = actual_column, actual_row, fraction * charge
+            if index < result_hits.shape[0]:
+                result_hits[index][0], result_hits[index][1], result_hits[
+                    index][2] = actual_column, actual_row, fraction * charge
+            else:
+                raise RuntimeError(
+                    'Provided result hist does not fit charge sharing hits')
             index += 1
             n_hits += 1
             if total_fraction >= 1. - min_fraction:
@@ -176,33 +267,37 @@ def _create_charge_sharing_hits(relative_position, column, row, charge, max_colu
 
 
 @njit()
-def _add_charge_sharing_hits(relative_position, hits_digits, max_column, max_row, thickness, pixel_size_x, pixel_size_y, temperature, bias):
-    ''' Takes the arrea of seed hits and adds for each seed hit additionally hits that arise from charge sharing. To calculate the charge sharing a lot of
-    parameters are needed.
+def _add_charge_sharing_hits(rel_pos, hits_digits, max_column,
+                             max_row, thickness, pixel_size_x, pixel_size_y,
+                             temperature, bias):
+    ''' Add additional hits to seed hits due to charge sharing.
     '''
+
     n_hits_per_seed_hit = np.zeros(hits_digits.shape[0], dtype=np.int16)
-    result_hits = np.zeros(shape=(5 * hits_digits.shape[0], 3), dtype=np.float32)  # Result array to be filled; up to 5 hits per seed hit is expected
-    result_index = 0
-    for actual_index in range(hits_digits.shape[0]):
-        actual_hit_digit = hits_digits[actual_index]
-        result_index, n_hits = _create_charge_sharing_hits(relative_position=relative_position[actual_index],
-                                                           column=actual_hit_digit[0],
-                                                           row=actual_hit_digit[1],
-                                                           charge=actual_hit_digit[2],
-                                                           max_column=max_column,
-                                                           max_row=max_row,
-                                                           thickness=thickness,
-                                                           pixel_size_x=pixel_size_x,
-                                                           pixel_size_y=pixel_size_y,
-                                                           temperature=temperature,
-                                                           bias=bias,
-                                                           digitization_sigma_cc=1.,
-                                                           result_hits=result_hits,
-                                                           index=result_index)
+    # Result array to be filled; up to 10 hits per seed hit is possible
+    result_hits = np.zeros(
+        shape=(5 * hits_digits.shape[0], 3), dtype=np.float32)
+    index = 0
+    for d_index in range(hits_digits.shape[0]):
+        actual_hit_digit = hits_digits[d_index]
+        index, n_hits = _create_cs_hits(relative_position=rel_pos[d_index],
+                                        column=actual_hit_digit[0],
+                                        row=actual_hit_digit[1],
+                                        charge=actual_hit_digit[2],
+                                        max_column=max_column,
+                                        max_row=max_row,
+                                        thickness=thickness,
+                                        pixel_size_x=pixel_size_x,
+                                        pixel_size_y=pixel_size_y,
+                                        temperature=temperature,
+                                        bias=bias,
+                                        digitization_sigma_cc=1.,
+                                        result_hits=result_hits,
+                                        index=index)
 
-        n_hits_per_seed_hit[actual_index] = n_hits
+        n_hits_per_seed_hit[d_index] = n_hits
 
-    return result_hits[:result_index], n_hits_per_seed_hit
+    return result_hits[:index], n_hits_per_seed_hit
 
 
 @njit()
@@ -211,7 +306,9 @@ def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
     '''
 
     index = 0
-    indeces = np.arange(hits.shape[0])  # Hack to allow np.shuffle on a multidimesnional array, http://numba.pydata.org/numba-doc/dev/reference/numpysupported.html#simple-random-data
+    # Hack to allow np.shuffle on a multidimesnional array,
+    # http://numba.pydata.org/numba-doc/dev/reference/numpysupported.html#simple-random-data
+    indices = np.arange(hits.shape[0])
 
     np.random.seed(seed)
 
@@ -220,26 +317,31 @@ def shuffle_event_hits(event_number, n_tracks_per_event, hits, seed):
             index += 1
             continue
 
-        np.random.shuffle(indeces[index:index + n_tracks_per_event[index]])  # Happens inplace
+        # Happens inplace
+        np.random.shuffle(indices[index:index + n_tracks_per_event[index]])
 
-        while index < hits.shape[0] - 1:  # Actual event is shuffled, increase index until new event
+        # Actual event is shuffled, increase index until new event
+        while index < hits.shape[0] - 1:
             if event_number[index] != event_number[index + 1]:
                 break
             index += 1
 
         index += 1
 
-    return hits[indeces]  # copy instruction, inplace not possible due to numba limitations
+    # copy instruction, inplace not possible due to numba limitations
+    return hits[indices]
 
 
 class SimulateData(object):
 
-    def __init__(self, random_seed=None):
+    def __init__(self, random_seed=0):
+        self.random_seed = random_seed
         self.reset()
 
     def set_random_seed(self, value):
         self.random_seed = value
-        np.random.seed(self.random_seed)  # Set the random number seed to be able to rerun with same results
+        # Set the random number seed to be able to rerun with same results
+        np.random.seed(self.random_seed)
 
     @property
     def n_duts(self):
@@ -248,79 +350,118 @@ class SimulateData(object):
     @n_duts.setter
     def n_duts(self, value):
         if value > self._n_duts:
-            logging.warning('Number of DUTs increased, reset to standard settings!')
+            logging.warning(
+                'Number of DUTs increased, reset to standard settings!')
             self.set_std_settings()
         self._n_duts = value
 
     def set_std_settings(self):
         # Setup settings
-        self.z_positions = [i * 10000 for i in range(self._n_duts)]  # in um; std: every 10 cm
+        # in um; std: every 10 cm
+        self.z_positions = [i * 10000 for i in range(self._n_duts)]
         self.offsets = [(-2500, -2500)] * self._n_duts  # in x, y in mu
-        self.rotations = [(0, 0, 0)] * self._n_duts  # in rotation around x, y, z axis in Rad
-        self.temperature = 300  # Temperature in Kelvin, needed for charge sharing calculation
+        # in rotation around x, y, z axis in Rad
+        self.rotations = [(0, 0, 0)] * self._n_duts
+        # Temperature in Kelvin, needed for charge sharing calculation
+        self.temperature = 300
 
         # Beam settings
-        self.beam_position = (0, 0)  # Average beam position in x, y at z = 0 in mu
+        # Average beam position in x, y at z = 0 in mu
+        self.beam_position = (0, 0)
         self.beam_position_sigma = (2000, 2000)  # in x, y at z = 0 in mu
-        self.beam_angle = 0  # Average beam angle from the beam axis in theta at z = 0 in mRad
-        self.beam_angle_sigma = 1  # Deviation from the average beam angle in theta at z = 0 in mRad
-        self.beam_direction = (0, 2. * np.pi)  # The range of directions of the beam (phi in spherical coordinates) at z = 0 in Rad
+        # Average beam angle from the beam axis in theta at z = 0 in mRad
+        self.beam_angle = 0
+        # Deviation from the average beam angle in theta at z = 0 in mRad
+        self.beam_angle_sigma = 1
+        # The range of directions of the beam (phi in spherical coordinates) at
+        # z = 0 in Rad
+        self.beam_direction = (0, 2. * np.pi)
         self.beam_momentum = 3200  # Beam momentum in MeV
         self.tracks_per_event = 1  # Average number of tracks per event
-        self.tracks_per_event_sigma = 1  # Deviation from the average number of tracks, makes no track per event possible!
+        # Deviation from the average number of tracks, makes no track per event
+        # possible!
+        self.tracks_per_event_sigma = 1
 
         # Device settings
-        self.dut_bias = [50] * self._n_duts  # Sensor bias voltage for each device in volt
-        self.dut_thickness = [100] * self._n_duts  # Sensor thickness for each device in um
-        self.dut_threshold = [0] * self._n_duts  # Detection threshold for each device in electrons, influences efficiency!
-        self.dut_noise = [50] * self._n_duts  # Noise for each device in electrons
-        self.dut_pixel_size = [(50, 50)] * self._n_duts  # Pixel size for each device in x / y in um
-        self.dut_n_pixel = [(1000, 1000)] * self._n_duts  # Number of pixel for each device in x / y
-        self.dut_efficiencies = [1.] * self._n_duts  # Efficiency for each device from 0. to 1. for hits above threshold
-        self.dut_material_budget = [self.dut_thickness[i] * 1e-4 / 9.370 for i in range(self._n_duts)]  # The effective material budget (sensor + passive compoonents) given in total material distance / total radiation length (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf); 0 means no multiple scattering; std. setting is the sensor thickness made of silicon as material budget
+        # Sensor bias voltage for each device in volt
+        self.dut_bias = [50] * self._n_duts
+        # Sensor thickness for each device in um
+        self.dut_thickness = [100] * self._n_duts
+        # Detection threshold for each device in electrons, influences
+        # efficiency!
+        self.dut_threshold = [0] * self._n_duts
+        # Noise for each device in electrons
+        self.dut_noise = [50] * self._n_duts
+        # Pixel size for each device in x / y in um
+        self.dut_pixel_size = [(50, 50)] * self._n_duts
+        # Number of pixel for each device in x / y
+        self.dut_n_pixel = [(1000, 1000)] * self._n_duts
+        # Efficiency for each device from 0. to 1. for hits above threshold
+        self.dut_efficiencies = [1.] * self._n_duts
+        # The effective material budget (sensor + passive compoonents) given in
+        # total material distance / total radiation length
+        # (https://cdsweb.cern.ch/record/1279627/files/PH-EP-Tech-Note-2010-013.pdf);
+        # 0 means no multiple scattering; std. setting is the sensor thickness
+        # made of silicon as material budget
+        self.dut_material_budget = [
+            self.dut_thickness[i] * 1e-4 / 9.370 for i in range(self._n_duts)]
 
         # Digitization settings
         self.digitization_charge_sharing = True
-        self.digitization_shuffle_hits = True  # Shuffle hit per event to challange track finding
-        self.digitization_sigma_cc = 1.35  # Correction factor for charge cloud sigma(z) to take into account also repulsion; for further info see NIMA 606 (2009) 508-516
-        self.digitization_pixel_discretization = True  # Translate hit position on DUT plane to channel indices (column / row)
+        # Shuffle hit per event to challange track finding
+        self.digitization_shuffle_hits = True
+        # Correction factor for charge cloud sigma(z) to take into account also
+        # repulsion; for further info see NIMA 606 (2009) 508-516
+        self.digitization_sigma_cc = 1.35
+        # Translate hit position on DUT plane to channel indices (column / row)
+        self.digitization_pixel_discretization = True
 
         # Internals
-        self._hit_dtype = np.dtype([('event_number', np.int64), ('frame', np.uint8), ('column', np.uint16), ('row', np.uint16), ('charge', np.uint16)])
+        self._hit_dtype = np.dtype([('event_number', np.int64), ('frame', np.uint8), (
+            'column', np.uint16), ('row', np.uint16), ('charge', np.uint16)])
 
     def reset(self):
         ''' Reset to init configuration '''
         self._n_duts = 6  # Std. settinng for the number of DUTs
-        self.set_random_seed(0)
+        self.set_random_seed(self.random_seed)
         self.set_std_settings()
         self._hit_files = None
 
-    def create_data_and_store(self, base_file_name, n_events, chunk_size=100000):
+    def create_data_and_store(self, base_file_name, n_events,
+                              chunk_size=100000):
         logging.info('Simulate %d events with %d DUTs', n_events, self._n_duts)
 
-        if chunk_size > n_events:  # Special case: all events can be created at once
+        # Special case: all events can be created at once
+        if chunk_size > n_events:
             chunk_size = n_events
 
         # Create output h5 files with emtpy hit ta
         output_files = []
         hit_tables = []
         for dut_index in range(self._n_duts):
-            output_files.append(tb.open_file(base_file_name + '_DUT%d.h5' % dut_index, 'w'))
-            hit_tables.append(output_files[dut_index].create_table(output_files[dut_index].root, name='Hits', description=self._hit_dtype, title='Simulated hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)))
+            output_files.append(
+                tb.open_file(base_file_name + '_DUT%d.h5' % dut_index, 'w'))
+            hit_tables.append(output_files[dut_index].create_table(output_files[dut_index].root, name='Hits', description=self._hit_dtype,
+                                                                   title='Simulated hits for test beam analysis', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False)))
 
         if n_events * self.tracks_per_event > 100000:
-            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=len(range(0, n_events, chunk_size)), term_width=80)
+            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(
+                marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=len(range(0, n_events, chunk_size)), term_width=80)
             progress_bar.start()
         # Fill output files in chunks
         for chunk_index, _ in enumerate(range(0, n_events, chunk_size)):
-            actual_events, actual_digitized_hits = self._create_data(start_event_number=chunk_index * chunk_size, n_events=chunk_size)
+            actual_events, actual_digitized_hits = self._create_data(
+                start_event_number=chunk_index * chunk_size, n_events=chunk_size)
             for dut_index in range(self._n_duts):
-                actual_dut_events, actual_dut_hits = actual_events[dut_index], actual_digitized_hits[dut_index]
-                actual_hits = np.zeros(shape=actual_dut_events.shape[0], dtype=self._hit_dtype)
+                actual_dut_events, actual_dut_hits = actual_events[
+                    dut_index], actual_digitized_hits[dut_index]
+                actual_hits = np.zeros(
+                    shape=actual_dut_events.shape[0], dtype=self._hit_dtype)
                 actual_hits['event_number'] = actual_dut_events
                 actual_hits['column'] = actual_dut_hits.T[0]
                 actual_hits['row'] = actual_dut_hits.T[1]
-                actual_hits['charge'] = actual_dut_hits.T[2] / 10.  # One charge LSB corresponds to 10 electrons
+                actual_hits['charge'] = actual_dut_hits.T[
+                    2] / 10.  # One charge LSB corresponds to 10 electrons
                 hit_tables[dut_index].append(actual_hits)
             if n_events * self.tracks_per_event > 100000:
                 progress_bar.update(chunk_index)
@@ -343,41 +484,54 @@ class SimulateData(object):
         Four np.arrays with position x,y and angles phi, theta
         '''
 
-        logging.debug('Create %d tracks at x/y = (%d/%d +- %d/%d) um and theta = (%d +- %d) mRad', n_tracks, self.beam_position[0], self.beam_position[1], self.beam_position_sigma[0], self.beam_position_sigma[1], self.beam_angle, self.beam_angle_sigma)
+        logging.debug('Create %d tracks at x/y = (%d/%d +- %d/%d) um and theta = (%d +- %d) mRad', n_tracks, self.beam_position[
+                      0], self.beam_position[1], self.beam_position_sigma[0], self.beam_position_sigma[1], self.beam_angle, self.beam_angle_sigma)
 
         if self.beam_angle / 1000. > np.pi or self.beam_angle / 1000. < 0:
             raise ValueError('beam_angle has to be between [0..pi] Rad')
 
         if self.beam_position_sigma[0] != 0:
-            track_positions_x = np.random.normal(self.beam_position[0], self.beam_position_sigma[0], n_tracks)
+            track_positions_x = np.random.normal(
+                self.beam_position[0], self.beam_position_sigma[0], n_tracks)
 
         else:
-            track_positions_x = np.repeat(self.beam_position[0], repeats=n_tracks)  # Constant x = mean_x
+            track_positions_x = np.repeat(
+                self.beam_position[0], repeats=n_tracks)  # Constant x = mean_x
 
         if self.beam_position_sigma[1] != 0:
-            track_positions_y = np.random.normal(self.beam_position[1], self.beam_position_sigma[0], n_tracks)
+            track_positions_y = np.random.normal(
+                self.beam_position[1], self.beam_position_sigma[0], n_tracks)
 
         else:
-            track_positions_y = np.repeat(self.beam_position[1], repeats=n_tracks)  # Constant y = mean_y
+            track_positions_y = np.repeat(
+                self.beam_position[1], repeats=n_tracks)  # Constant y = mean_y
 
         if self.beam_angle_sigma != 0:
-            track_angles_theta = np.abs(np.random.normal(self.beam_angle / 1000., self.beam_angle_sigma / 1000., size=n_tracks))  # Gaussian distributed theta
+            track_angles_theta = np.abs(np.random.normal(
+                self.beam_angle / 1000., self.beam_angle_sigma / 1000., size=n_tracks))  # Gaussian distributed theta
         else:  # Allow sigma = 0
-            track_angles_theta = np.repeat(self.beam_angle / 1000., repeats=n_tracks)  # Constant theta = 0
+            track_angles_theta = np.repeat(
+                self.beam_angle / 1000., repeats=n_tracks)  # Constant theta = 0
 
         # Cut down to theta = 0 .. Pi
         iterations = 0
         while(np.any(track_angles_theta > np.pi) or np.any(track_angles_theta < 0)):
-            track_angles_theta[track_angles_theta > np.pi] = np.random.normal(self.beam_angle, self.beam_angle_sigma, size=track_angles_theta[track_angles_theta > np.pi].shape[0])
-            track_angles_theta[track_angles_theta < 0] = np.random.normal(self.beam_angle, self.beam_angle_sigma, size=track_angles_theta[track_angles_theta < 0].shape[0])
+            track_angles_theta[track_angles_theta > np.pi] = np.random.normal(
+                self.beam_angle, self.beam_angle_sigma, size=track_angles_theta[track_angles_theta > np.pi].shape[0])
+            track_angles_theta[track_angles_theta < 0] = np.random.normal(
+                self.beam_angle, self.beam_angle_sigma, size=track_angles_theta[track_angles_theta < 0].shape[0])
             iterations += 1
             if iterations > 1000:
-                raise RuntimeError('Cannot create theta between [0, 2 Pi[, decrease track angle sigma!')
+                raise RuntimeError(
+                    'Cannot create theta between [0, 2 Pi[, decrease track angle sigma!')
 
         if (self.beam_direction[0] != self.beam_direction[1]):
-            track_angles_phi = np.random.uniform(self.beam_direction[0], self.beam_direction[1], size=n_tracks)  # Flat distributed in phi
+            track_angles_phi = np.random.uniform(self.beam_direction[0], self.beam_direction[
+                                                 1], size=n_tracks)  # Flat distributed in phi
         else:
-            track_angles_phi = np.repeat(self.beam_direction[0], repeats=n_tracks)  # Constant phi = self.beam_direction
+            # Constant phi = self.beam_direction
+            track_angles_phi = np.repeat(
+                self.beam_direction[0], repeats=n_tracks)
 
         return track_positions_x, track_positions_y, track_angles_phi, track_angles_theta
 
@@ -397,24 +551,36 @@ class SimulateData(object):
         logging.debug('Intersect tracks with DUTs to create hits')
 
         intersections = []
-        track_positions = np.column_stack((track_positions_x, track_positions_y, np.zeros_like(track_positions_x)))  # Track position at z = 0
+        track_positions = np.column_stack((track_positions_x, track_positions_y, np.zeros_like(
+            track_positions_x)))  # Track position at z = 0
 
-        # Multiple scattering changes the angle at each plane, thus these temporary array have to be filled
+        # Multiple scattering changes the angle at each plane, thus these
+        # temporary array have to be filled
         actual_track_angles_phi = track_angles_phi
         actual_track_angles_theta = track_angles_theta
 
-        for dut_index, z_position in enumerate(self.z_positions):  # Loop over DUTs
+        # Loop over DUTs
+        for dut_index, z_position in enumerate(self.z_positions):
 
-            # Deduce geometry in global coordinates of actual DUT from DUT position and rotation
-            dut_position = np.array([self.offsets[dut_index][0], self.offsets[dut_index][1], z_position])  # Actual DUT position in global coordinates
+            # Deduce geometry in global coordinates of actual DUT from DUT
+            # position and rotation
+            dut_position = np.array([self.offsets[dut_index][0], self.offsets[dut_index][
+                                    1], z_position])  # Actual DUT position in global coordinates
             # Calculate plane x/y direction vectors in global coordinate system, taking into account DUT rotations around x/y axis
-            # z-axis rotations do not influence the intersection with a plane not expanding in z
-            rotation_matrix = geometry_utils.rotation_matrix(*self.rotations[dut_index])
-            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
-            # Normal vector of the actual DUT plane in the global coordinate system, needed for line intersection
-            normal_plane = basis_global[2]  # geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
+            # z-axis rotations do not influence the intersection with a plane
+            # not expanding in z
+            rotation_matrix = geometry_utils.rotation_matrix(
+                *self.rotations[dut_index])
+            basis_global = rotation_matrix.T.dot(
+                np.eye(3))  # TODO: why transposed?
+            # Normal vector of the actual DUT plane in the global coordinate
+            # system, needed for line intersection
+            # geometry_utils.get_plane_normal(direction_plane_x_global, direction_plane_y_global)
+            normal_plane = basis_global[2]
 
-            # Track does not scatter before first plane, thus just extrapolate from x, y, z = (track_positions_x, track_positions_y, 0) to first plane
+            # Track does not scatter before first plane, thus just extrapolate
+            # from x, y, z = (track_positions_x, track_positions_y, 0) to first
+            # plane
             if dut_index == 0:
                 track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
                                                                                           theta=actual_track_angles_theta,
@@ -425,7 +591,9 @@ class SimulateData(object):
                                                                                         position_plane=dut_position,
                                                                                         normal_plane=normal_plane)
 
-            else:  # Extrapolate from last plane position with last track angle to this plane
+            # Extrapolate from last plane position with last track angle to
+            # this plane
+            else:
                 track_directions = np.column_stack((geometry_utils.spherical_to_cartesian(phi=actual_track_angles_phi,
                                                                                           theta=actual_track_angles_theta,
                                                                                           r=1.)))  # r does not define a direction in spherical coordinates, any r > 0 can be used
@@ -435,29 +603,48 @@ class SimulateData(object):
                                                                                         position_plane=dut_position,
                                                                                         normal_plane=normal_plane)
 
-            if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:  # Scatter at actual plane, omit virtual planes (material_budget = 0)
+            # Scatter at actual plane, omit virtual planes (material_budget =
+            # 0) and last plane
+            if self.dut_material_budget[dut_index] != 0 and dut_index != len(self.z_positions) - 1:
                 # Calculated the change of the direction vector due to multiple scattering, TODO: needs cross check
-                # Vector addition in spherical coordinates needs transformation into cartesian space: http://math.stackexchange.com/questions/790057/how-to-sum-2-vectors-in-spherical-coordinate-system
-                x, y, z = geometry_utils.spherical_to_cartesian(actual_track_angles_phi, actual_track_angles_theta, r=1.)  # r does not define a direction in spherical coordinates, any r > 0 can be used
+                # Vector addition in spherical coordinates needs transformation
+                # into cartesian space:
+                # http://math.stackexchange.com/questions/790057/how-to-sum-2-vectors-in-spherical-coordinate-system
+                # r does not define a direction in spherical coordinates, any r
+                # > 0 can be used
+                x, y, z = geometry_utils.spherical_to_cartesian(
+                    actual_track_angles_phi, actual_track_angles_theta, r=1.)
 
                 # Calculate scattering in spherical coordinates
-                scattering_phi = np.random.uniform(0, 2. * np.pi, size=actual_track_angles_phi.shape[0])
-                theta_0 = self._scattering_angle_sigma(material_budget=self.dut_material_budget[dut_index])  # Scattering distribution theta_0, calculated from DUT material budget
-                scattering_theta = np.abs(np.random.normal(0, theta_0, actual_track_angles_theta.shape[0]))  # Change theta angles due to scattering, abs because theta is defined [0..np.pi]
+                scattering_phi = np.random.uniform(
+                    0, 2. * np.pi, size=actual_track_angles_phi.shape[0])
+                # Scattering distribution theta_0, calculated from DUT material
+                # budget
+                theta_0 = self._scattering_angle_sigma(
+                    material_budget=self.dut_material_budget[dut_index])
+                # Change theta angles due to scattering, abs because theta is
+                # defined [0..np.pi]
+                scattering_theta = np.abs(
+                    np.random.normal(0, theta_0, actual_track_angles_theta.shape[0]))
 
                 # Add scattering to direction vector in cartesian coordinates
-                dx, dy, _ = geometry_utils.spherical_to_cartesian(scattering_phi, scattering_theta, r=1.)  # r does not define a direction in spherical coordinates, any r > 0 can be used
+                # r does not define a direction in spherical coordinates, any r
+                # > 0 can be used
+                dx, dy, _ = geometry_utils.spherical_to_cartesian(
+                    scattering_phi, scattering_theta, r=1.)
                 x += dx
                 y += dy
 
-                actual_track_angles_phi, actual_track_angles_theta, _ = geometry_utils.cartesian_to_spherical(x, y, z)  # r does not define a direction in spherical coordinates and is omitted
+                actual_track_angles_phi, actual_track_angles_theta, _ = geometry_utils.cartesian_to_spherical(
+                    x, y, z)  # r does not define a direction in spherical coordinates and is omitted
 
-            intersections.append(actual_intersections)  # Add intersections of actual DUT to result
+            # Add intersections of actual DUT to result
+            intersections.append(actual_intersections)
 #         print intersections[0].shape
 #         import matplotlib.pyplot as plt
 #         plt.hist(intersections[0][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[0][:, 1], bins=100, alpha=0.2)
-# #         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
+#         plt.hist(intersections[0][:, 2], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 0], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 1], bins=100, alpha=0.2)
 #         plt.hist(intersections[1][:, 2], bins=100, alpha=0.2)
@@ -478,63 +665,99 @@ class SimulateData(object):
         ''' Takes the Monte Carlo hits and transfers them to the local DUT coordinate system and discretizes the position and creates additional hit belonging to a cluster.'''
         logging.debug('Digitize hits')
         digitized_hits = []
-        event_numbers = []  # The event number index can be different for each DUT due to noisy pixel and charge sharing hits
+        # The event number index can be different for each DUT due to noisy
+        # pixel and charge sharing hits
+        event_numbers = []
 
         for dut_index, dut_hits in enumerate(hits):  # Loop over DUTs
-            actual_event_number = event_number.copy()  # Since actual_event_number is changed depending on the DUT this is needed
-            # Transform hits from global coordinate system into local coordinate system of actual DUT
+            # Since actual_event_number is changed depending on the DUT this is
+            # needed
+            actual_event_number = event_number.copy()
+            # Transform hits from global coordinate system into local
+            # coordinate system of actual DUT
             transformation_matrix = geometry_utils.global_to_local_transformation_matrix(x=self.offsets[dut_index][0],  # Get the transformation matrix
-                                                                                         y=self.offsets[dut_index][1],
-                                                                                         z=self.z_positions[dut_index],
-                                                                                         alpha=self.rotations[dut_index][0],
-                                                                                         beta=self.rotations[dut_index][1],
+                                                                                         y=self.offsets[
+                                                                                             dut_index][1],
+                                                                                         z=self.z_positions[
+                                                                                             dut_index],
+                                                                                         alpha=self.rotations[
+                                                                                             dut_index][0],
+                                                                                         beta=self.rotations[
+                                                                                             dut_index][1],
                                                                                          gamma=self.rotations[dut_index][2])
             dut_hits[:, 0], dut_hits[:, 1], dut_hits[:, 2] = geometry_utils.apply_transformation_matrix(x=dut_hits[:, 0],
-                                                                                                        y=dut_hits[:, 1],
-                                                                                                        z=dut_hits[:, 2],
+                                                                                                        y=dut_hits[
+                                                                                                            :, 1],
+                                                                                                        z=dut_hits[
+                                                                                                            :, 2],
                                                                                                         transformation_matrix=transformation_matrix)
 
             # Output hit digits, with x/y information and charge
-            dut_hits_digits = np.zeros(shape=(dut_hits.shape[0], 3))  # Create new array with additional charge column
-            dut_hits_digits[:, 2] = self._get_charge_deposited(dut_index, n_entries=dut_hits.shape[0])  # Fill charge column
+            # Create new array with additional charge column
+            dut_hits_digits = np.zeros(shape=(dut_hits.shape[0], 3))
+            dut_hits_digits[:, 2] = self._get_charge_deposited(
+                dut_index, n_entries=dut_hits.shape[0])  # Fill charge column
 
-            # Calculate discretized pixel hit position in x,y = column/row (digit)
+            # Calculate discretized pixel hit position in x,y = column/row
+            # (digit)
             if self.digitization_pixel_discretization:
-                dut_hits_digits[:, :2] = dut_hits[:, :2] / np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
-                dut_hits_digits[:, :2] = np.around(dut_hits_digits[:, :2] - 0.5) + 1  # Pixel discretization, column/row index start from 1
+                dut_hits_digits[:, :2] = dut_hits[
+                    :, :2] / np.array(self.dut_pixel_size[dut_index])  # Position in pixel numbers
+                # Pixel discretization, column/row index start from 1
+                dut_hits_digits[:, :2] = np.around(
+                    dut_hits_digits[:, :2] - 0.5) + 1
 
                 # Create cluster from seed hits dut to charge sharing
                 if self.digitization_charge_sharing:
-                    relative_position = dut_hits[:, :2] - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]  # Calculate the relative position within the pixel, origin is in the center
+                    # Calculate the relative position within the pixel, origin
+                    # is in the center
+                    relative_position = dut_hits[
+                        :, :2] - (dut_hits_digits[:, :2] - 0.5) * self.dut_pixel_size[dut_index]
                     dut_hits_digits, n_hits_per_event = _add_charge_sharing_hits(relative_position,  # This function takes 75 % of the time
                                                                                  hits_digits=dut_hits_digits,
-                                                                                 max_column=self.dut_n_pixel[dut_index][0],
-                                                                                 max_row=self.dut_n_pixel[dut_index][1],
-                                                                                 thickness=self.dut_thickness[dut_index],
-                                                                                 pixel_size_x=self.dut_pixel_size[dut_index][0],
-                                                                                 pixel_size_y=self.dut_pixel_size[dut_index][1],
+                                                                                 max_column=self.dut_n_pixel[
+                                                                                     dut_index][0],
+                                                                                 max_row=self.dut_n_pixel[
+                                                                                     dut_index][1],
+                                                                                 thickness=self.dut_thickness[
+                                                                                     dut_index],
+                                                                                 pixel_size_x=self.dut_pixel_size[
+                                                                                     dut_index][0],
+                                                                                 pixel_size_y=self.dut_pixel_size[
+                                                                                     dut_index][1],
                                                                                  temperature=self.temperature,
                                                                                  bias=self.dut_bias[dut_index])
-                    actual_event_number = np.repeat(actual_event_number, n_hits_per_event)
+                    actual_event_number = np.repeat(
+                        actual_event_number, n_hits_per_event)
 
                 # Delete hits outside of the DUT
-                selection_x = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[0] <= self.dut_n_pixel[dut_index][0])  # Hits that are inside the x dimension of the DUT
-                selection_y = np.logical_and(dut_hits_digits.T[1] > 0, dut_hits_digits.T[1] <= self.dut_n_pixel[dut_index][1])  # Hits that are inside the y dimension of the DUT
+                selection_x = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[
+                                             0] <= self.dut_n_pixel[dut_index][0])  # Hits that are inside the x dimension of the DUT
+                selection_y = np.logical_and(dut_hits_digits.T[1] > 0, dut_hits_digits.T[
+                                             1] <= self.dut_n_pixel[dut_index][1])  # Hits that are inside the y dimension of the DUT
                 selection = np.logical_and(selection_x, selection_y)
-                dut_hits_digits = dut_hits_digits[selection]  # reduce hits to valid hits
-                actual_event_number = actual_event_number[selection]  # Reducce event number to event number with valid hits
+                # reduce hits to valid hits
+                dut_hits_digits = dut_hits_digits[selection]
+                # Reducce event number to event number with valid hits
+                actual_event_number = actual_event_number[selection]
             else:  # No position digitization
                 dut_hits_digits[:, :2] = dut_hits[:, :2]
-                selection = np.logical_and(dut_hits_digits.T[0] > 0, dut_hits_digits.T[1] > 0)   # Hits can only have a positive position
-                dut_hits_digits = dut_hits_digits[selection]  # reduce hits to valid hits
-                actual_event_number = actual_event_number[selection]  # Reducce event number to event number with valid hits
+                # Hits can only have a positive position
+                selection = np.logical_and(
+                    dut_hits_digits.T[0] > 0, dut_hits_digits.T[1] > 0)
+                # reduce hits to valid hits
+                dut_hits_digits = dut_hits_digits[selection]
+                # Reducce event number to event number with valid hits
+                actual_event_number = actual_event_number[selection]
 
             # Mask hits due to inefficiency
             selection = np.ones_like(actual_event_number, dtype=np.bool)
             if self.dut_efficiencies[dut_index] < 1.:
-                hit_indices = np.arange(actual_event_number.shape[0])  # Indices of hits
+                hit_indices = np.arange(
+                    actual_event_number.shape[0])  # Indices of hits
                 np.random.shuffle(hit_indices)  # shuffle hit indeces
-                n_inefficient_hit = int(hit_indices.shape[0] * (1. - self.dut_efficiencies[dut_index]))
+                n_inefficient_hit = int(
+                    hit_indices.shape[0] * (1. - self.dut_efficiencies[dut_index]))
                 selection[hit_indices[:n_inefficient_hit]] = False
 
             dut_hits_digits = dut_hits_digits[selection]
@@ -542,12 +765,15 @@ class SimulateData(object):
 
             # Add noise to charge
             if self.dut_noise[dut_index] != 0:
-                dut_hits_digits[:, 2] += np.random.normal(0, self.dut_noise[dut_index], dut_hits_digits[:, 2].shape[0])
+                dut_hits_digits[
+                    :, 2] += np.random.normal(0, self.dut_noise[dut_index], dut_hits_digits[:, 2].shape[0])
 
             # Delete hits below threshold
             if self.dut_threshold[dut_index] != 0:
-                actual_event_number = actual_event_number[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
-                dut_hits_digits = dut_hits_digits[dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
+                actual_event_number = actual_event_number[
+                    dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
+                dut_hits_digits = dut_hits_digits[
+                    dut_hits_digits[:, 2] >= self.dut_threshold[dut_index]]
 
             # Append results
             digitized_hits.append(dut_hits_digits)
@@ -558,30 +784,40 @@ class SimulateData(object):
     def _create_data(self, start_event_number=0, n_events=10000):
         # Calculate the number of tracks per event
         if self.tracks_per_event_sigma > 0:
-            n_tracks_per_event = np.random.normal(self.tracks_per_event, self.tracks_per_event_sigma, n_events).astype(np.int)
+            n_tracks_per_event = np.random.normal(
+                self.tracks_per_event, self.tracks_per_event_sigma, n_events).astype(np.int)
         else:
-            n_tracks_per_event = np.ones(n_events, dtype=np.int) * self.tracks_per_event
-        n_tracks_per_event[n_tracks_per_event < 0] = 0  # One cannot have less than 0 tracks per event, this will be triggered events without a track
+            n_tracks_per_event = np.ones(
+                n_events, dtype=np.int) * self.tracks_per_event
+        # One cannot have less than 0 tracks per event, this will be triggered
+        # events without a track
+        n_tracks_per_event[n_tracks_per_event < 0] = 0
 
         # Create event number
         events = np.arange(n_events)
-        event_number = np.repeat(events, n_tracks_per_event).astype(np.int64)  # Create an event number of events with tracks
+        # Create an event number of events with tracks
+        event_number = np.repeat(events, n_tracks_per_event).astype(np.int64)
         event_number += start_event_number
 
         # Reduce to n_tracks_per_event > 0
         n_tracks = n_tracks_per_event.sum()
-        n_tracks_per_event = np.repeat(n_tracks_per_event, n_tracks_per_event)  # Create per event n track info, needed for hit shuffling
+        # Create per event n track info, needed for hit shuffling
+        n_tracks_per_event = np.repeat(n_tracks_per_event, n_tracks_per_event)
 
         # Create tracks
-        track_positions_x, track_positions_y, track_angles_phi, track_angles_theta = self._create_tracks(n_tracks)
+        track_positions_x, track_positions_y, track_angles_phi, track_angles_theta = self._create_tracks(
+            n_tracks)
 
         # Create MC hits
-        hits = self._create_hits_from_tracks(track_positions_x, track_positions_y, track_angles_phi, track_angles_theta)
+        hits = self._create_hits_from_tracks(
+            track_positions_x, track_positions_y, track_angles_phi, track_angles_theta)
 
         # Suffle event hits to simulate unordered hit data per trigger
         if self.digitization_shuffle_hits:
             for index, actual_dut_hits in enumerate(hits):
-                hits[index] = shuffle_event_hits(event_number, n_tracks_per_event, actual_dut_hits, self.random_seed + index)  # + Index is a trick to shuffle different for each device 
+                # + Index is a trick to shuffle different for each device
+                hits[index] = shuffle_event_hits(
+                    event_number, n_tracks_per_event, actual_dut_hits, self.random_seed + index)
 
         # Create detector response: digitized hits
         hits_digitized = self._digitize_hits(event_number, hits)
@@ -594,7 +830,9 @@ class SimulateData(object):
         '''
 
         x = np.linspace(0., 100., 10000)
-        y = pylandau.landau(x, mpv=10., eta=eta)  # eta is different depending on the device thickness; this is neglected here
+        # eta is different depending on the device thickness; this is neglected
+        # here
+        y = pylandau.landau(x, mpv=10., eta=eta)
         p = y / np.sum(y)  # Propability by normalization to integral
 
         mpv = 71 * self.dut_thickness[dut_index]

@@ -7,6 +7,60 @@ functions where no decicion is done yet to keep them, fx them or not.'''
 from pykalman.standard import KalmanFilter
 
 
+def plot_hit_alignment(title, difference, particles, ref_dut_column, table_column, actual_median, actual_mean, bins=100, output_pdf=None):
+    plt.clf()
+    plt.hist(difference, bins=bins, range=(-1. / 100. * np.amax(particles[:][ref_dut_column]) / 1., 1. / 100. * np.amax(particles[:][ref_dut_column]) / 1.))
+    try:
+        plt.yscale('log')
+    except ValueError:
+        pass
+    plt.xlabel('%s - %s' % (ref_dut_column, table_column))
+    plt.ylabel('#')
+    plt.title(title)
+    plt.grid()
+    plt.plot([actual_median, actual_median], [0, plt.ylim()[1]], '-', linewidth=2.0, label='Median %1.1f' % actual_median)
+    plt.plot([actual_mean, actual_mean], [0, plt.ylim()[1]], '-', linewidth=2.0, label='Mean %1.1f' % actual_mean)
+    plt.legend(loc=0)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
+
+
+def plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_pdf=None):
+    plt.clf()
+    plt.xlabel('Hits')
+    plt.ylabel('Offset')
+    plt.grid()
+    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), median, linewidth=2.0, label='Median')
+    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), mean, linewidth=2.0, label='Mean')
+    plt.plot(range(0, in_file_h5.root.Tracklets.shape[0], combine_n_hits), correlation, linewidth=2.0, label='Alignment')
+    plt.legend(loc=0)
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
+
+
+def plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, dut_index, output_pdf=None):
+    plt.clf()
+    plt.plot([dut_z_col.x, dut_z_col.x], [0., 1.], "--", label="DUT%d, col, z=%1.4f" % (dut_index, dut_z_col.x))
+    plt.plot([dut_z_row.x, dut_z_row.x], [0., 1.], "--", label="DUT%d, row, z=%1.4f" % (dut_index, dut_z_row.x))
+    plt.plot(z, dut_z_col_pos_errors / np.amax(dut_z_col_pos_errors), "-", label="DUT%d, column" % dut_index)
+    plt.plot(z, dut_z_row_pos_errors / np.amax(dut_z_row_pos_errors), "-", label="DUT%d, row" % dut_index)
+    plt.grid()
+    plt.legend(loc=1)
+    plt.ylim((np.amin(dut_z_col_pos_errors / np.amax(dut_z_col_pos_errors)), 1.))
+    plt.xlabel('Relative z-position')
+    plt.ylabel('Mean squared offset [a.u.]')
+    plt.gca().set_yscale('log')
+    plt.gca().get_yaxis().set_ticks([])
+    if isinstance(output_pdf, PdfPages):
+        output_pdf.savefig()
+    elif output_pdf is True:
+        plt.show()
+
+
 def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=100000, correlated_only=False):
     '''Takes the tracklet array and plots the difference of column/row position of each DUT against the reference DUT0
     for every combine_n_events. If the alignment worked the median has to be around 0 and should not change with time
@@ -24,7 +78,7 @@ def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=10
     '''
     logging.info('=== Check hit alignment ===')
     with tb.open_file(input_tracklets_file, mode="r") as in_file_h5:
-        with PdfPages(output_pdf_file) as output_fig:
+        with PdfPages(output_pdf_file) as output_pdf:
             for table_column in in_file_h5.root.Tracklets.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
                     median, mean, std, alignment, correlation = [], [], [], [], []
@@ -56,9 +110,9 @@ def check_hit_alignment(input_tracklets_file, output_pdf_file, combine_n_hits=10
                         mean.append(actual_mean)
                         std.append(actual_rms)
 
-                        plot_utils.plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=64)
+                        plot_hit_alignment('Aligned position difference for events %d - %d' % (index, index + combine_n_hits), difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_pdf, bins=64)
                         progress_bar.update(index)
-                    plot_utils.plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_fig)
+                    plot_hit_alignment_2(in_file_h5, combine_n_hits, median, mean, correlation, alignment, output_pdf)
                     progress_bar.finish()
 
 
@@ -163,7 +217,7 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
     def pos_error(z, dut, first_reference, last_reference):
         return np.mean(np.square(z * (last_reference - first_reference) + first_reference - dut))
 
-    with PdfPages(output_pdf) as output_fig:
+    with PdfPages(output_pdf) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
             track_candidates = in_file_h5.root.TrackCandidates[::10]  # take only every 10th track
@@ -189,7 +243,7 @@ def align_z(input_track_candidates_file, input_alignment_file, output_pdf, z_pos
                 results[dut_index - 1]['z_position_column'] = dut_z_col.x
                 results[dut_index - 1]['z_position_row'] = dut_z_row.x
 
-                plot_utils.plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, dut_index, output_fig)
+                plot_z(z, dut_z_col, dut_z_row, dut_z_col_pos_errors, dut_z_row_pos_errors, dut_index, output_pdf)
 
     with tb.open_file(input_alignment_file, mode='r+') as out_file_h5:
         try:
@@ -284,7 +338,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
     '''
     logging.info('=== Check TrackCandidates Alignment ===')
     with tb.open_file(trackcandidates_files, mode="r") as in_file_h5:
-        with PdfPages(output_pdf) as output_fig:
+        with PdfPages(output_pdf) as output_pdf:
             for table_column in in_file_h5.root.TrackCandidates.dtype.names:
                 if 'dut' in table_column and 'dut_0' not in table_column and 'charge' not in table_column:
                     dut_index = int(table_column[-1])  # DUT index of actual DUT data
@@ -313,7 +367,7 @@ def check_track_alignment(trackcandidates_files, output_pdf, combine_n_hits=1000
                         actual_median, actual_mean = np.median(difference), np.mean(difference)
                         alignment.append(np.median(np.abs(difference)))
                         correlation.append(difference.shape[0] * 100. / combine_n_hits)
-                        plot_utils.plot_hit_alignment('Aligned position difference', difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_fig, bins=100)
+                        plot_hit_alignment('Aligned position difference', difference, particles, ref_dut_column, table_column, actual_median, actual_mean, output_pdf, bins=100)
 
                         progress_bar.update(index)
 
@@ -435,7 +489,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
     if method == "kalman" and not pixel_size:
         raise ValueError('Kalman filter requires to provide pixel size for error measurement matrix covariance!')
 
-    with PdfPages(output_pdf) as output_fig:
+    with PdfPages(output_pdf) as output_pdf:
         with tb.open_file(input_track_candidates_file, mode='r') as in_file_h5:
             with tb.open_file(output_tracks_file, mode='w') as out_file_h5:
                 n_duts = sum(['column' in col for col in in_file_h5.root.TrackCandidates.dtype.names])
@@ -538,7 +592,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
                                     fit_ok = True
                                 except:
                                     fit_ok = False
-                                plot_utils.plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matrix, output_fig, fit_dut, parName='Slope')
+                                plot_utils.plot_tracks_parameter(slopes, edges, i, hist, fit_ok, coeff, gauss, var_matrix, output_pdf, fit_dut, parName='Slope')
                                 meano, rmso = np.mean(offsets[:, i]), np.std(offsets[:, i])
                                 histo, edgeso = np.histogram(offsets[:, i], range=(meano - 5. * rmso, meano + 5. * rmso), bins=1000)
                                 fit_ok = False
@@ -547,7 +601,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
                                     fit_ok = True
                                 except:
                                     fit_ok = False
-                                plot_utils.plot_tracks_parameter(offsets, edgeso, i, histo, fit_ok, coeffo, gauss, var_matrixo, output_fig, fit_dut, parName='Offset')
+                                plot_utils.plot_tracks_parameter(offsets, edgeso, i, histo, fit_ok, coeffo, gauss, var_matrixo, output_pdf, fit_dut, parName='Offset')
                         elif method == "kalman":
                             track_estimates = np.concatenate([i[0] for i in results])  # merge predicted x,y pos from all cores in results
                             chi2s = np.concatenate([i[1] for i in results])  # merge chi2 from all cores in results
@@ -557,7 +611,7 @@ def fit_tracks_kalman(input_track_candidates_file, output_tracks_file, geometry_
                             tracklets_table.append(tracks_array)
 
                         # Plot chi2 distribution
-                        plot_utils.plot_track_chi2(chi2s, fit_dut, output_fig)
+                        plot_utils.plot_track_chi2(chi2s, fit_dut, output_pdf)
 
 def _function_wrapper_fit_tracks_kalman_loop(args):  # Needed for multiprocessing call with arguments
     return _fit_tracks_kalman_loop(*args)
