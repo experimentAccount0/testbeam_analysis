@@ -21,15 +21,15 @@ Choose the 64-bit version of Python 2.7.x or Python 3.6.x.
 
 Installing C++ Compiler
 ***********************
-- Linux
+- Linux:
   Install *gcc* via package manager, e.g. on Ubuntu run:
 
   :bash:`sudo apt-get install build-essential`
 
-- Windows
+- Windows:
   Install `Microsoft Visual C++ Compiler for Python 2.7 <http://aka.ms/vcpython27>`_.
 
-- OS X
+- OS X:
   Install `Xcode <https://itunes.apple.com/us/app/xcode/id497799835>`_ from App Store and install Xcode Command Line Tools by running
   :bash:`xcode-select install`
 
@@ -47,47 +47,56 @@ Eclipse needs a Java runtime environmet (JRE) and will not start if this is not 
    to be extracted to a folder of your choice. Eclipse can be executed by double clicking on the executable.
 2. Eclipse asks for a workspace path where the projects will be located on your harddrive. Standard settings are sufficient.
 3. Close the welcome screen.
-4. Install the PyDev plugin by clicking on _Help -> Install New Software_ . Press add and fill the form (_name = PyDev_, _location = http://pydev.org/updates_):
+4. Install the PyDev plugin by clicking on *Help -> Install New Software* . Press add and fill the form (*name = PyDev*, *location = http://pydev.org/updates*):
 
-   &nbsp;
-   !{width:400px}PyDev.jpg!
-   &nbsp;
+   .. image:: _static/installation/PyDev.jpg
 
    Select PyDev and install (accept license agreement and trust the certificate).
   
    .. NOTE::
       Under Linux you need at least *Java 7*, otherwise *PyDev* will not show up in Eclipse without any error message. Please install *Java 7* and activate it.
       In Ubuntu activate it with
-      :bash:`sudo update-alternatives java`
+      :bash:`sudo update-alternatives --config java`
 
 5. Add PyDev perspective to Eclipse and select it. The button is located in the upper rigth corner:
 
-   !{width:300px}Perspective.jpg!
+	.. image:: _static/installation/Perspective.jpg
 
-6. Goto _Window -> Preferences -> PyDev -> Interpreters-> Python Interpreter_ and press new.
+6. Goto *Window -> Preferences -> PyDev -> Interpreters -> Python Interpreter* and press new.
 
-   !{width:600px}AnacondaSetup1.jpg!
+	.. image:: _static/installation/AnacondaSetup1.jpg
 
-   Select the Python executable in /home/<username>/anaconda/bin/ on *Linux* or c:\Anaconda\ on *Windows* (optionally use the Anaconda/env/<environment name>/ folder if you are using Anaconda environments) and press the OK button. Everything is set up automatically.
-   More details are given "here":http://docs.continuum.io/anaconda/ide_integration.html.
+   Select the Python executable in :bash:`/home/<username>/anaconda/bin/` on *Linux* or :bash:`c:\Anaconda\`
+   on *Windows* (optionally use the :bash:`Anaconda/env/<environment name>/` folder if you are using Anaconda environments) and press the OK button.
+   Everything is set up automatically. More details are given `here <http://docs.continuum.io/anaconda/ide_integration.html>`_.
 
 Installing Required Python Packages
 ***********************************
 
 Open a console and type one by one:
-:bash:`conda update conda
-       conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml
-       pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock`
-       
-       On *Windows* additionally run:
-       :bash:`conda install pywin32`
-# *Installing pyTestbeamAnalysis*
-## Goto File->Import->Git and select Projects from Git
-## Click clone URI and type the pyTestbeamAnalysis repository (_URI: https://github.com/SiLab-Bonn/pyTestbeamAnalysis_)
-## If you have a "GitHub":https://github.com account you can add the credentials here
-## Click next, select all branches, click next and specify the directory where pyBAR will be cloned to
-## Wait until the download of the code is finished and check _Check out as project configured using the New Project Wizard_
-## Select _PyDev -> PyDevProject_
-## Give the project a name, select the folder where the pyBAR was cloned to (e.g. /home/username/git/pyBAR) and click finish
-## Open a shell and run the following command from the pyBar/host folder: <pre> python setup.py develop </pre> This will compile and install pyTestbeamAnalysis to the environment.
-*Windows:* If the compilation fails use the Visual Studio Command promt to run the setup script. Because distutils sometimes cannot find VS due to multiple/old VS installation. It might also be needed to install and "activate the 64-bit compiler":https://msdn.microsoft.com/en-us/library/x4d2c09s%28v=vs.90%29.aspx if you use 64-bit.
+
+:bash:`conda update conda`
+:bash:`conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml`
+:bash:`pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock`
+
+On *Windows* additionally run:
+:bash:`conda install pywin32`
+
+Installing testbeam analysis
+****************************
+1. Goto *File -> Import -> Git* and select Projects from Git
+2. Click clone URI and type the *testbeam analysis* repository (`https://github.com/SiLab-Bonn/testbeam_analysis <https://github.com/SiLab-Bonn/testbeam_analysis>`_)
+   If you have a `GitHub <https://github.com>`_ account you can add the credentials here
+3. Click next, select all branches, click next and specify the directory where *testbeam analysis* will be cloned to
+   Wait until the download of the code is finished.
+4. Check *Check out as project configured using the New Project Wizard*
+5. Select *PyDev -> PyDevProject*
+6. Give the project a name, select the folder where the *testbeam analysis* was cloned to (e.g. :bash:`/home/username/git/testbeam_analysis`) and click finish
+7. Open a shell and run the following command from the *testbeam analysis* folder:
+   :bash:`python setup.py develop`
+   This will compile and install *testbeam analysis* to the environment.
+   
+   .. NOTE::
+      On Windows if the compilation fails use the Visual Studio Command promt to run the setup script. Because distutils sometimes cannot find VS
+      due to multiple/old VS installation. It might also be needed to install and
+      `activate the 64-bit compiler <https://msdn.microsoft.com/en-us/library/x4d2c09s%28v=vs.90%29.aspx>`_.
