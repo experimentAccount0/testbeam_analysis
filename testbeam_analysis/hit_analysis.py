@@ -123,22 +123,46 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     if output_cluster_file is None:
         output_cluster_file = os.path.splitext(input_hits_file)[0] + '_clustered.h5'
 
+    # Calculate the size in col/row for each cluster
+    def calc_cluster_dimensions(hits, clusters, cluster_size, cluster_hit_indices, cluster_index, cluster_id, charge_correction, noisy_pixels, disabled_pixels, seed_hit_index):
+        min_col = hits[cluster_hit_indices[0]].column
+        max_col = hits[cluster_hit_indices[0]].column
+        min_row = hits[cluster_hit_indices[0]].row
+        max_row = hits[cluster_hit_indices[0]].row
+        for i in cluster_hit_indices[1:]:
+            if i < 0:  # Not used indeces = -1
+                break
+            if hits[i].column < min_col:
+                min_col = hits[i].column
+            if hits[i].column > max_col:
+                max_col = hits[i].column
+            if hits[i].row < min_row:
+                min_row = hits[i].row
+            if hits[i].row > max_row:
+                max_row = hits[i].row
+        clusters[cluster_index].n_cols = int(max_col - min_col + 1)
+        clusters[cluster_index].n_rows = int(max_row - min_row + 1)
+
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_cluster_file, 'w') as output_file_h5:
             if input_disabled_pixel_mask_file is not None:
                 with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
-                     disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
-                     input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
+                    disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
+                    input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
             else:
                 disabled_pixels = None
             if input_noisy_pixel_mask_file is not None:
                 with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                     noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
-                     input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
+                    noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
+                    input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
             else:
                 noisy_pixels = None
 
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
+            clusterizer.add_cluster_field(description=('n_cols', '<u2'))  # Add an additional field to hold the cluster size in x
+            clusterizer.add_cluster_field(description=('n_rows', '<u2'))  # Add an additional field to hold the cluster size in y
+            clusterizer.set_end_of_cluster_function(calc_cluster_dimensions)  # Set the new function to the clusterizer
+
             cluster_hits_table = None
             cluster_table = None
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
