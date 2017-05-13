@@ -148,6 +148,7 @@ class PrealignmentTab(AnalysisWidget):
         self.add_option(option='no_z', func=apply_alignment, fixed=True)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+        self.analysisDone.connect(lambda: self.button_ok.setDisabled(True))
 
 
 class TrackFindingTab(AnalysisWidget):
@@ -176,13 +177,14 @@ class TrackFindingTab(AnalysisWidget):
                         fixed=True)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+        self.analysisDone.connect(lambda: self.button_ok.setDisabled(True))
 
 
 class AlignmentTab(AnalysisWidget):
     ''' Implements the alignment gui'''
 
     proceedAnalysis = QtCore.pyqtSignal(list)
-    skipAlignment = QtCore.pyqtSignal(bool)
+    skipAlignment = QtCore.pyqtSignal()
 
     def __init__(self, parent, setup, options, tab_list):
         super(AlignmentTab, self).__init__(parent, setup, options, tab_list)
@@ -245,11 +247,11 @@ class AlignmentTab(AnalysisWidget):
 
         if reply == QtWidgets.QMessageBox.Yes:
 
-            self.proceedAnalysis.emit(self.tl)
             self.btn_skip.setText('Alignment skipped')
             self.button_ok.deleteLater()
             self.right_widget.setDisabled(True)
-            self.skipAlignment.emit(True)
+            self.skipAlignment.emit()
+            self.proceedAnalysis.emit(self.tl)
 
         else:
             pass
@@ -260,13 +262,13 @@ class TrackFittingTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list, skip_alignment=False):
+    def __init__(self, parent, setup, options, tab_list):
         super(TrackFittingTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=find_tracks)
         self.add_function(func=fit_tracks)
 
-        if skip_alignment:
+        if options['skip_alignment']:
             input_tracks = options['output_path'] + '/TrackCandidates_prealignment.h5'
         else:
             input_tracks = options['output_path'] + '/Tracklets.h5'
@@ -299,6 +301,7 @@ class TrackFittingTab(AnalysisWidget):
                         default_value=[200] * setup['n_duts'], optional=False)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+        self.analysisDone.connect(lambda: self.button_ok.setDisabled(True))
 
 
 class ResultTab(AnalysisWidget):

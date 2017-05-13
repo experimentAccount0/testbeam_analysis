@@ -227,8 +227,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                                                                    skip='Setup'))
 
                 if name == 'Alignment':
-                    self.tw[name].skipAlignment.connect(lambda skip: self.update_tabs(tabs='Track fitting',
-                                                                                      skip_alignment=skip))
+                    self.tw[name].skipAlignment.connect(lambda: self.update_tabs(data={'skip_alignment': True},
+                                                                                 tabs='Track fitting'))
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
                 self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
@@ -312,8 +312,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.TrackFittingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options,
-                                                    tab_list='Result',
-                                                    skip_alignment=skip_alignment)
+                                                    tab_list='Result')
             elif name == 'Result':
                 widget = tab_widget.ResultTab(parent=self.tabs,
                                               setup=self.setup,

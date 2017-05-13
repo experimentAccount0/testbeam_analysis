@@ -355,10 +355,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         """ 
         Call all functions in a row
         """
-
+        # pool = Pool()
         for func, kwargs in self.calls.iteritems():
             print(func.__name__, kwargs)
-            # self._call_func(func, kwargs)
+            # pool.apply_async(self._call_func(func, kwargs))
+        # pool.close()
+        # pool.join()
 
         # Emit signal to indicate end of analysis
         if self.tab_list is not None:
@@ -498,8 +500,6 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         if self.tab_list is not None:
             self.parallelAnalysisDone.emit(self.tab_list)
-
-        self.btn_ok.setDisabled(False)
 
 
 class AnalysisLogger(logging.Handler):

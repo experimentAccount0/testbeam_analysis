@@ -27,7 +27,8 @@ class SettingsWindow(QtWidgets.QMainWindow):
                                 'chunk_size': 1000000,
                                 'plot': False,
                                 'noisy_suffix': '_noisy.h5',  # fixed since fixed in function
-                                'cluster_suffix': '_clustered.h5'}  # fixed since fixed in function
+                                'cluster_suffix': '_clustered.h5',  # fixed since fixed in function
+                                'skip_alignment': False}
 
         # Make copy of defaults to change values but dont change defaults
         if setup is None:
