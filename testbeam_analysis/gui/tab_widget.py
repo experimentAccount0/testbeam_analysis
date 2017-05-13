@@ -4,7 +4,7 @@
     gui options and plotting outputs
 '''
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
 from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
 from testbeam_analysis.dut_alignment import correlate_cluster, prealignment, merge_cluster_data, apply_alignment, alignment
@@ -182,9 +182,15 @@ class AlignmentTab(AnalysisWidget):
     ''' Implements the alignment gui'''
 
     proceedAnalysis = QtCore.pyqtSignal(list)
+    skipAlignment = QtCore.pyqtSignal(bool)
 
     def __init__(self, parent, setup, options, tab_list):
         super(AlignmentTab, self).__init__(parent, setup, options, tab_list)
+
+        if isinstance(tab_list, list):
+            self.tl = tab_list
+        else:
+            self.tl = [tab_list]
 
         self.add_function(func=alignment)
         self.add_function(func=apply_alignment)
@@ -199,6 +205,21 @@ class AlignmentTab(AnalysisWidget):
                         func=alignment,
                         fixed=True)
 
+        self.add_option(option='output_hit_file',
+                        default_value=options['output_path'] + '/Tracklets.h5',
+                        func=alignment,
+                        fixed=True)
+
+        self.add_option(option='initial_translation',
+                        default_value=setup['z_positions'],
+                        func=alignment,
+                        fixed=True)
+
+        self.add_option(option='initial_rotation',
+                        default_value=setup['rotations'],
+                        func=alignment,
+                        fixed=True)
+
         self.add_option(option='input_hit_file',
                         default_value=options['output_path'] + '/Merged.h5',
                         func=apply_alignment,
@@ -209,12 +230,29 @@ class AlignmentTab(AnalysisWidget):
                         func=apply_alignment,
                         fixed=True)
 
-        self.add_option(option='output_hit_file',
-                        default_value=options['output_path'] + '/Tracklets.h5',
-                        func=alignment,
-                        fixed=True)
-
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+
+        self.btn_skip = QtWidgets.QPushButton('Skip')
+        self.btn_skip.setToolTip('Skip alignment and use pre-alignment for further analysis')
+        self.btn_skip.clicked.connect(lambda: self._skip_alignment())
+        self.layout_options.addWidget(self.btn_skip)
+
+    def _skip_alignment(self):
+
+        msg = 'Do you want to skip alignment and use pre-alignment for further analysis?'
+        reply = QtWidgets.QMessageBox.question(self, 'Skip alignment', msg, QtWidgets.QMessageBox.Yes,
+                                               QtWidgets.QMessageBox.Cancel)
+
+        if reply == QtWidgets.QMessageBox.Yes:
+
+            self.proceedAnalysis.emit(self.tl)
+            self.btn_skip.setText('Alignment skipped')
+            self.button_ok.deleteLater()
+            self.right_widget.setDisabled(True)
+            self.skipAlignment.emit(True)
+
+        else:
+            pass
 
 
 class TrackFittingTab(AnalysisWidget):
@@ -222,14 +260,19 @@ class TrackFittingTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
+    def __init__(self, parent, setup, options, tab_list, skip_alignment=False):
         super(TrackFittingTab, self).__init__(parent, setup, options, tab_list)
 
         self.add_function(func=find_tracks)
         self.add_function(func=fit_tracks)
 
+        if skip_alignment:
+            input_tracks = options['output_path'] + '/TrackCandidates_prealignment.h5'
+        else:
+            input_tracks = options['output_path'] + '/Tracklets.h5'
+
         self.add_option(option='input_tracklets_file',
-                        default_value=options['output_path'] + '/Tracklets.h5',
+                        default_value=input_tracks,
                         func=find_tracks,
                         fixed=True)
 

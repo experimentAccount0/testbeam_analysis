@@ -237,9 +237,20 @@ class AnalysisWidget(QtWidgets.QWidget):
             palette.setColor(QtGui.QPalette.Foreground, QtCore.Qt.darkGray)
             text.setPalette(palette)
             text.setToolTip(tooltip)
-#            metrics = QtGui.QFontMetrics(self.font())
-#            elided_text = metrics.elidedText(str(default_value), QtCore.Qt.ElideMiddle, 500)
-            text.setText(name + ': ' + str(default_value))
+            # Handle displaying list entries of default_value
+            if isinstance(default_value, list):
+                # Needed to get width of text
+                metrics = QtGui.QFontMetrics(self.font())
+                # If width of default_value as str is greater than widget, make new line for each entry
+                if metrics.width(str(default_value)) > self.right_widget.width():
+                    d_v = ['\n' + str(v) for v in default_value]
+                    t = name + ':' + ''.join(d_v) + '\n'
+                # If not, write list in one line
+                else:
+                    t = (name + ':\n' + str(default_value) + '\n')
+                text.setText(t)
+            else:
+                text.setText(name + ':\n' + str(default_value) + '\n')
             self.opt_fixed.addWidget(text)
             self.calls[func][option] = default_value
 
@@ -328,7 +339,7 @@ class AnalysisWidget(QtWidgets.QWidget):
                 elif arg in self.options or 'file' in arg:
                     try:
                         if 'input' in arg or 'output' in arg:
-                            kwargs[arg] = os.path.join(self.options['working_directory'],
+                            kwargs[arg] = os.path.join(self.options['output_path'],  # self.options['working_directory']
                                                        self.options[arg])
                         else:
                             kwargs[arg] = self.options[arg]
@@ -345,12 +356,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         Call all functions in a row
         """
 
-        pool = Pool()
         for func, kwargs in self.calls.iteritems():
-            # print(func.__name__, kwargs)
-            pool.apply_async(self._call_func(func, kwargs))
-        pool.close()
-        pool.join()
+            print(func.__name__, kwargs)
+            # self._call_func(func, kwargs)
 
         # Emit signal to indicate end of analysis
         if self.tab_list is not None:
@@ -487,7 +495,6 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         for i, tab in enumerate(self.tw.keys()):
             self.p_bar.setValue(i+1)
             self.tw[tab]._call_funcs()
-            # QtCore.QCoreApplication.processEvents()  # FIXME: Multi-threading probably needed here
 
         if self.tab_list is not None:
             self.parallelAnalysisDone.emit(self.tab_list)
