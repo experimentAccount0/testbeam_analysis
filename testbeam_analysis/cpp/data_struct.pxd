@@ -28,3 +28,5 @@ cdef packed struct numpy_cluster_info:
     cnp.uint16_t seed_row  # row value (unsigned short int: 0 to 65.535)
     cnp.float32_t mean_column  # sum charge of all cluster hits
     cnp.float32_t mean_row  # sum charge of all cluster hits
+    cnp.float32_t err_column  # sum charge of all cluster hits
+    cnp.float32_t err_row  # sum charge of all cluster hits
