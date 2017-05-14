@@ -396,9 +396,9 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     return pos_transformed[:, 0], pos_transformed[:, 1], pos_transformed[:, 2]
 
 
-def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
-                    prealignment=None, inverse=False):
-    ''' Takes hits and applies a transformation according to the alignment data.
+def apply_alignment(hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr,
+                    dut_index, alignment=None, prealignment=None, inverse=False):
+    ''' Takes hits with errors and applies a transformation according to the alignment data.
 
     If alignment data with rotations and translations are given the hits are
     transformed according to the rotations and translations.
@@ -440,6 +440,13 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
                 alpha=alignment[dut_index]['alpha'],
                 beta=alignment[dut_index]['beta'],
                 gamma=alignment[dut_index]['gamma'])
+            rotation_matrix = global_to_local_transformation_matrix(
+                x=0.,
+                y=0.,
+                z=0.,
+                alpha=alignment[dut_index]['alpha'],
+                beta=alignment[dut_index]['beta'],
+                gamma=alignment[dut_index]['gamma'])
         else:
             logging.debug('Transform hit position into the global coordinate '
                           'system using alignment data')
@@ -450,12 +457,26 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
                 alpha=alignment[dut_index]['alpha'],
                 beta=alignment[dut_index]['beta'],
                 gamma=alignment[dut_index]['gamma'])
+            rotation_matrix = local_to_global_transformation_matrix(
+                x=0.,
+                y=0.,
+                z=0.,
+                alpha=alignment[dut_index]['alpha'],
+                beta=alignment[dut_index]['beta'],
+                gamma=alignment[dut_index]['gamma'])
 
         hits_x, hits_y, hits_z = apply_transformation_matrix(
             x=hits_x,
             y=hits_y,
             z=hits_z,
             transformation_matrix=transformation_matrix)
+        # Errors need only rotation but no translation
+        hits_xerr, hits_yerr, hits_zerr = apply_transformation_matrix(
+            x=hits_xerr,
+            y=hits_yerr,
+            z=hits_zerr,
+            transformation_matrix=rotation_matrix)
+
     else:
         c0_column = prealignment[dut_index]['column_c0']
         c1_column = prealignment[dut_index]['column_c1']
@@ -469,14 +490,20 @@ def apply_alignment(hits_x, hits_y, hits_z, dut_index, alignment=None,
             hits_x = (hits_x - c0_column) / c1_column
             hits_y = (hits_y - c0_row) / c1_row
             hits_z -= z
+
+            hits_xerr = hits_xerr / c1_column
+            hits_yerr = hits_yerr / c1_row
         else:
             logging.debug('Transform hit position into the global coordinate '
                           'system using pre-alignment data')
-            hits_x = (c1_column * hits_x + c0_column)
-            hits_y = (c1_row * hits_y + c0_row)
+            hits_x = c1_column * hits_x + c0_column
+            hits_y = c1_row * hits_y + c0_row
             hits_z += z
 
-    return hits_x, hits_y, hits_z
+            hits_xerr = c1_column * hits_xerr
+            hits_yerr = c1_row * hits_yerr
+
+    return hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr
 
 
 def merge_alignment_parameters(old_alignment, new_alignment, mode='relative',
@@ -548,14 +575,14 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
     with tb.open_file(alignment_file, mode="r+") as out_file_h5:
         try:
             align_tab = out_file_h5.create_table(out_file_h5.root, name='Alignment',
-                                              title='Table containing the '
-                                              'alignment geometry parameters '
-                                              '(translations and rotations)',
-                                              description=alignment_parameters.dtype,
-                                              filters=tb.Filters(
-                                                  complib='blosc',
-                                                  complevel=5,
-                                                  fletcher32=False))
+                                                 title='Table containing the '
+                                                 'alignment geometry parameters '
+                                                 '(translations and rotations)',
+                                                 description=alignment_parameters.dtype,
+                                                 filters=tb.Filters(
+                                                     complib='blosc',
+                                                     complevel=5,
+                                                     fletcher32=False))
             align_tab.append(alignment_parameters)
         except tb.NodeError:
             alignment_parameters = merge_alignment_parameters(
@@ -568,14 +595,14 @@ def store_alignment_parameters(alignment_file, alignment_parameters,
             # Remove old node
             out_file_h5.root.Alignment._f_remove()
             align_tab = out_file_h5.create_table(out_file_h5.root, name='Alignment',
-                                              title='Table containing the '
-                                              'alignment geometry parameters '
-                                              '(translations and rotations)',
-                                              description=alignment_parameters.dtype,
-                                              filters=tb.Filters(
-                                                  complib='blosc',
-                                                  complevel=5,
-                                                  fletcher32=False))
+                                                 title='Table containing the '
+                                                 'alignment geometry parameters '
+                                                 '(translations and rotations)',
+                                                 description=alignment_parameters.dtype,
+                                                 filters=tb.Filters(
+                                                     complib='blosc',
+                                                     complevel=5,
+                                                     fletcher32=False))
             align_tab.append(alignment_parameters)
 
         string = "\n".join(['DUT%d: alpha=%1.4f, beta=%1.4f, gamma=%1.4f Rad, '
