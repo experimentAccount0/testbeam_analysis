@@ -305,6 +305,8 @@ def get_data_in_event_range(array, event_start=None, event_stop=None, assume_sor
         hit array with the hits in the event range.
     '''
     event_number = array['event_number']
+    if not np.any(event_number):  # No events in selection
+        return np.array([])
     if assume_sorted:
         data_event_start = event_number[0]
         data_event_stop = event_number[-1]
