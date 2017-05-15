@@ -51,8 +51,8 @@ In the examples folder type e.g.:
     :target: https://travis-ci.org/SiLab-Bonn/testbeam_analysis
     :alt: Build status
     
-.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis
-    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis
+.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis/branch/development
+    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis/branch/development
     :alt: Build status
 
 .. |doc| image:: https://img.shields.io/badge/documentation--blue.svg
