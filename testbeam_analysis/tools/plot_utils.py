@@ -107,45 +107,22 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         output_pdf.savefig(fig)
 
 
-def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, chunk_size=1000000):
+def plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size, dut_name, output_pdf_file):
     '''Plotting cluster size histogram.
 
     Parameters
     ----------
-    input_cluster_file : string
-        Filename of the input cluster file.
-    dut_name : string
-        Name of the DUT. If None, the filename of the input cluster file will be used.
-    output_pdf_file : string
-        Filename of the output PDF file. If None, the filename is derived from the input file.
-    chunk_size : int
-        Chunk size of the data when reading from file.
+    hight : array like
+        Histogram entries
+    n_hits : number
+        Total number of hits
+    n_clusters : number
+        Total number of cluster
+    max_cluster_size : number
+        Maximum cluster size
     '''
-    if not dut_name:
-        dut_name = os.path.split(input_cluster_file)[1]
-
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_cluster_file)[0] + '_cluster_size.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
-        with tb.open_file(input_cluster_file, 'r') as input_file_h5:
-            hight = None
-            n_hits = 0
-            n_clusters = input_file_h5.root.Cluster.nrows
-            for start_index in range(0, n_clusters, chunk_size):
-                cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
-                # calculate cluster size histogram
-                if hight is None:
-                    max_cluster_size = np.amax(cluster_n_hits)
-                    hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                elif max_cluster_size < np.amax(cluster_n_hits):
-                    max_cluster_size = np.amax(cluster_n_hits)
-                    hight.resize(max_cluster_size + 1)
-                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                else:
-                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                n_hits += np.sum(cluster_n_hits)
-
         left = np.arange(max_cluster_size + 1)
         fig = Figure()
         _ = FigureCanvas(fig)
