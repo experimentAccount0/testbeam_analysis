@@ -396,8 +396,9 @@ def apply_rotation_matrix(x, y, z, rotation_matrix):
     return pos_transformed[:, 0], pos_transformed[:, 1], pos_transformed[:, 2]
 
 
-def apply_alignment(hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr,
-                    dut_index, alignment=None, prealignment=None, inverse=False):
+def apply_alignment(hits_x, hits_y, hits_z, dut_index,
+                    hits_xerr=None, hits_yerr=None, hits_zerr=None,
+                    alignment=None, prealignment=None, inverse=False):
     ''' Takes hits with errors and applies a transformation according to the alignment data.
 
     If alignment data with rotations and translations are given the hits are
@@ -410,9 +411,11 @@ def apply_alignment(hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr,
     Parameters
     ---------
     hits_x, hits_y, hits_z : array
-        Array with corresponding hit positions.
+        Array(s) with hit positions.
     dut_index : int
         Needed to select the corrct alignment info.
+    hits_x, hits_y, hits_z : array
+        Array(s) with hit errors.
     alignment : array
         Alignment information with rotations and translations.
     prealignment : array
@@ -470,12 +473,14 @@ def apply_alignment(hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr,
             y=hits_y,
             z=hits_z,
             transformation_matrix=transformation_matrix)
-        # Errors need only rotation but no translation
-        hits_xerr, hits_yerr, hits_zerr = apply_transformation_matrix(
-            x=hits_xerr,
-            y=hits_yerr,
-            z=hits_zerr,
-            transformation_matrix=rotation_matrix)
+
+        if hits_xerr is not None and hits_yerr is not None and hits_zerr is not None:
+            # Errors need only rotation but no translation
+            hits_xerr, hits_yerr, hits_zerr = apply_transformation_matrix(
+                x=hits_xerr,
+                y=hits_yerr,
+                z=hits_zerr,
+                transformation_matrix=rotation_matrix)
 
     else:
         c0_column = prealignment[dut_index]['column_c0']
@@ -491,8 +496,9 @@ def apply_alignment(hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr,
             hits_y = (hits_y - c0_row) / c1_row
             hits_z -= z
 
-            hits_xerr = hits_xerr / c1_column
-            hits_yerr = hits_yerr / c1_row
+            if hits_xerr is not None and hits_yerr is not None and hits_zerr is not None:
+                hits_xerr = hits_xerr / c1_column
+                hits_yerr = hits_yerr / c1_row
         else:
             logging.debug('Transform hit position into the global coordinate '
                           'system using pre-alignment data')
@@ -500,10 +506,14 @@ def apply_alignment(hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr,
             hits_y = c1_row * hits_y + c0_row
             hits_z += z
 
-            hits_xerr = c1_column * hits_xerr
-            hits_yerr = c1_row * hits_yerr
+            if hits_xerr is not None and hits_yerr is not None and hits_zerr is not None:
+                hits_xerr = c1_column * hits_xerr
+                hits_yerr = c1_row * hits_yerr
 
-    return hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr
+    if hits_xerr is not None and hits_yerr is not None and hits_zerr is not None:
+        return hits_x, hits_y, hits_z, hits_xerr, hits_yerr, hits_zerr
+
+    return hits_x, hits_y, hits_z
 
 
 def merge_alignment_parameters(old_alignment, new_alignment, mode='relative',
