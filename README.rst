@@ -49,12 +49,12 @@ In the examples folder type e.g.:
    
    python fei4_telescope_example.py
 
-.. |travis-status| image:: https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=development
+.. |travis-status| image:: https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=master
     :target: https://travis-ci.org/SiLab-Bonn/testbeam_analysis
     :alt: Build status
     
-.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis
-    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis
+.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis/branch/master
+    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis/branch/master
     :alt: Build status
 
 .. |rtd-status| image:: https://readthedocs.org/projects/testbeam_analysis/badge/?version=latest
