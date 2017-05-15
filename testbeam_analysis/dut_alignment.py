@@ -190,7 +190,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 xerr = np.zeros(selection.shape)
                 yerr = np.zeros(selection.shape)
                 zerr = np.zeros(selection.shape)
-                xerr[selection], yerr[selection] = actual_cluster['err_column'][selection], actual_cluster['err_row'][selection]
+                xerr[selection] = actual_cluster['err_column'][selection] * pixel_size[0][0]
+                yerr[selection] = actual_cluster['err_row'][selection] * pixel_size[0][1]
                 merged_cluster_array['xerr_dut_0'][selection] = xerr[selection]
                 merged_cluster_array['yerr_dut_0'][selection] = yerr[selection]
                 merged_cluster_array['zerr_dut_0'][selection] = zerr[selection]
@@ -211,7 +212,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                             xerr = np.zeros(selection.shape)
                             yerr = np.zeros(selection.shape)
                             zerr = np.zeros(selection.shape)
-                            xerr[selection], yerr[selection] = actual_cluster['err_column'][selection], actual_cluster['err_row'][selection]
+                            xerr[selection] = actual_cluster['err_column'][selection] * pixel_size[dut_index][0]
+                            yerr[selection] = actual_cluster['err_row'][selection] * pixel_size[dut_index][1]
                             merged_cluster_array['xerr_dut_%d' % (dut_index)][selection] = xerr[selection]
                             merged_cluster_array['yerr_dut_%d' % (dut_index)][selection] = yerr[selection]
                             merged_cluster_array['zerr_dut_%d' % (dut_index)][selection] = zerr[selection]
