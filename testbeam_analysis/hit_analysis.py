@@ -140,8 +140,8 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                 min_row = hits[i].row
             if hits[i].row > max_row:
                 max_row = hits[i].row
-        clusters[cluster_index].n_cols = int(max_col - min_col + 1)
-        clusters[cluster_index].n_rows = int(max_row - min_row + 1)
+        clusters[cluster_index].err_cols = max_col - min_col + 1
+        clusters[cluster_index].err_rows = max_row - min_row + 1
 
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_cluster_file, 'w') as output_file_h5:
@@ -159,8 +159,8 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                 noisy_pixels = None
 
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
-            clusterizer.add_cluster_field(description=('n_cols', '<u2'))  # Add an additional field to hold the cluster size in x
-            clusterizer.add_cluster_field(description=('n_rows', '<u2'))  # Add an additional field to hold the cluster size in y
+            clusterizer.add_cluster_field(description=('err_cols', '<f4'))  # Add an additional field to hold the cluster size in x
+            clusterizer.add_cluster_field(description=('err_rows', '<f4'))  # Add an additional field to hold the cluster size in y
             clusterizer.set_end_of_cluster_function(calc_cluster_dimensions)  # Set the new function to the clusterizer
 
             cluster_hits_table = None
