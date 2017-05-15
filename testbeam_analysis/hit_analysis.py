@@ -182,7 +182,54 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                     cluster_hits_table.append(cluster_hits)
                 cluster_table.append(clusters)
 
+    def get_eff_pitch(hist, cluster_size):
+        ''' Effective pitch to describe the cluster
+            size propability distribution
+
+        hist : array like
+            Histogram with cluster size distribution
+        cluster_size : Cluster size to calculate the pitch for
+        '''
+
+        return np.sqrt(hight[int(cluster_size)].astype(np.float) / hight.sum())
+
+    # Calculate cluster size histogram
+    with tb.open_file(output_cluster_file, 'r') as input_file_h5:
+        hight = None
+        n_hits = 0
+        n_clusters = input_file_h5.root.Cluster.nrows
+        for start_index in range(0, n_clusters, chunk_size):
+            cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
+            # calculate cluster size histogram
+            if hight is None:
+                max_cluster_size = np.amax(cluster_n_hits)
+                hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+            elif max_cluster_size < np.amax(cluster_n_hits):
+                max_cluster_size = np.amax(cluster_n_hits)
+                hight.resize(max_cluster_size + 1)
+                hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+            else:
+                hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+            n_hits += np.sum(cluster_n_hits)
+
+    # Calculate cluster size histogram
+    with tb.open_file(output_cluster_file, 'r+') as io_file_h5:
+        for start_index in range(0, io_file_h5.root.Cluster.nrows, chunk_size):
+            clusters = io_file_h5.root.Cluster[start_index:start_index + chunk_size]
+            # Set errors for small clusters, where charge sharing enhances resolution
+            for css in [(1, 1), (1, 2), (2, 1), (2, 2)]:
+                sel = np.logical_and(clusters['err_cols'] == css[0], clusters['err_rows'] == css[1])
+                clusters['err_cols'][sel] = get_eff_pitch(hist=hight, cluster_size=css[0]) / np.sqrt(12)
+                clusters['err_rows'][sel] = get_eff_pitch(hist=hight, cluster_size=css[1]) / np.sqrt(12)
+            # Set errors for big clusters, where delta electrons reduce resolution
+            sel = np.logical_or(clusters['err_cols'] > 2, clusters['err_rows'] > 2)
+            clusters['err_cols'][sel] = clusters['err_cols'][sel] / np.sqrt(12)
+            clusters['err_rows'][sel] = clusters['err_rows'][sel] / np.sqrt(12)
+            io_file_h5.root.Cluster[start_index:start_index + chunk_size] = clusters
+
     if plot:
-        plot_cluster_size(input_cluster_file=output_cluster_file, dut_name=dut_name)
+        plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size,
+                          dut_name=os.path.split(output_cluster_file)[1],
+                          output_pdf_file=os.path.splitext(output_cluster_file)[0] + '_cluster_size.pdf')
 
     return output_cluster_file
