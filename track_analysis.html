@@ -174,16 +174,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  
-
-
-    
-    
-
-
-
-    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
-<div class="section" id="module-testbeam_analysis.track_analysis">
+  <div class="section" id="module-testbeam_analysis.track_analysis">
 <span id="track-analysis"></span><h1>track_analysis<a class="headerlink" href="#module-testbeam_analysis.track_analysis" title="Permalink to this headline">¶</a></h1>
 <p>Track finding and fitting functions are listed here.</p>
 <div class="section" id="methods">
@@ -212,7 +203,6 @@ If it is true the std setting of 200 um is used. Otherwise a distance in um for 
 e.g.: For two devices: min_cluster_distance = (50, 250)
 If false the cluster distance is not considered.
 The events where any plane does have hits &lt; min_cluster_distance is flagged with n_tracks = -1</li>
-<li><strong>chunk_size</strong> (<em>uint</em>) &#8211; Chunk size of the data when reading from file.</li>
 </ul>
 </td>
 </tr>
@@ -249,7 +239,6 @@ selection_fit_duts = (0, 1, 4)</li>
 False: Just use all devices as specified in selection_hit_duts.
 True: Do not take the DUT hit for track selection / fitting, even if specified in selection_hit_duts.</li>
 <li><strong>max_tracks</strong> (<em>uint</em>) &#8211; Take only events with tracks &lt;= max_tracks. If None, take any event.</li>
-<li><strong>force_prealignment</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, use pre-alignment, even if alignment data is availale.</li>
 <li><strong>selection_track_quality</strong> (<em>uint</em><em>, </em><em>iterable</em>) &#8211; One number valid for all DUTs or an iterable with a number for each DUT.
 0: All tracks with hits in DUT and references are taken
 1: The track hits in DUT and reference are within 2-sigma of the correlation
@@ -264,7 +253,6 @@ This is needed to get a correct efficiency number, since assigning the same clus
 If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
 e.g.: For two devices: min_track_distance = (50, 250)
 If False, the minimum track distance is not considered.</li>
-<li><strong>chunk_size</strong> (<em>uint</em>) &#8211; Chunk size of the data when reading from file.</li>
 </ul>
 </td>
 </tr>
@@ -320,13 +308,8 @@ If False, the minimum track distance is not considered.</li>
     </span>
     <div class="rst-other-versions">
         <dl>
-            <dt>Tags</dt>
-            <dd><a href="0.0.1/index.html">0.0.1</a></dd>
-        </dl>
-        <dl>
             <dt>Branches</dt>
             <dd><a href="development/track_analysis.html">development</a></dd>
-            <dd><a href="master/index.html">master</a></dd>
         </dl>
     </div>
 </div>

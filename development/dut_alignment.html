@@ -174,16 +174,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  
-
-
-    
-    
-
-
-
-    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
-<div class="section" id="module-testbeam_analysis.dut_alignment">
+  <div class="section" id="module-testbeam_analysis.dut_alignment">
 <span id="dut-alignment"></span><h1>dut_alignment<a class="headerlink" href="#module-testbeam_analysis.dut_alignment" title="Permalink to this headline">¶</a></h1>
 <p>All DUT alignment functions in space and time are listed here plus additional alignment check functions</p>
 <div class="section" id="methods">
@@ -221,7 +212,8 @@ If None, assuming same pixel size for all DUTs.</li>
 <code class="descclassname">testbeam_analysis.dut_alignment.</code><code class="descname">merge_cluster_data</code><span class="sig-paren">(</span><em>input_cluster_files</em>, <em>output_merged_file</em>, <em>n_pixels</em>, <em>pixel_size</em>, <em>chunk_size=4999999</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/dut_alignment.html#merge_cluster_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.dut_alignment.merge_cluster_data" title="Permalink to this definition">¶</a></dt>
 <dd><p>Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.</p>
 <p>Empty entries are signaled with column = row = charge = nan. Position is translated from indices to um. The
-local coordinate system origin (0, 0) is defined in the sensor center, to decouple translation and rotation.</p>
+local coordinate system origin (0, 0) is defined in the sensor center, to decouple translation and rotation.
+Cluster position errors are calculated from cluster dimensions.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -280,11 +272,12 @@ this option should be off, because otherwise overfitting is possible.</li>
 <dl class="function">
 <dt id="testbeam_analysis.dut_alignment.apply_alignment">
 <code class="descclassname">testbeam_analysis.dut_alignment.</code><code class="descname">apply_alignment</code><span class="sig-paren">(</span><em>input_hit_file</em>, <em>input_alignment_file</em>, <em>output_hit_file</em>, <em>inverse=False</em>, <em>force_prealignment=False</em>, <em>no_z=False</em>, <em>use_duts=None</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/dut_alignment.html#apply_alignment"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.dut_alignment.apply_alignment" title="Permalink to this definition">¶</a></dt>
-<dd><p>Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hits positions. The alignment data is used. If this is not
-available a fallback to the pre-alignment is done.
+<dd><p>Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hit (positions and errors).
+The alignment data is used. If this is not available a fallback to the pre-alignment is done.
 One can also inverse the alignment or apply the alignment without changing the z position.</p>
-<p>This function cannot be easily made faster with multiprocessing since the computation function (apply_alignment_to_chunk) does not contribute significantly to the runtime (&lt; 20 %),
-but the copy overhead for not shared memory needed for multipgrocessing is higher. Also the hard drive IO can be limiting (30 Mb/s read, 20 Mb/s write to the same disk)</p>
+<p>This function cannot be easily made faster with multiprocessing since the computation function (apply_alignment_to_chunk) does not
+contribute significantly to the runtime (&lt; 20 %), but the copy overhead for not shared memory needed for multipgrocessing is higher.
+Also the hard drive IO can be limiting (30 Mb/s read, 20 Mb/s write to the same disk)</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -407,13 +400,8 @@ more precise, but will also increase the calculation time.</li>
     </span>
     <div class="rst-other-versions">
         <dl>
-            <dt>Tags</dt>
-            <dd><a href="../0.0.1/index.html">0.0.1</a></dd>
-        </dl>
-        <dl>
             <dt>Branches</dt>
             <dd><a href="dut_alignment.html">development</a></dd>
-            <dd><a href="../master/index.html">master</a></dd>
         </dl>
     </div>
 </div>

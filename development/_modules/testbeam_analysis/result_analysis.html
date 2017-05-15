@@ -161,16 +161,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  
-
-
-    
-    
-
-
-
-    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
-<h1>Source code for testbeam_analysis.result_analysis</h1><div class="highlight"><pre>
+  <h1>Source code for testbeam_analysis.result_analysis</h1><div class="highlight"><pre>
 <span></span><span class="sd">&#39;&#39;&#39; All functions creating results (e.g. efficiency, residuals, track density) from fitted tracks are listed here.&#39;&#39;&#39;</span>
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
 
@@ -813,20 +804,12 @@
 <span class="sd">        Use only distances (between DUT hit and track hit) smaller than cut_distance.</span>
 <span class="sd">    max_distance : int</span>
 <span class="sd">        Defines binnig of distance values.</span>
-<span class="sd">    col_range : iterable</span>
-<span class="sd">        Column value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</span>
-<span class="sd">    row_range : iterable</span>
-<span class="sd">        Row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</span>
+<span class="sd">    col_range, row_range : iterable</span>
+<span class="sd">        Column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</span>
 <span class="sd">    plot : bool</span>
 <span class="sd">        If True, create additional output plots.</span>
 <span class="sd">    chunk_size : int</span>
 <span class="sd">        Chunk size of the data when reading from file.</span>
-<span class="sd">    pixel_size : iterable</span>
-<span class="sd">        tuple or list of col/row pixel dimension</span>
-<span class="sd">    n_pixels : iterable</span>
-<span class="sd">        tuple or list of amount of pixel in col/row dimension</span>
-<span class="sd">    show_inefficient_events : bool</span>
-<span class="sd">        Whether to log inefficient events</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;=== Calculating efficiency ===&#39;</span><span class="p">)</span>
 
@@ -1166,13 +1149,8 @@
     </span>
     <div class="rst-other-versions">
         <dl>
-            <dt>Tags</dt>
-            <dd><a href="../../../0.0.1/index.html">0.0.1</a></dd>
-        </dl>
-        <dl>
             <dt>Branches</dt>
             <dd><a href="result_analysis.html">development</a></dd>
-            <dd><a href="../../../master/index.html">master</a></dd>
         </dl>
     </div>
 </div>

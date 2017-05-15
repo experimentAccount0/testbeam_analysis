@@ -161,16 +161,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  
-
-
-    
-    
-
-
-
-    <p class="scv-banner scv-sphinx_rtd_theme"><b>Warning:</b> This document is for the development version of Testbeam Analysis.</p>
-<h1>Source code for testbeam_analysis.hit_analysis</h1><div class="highlight"><pre>
+  <h1>Source code for testbeam_analysis.hit_analysis</h1><div class="highlight"><pre>
 <span></span><span class="sd">&#39;&#39;&#39; All functions acting on the hits of one DUT are listed here&#39;&#39;&#39;</span>
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">division</span>
 
@@ -296,22 +287,46 @@
     <span class="k">if</span> <span class="n">output_cluster_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">output_cluster_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_clustered.h5&#39;</span>
 
+    <span class="c1"># Calculate the size in col/row for each cluster</span>
+    <span class="k">def</span> <span class="nf">calc_cluster_dimensions</span><span class="p">(</span><span class="n">hits</span><span class="p">,</span> <span class="n">clusters</span><span class="p">,</span> <span class="n">cluster_size</span><span class="p">,</span> <span class="n">cluster_hit_indices</span><span class="p">,</span> <span class="n">cluster_index</span><span class="p">,</span> <span class="n">cluster_id</span><span class="p">,</span> <span class="n">charge_correction</span><span class="p">,</span> <span class="n">noisy_pixels</span><span class="p">,</span> <span class="n">disabled_pixels</span><span class="p">,</span> <span class="n">seed_hit_index</span><span class="p">):</span>
+        <span class="n">min_col</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">cluster_hit_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">column</span>
+        <span class="n">max_col</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">cluster_hit_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">column</span>
+        <span class="n">min_row</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">cluster_hit_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">row</span>
+        <span class="n">max_row</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">cluster_hit_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">row</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">cluster_hit_indices</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Not used indeces = -1</span>
+                <span class="k">break</span>
+            <span class="k">if</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">column</span> <span class="o">&lt;</span> <span class="n">min_col</span><span class="p">:</span>
+                <span class="n">min_col</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">column</span>
+            <span class="k">if</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">column</span> <span class="o">&gt;</span> <span class="n">max_col</span><span class="p">:</span>
+                <span class="n">max_col</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">column</span>
+            <span class="k">if</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">row</span> <span class="o">&lt;</span> <span class="n">min_row</span><span class="p">:</span>
+                <span class="n">min_row</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">row</span>
+            <span class="k">if</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">row</span> <span class="o">&gt;</span> <span class="n">max_row</span><span class="p">:</span>
+                <span class="n">max_row</span> <span class="o">=</span> <span class="n">hits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">row</span>
+        <span class="n">clusters</span><span class="p">[</span><span class="n">cluster_index</span><span class="p">]</span><span class="o">.</span><span class="n">err_cols</span> <span class="o">=</span> <span class="n">max_col</span> <span class="o">-</span> <span class="n">min_col</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">clusters</span><span class="p">[</span><span class="n">cluster_index</span><span class="p">]</span><span class="o">.</span><span class="n">err_rows</span> <span class="o">=</span> <span class="n">max_row</span> <span class="o">-</span> <span class="n">min_row</span> <span class="o">+</span> <span class="mi">1</span>
+
     <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_hits_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_file_h5</span><span class="p">:</span>
         <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_cluster_file</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output_file_h5</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">input_disabled_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_disabled_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
-                     <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
-                     <span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="o">.</span><span class="n">_f_copy</span><span class="p">(</span><span class="n">newparent</span><span class="o">=</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
+                    <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+                    <span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">DisabledPixelMask</span><span class="o">.</span><span class="n">_f_copy</span><span class="p">(</span><span class="n">newparent</span><span class="o">=</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">disabled_pixels</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="n">input_noisy_pixel_mask_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_noisy_pixel_mask_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_mask_file_h5</span><span class="p">:</span>
-                     <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
-                     <span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="o">.</span><span class="n">_f_copy</span><span class="p">(</span><span class="n">newparent</span><span class="o">=</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
+                    <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dstack</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="p">[:]))[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+                    <span class="n">input_mask_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">NoisyPixelMask</span><span class="o">.</span><span class="n">_f_copy</span><span class="p">(</span><span class="n">newparent</span><span class="o">=</span><span class="n">output_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">noisy_pixels</span> <span class="o">=</span> <span class="kc">None</span>
 
             <span class="n">clusterizer</span> <span class="o">=</span> <span class="n">HitClusterizer</span><span class="p">(</span><span class="n">column_cluster_distance</span><span class="o">=</span><span class="n">column_cluster_distance</span><span class="p">,</span> <span class="n">row_cluster_distance</span><span class="o">=</span><span class="n">row_cluster_distance</span><span class="p">,</span> <span class="n">frame_cluster_distance</span><span class="o">=</span><span class="n">frame_cluster_distance</span><span class="p">,</span> <span class="n">min_hit_charge</span><span class="o">=</span><span class="n">min_hit_charge</span><span class="p">,</span> <span class="n">max_hit_charge</span><span class="o">=</span><span class="n">max_hit_charge</span><span class="p">)</span>
+            <span class="n">clusterizer</span><span class="o">.</span><span class="n">add_cluster_field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;err_cols&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;f4&#39;</span><span class="p">))</span>  <span class="c1"># Add an additional field to hold the cluster size in x</span>
+            <span class="n">clusterizer</span><span class="o">.</span><span class="n">add_cluster_field</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;err_rows&#39;</span><span class="p">,</span> <span class="s1">&#39;&lt;f4&#39;</span><span class="p">))</span>  <span class="c1"># Add an additional field to hold the cluster size in y</span>
+            <span class="n">clusterizer</span><span class="o">.</span><span class="n">set_end_of_cluster_function</span><span class="p">(</span><span class="n">calc_cluster_dimensions</span><span class="p">)</span>  <span class="c1"># Set the new function to the clusterizer</span>
+
             <span class="n">cluster_hits_table</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="n">cluster_table</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">for</span> <span class="n">hits</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">analysis_utils</span><span class="o">.</span><span class="n">data_aligned_at_events</span><span class="p">(</span><span class="n">input_file_h5</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">Hits</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="n">chunk_size</span><span class="p">):</span>
@@ -372,13 +387,8 @@
     </span>
     <div class="rst-other-versions">
         <dl>
-            <dt>Tags</dt>
-            <dd><a href="../../0.0.1/index.html">0.0.1</a></dd>
-        </dl>
-        <dl>
             <dt>Branches</dt>
             <dd><a href="../../development/_modules/testbeam_analysis/hit_analysis.html">development</a></dd>
-            <dd><a href="../../master/index.html">master</a></dd>
         </dl>
     </div>
 </div>
