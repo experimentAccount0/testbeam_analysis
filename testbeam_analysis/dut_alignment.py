@@ -149,7 +149,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
     for index, _ in enumerate(input_cluster_files):
         description.append(('charge_dut_%d' % index, np.float))
     for index, _ in enumerate(input_cluster_files):
-        description.append(('n_hits_dut_%d' % index, np.float))
+        description.append(('n_hits_dut_%d' % index, np.int8))
     description.extend([('track_quality', np.uint32), ('n_tracks', np.int8)])
     for index, _ in enumerate(input_cluster_files):
         description.append(('xerr_dut_%d' % index, np.float))
