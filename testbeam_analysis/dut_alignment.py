@@ -148,6 +148,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
         description.append(('z_dut_%d' % index, np.float))
     for index, _ in enumerate(input_cluster_files):
         description.append(('charge_dut_%d' % index, np.float))
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('n_hits_dut_%d' % index, np.float))
     description.extend([('track_quality', np.uint32), ('n_tracks', np.int8)])
     for index, _ in enumerate(input_cluster_files):
         description.append(('xerr_dut_%d' % index, np.float))
@@ -197,6 +199,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 merged_cluster_array['zerr_dut_0'][selection] = zerr[selection]
                 merged_cluster_array['z_dut_0'][selection] = 0.0
                 merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
+                merged_cluster_array['n_hits_dut_0'][selection] = actual_cluster['n_hits'][selection]
 
                 # Fill result array with other DUT data
                 # Second loop: get the cluster from all files and merge them to the common event number
@@ -219,6 +222,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                             merged_cluster_array['zerr_dut_%d' % (dut_index)][selection] = zerr[selection]
                             merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.0
                             merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
+                            merged_cluster_array['n_hits_dut_%d' % (dut_index)][selection] = actual_cluster['n_hits'][selection]
 
                 merged_cluster_table.append(merged_cluster_array)
                 actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read
