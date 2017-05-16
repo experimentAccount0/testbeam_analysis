@@ -47,7 +47,10 @@ def get_array_differences(first_array, second_array):
                 return_str += 'The array length is different: %s != %s' % (str(first_column.shape), str(second_column.shape))
                 return ': ' + return_str
             if not np.all(first_column == second_column):  # Check if the data of the column is equal
-                return_str += 'Column ' + column_name + ' not equal. '
+                return_str += 'Column ' + column_name + ' not equal'
+                if np.allclose(first_column, second_column, rtol=1.e-5, atol=1.e-8, equal_nan=True):
+                    return_str += ', but close'
+                return_str += '. '
         for column_name in second_array.dtype.names:
             try:
                 first_array[column_name]
