@@ -57,8 +57,6 @@ class SetupTab(QtWidgets.QWidget):
         self.left_widget = QtWidgets.QWidget()
         self.left_widget.setMinimumWidth(475)
         self.draw = QtWidgets.QVBoxLayout()
-        label_setup = QtWidgets.QLabel('Schematic setup:')
-        self.draw.addWidget(label_setup)
         self.left_widget.setLayout(self.draw)
 
         # Area for setup tabs for each dut
@@ -115,9 +113,18 @@ class SetupTab(QtWidgets.QWidget):
                 self.draw.removeWidget(w)
                 w.setParent(None)
 
-        self.setup_painter = SetupPainter(dut_names, self.left_widget)
+        label_side = QtWidgets.QLabel('Schematic side-view:')
+        label_top = QtWidgets.QLabel('Schematic top-view:')
 
-        self.draw.addWidget(self.setup_painter)
+        self.side_view = SetupPainter(dut_names, self.left_widget)
+        self.side_view.draw_coordinate_system(axes=['z', 'x', 'y'])
+        self.top_view = SetupPainter(dut_names, self.left_widget)
+        self.top_view.draw_coordinate_system(axes=['z', 'y', '-x'])
+
+        self.draw.addWidget(label_top)
+        self.draw.addWidget(self.top_view)
+        self.draw.addWidget(label_side)
+        self.draw.addWidget(self.side_view)
 
     def _init_tabs(self):
         """
@@ -157,10 +164,6 @@ class SetupTab(QtWidgets.QWidget):
             sl_2.addLayout(layout_props)
 
             # Make dut type selection layout
-#            checkbox_type = QtWidgets.QCheckBox()
-#            checkbox_type.setText('Set DUT type')
-#            checkbox_type.setDisabled(True)
-#            checkbox_type.setFixedWidth(label_width)
             label_type = QtWidgets.QLabel('Set DUT type')
             label_type.setFixedWidth(label_width)
             cb_type = QtWidgets.QComboBox()
@@ -195,10 +198,13 @@ class SetupTab(QtWidgets.QWidget):
             label_rot = QtWidgets.QLabel('Rotation / mRad:')
             label_rot.setFixedWidth(label_width)
             edit_alpha = QtWidgets.QLineEdit()
+            edit_alpha.setToolTip('Rotation around x-axis')
             edit_alpha.setPlaceholderText(u'\u03B1' + ' = 0')
             edit_beta = QtWidgets.QLineEdit()
+            edit_beta.setToolTip('Rotation around y-axis')
             edit_beta.setPlaceholderText(u'\u03B2' + ' = 0')
             edit_gamma = QtWidgets.QLineEdit()
+            edit_gamma.setToolTip('Rotation around z-axis. Not shown in setup')
             edit_gamma.setPlaceholderText(u'\u03B3' + ' = 0')
             label_pitch = QtWidgets.QLabel('Pixel pitch / ' + u'\u03BC' + 'm :')
             label_pitch.setFixedWidth(label_width)
@@ -238,7 +244,6 @@ class SetupTab(QtWidgets.QWidget):
             layout_setup.addWidget(edit_beta, 1, 3, 1, 1)
             layout_setup.addWidget(edit_gamma, 1, 4, 1, 1)
             # Properties layout
-#            layout_props.addWidget(checkbox_type, 0, 0, 1, 1)
             layout_props.addWidget(label_type, 0, 0, 1, 1)
             layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 0, 1, 1, 1)
             layout_props.addWidget(cb_type, 0, 2, 1, 1)
@@ -287,7 +292,6 @@ class SetupTab(QtWidgets.QWidget):
                 self._dut_widgets[dut][prop] = edit_widgets[j]
 
             # Add all dut type setting/handling related widgets to a dict with respective dut as key
-#            self._type_widgets[dut] = {'check_t': checkbox_type, 'combo_t': cb_type, 'button_t': button_type}
             self._type_widgets[dut] = {'combo_t': cb_type, 'button_t': button_type}
 
             # Add all dut type creating related widgets to a dict with respective dut as key
@@ -310,10 +314,6 @@ class SetupTab(QtWidgets.QWidget):
                 lambda: self._set_properties(
                     self.data['dut_names'][self.tabs.currentIndex()],
                     self._type_widgets[self.data['dut_names'][self.tabs.currentIndex()]]['combo_t'].currentText()))
-
-#            # Connect set type checkbox
-#            self._type_widgets[dut]['check_t'].toggled.connect(
-#                lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()]))
 
             # Connect handle type checkbox
             self._handle_widgets[dut]['check_h'].toggled.connect(
@@ -338,10 +338,26 @@ class SetupTab(QtWidgets.QWidget):
             # Connect all input QLineEdit widgets
             for prop in self._dut_props:
 
-                if prop in ['z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma']:
+                if prop == 'rot_alpha':
                     self._dut_widgets[dut][prop].textChanged.connect(
-                        lambda text: self.setup_painter.update_setup(
-                            self.data['dut_names'][self.tabs.currentIndex()], self.tabs.currentIndex(), text))
+                        lambda text: self.top_view.set_rotation(self.data['dut_names'][self.tabs.currentIndex()],
+                                                                text))
+                if prop == 'rot_beta':
+                    self._dut_widgets[dut][prop].textChanged.connect(
+                        lambda text: self.side_view.set_rotation(self.data['dut_names'][self.tabs.currentIndex()],
+                                                                 text))
+                if prop == 'z_positions':
+                    self._dut_widgets[dut][prop].textChanged.connect(
+                        lambda text: self.side_view.set_z_pos(self.data['dut_names'][self.tabs.currentIndex()],
+                                                              text))
+                    self._dut_widgets[dut][prop].textChanged.connect(
+                        lambda: self.side_view.set_rotation(self.data['dut_names'][self.tabs.currentIndex()]))
+
+                    self._dut_widgets[dut][prop].textChanged.connect(
+                        lambda text: self.top_view.set_z_pos(self.data['dut_names'][self.tabs.currentIndex()],
+                                                             text))
+                    self._dut_widgets[dut][prop].textChanged.connect(
+                        lambda: self.top_view.set_rotation(self.data['dut_names'][self.tabs.currentIndex()]))
 
                 for x in [lambda: self._check_input(),
                           lambda: self._handle_dut_types(self.data['dut_names'][self.tabs.currentIndex()])]:
@@ -472,14 +488,6 @@ class SetupTab(QtWidgets.QWidget):
 
             # Go through widgets of respective dut tab and handle behavior
             if mode is 'h':
-
-                #  if self._type_widgets[dut]['check_t'].isChecked():
-                    #  for key in self._type_widgets[dut].keys():
-                        #  self._type_widgets[dut][key].setDisabled(False)
-                #  else:
-                    #  for key in self._type_widgets[dut].keys():
-                        #  if key is not 'check_t':
-                            #  self._type_widgets[dut][key].setDisabled(True)
 
                 if self._handle_widgets[dut]['check_h'].isChecked():
 
@@ -657,120 +665,251 @@ class SetupTab(QtWidgets.QWidget):
 
 class SetupPainter(QtWidgets.QGraphicsView):
 
-    def __init__(self, dut_names, parent=None):
+    def __init__(self, dut_names, parent=None, plane_width=10, plane_height=100, n_painters=2, rotation_factor=10):
         super(SetupPainter, self).__init__(parent)
 
-        # Handle appearance of view
-        self.setGeometry(parent.geometry())
+        if parent is not None:
+            self.w = parent.width()
+            self.h = parent.height()/n_painters
+        else:
+            self.w = 400
+            self.h = self.w/n_painters
+
+        self.setMinimumSize(self.w, self.h)
+
+        # Add graphics scene to view
         self.scene = QtWidgets.QGraphicsScene(self)
         self.setScene(self.scene)
-        width = self.frameSize().width() * (1 - (self.frameSize().width() / 2) * (1 / (len(dut_names)+1)))
-        self.setSceneRect(0, 0, width, self.frameSize().height())
+        self.setSceneRect(0, 0, self.w, self.h)
         self.setRenderHint(QtGui.QPainter.Antialiasing)
 
-        # Add dicts to save duts z positions and rotation values
+        # Add stuff
+        self.dut_names = dut_names
+        self.plane_w = plane_width
+        self.plane_h = plane_height
         self.planes = {}
-        self.rotations = {}
+        self.names = {}
         self.z_positions = {}
+        self.rotations = {}
+        self.mRad = 0.001 * 180.0/3.14159265
+        self.unit = None
+        self.rot_factor = rotation_factor
 
         # Get coordinates of scene
         self.left = 0
-        self.right = width
+        self.right = self.w
         self.top = 0
-        self.bottom = self.frameSize().height()
-        self.h_center = width / 2
-        self.v_center = self.frameSize().height() / 2
+        self.bottom = self.h
+        self.h_center = self.w/2
+        self.v_center = self.h/2
 
         # Add different QPens etc. for drawing duts and beam
-        pen_dut = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.SolidLine)
-        brush_dut = QtGui.QBrush(QtCore.Qt.SolidPattern)
-        brush_dut.setColor(QtGui.QColor('lightgrey'))
-        pen_beam = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.DashLine)
-        font_plot = QtGui.QFont()
-        font_plot.setBold(True)
+        self.pen_dut = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.SolidLine)
+        self.brush_dut = QtGui.QBrush(QtCore.Qt.SolidPattern)
+        self.brush_dut.setColor(QtGui.QColor('lightgrey'))
+        self.pen_beam = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.DashLine)
+        self.font_plot = QtGui.QFont()
+        self.font_plot.setBold(True)
+        self.font_z = QtGui.QFont()
+        self.font_z.setPointSize(11 - len(self.dut_names)/2)
+
+        self.setToolTip('Rotations shown are enlarged by a factor %d' % self.rot_factor)
+
+        self.setToolTipDuration(5000)
+
+        self._draw_beam()
+        self._draw_setup()
+
+    def _draw_setup(self):
+
+        single_dut = False
 
         # Create dynamic distance in between planes
-        self.dist = width / (len(dut_names) + 1)
+        try:
+            self.dist = self.w / (len(self.dut_names) - 1)
 
-        # Draw beam axis in vertical center of scene, add labels
-        self.scene.addLine(self.left, self.v_center, self.right, self.v_center, pen_beam)
-        self.scene.addLine(self.right-10, self.v_center+10, self.right, self.v_center, pen_dut)
-        self.scene.addLine(self.right-10, self.v_center-10, self.right, self.v_center, pen_dut)
-        label_beam = QtWidgets.QGraphicsTextItem('Beam')
-        label_beam.setFont(font_plot)
-        label_beam.setPos(-60, self.v_center-15)
-        label_axis = QtWidgets.QGraphicsTextItem('z-Axis')
-        label_axis.setFont(font_plot)
-        label_axis.setPos(self.right, self.v_center-15)
-        self.scene.addItem(label_beam)
-        # self.scene.addItem(label_axis)
+        # Only single DUT
+        except ZeroDivisionError:
+            self.dist = self.w / (len(self.dut_names) + 1)
+            single_dut = True
 
-        # Draw coordinate system in lower left corner # FIXME: Hardcoded
-        # Draw axes
-        # X
-        self.scene.addLine(self.left, self.bottom, self.left, self.bottom-50, pen_dut)
-        # Y
-        self.scene.addLine(self.left, self.bottom, self.left + (50 * 0.707), self.bottom - (50 * 0.707), pen_dut)
-        # Z
-        self.scene.addLine(self.left, self.bottom, self.left+50, self.bottom, pen_dut)
-        # Make arrowheads for axes
-        # X
-        self.scene.addLine(self.left-5, self.bottom-45, self.left, self.bottom - 50, pen_dut)
-        self.scene.addLine(self.left + 5, self.bottom - 45, self.left, self.bottom - 50, pen_dut)
-        # Y
-        self.scene.addLine(self.left + (50 * 0.707), self.bottom - (50 * 0.707) + (5 * 1.41), self.left + (50 * 0.707),
-                           self.bottom - (50 * 0.707), pen_dut)
-        self.scene.addLine(self.left + (50 * 0.707) - (5 * 1.41), self.bottom - (50 * 0.707), self.left + (50 * 0.707),
-                           self.bottom - (50 * 0.707), pen_dut)
-        # Z
-        self.scene.addLine(self.left + 45, self.bottom - 5, self.left + 50, self.bottom, pen_dut)
-        self.scene.addLine(self.left + 45, self.bottom + 5, self.left + 50, self.bottom, pen_dut)
-        # Make labels for axis
-        label_x = QtWidgets.QGraphicsTextItem('x')
-        label_x.setPos(self.left-10, self.bottom-75)
-        label_y = QtWidgets.QGraphicsTextItem('y')
-        label_y.setPos(self.left + (50*0.707), self.bottom-(50*0.707) - 20)
-        label_z = QtWidgets.QGraphicsTextItem('z')
-        label_z.setPos(self.left + 50, self.bottom - 10)
-        # Add axes labels
-        self.scene.addItem(label_x)
-        self.scene.addItem(label_y)
-        self.scene.addItem(label_z)
+        for i, dut in enumerate(self.dut_names):
 
-        for i, dut in enumerate(dut_names):
+            # Factor for initial equidistant separation of DUTs
+            if single_dut:
+                factor = self.dist
+            else:
+                factor = i * self.dist
 
-            # Factor with which dist is multiplied
-            factor = i+1
-
-            # Initialize the dicts with None for each dut
-            self.z_positions[dut] = None
-            self.rotations[dut] = {'alpha': None, 'beta': None, 'gamma': None}
-
-            plane = QtWidgets.QGraphicsRectItem(factor * self.dist, self.v_center/2, 20, self.v_center)
-            plane.setPen(pen_dut)
-            plane.setBrush(brush_dut)
-            plane.setTransformOriginPoint(factor * self.dist, self.v_center)
+            plane = QtWidgets.QGraphicsRectItem(factor, self.v_center-self.plane_h*0.5, self.plane_w, self.plane_h)
+            plane.setPen(self.pen_dut)
+            plane.setBrush(self.brush_dut)
+            plane.setTransformOriginPoint(factor, self.v_center)
+            name = QtWidgets.QGraphicsTextItem(dut)
+            name.setPos(factor - len(dut) * 3, self.v_center / 2 - 40)
 
             # Add dut plane to dict for changing rotation in update_setup
             self.planes[dut] = plane
+            self.names[dut] = name
+            self.z_positions[dut] = factor
 
-            name = QtWidgets.QGraphicsTextItem(dut)
-            name.setPos(factor * self.dist - len(dut)*3, self.v_center / 2 - 40)
-
-            if i == 0:
-
-                z_pos = QtWidgets.QGraphicsTextItem('z: 0 ' + u'\u03BC' + 'm')
-                z_pos.setPos(factor * self.dist - len(dut) * 5, self.v_center+2*self.v_center/3)
-                self.scene.addItem(z_pos)
+#            if i == 0:
+#
+#                z_pos = QtWidgets.QGraphicsTextItem('0 ' + u'\u03BC' + 'm')
+#                z_pos.setPos(factor * self.dist - len(dut) * 5, self.v_center+2*self.v_center/3)
+#                z_pos.setFont(self.font_z)
+#                self.z_positions[dut] = z_pos
+#                self.scene.addItem(self.z_positions[dut])
 
             self.scene.addItem(self.planes[dut])
             self.scene.addItem(name)
 
-    def update_setup(self, dut, index, rotation=None):
-        return # TODO
-        i = index+1
-        for j in range(len(self.rotations[dut].keys())):
-            for key in self.rotations[dut].keys():
-                a = QtWidgets.QGraphicsTextItem(u'\u03B1' + ': %s' % self.rotations[dut][key] + ' mRad')
-                a.setPos(i * self.dist - len(dut) * 5, self.v_center+150+j*40)
-            self.scene.addItem(a)
+    def _draw_beam(self, arrow_length=10, offset=[90, 15]):
+
+        # Draw beam axis in vertical center of scene
+        self.scene.addLine(self.left-offset[0]/3, self.v_center, self.right+offset[0]/3, self.v_center, self.pen_beam)
+
+        # Draw arrow lines
+        self.scene.addLine(self.right+offset[0]/3 - arrow_length, self.v_center + arrow_length,
+                           self.right+offset[0]/3, self.v_center, self.pen_dut)
+        self.scene.addLine(self.right+offset[0]/3 - arrow_length, self.v_center - arrow_length,
+                           self.right+offset[0]/3, self.v_center, self.pen_dut)
+
+        # Add beam label
+        label_beam = QtWidgets.QGraphicsTextItem('Beam')
+        label_beam.setFont(self.font_plot)
+        label_beam.setPos(self.left-offset[0], self.v_center - offset[1])
+        self.scene.addItem(label_beam)
+
+    def draw_coordinate_system(self, origin=None, axes=['x', 'y', 'z'], axis_length=40, arrow_length=4, offset=[80,20]):
+
+        if origin is None:
+            origin = (-offset[0], self.h + offset[1])
+
+        pen_cs = QtGui.QPen(QtCore.Qt.black, 2, QtCore.Qt.SolidLine)
+
+        # Make axis labels; 0==x, 1==y, 2==z
+        labels = {}
+
+        for i in range(len(axes)):
+            labels[i] = QtWidgets.QGraphicsTextItem(axes[i])
+
+            # X axis
+            if i == 0:
+                self.scene.addLine(origin[0], origin[1], origin[0] + axis_length, origin[1], pen_cs)
+
+                self.scene.addLine(origin[0] + axis_length - arrow_length, origin[1] - arrow_length,
+                                   origin[0] + axis_length, origin[1], pen_cs)
+
+                self.scene.addLine(origin[0] + axis_length - arrow_length, origin[1] + arrow_length,
+                                   origin[0] + axis_length, origin[1], pen_cs)
+
+                labels[i].setPos(origin[0] + axis_length, origin[1] - 2 * axis_length/10)
+                self.scene.addItem(labels[i])
+
+            # Y axis
+            if i == 1:
+                self.scene.addLine(origin[0], origin[1], origin[0], origin[1] - axis_length, pen_cs)
+
+                self.scene.addLine(origin[0] - arrow_length, origin[1] - axis_length + arrow_length,
+                                   origin[0], origin[1] - axis_length, pen_cs)
+
+                self.scene.addLine(origin[0] + arrow_length, origin[1] - axis_length + arrow_length,
+                                   origin[0], origin[1] - axis_length, pen_cs)
+
+                labels[i].setPos(origin[0] - 3 * arrow_length, origin[1] - 1.5 * axis_length)
+                self.scene.addItem(labels[i])
+
+            # Z axis
+            if i == 2:
+
+                factor_1 = 1/2**0.5
+                factor_2 = 2**0.5
+
+                self.scene.addLine(origin[0], origin[1],
+                                   origin[0] + (axis_length * factor_1), origin[1] - (axis_length * factor_1),
+                                   pen_cs)
+
+                self.scene.addLine(origin[0] + (axis_length * factor_1),
+                                   origin[1] - (axis_length * factor_1) + (arrow_length * factor_2),
+                                   origin[0] + (axis_length * factor_1),
+                                   origin[1] - (axis_length * factor_1), pen_cs)
+
+                self.scene.addLine(origin[0] + (axis_length * factor_1) - (arrow_length * factor_2),
+                                   origin[1] - (axis_length * factor_1),
+                                   origin[0] + (axis_length * factor_1),
+                                   origin[1] - (axis_length * factor_1), pen_cs)
+
+                labels[i].setPos(origin[0] + (axis_length * factor_1),
+                                 origin[1] - (axis_length * factor_1) - 4 * axis_length/10)
+                self.scene.addItem(labels[i])
+
+    def set_rotation(self, dut, rotation=None):
+
+        if rotation is not None:
+
+            try:
+                rot = float(rotation)
+            except ValueError:
+                rot = 0
+
+            self.rotations[dut] = rot
+
+            self.planes[dut].setRotation(self.rotations[dut] * self.mRad * self.rot_factor)
+
+        else:
+
+            for dut_1 in self.planes.keys():
+                try:
+                    self.planes[dut_1].setRotation(self.rotations[dut_1]*self.mRad * self.rot_factor)
+                except KeyError:
+                    pass
+
+    def set_z_pos(self, dut, z_position):
+
+        try:
+            z_pos = float(z_position)
+        except (TypeError, ValueError):
+            z_pos = 0
+
+        self.z_positions[dut] = z_pos
+
+        if dut == self.dut_names[-1]:
+
+            try:
+                self.unit = self.w / self.z_positions[self.dut_names[-1]]
+            except ZeroDivisionError:
+                self.unit = 0
+
+            for dut_1 in self.planes.keys():
+
+                factor = self.z_positions[dut_1] * self.unit
+
+                self.scene.removeItem(self.planes[dut_1])
+
+                plane = QtWidgets.QGraphicsRectItem(factor, self.v_center-self.plane_h*0.5, self.plane_w, self.plane_h)
+                plane.setPen(self.pen_dut)
+                plane.setBrush(self.brush_dut)
+                plane.setTransformOriginPoint(factor, self.v_center)
+
+                self.planes[dut_1] = plane
+                self.names[dut_1].setPos(factor - len(dut_1) * 3, self.v_center / 2 - 40)
+
+                self.scene.addItem(self.planes[dut_1])
+
+        if self.unit is not None:
+
+                factor = z_pos * self.unit
+
+                self.scene.removeItem(self.planes[dut])
+
+                plane = QtWidgets.QGraphicsRectItem(factor, self.v_center - self.plane_h * 0.5,
+                                                    self.plane_w, self.plane_h)
+                plane.setPen(self.pen_dut)
+                plane.setBrush(self.brush_dut)
+                plane.setTransformOriginPoint(factor, self.v_center)
+
+                self.planes[dut] = plane
+                self.names[dut].setPos(factor - len(dut) * 3, self.v_center / 2 - 40)
+
+                self.scene.addItem(self.planes[dut])

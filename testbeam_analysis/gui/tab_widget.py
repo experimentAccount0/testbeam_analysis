@@ -4,7 +4,7 @@
     gui options and plotting outputs
 '''
 
-from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt5 import QtCore, QtWidgets
 from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
 from testbeam_analysis.dut_alignment import correlate_cluster, prealignment, merge_cluster_data, apply_alignment, alignment
@@ -239,19 +239,28 @@ class AlignmentTab(AnalysisWidget):
         self.btn_skip.clicked.connect(lambda: self._skip_alignment())
         self.layout_options.addWidget(self.btn_skip)
 
-    def _skip_alignment(self):
+        # When global settings are updated, recreate state of alignment tab
+        if options['skip_alignment']:
+            self._skip_alignment(ask=False)
 
-        msg = 'Do you want to skip alignment and use pre-alignment for further analysis?'
-        reply = QtWidgets.QMessageBox.question(self, 'Skip alignment', msg, QtWidgets.QMessageBox.Yes,
-                                               QtWidgets.QMessageBox.Cancel)
+    def _skip_alignment(self, ask=True):
+
+        if ask:
+            msg = 'Do you want to skip alignment and use pre-alignment for further analysis?'
+            reply = QtWidgets.QMessageBox.question(self, 'Skip alignment', msg, QtWidgets.QMessageBox.Yes,
+                                                   QtWidgets.QMessageBox.Cancel)
+        else:
+            reply = QtWidgets.QMessageBox.Yes
 
         if reply == QtWidgets.QMessageBox.Yes:
 
             self.btn_skip.setText('Alignment skipped')
             self.button_ok.deleteLater()
             self.right_widget.setDisabled(True)
-            self.skipAlignment.emit()
-            self.proceedAnalysis.emit(self.tl)
+
+            if ask:
+                self.skipAlignment.emit()
+                self.proceedAnalysis.emit(self.tl)
 
         else:
             pass
