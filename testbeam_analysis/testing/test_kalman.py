@@ -189,7 +189,7 @@ class TestTrackAnalysis(unittest.TestCase):
                   'pixel_size': ((18.5, 18.5), (18.5, 18.5), (18.5, 18.5),
                                  (18.5, 18.5), (18.5, 18.5), (250, 50), (250, 50)),
                   'beam_energy': 2500.,
-                  'sensor_thickness': [50., 50., 50., 50., 50., 50., 250.]}
+                  'sensor_thickness': [[50., 50., 50., 50., 50., 50., 250.]]}
         for i in range(4):  # test each return (state estimates, chi, x error, y errors) seperatly
             test = test_tools._call_function_with_args(function=track_analysis._fit_tracks_kalman_loop,
                                                        **kwargs)[0][i]
