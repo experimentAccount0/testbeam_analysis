@@ -151,7 +151,7 @@ def run_analysis():
         input_hit_file=os.path.join(output_folder, 'Merged.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_hit_file=os.path.join(output_folder,
-                                             'Tracklets_prealigned.h5'),
+                                     'Tracklets_prealigned.h5'),
         force_prealignment=True)
 
     # Find tracks from the prealigned tracklets and stores them with quality
