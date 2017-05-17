@@ -79,7 +79,7 @@ class TestExamples(unittest.TestCase):
 
     # Alignments do not converge for reduced data set
     # Thus mock out the alignment steps
-    @unittest.SkipTest()
+    @unittest.SkipTest
     @mock.patch('testbeam_analysis.dut_alignment.prealignment',
                 side_effect=copy_alignment(
                     path=r'eutelescope/Alignment.h5',
