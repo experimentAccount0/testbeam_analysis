@@ -1,6 +1,8 @@
 ''' Example script to run a full analysis on telescope data. The original data
     can be found in the example folder of the EUTelescope framework.
 
+    Data in https://github.com/eutelescope/eutelescope/tree/v1.0-tag/jobsub/examples/datura-150mm-DAF
+
     The residuals are calculated with different cuts on prealigned and aligned data
     for demonstration purpose:
 
@@ -19,11 +21,12 @@
       have a rather high residual (~ 18 um)
 
 
-    Setup
-    -----
+    - When using a Kalman Filter for track builing instead of an interpolation
+      which takes no correlations between the measurements into account, the
+      residuals can be improved by ~ 30 percent for the inner planes.
 
     The telescope consists of 6 planes with 15 cm clearance between the planes.
-    The data was taken at Desy with ~ 3-4 GeV/c (to be checked).
+    The data was taken at Desy with ~ 5 GeV/c (Run number 36).
 
     The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix
     consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
@@ -232,16 +235,24 @@ def run_analysis():
         # We do not cut on track quality but on chi2 later
         selection_track_quality=0)
 
-    # Create unconstrained residuals
+    # Create unconstrained residuals with chi2 cut
     result_analysis.calculate_residuals(
         input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_residuals_file=os.path.join(output_folder, 'Residuals_all.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all_chi2_cut.h5'),
         # The chi2 cut has a large influence on
         # the residuals and number of tracks,
         # since the resolution is dominated by
         # multiple scattering
         max_chi2=500,
+        n_pixels=n_pixels,
+        pixel_size=pixel_size)
+
+    # Create unconstrained residuals
+    result_analysis.calculate_residuals(
+        input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all.h5'),
         n_pixels=n_pixels,
         pixel_size=pixel_size)
 
@@ -271,6 +282,42 @@ def run_analysis():
         output_residuals_file=os.path.join(output_folder, 'Residuals_some.h5'),
         n_pixels=n_pixels,
         pixel_size=pixel_size)
+
+    # Example 3: Use a Kalman Filter to build tracks. This is the best way to build
+    # tracks in case of heavily scattered tracks.
+    track_analysis.fit_tracks(
+        input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman_test.h5'),
+        exclude_dut_hit=True,
+        pixel_size=pixel_size,
+        z_positions=z_positions,
+        beam_energy=5000.,
+        sensor_thickness=[50., 50., 50., 50., 50., 50.],
+        selection_track_quality=0,
+        method='Kalman')
+
+    # Create unconstrained residuals
+    result_analysis.calculate_residuals(
+        input_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman_test.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all_Kalman_test.h5'),
+        n_pixels=n_pixels,
+        pixel_size=pixel_size,
+        npixels_per_bin=10,
+        nbins_per_pixel=50)
+
+    # Create unconstrained residuals with chi2 cut
+    result_analysis.calculate_residuals(
+        input_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all_Kalman_chi2_cut.h5'),
+        n_pixels=n_pixels,
+        pixel_size=pixel_size,
+        max_chi2=500,
+        npixels_per_bin=10,
+        nbins_per_pixel=100)
+
 
 # Main entry point is needed for multiprocessing under windows
 if __name__ == '__main__':
