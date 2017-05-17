@@ -113,6 +113,7 @@ class TestExamples(unittest.TestCase):
                 mask = in_file_h5.get_node('/DUT_%d/Efficiency_mask' % i)[:]
                 self.assertAlmostEqual(eff[~mask].mean(), 100., delta=0.0001)
 
+
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestExamples)
     unittest.TextTestRunner(verbosity=2).run(suite)
