@@ -152,7 +152,8 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
             measurements, dut_fit_selection,
             pixel_size, measurements_2[0, :, -1],
             beam_energy=2500.,
-            sensor_thickness=[50., 50., 50., 50., 50., 50., 250.])
+            total_thickness=[100., 100., 100., 100., 100., 100., 250.],
+            radiation_length=[125390., 125390., 125390., 125390., 125390., 125390., 93700.])
 
         # interpolate hits with straight line
         fit_x, _ = curve_fit(straight_line, measurements_2[0, :, -1][fit_selection] / 1000., measurements[0, :, 0][fit_selection])

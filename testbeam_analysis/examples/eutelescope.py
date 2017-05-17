@@ -293,7 +293,8 @@ def run_analysis():
         pixel_size=pixel_size,
         z_positions=z_positions,
         beam_energy=5000.,
-        sensor_thickness=[50., 50., 50., 50., 50., 50.],
+        total_thickness=[100., 100., 100., 100., 100., 100.],
+        radiation_length=[125390., 125390., 125390., 125390., 125390., 125390.],
         selection_track_quality=0,
         method='Kalman')
 

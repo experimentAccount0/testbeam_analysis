@@ -39,7 +39,7 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     return smoothed_state_estimates, chi2, x_err, y_err
 
 
-def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, sensor_thickness):
+def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length):
     n_duts = track_hits.shape[1]
     dut_selection = np.array(range(0, n_duts))
     z_positions = np.array(z_positions)
@@ -53,10 +53,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
     dut_fit_selection = dut_list[~np.isnan(dut_list)].astype(int)
 
     # set multiple scattering environment
-    thickness_si = np.array(sensor_thickness)  # 50 um Si for M26 sensor, FE-I4 is 250 um thick
-    thickness_kapton = np.array([50., 50., 50., 50., 50., 50., 250.])  # 2 x 25 um kapton foil befor and after M26 sensors.
-    thickness_tot = thickness_si + thickness_kapton
-    rad_len_tot = np.array([125390., 125390., 125390., 125390., 125390., 125390., 93700.])  # total radiation length of 2 kapton foils (before and after sensor) and m26 sensor in um
+    total_thickness = np.array(total_thickness)
+    radiation_length = np.array(radiation_length)  # total radiation length of 2 kapton foils (before and after sensor) and m26 sensor in um
 
     pixel_resolution = pixel_size / np.sqrt(12.)  # Resolution of each telescope plane
 
@@ -65,7 +63,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
     momentum = np.sqrt(beam_energy * beam_energy - mass * mass)
     beta = momentum / beam_energy  # almost 1
     # rms angle of multiple scattering
-    theta = np.array(((13.6 / momentum / beta) * np.sqrt(thickness_tot / rad_len_tot) * (1. + 0.038 * np.log(thickness_tot / rad_len_tot))))
+    theta = np.array(((13.6 / momentum / beta) * np.sqrt(total_thickness / radiation_length) * (1. + 0.038 * np.log(total_thickness / radiation_length))))
 
     track_estimates_chunk = np.zeros((track_hits.shape[0], track_hits.shape[1], 4))
     chi2_tot = np.empty((track_hits.shape[0],), dtype=np.float)
@@ -189,7 +187,8 @@ class TestTrackAnalysis(unittest.TestCase):
                   'pixel_size': ((18.5, 18.5), (18.5, 18.5), (18.5, 18.5),
                                  (18.5, 18.5), (18.5, 18.5), (250, 50), (250, 50)),
                   'beam_energy': 2500.,
-                  'sensor_thickness': [[50., 50., 50., 50., 50., 50., 250.]]}
+                  'total_thickness': [[100., 100., 100., 100., 100., 100., 250.]],
+                  'radiation_length': [[125390., 125390., 125390., 125390., 125390., 125390., 93700.]]}
         for i in range(4):  # test each return (state estimates, chi, x error, y errors) seperatly
             test = test_tools._call_function_with_args(function=track_analysis._fit_tracks_kalman_loop,
                                                        **kwargs)[0][i]
