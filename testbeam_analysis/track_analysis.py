@@ -356,7 +356,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             tracks_array['x_dut_%d' % index] = track_candidates_chunk['x_dut_%d' % index]
             tracks_array['y_dut_%d' % index] = track_candidates_chunk['y_dut_%d' % index]
             tracks_array['z_dut_%d' % index] = track_candidates_chunk['z_dut_%d' % index]
-	    tracks_array['xerr_dut_%d' % index] = track_candidates_chunk['xerr_dut_%d' % index]
+            tracks_array['xerr_dut_%d' % index] = track_candidates_chunk['xerr_dut_%d' % index]
             tracks_array['yerr_dut_%d' % index] = track_candidates_chunk['yerr_dut_%d' % index]
             tracks_array['zerr_dut_%d' % index] = track_candidates_chunk['zerr_dut_%d' % index]
             tracks_array['charge_dut_%d' % index] = track_candidates_chunk['charge_dut_%d' % index]
@@ -410,7 +410,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
         tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
 
-	try:  # Check if table exists already, than append data
+        try:  # Check if table exists already, than append data
             tracklets_table = out_file_h5.get_node('/Tracks_DUT_%d' % fit_dut)
         except tb.NoSuchNodeError:  # Table does not exist, thus create new
             tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
@@ -771,6 +771,7 @@ def _find_tracks_loop(tracklets, tr_x, tr_y, tr_z, tr_xerr, tr_yerr, tr_zerr, tr
                       tr_y=tr_y,
                       min_cluster_distance=min_cluster_distance,
                       n_duts=n_duts)
+
 
 @njit
 def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several tracks are less than min_track_distance apart. Then exclude these tracks (set n_tracks = -1)
