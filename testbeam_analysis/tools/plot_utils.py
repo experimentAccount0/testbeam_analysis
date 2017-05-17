@@ -1031,6 +1031,57 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         logging.warning('Cannot create efficiency plots, all pixels are masked')
 
 
+def purity_plots(pure_hit_hist, hit_hist, purity, actual_dut, minimum_hit_density, plot_range, cut_distance, mask_zero=True, output_pdf=None):
+    # get number of entries for every histogram
+    n_pure_hit_hist = np.count_nonzero(pure_hit_hist)
+    n_hits_hit_density = np.sum(hit_hist)
+    n_hits_purity = np.count_nonzero(purity)
+
+    # for better readability allow masking of entries that are zero
+    if mask_zero:
+        pure_hit_hist = np.ma.array(pure_hit_hist, mask=(pure_hit_hist == 0))
+        hit_hist = np.ma.array(hit_hist, mask=hit_hist == 0)
+
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    plot_2d_pixel_hist(fig, ax, pure_hit_hist.T, plot_range, title='Pure hit density for DUT %d (%d Pure Hits)' % (actual_dut, n_pure_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
+    fig.tight_layout()
+    output_pdf.savefig(fig)
+
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_density), x_axis_title="column [um]", y_axis_title="row [um]")
+    fig.tight_layout()
+    output_pdf.savefig(fig)
+
+    if np.any(~purity.mask):
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        z_min = np.ma.min(purity)
+        if z_min == 100.:  # One cannot plot with 0 z axis range
+            z_min = 90.
+        plot_2d_pixel_hist(fig, ax, purity.T, plot_range, title='Purity for DUT %d (%d Entries)' % (actual_dut, n_hits_purity), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
+        fig.tight_layout()
+        output_pdf.savefig(fig)
+
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.grid()
+        ax.set_title('Purity per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(purity), np.ma.std(purity)))
+        ax.set_xlabel('Purity [%]')
+        ax.set_ylabel('#')
+        ax.set_yscale('log')
+        ax.set_xlim([-0.5, 101.5])
+        ax.hist(purity.ravel()[purity.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel purity
+        output_pdf.savefig(fig)
+    else:
+        logging.warning('Cannot create purity plots, since all pixels are masked')
+
+
 def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=None):
     ''' Plot track slopes.
 
