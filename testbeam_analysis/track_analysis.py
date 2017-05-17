@@ -1019,8 +1019,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
 
     # express initial state covariance matrices: x and y pos have initial error of pixel resolution and x and y slopes have large error
     initial_state_covariance = np.zeros((4, 4))
-    initial_state_covariance[0, 0] = pixel_resolution[0, 0]**2 * 10
-    initial_state_covariance[1, 1] = pixel_resolution[0, 1]**2 * 10
+    initial_state_covariance[0, 0] = pixel_resolution[0, 0]**2
+    initial_state_covariance[1, 1] = pixel_resolution[0, 1]**2
     initial_state_covariance[2, 2] = 0.01  # 0.01
     initial_state_covariance[3, 3] = 0.01  # 0.01
 
