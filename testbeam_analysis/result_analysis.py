@@ -17,7 +17,7 @@ from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, plot=True, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=True, plot=True, cluster_size_selection=None, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
 
     Parameters
@@ -50,6 +50,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
         Take the prealignment, although if a coarse alignment is availale.
     plot : bool
         If True, create additional output plots.
+    cluster_size_selection : uint
+        Select which cluster sizes should be included for residual calculation. If None all cluster sizes are taken.
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
