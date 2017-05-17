@@ -317,7 +317,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         for index in range(n_duts):
             description.append(('charge_dut_%d' % index, np.float))
         for index in range(n_duts):
-            description.append(('n_hits_dut_%d' % index, np.float))
+            description.append(('n_hits_dut_%d' % index, np.int8))
         for dimension in range(3):
             description.append(('offset_%d' % dimension, np.float))
         for dimension in range(3):
@@ -331,7 +331,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 description.append(('slope_x_dut_%d' % index, np.float))
             for index in range(n_duts):
                 description.append(('slope_y_dut_%d' % index, np.float))
-        description.extend([('track_chi2', np.float), ('track_quality', np.uint32), ('n_tracks', np.int8)])
+        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.int8)])
         for index in range(n_duts):
             description.append(('xerr_dut_%d' % index, np.float))
         for index in range(n_duts):
