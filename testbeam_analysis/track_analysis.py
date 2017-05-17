@@ -429,6 +429,50 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         # Plot chi2 distribution
         plot_utils.plot_track_chi2(chi2s=chi2s, fit_dut=fit_dut, output_pdf=output_pdf)
 
+    def store_track_data_kalman(fit_dut, min_track_distance, track_estimates_chunk):  # Set the offset to the track intersection with the tilted plane and store the data
+        if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+            print 'pre-alignment'
+            dut_position = np.array([0., 0., prealignment['z'][fit_dut]])
+            dut_plane_normal = np.array([0., 0., 1.])
+        else:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
+            dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
+            rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
+                                                             beta=alignment[fit_dut]['beta'],
+                                                             gamma=alignment[fit_dut]['gamma'])
+            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+            dut_plane_normal = basis_global[2]
+
+        slopes = np.column_stack((track_estimates_chunk[:, fit_dut, 2],
+                                  track_estimates_chunk[:, fit_dut, 3],
+                                  np.ones((track_estimates_chunk.shape[0],)).reshape(track_estimates_chunk.shape[0], 1)))
+        offsets = np.column_stack((track_estimates_chunk[:, fit_dut, 0],
+                                   track_estimates_chunk[:, fit_dut, 1],
+                                   np.repeat(dut_position[-1], track_estimates_chunk.shape[0]).reshape(track_estimates_chunk.shape[0], 1)))
+
+        if full_track_info is True and method == "Kalman":
+            tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk)
+        else:
+            tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
+
+        try:  # Check if table exists already, than append data
+            tracklets_table = out_file_h5.get_node('/Kalman_Tracks_DUT_%d' % fit_dut)
+        except tb.NoSuchNodeError:  # Table does not exist, thus create new
+            tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Kalman_Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d_with_Kalman_Filter' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+        # Remove tracks that are too close when extrapolated to the actual DUT
+        # All merged track are signaled by n_tracks = -1
+        actual_min_track_distance = min_track_distance[fit_dut]
+        if actual_min_track_distance > 0:
+            _find_merged_tracks(tracks_array, actual_min_track_distance)
+            selection = tracks_array['n_tracks'] > 0
+            logging.info('Removed %d merged tracks (%1.1f%%)', np.count_nonzero(~selection), float(np.count_nonzero(~selection)) / selection.shape[0] * 100.)
+            tracks_array = tracks_array[selection]
+
+        tracklets_table.append(tracks_array)
+
+        # Plot chi2 distribution
+        plot_utils.plot_track_chi2(chi2s=chi2s, fit_dut=fit_dut, output_pdf=output_pdf)
+
     def select_data(dut_index):  # Select track by and DUT hits to use
 
         dut_selection = 0  # DUTs to be used in the fit
