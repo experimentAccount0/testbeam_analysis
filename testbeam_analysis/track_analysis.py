@@ -433,7 +433,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
     def store_track_data_kalman(fit_dut, min_track_distance, track_estimates_chunk):  # Set the offset to the track intersection with the tilted plane and store the data
         if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
-            print 'pre-alignment'
             dut_position = np.array([0., 0., prealignment['z'][fit_dut]])
             dut_plane_normal = np.array([0., 0., 1.])
         else:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
