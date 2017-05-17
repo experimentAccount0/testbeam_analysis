@@ -26,7 +26,7 @@ before_install:
   - conda update --yes conda
   - conda info -a
   - conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov
-  - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pykalman pylandau pytest
+  - pip install progressbar-latest xvfbwrapper coverage python-coveralls pixel_clusterizer pylandau pytest
   - pip install -r requirements_docs.txt
   - python setup.py develop
 
