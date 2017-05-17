@@ -126,7 +126,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, z_positions=None, beam_energy=None, sensor_thickness=None ,max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, z_positions=None, beam_energy=None, total_thickness=None, radiation_length=None ,max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
     '''Fits either a line through selected DUT hits for selected DUTs (method=Fit) or uses a Kalman Filter to build tracks (method=Kalman).
     The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts).
@@ -175,8 +175,10 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         The z positions of the DUTs in um. Only needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV. Only needed for Kalman Filter.
-    sensor_thickness: iterable
-        Thickness of all sensors in um. Only needed for Kalman Filter.
+    total_thickness : iterable
+        Total thickness of all DUTs in um. (Sensor + other materials)
+    radiation_length : iterable
+        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     keep_data : bool
@@ -616,7 +618,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                             results = pool.map(functools.partial(
                                 _function_wrapper_fit_tracks_kalman_loop, pixel_size,
                                 dut_fit_selection, z_positions,
-                                beam_energy, sensor_thickness), slices)
+                                beam_energy, total_thickness, radiation_length), slices)
                         del track_hits
 
                         # Store results
@@ -869,9 +871,9 @@ def _function_wrapper_fit_tracks_kalman_loop(*args):  # Needed for multiprocessi
     '''
     Function for multiprocessing call with arguments for speed up.
     '''
-    pixel_size, dut_fit_selection, z_positions, beam_energy, sensor_thickness, track_hits = args
+    pixel_size, dut_fit_selection, z_positions, beam_energy, total_thickness, radiation_length, track_hits = args
 
-    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, sensor_thickness)[0:2]
+    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length)[0:2]
 
 
 def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance):
@@ -937,7 +939,7 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     return smoothed_state_estimates, chi2, x_err, y_err
 
 
-def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, sensor_thickness):
+def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length):
     '''
     Loop over the selected tracks. In this function all matrices for the Kalman Filter are calculated track by track
     and the Kalman Filter is started. With dut_fit_selection only the duts which are selected are included in the Kalman Filter.
@@ -957,8 +959,10 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
         The z positions of the DUTs in um. Here, needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV.
-    sensor_thickness: iterable
-        Thickness of all sensors in um.
+    total_thickness : iterable
+        Total thickness of all DUTs in um. (Sensor + other materials)
+    radiation_length : iterable
+        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
 
     Returns
     -------
@@ -979,10 +983,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
     dut_selection = np.array(range(0, n_duts))
 
     # set multiple scattering environment
-    thickness_si = np.array(sensor_thickness)  # 50 um Si for M26 sensor, FE-I4 is 250 um thick
-    thickness_kapton = np.array([50., 50., 50., 50., 50., 50., 250.])  # 2 x 25 um kapton foil befor and after M26 sensors.
-    thickness_tot = thickness_si + thickness_kapton
-    rad_len_tot = np.array([125390., 125390., 125390., 125390., 125390., 125390., 93700.])  # total radiation length of 2 kapton foils (before and after sensor) and m26 sensor in um
+    total_thickness = np.array(total_thickness)
+    radiation_length = np.array(radiation_length)
 
     pixel_resolution = pixel_size / np.sqrt(12.)  # Resolution of each telescope plane
 
@@ -992,7 +994,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
     beta = momentum / beam_energy  # almost 1
 
     # rms angle of multiple scattering
-    theta = np.array(((13.6 / momentum / beta) * np.sqrt(thickness_tot / rad_len_tot) * (1. + 0.038 * np.log(thickness_tot / rad_len_tot))))
+    theta = np.array(((13.6 / momentum / beta) * np.sqrt(total_thickness / radiation_length) * (1. + 0.038 * np.log(total_thickness / radiation_length))))
     # express transition covariance matrix
     transition_covariance = np.zeros((chunk_size, n_duts - 1, 4, 4))
 
