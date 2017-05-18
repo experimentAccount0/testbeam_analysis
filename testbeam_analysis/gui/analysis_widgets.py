@@ -3,6 +3,7 @@ import inspect
 import logging
 import math
 from multiprocessing import Pool
+from subprocess import call, CalledProcessError
 from collections import OrderedDict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -87,9 +88,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.layout_options.addStretch(0)
 
         # Proceed button
-        self.button_ok = QtWidgets.QPushButton('OK')
-        self.button_ok.clicked.connect(self._call_funcs)
-        self.layout_options.addWidget(self.button_ok)
+        self.btn_ok = QtWidgets.QPushButton('OK')
+        self.btn_ok.clicked.connect(self._call_funcs)
+        self.layout_options.addWidget(self.btn_ok)
 
         # Right widget
         self.right_widget = QtWidgets.QWidget()
@@ -355,6 +356,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         """ 
         Call all functions in a row
         """
+
+        try:
+            self.btn_ok.setDisabled(True)
+        except RuntimeError:
+            pass
+
         pool = Pool()
         for func, kwargs in self.calls.iteritems():
             # print(func.__name__, kwargs)
@@ -365,6 +372,34 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Emit signal to indicate end of analysis
         if self.tab_list is not None:
             self.analysisDone.emit(self.tab_list)
+
+    def _connect_vitables(self, files):
+
+        self.btn_ok.setDisabled(False)
+        self.btn_ok.setText('Open output file(s) via ViTables')
+        self.btn_ok.clicked.disconnect()
+        self.btn_ok.clicked.connect(lambda: self._call_vitables(files=files))
+
+    def _call_vitables(self, files):
+
+        if isinstance(files, list):
+            vitables_paths = ['vitables']
+            for f in files:
+                vitables_paths.append(str(f))
+        else:
+            vitables_paths = ['vitables', str(files)]
+
+        try:
+            call(vitables_paths)
+
+        except CalledProcessError:
+            msg = 'An error occurred during executing ViTables'
+            logging.warning(msg)
+        except OSError:
+            msg = 'ViTables not found'
+            logging.warning(msg)
+            self.btn_ok.setText('Ok')
+            self.btn_ok.setDisabled(True)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
@@ -449,7 +484,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                     tmp_options[o_key] = self.options[o_key]
 
             widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, tab_list=self.tab_list)
-            widget.button_ok.deleteLater()
+            widget.btn_ok.deleteLater()
 
             self.tw[self.setup['dut_names'][i]] = widget
             self.tabs.addTab(self.tw[self.setup['dut_names'][i]], self.setup['dut_names'][i])
@@ -500,6 +535,34 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         if self.tab_list is not None:
             self.parallelAnalysisDone.emit(self.tab_list)
+
+    def _connect_vitables(self, files):
+
+        self.btn_ok.setDisabled(False)
+        self.btn_ok.setText('Open output file(s) via ViTables')
+        self.btn_ok.clicked.disconnect()
+        self.btn_ok.clicked.connect(lambda: self._call_vitables(files=files))
+
+    def _call_vitables(self, files):
+
+        if isinstance(files, list):
+            vitables_paths = ['vitables']
+            for f in files:
+                vitables_paths.append(str(f))
+        else:
+            vitables_paths = ['vitables', str(files)]
+
+        try:
+            call(vitables_paths)
+
+        except CalledProcessError:
+            msg = 'An error occurred during executing ViTables'
+            logging.error(msg)
+        except OSError:
+            msg = 'ViTables not found. Try (re)installing ViTables'
+            logging.error(msg)
+            self.btn_ok.setText('Ok')
+            self.btn_ok.setDisabled(True)
 
 
 class AnalysisLogger(logging.Handler):

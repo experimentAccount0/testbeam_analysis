@@ -69,10 +69,10 @@ class SetupTab(QtWidgets.QWidget):
         layout_right.addSpacing(10)
 
         # Proceed button
-        self.button_ok = QtWidgets.QPushButton('OK')
-        self.button_ok.clicked.connect(lambda: self._handle_input())
-        self.button_ok.setDisabled(True)
-        layout_right.addWidget(self.button_ok)
+        self.btn_ok = QtWidgets.QPushButton('OK')
+        self.btn_ok.clicked.connect(lambda: self._handle_input())
+        self.btn_ok.setDisabled(True)
+        layout_right.addWidget(self.btn_ok)
         right_widget = QtWidgets.QWidget()
         right_widget.setLayout(layout_right)
 
@@ -653,7 +653,7 @@ class SetupTab(QtWidgets.QWidget):
 
         # Set the status of the proceed button
         if skip_props is None:
-            self.button_ok.setDisabled(broken)
+            self.btn_ok.setDisabled(broken)
 
     def _emit_message(self, message):
         """

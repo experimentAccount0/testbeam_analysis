@@ -4,6 +4,7 @@
     gui options and plotting outputs
 '''
 
+from subprocess import call
 from PyQt5 import QtCore, QtWidgets
 from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
@@ -39,7 +40,10 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=False)
 
+        output_file = [options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']]
+
         self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+        self.parallelAnalysisDone.connect(lambda: self._connect_vitables(files=output_file))
 
 
 class ClusterPixelsTab(ParallelAnalysisWidget):
@@ -72,7 +76,10 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
                                  func=cluster_hits,
                                  fixed=False)
 
+        output_file = [options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']]
+
         self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+        self.parallelAnalysisDone.connect(lambda: self._connect_vitables(files=output_file))
 
 
 class PrealignmentTab(AnalysisWidget):
@@ -139,6 +146,11 @@ class PrealignmentTab(AnalysisWidget):
                         func=apply_alignment,
                         fixed=True)
 
+        output_files = [options['output_path'] + '/Correlation.h5',
+                        options['output_path'] + '/Alignment.h5',
+                        options['output_path'] + '/Merged.h5',
+                        options['output_path'] + '/Tracklets_prealigned.h5']
+
         # Fix options that should not be changed
         self.add_option(option='use_duts', func=apply_alignment,
                         default_value=[1] * setup['n_duts'], fixed=True)
@@ -148,7 +160,7 @@ class PrealignmentTab(AnalysisWidget):
         self.add_option(option='no_z', func=apply_alignment, fixed=True)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self.button_ok.setDisabled(True))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=output_files))
 
 
 class TrackFindingTab(AnalysisWidget):
@@ -176,8 +188,10 @@ class TrackFindingTab(AnalysisWidget):
                         func=find_tracks,
                         fixed=True)
 
+        output_file = [options['output_path'] + '/TrackCandidates_prealignment.h5']
+
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self.button_ok.setDisabled(True))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=output_file))
 
 
 class AlignmentTab(AnalysisWidget):
@@ -207,13 +221,8 @@ class AlignmentTab(AnalysisWidget):
                         func=alignment,
                         fixed=True)
 
-        self.add_option(option='output_hit_file',
-                        default_value=options['output_path'] + '/Tracklets.h5',
-                        func=alignment,
-                        fixed=True)
-
         self.add_option(option='initial_translation',
-                        default_value=setup['z_positions'],
+                        default_value=False,
                         func=alignment,
                         fixed=True)
 
@@ -232,7 +241,16 @@ class AlignmentTab(AnalysisWidget):
                         func=apply_alignment,
                         fixed=True)
 
+        self.add_option(option='output_hit_file',
+                        default_value=options['output_path'] + '/Tracklets.h5',
+                        func=apply_alignment,
+                        fixed=True)
+
+        output_files = [options['output_path'] + '/Tracklets.h5']
+
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=output_files))
+        self.analysisDone.connect(lambda: self.btn_skip.deleteLater())
 
         self.btn_skip = QtWidgets.QPushButton('Skip')
         self.btn_skip.setToolTip('Skip alignment and use pre-alignment for further analysis')
@@ -255,7 +273,7 @@ class AlignmentTab(AnalysisWidget):
         if reply == QtWidgets.QMessageBox.Yes:
 
             self.btn_skip.setText('Alignment skipped')
-            self.button_ok.deleteLater()
+            self.btn_ok.deleteLater()
             self.right_widget.setDisabled(True)
 
             if ask:
@@ -297,6 +315,8 @@ class TrackFittingTab(AnalysisWidget):
                         func=find_tracks,
                         fixed=True)
 
+        output_file = [options['output_path'] + '/TrackCandidates.h5']
+
         # Set and fix options
         self.add_option(option='fit_duts', func=fit_tracks,
                         default_value=[0] * setup['n_duts'], optional=True)
@@ -310,7 +330,7 @@ class TrackFittingTab(AnalysisWidget):
                         default_value=[200] * setup['n_duts'], optional=False)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self.button_ok.setDisabled(True))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=output_file))
 
 
 class ResultTab(AnalysisWidget):
