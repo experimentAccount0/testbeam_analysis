@@ -288,10 +288,9 @@ def run_analysis():
     track_analysis.fit_tracks(
         input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman_test.h5'),
+        output_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
         exclude_dut_hit=True,
         pixel_size=pixel_size,
-        z_positions=z_positions,
         beam_energy=5000.,
         total_thickness=[100., 100., 100., 100., 100., 100.],
         radiation_length=[125390., 125390., 125390., 125390., 125390., 125390.],
@@ -300,9 +299,9 @@ def run_analysis():
 
     # Create unconstrained residuals
     result_analysis.calculate_residuals(
-        input_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman_test.h5'),
+        input_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_residuals_file=os.path.join(output_folder, 'Residuals_all_Kalman_test.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all_Kalman.h5'),
         n_pixels=n_pixels,
         pixel_size=pixel_size,
         npixels_per_bin=10,
