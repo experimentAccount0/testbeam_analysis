@@ -126,7 +126,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, z_positions=None, beam_energy=None, total_thickness=None, radiation_length=None ,max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, beam_energy=None, total_thickness=None, radiation_length=None ,max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
     '''Fits either a line through selected DUT hits for selected DUTs (method=Fit) or uses a Kalman Filter to build tracks (method=Kalman).
     The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts).
@@ -171,8 +171,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension (column/row),
         e.g. for two FE-I4 DUTs [(250, 50), (250, 50)]. Only needed for Kalman Filter.
-    z_positions : iterable
-        The z positions of the DUTs in um. Only needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV. Only needed for Kalman Filter.
     total_thickness : iterable
@@ -216,10 +214,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             logging.info('Use pre-alignment data')
             prealignment = in_file_h5.root.PreAlignment[:]
             n_duts = prealignment.shape[0]
+            z_positions = prealignment['z']
         else:
             logging.info('Use alignment data')
             alignment = in_file_h5.root.Alignment[:]
             n_duts = alignment.shape[0]
+            z_positions = alignment['translation_z']
 
     if fit_duts is None:
         fit_duts = range(n_duts)  # standard setting: fit tracks for all DUTs
