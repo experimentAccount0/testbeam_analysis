@@ -20,10 +20,12 @@
       plane position. This is an effect of multiple scattering. The outer most plans
       have a rather high residual (~ 18 um)
 
-
     - When using a Kalman Filter for track builing instead of an interpolation
       which takes no correlations between the measurements into account, the
       residuals can be improved by ~ 30 percent for the inner planes.
+
+    Setup
+    -----
 
     The telescope consists of 6 planes with 15 cm clearance between the planes.
     The data was taken at Desy with ~ 5 GeV/c (Run number 36).
@@ -306,17 +308,6 @@ def run_analysis():
         pixel_size=pixel_size,
         npixels_per_bin=10,
         nbins_per_pixel=50)
-
-    # Create unconstrained residuals with chi2 cut
-    result_analysis.calculate_residuals(
-        input_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
-        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_residuals_file=os.path.join(output_folder, 'Residuals_all_Kalman_chi2_cut.h5'),
-        n_pixels=n_pixels,
-        pixel_size=pixel_size,
-        max_chi2=500,
-        npixels_per_bin=10,
-        nbins_per_pixel=100)
 
 
 # Main entry point is needed for multiprocessing under windows
