@@ -93,6 +93,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     # select good hits and tracks
                     selection = np.logical_and(~np.isnan(tracks_chunk['x_dut_%d' % actual_dut]), ~np.isnan(tracks_chunk['track_chi2']))
                     tracks_chunk = tracks_chunk[selection]  # Take only tracks where actual dut has a hit, otherwise residual wrong
+                    if cluster_size_selection is not None:
+                        tracks_chunk = tracks_chunk[tracks_chunk['n_hits_dut_%d' % actual_dut] == cluster_size_selection]
                     if max_chi2[actual_dut] is not None:
                         tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2[actual_dut]]
 
