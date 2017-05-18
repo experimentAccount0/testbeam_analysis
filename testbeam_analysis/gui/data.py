@@ -1,5 +1,6 @@
 import os
 import tables as tb
+import logging
 
 from PyQt5 import QtCore, QtWidgets, QtGui
 
@@ -33,6 +34,7 @@ class DataTab(QtWidgets.QWidget):
         tab_layout = QtWidgets.QHBoxLayout()
         left_widget.setLayout(tab_layout)
         self._data_table = DataTable(parent=left_widget)
+        self._data_table.dragAndDropText.connect(lambda msg: self._emit_message(msg))
         tab_layout.addWidget(self._data_table)
 
         # Make option area
@@ -189,6 +191,7 @@ class DataTable(QtWidgets.QTableWidget):
     """
 
     inputFilesChanged = QtCore.pyqtSignal()
+    dragAndDropText = QtCore.pyqtSignal('QString')
 
     def __init__(self, parent=None):
         super(DataTable, self).__init__(parent)
@@ -209,6 +212,44 @@ class DataTable(QtWidgets.QTableWidget):
         self.showGrid()
         self.setSortingEnabled(True)
         self.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+
+        # Drag and drop related
+        self.setAcceptDrops(True)
+        self.setMouseTracking(True)
+
+    def mouseMoveEvent(self, event):
+        if self.underMouse() and not self.input_files:
+            msg = 'Select files via the button on the right or "Drag & Drop" files directly onto table area'
+            self.dragAndDropText.emit(msg)
+        else:
+            self.setMouseTracking(False)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls:
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+            for url in event.mimeData().urls():
+                if '.h5' in url.toLocalFile():
+                    self.input_files.append(url.toLocalFile())
+                else:
+                    msg = 'Files must be HDF5-format'
+                    logging.warning(msg)
+            self.handle_data()
+        else:
+            event.ignore()
 
     def get_data(self):
         """

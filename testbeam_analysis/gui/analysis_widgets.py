@@ -355,12 +355,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         """ 
         Call all functions in a row
         """
-        # pool = Pool()
+        pool = Pool()
         for func, kwargs in self.calls.iteritems():
-            print(func.__name__, kwargs)
-            # pool.apply_async(self._call_func(func, kwargs))
-        # pool.close()
-        # pool.join()
+            # print(func.__name__, kwargs)
+            pool.apply_async(self._call_func(func, kwargs))
+        pool.close()
+        pool.join()
 
         # Emit signal to indicate end of analysis
         if self.tab_list is not None:

@@ -45,6 +45,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Make dict to access tab widgets
         self.tw = {}
 
+        # Add bool to indicate whether setup tab has been executed
+        self.setup_done = False
+
         self._init_UI()
 
     def _init_UI(self):
@@ -223,8 +226,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     self.tw[name].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
 
                 if name == 'Setup':
-                    self.tw[name].proceedAnalysis.connect(lambda: self.update_tabs(data=self.tw['Setup'].data,
-                                                                                   skip='Setup'))
+                    for x in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
+                              lambda: self.setup_complete()]:
+                        self.tw[name].proceedAnalysis.connect(x)
 
                 if name == 'Alignment':
                     self.tw[name].skipAlignment.connect(lambda: self.update_tabs(data={'skip_alignment': True},
@@ -237,14 +241,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             except (AttributeError, KeyError):
                 pass
 
-    def update_tabs(self, data=None, tabs=None, skip=None, skip_alignment=False):
+    def update_tabs(self, data=None, tabs=None, skip=None):
         """
         Updates the setup and options with data from the SetupTab and then updates the tabs
 
         :param tabs: list of strings with tab names that should be updated, if None update all
         :param data: dict with all information necessary to perform analysis, if None only update tabs
         :param skip: str or list of tab names which should be skipped when updating tabs
-        :param skip_alignment: bool whether alignment was skipped or not
         """
 
         # Save users current tab position
@@ -267,9 +270,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         if skip is not None:
             if isinstance(skip, list):
-                for tab in skip:
-                    if tab in update_tabs:
-                        update_tabs.remove(tab)
+                for t_name in skip:
+                    if t_name in update_tabs:
+                        update_tabs.remove(t_name)
             else:
                 if skip in update_tabs:
                     update_tabs.remove(skip)
@@ -318,7 +321,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                               setup=self.setup,
                                               options=self.options)
             else:
-                # logging.info('Gui for %s not implemented yet!' % name)
                 continue
 
             tmp_tw[name] = widget
@@ -343,6 +345,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Connect updated tabs
         self.connect_tabs(tabs)
 
+    def setup_complete(self):
+        self.setup_done = True
+
     def global_settings(self):
         """
         Creates a child SettingsWindow of the analysis window to change global settings
@@ -359,7 +364,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.setup = self.settings_window.setup
         self.options = self.settings_window.options
 
-        self.update_tabs(skip='Setup')
+        if self.setup_done:
+            self.update_tabs(skip='Setup')
 
     def save_session(self):
         """
