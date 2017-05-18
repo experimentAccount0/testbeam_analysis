@@ -431,7 +431,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         # Plot chi2 distribution
         plot_utils.plot_track_chi2(chi2s=chi2s, fit_dut=fit_dut, output_pdf=output_pdf)
 
-    def store_track_data_kalman(fit_dut, min_track_distance, track_estimates_chunk):  # Set the offset to the track intersection with the tilted plane and store the data
+    def store_track_data_kalman(fit_dut, min_track_distance):  # Set the offset to the track intersection with the tilted plane and store the data
         if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
             dut_position = np.array([0., 0., prealignment['z'][fit_dut]])
             dut_plane_normal = np.array([0., 0., 1.])
@@ -450,10 +450,15 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                                    track_estimates_chunk[:, fit_dut, 1],
                                    np.repeat(dut_position[-1], track_estimates_chunk.shape[0]).reshape(track_estimates_chunk.shape[0], 1)))
 
+        actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                          line_directions=slopes,
+                                                                          position_plane=dut_position,
+                                                                          normal_plane=dut_plane_normal)
+
         if full_track_info is True and method == "Kalman":
-            tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk)
+            tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk)
         else:
-            tracks_array = create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
+            tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
 
         try:  # Check if table exists already, than append data
             tracklets_table = out_file_h5.get_node('/Kalman_Tracks_DUT_%d' % fit_dut)
@@ -639,10 +644,10 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                             # Store the data
                             if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
-                                store_track_data_kalman(actual_fit_dut, min_track_distance, track_estimates_chunk)
+                                store_track_data_kalman(actual_fit_dut, min_track_distance)
                             else:
                                 for dut_index in fit_duts:
-                                    store_track_data_kalman(dut_index, min_track_distance, track_estimates_chunk)
+                                    store_track_data_kalman(dut_index, min_track_distance)
 
                         progress_bar.update(index_candidates)
                     progress_bar.finish()
