@@ -1,4 +1,5 @@
 import os
+import sys
 import inspect
 import logging
 import math
@@ -374,13 +375,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         except RuntimeError:
             pass
 
-        # Uncomment the following lines for multi-threading attempt
+        # Should work but analysis_thread somehow returns "finished" signal before all task are done
 
         #self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
-        #self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
         #self.analysis_thread.finished.connect(lambda: self.analysis_thread.quit())
+        #self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
         #self.analysis_thread.start()
-        #return
 
         # Comment rest of this function when trying multithreading
 
@@ -413,11 +413,8 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         try:
 
-            # Multi-threading attempt
             self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
             self.vitables_thread.start()
-
-            #call(vitables_paths)
 
         except CalledProcessError:
             msg = 'An error occurred during executing ViTables'
@@ -428,15 +425,10 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.btn_ok.setText('Ok')
             self.btn_ok.setDisabled(True)
 
-    def plot(self, input_file, plot_func, **kwargs):
+    def plot(self, input_file, plot_func, dut_names=None):
 
-        fig = plot_func(input_file, **kwargs)
-        fig.set_facecolor('0.99')
-        canvas = FigureCanvas(fig)
-        canvas.setParent(self.left_widget)
-        toolbar = NavigationToolbar(canvas, self.left_widget)
-        self.plt.addWidget(toolbar)
-        self.plt.addWidget(canvas)
+        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, dut_names=dut_names, parent=self.left_widget)
+        self.plt.addWidget(plot)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
@@ -562,31 +554,6 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                            optional=optional, default_value=default_value[i],
                                                            fixed=fixed, tooltip=tooltip)
 
-    def parallel_plot(self, input_files, plot_func, dut_names=None, **kwargs):
-
-        figs = {}
-        canvas = {}
-        toolbars = {}
-
-        if dut_names is not None:
-            if isinstance(dut_names, list):
-                names = dut_names
-            else:
-                names = [dut_names]
-        else:
-            names = list(self.tw.keys())
-            names.reverse()
-
-        for dut in names:
-            i = names.index(dut)
-            figs[dut] = plot_func(input_files[i], dut_name=dut, **kwargs)
-            figs[dut].set_facecolor('0.99')
-            canvas[dut] = FigureCanvas(figs[dut])
-            canvas[dut].setParent(self.tw[dut].left_widget)
-            toolbars[dut] = NavigationToolbar(canvas[dut], self.tw[dut].left_widget)
-            self.tw[dut].plt.addWidget(toolbars[dut])
-            self.tw[dut].plt.addWidget(canvas[dut])
-
     def _call_parallel_funcs(self):
 
         self.btn_ok.setDisabled(True)
@@ -618,11 +585,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             vitables_paths = ['vitables', str(files)]
 
         try:
-            # Multi-threading attempt
+
             self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
             self.vitables_thread.start()
-
-            # call(vitables_paths)
 
         except CalledProcessError:
             msg = 'An error occurred during executing ViTables'
@@ -633,34 +598,177 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             self.btn_ok.setText('Ok')
             self.btn_ok.setDisabled(True)
 
+    def plot(self, input_files, plot_func, dut_names=None, **kwargs):
+
+        if dut_names is not None:
+            if isinstance(dut_names, list):
+                names = dut_names
+            else:
+                names = [dut_names]
+        else:
+            names = list(self.tw.keys())
+            names.reverse()
+
+        for dut in names:
+            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_names=dut)
+            self.tw[dut].plt.addWidget(plot)
+
+
+class AnalysisPlotter(QtWidgets.QWidget):
+
+    def __init__(self, input_file, plot_func, dut_names=None, parent=None):
+
+        super(AnalysisPlotter, self).__init__(parent)
+
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        self.input_file = input_file
+        self.plot_func = plot_func
+        self.dut_names = dut_names
+        self.stack = QtWidgets.QStackedWidget()
+
+        # FIXME: Add possibility to plot several functions at once
+
+        self.plot()
+
+    def plot(self):
+        """
+        Function for plotting one or multiple plots from the given plot_func and input_data
+        """
+
+        # Get plots
+        try:
+            fig = self.plot_func(self.input_file, dut_names=self.dut_names, gui=True)
+        except TypeError:
+            fig = self.plot_func(self.input_file, dut_name=self.dut_names, gui=True)
+
+        # Check for multiple plots
+        if isinstance(fig, list):
+            fig_list = fig
+        else:
+            fig_list = [fig]
+
+        # Create a dummy widget and add a figure canvas and a toolbar for each plot
+        for f in fig_list:
+            dummy_widget = QtWidgets.QWidget()
+            dummy_layout = QtWidgets.QVBoxLayout()
+            dummy_widget.setLayout(dummy_layout)
+            f.set_facecolor('0.99')
+            canvas = FigureCanvas(f)
+            canvas.setParent(self)
+            toolbar = NavigationToolbar(canvas, self)
+            dummy_layout.addWidget(toolbar)
+            dummy_layout.addWidget(canvas)
+            self.stack.addWidget(dummy_widget)
+
+        self.main_layout.addWidget(self.stack)
+
+        # If more than one plot, make navigation buttons
+        if self.stack.count() > 1:
+
+            # Create buttons to navigate through different plots
+            layout_btn = QtWidgets.QHBoxLayout()
+            btn_forward = QtWidgets.QPushButton()
+            btn_back = QtWidgets.QPushButton()
+            icon_forward = btn_forward.style().standardIcon(QtWidgets.QStyle.SP_ArrowForward)
+            icon_back = btn_back.style().standardIcon(QtWidgets.QStyle.SP_ArrowBack)
+            btn_forward.setIcon(icon_forward)
+            btn_back.setIcon(icon_back)
+            btn_forward.setIconSize(QtCore.QSize(40, 40))
+            btn_back.setIconSize(QtCore.QSize(40, 40))
+            # Connect buttons
+            btn_forward.clicked.connect(lambda: navigate(val=1))
+            btn_back.clicked.connect(lambda: navigate(val=-1))
+            # Add buttons to layout
+            layout_btn.addStretch()
+            layout_btn.addWidget(btn_back)
+            layout_btn.addStretch()
+            layout_btn.addWidget(btn_forward)
+            layout_btn.addStretch()
+
+            # Disable back button when at first plot
+            if self.stack.currentIndex() == 0:
+                btn_back.setDisabled(True)
+
+            # Add all to main layout
+            self.main_layout.addLayout(layout_btn)
+
+            def navigate(val):
+
+                if 0 <= (self.stack.currentIndex() + val) <= self.stack.count():
+                    index = self.stack.currentIndex() + val
+                    self.stack.setCurrentIndex(index)
+
+                    if index == self.stack.count() - 1:
+                        btn_back.setDisabled(False)
+                        btn_forward.setDisabled(True)
+                    elif index == 0:
+                        btn_back.setDisabled(True)
+                        btn_forward.setDisabled(False)
+                    else:
+                        btn_forward.setDisabled(False)
+                        btn_back.setDisabled(False)
+                else:
+                    pass
+
+
+class AnalysisStream(QtCore.QObject):
+    """
+    Class to handle the stdout stream which is used to do thread safe logging
+    since QtWidgets are not thread safe and therefore one can not directly log to GUIs
+    widgets when performing analysis on different thread than main thread
+    """
+
+    _stdout = None
+    _stderr = None
+    messageWritten = QtCore.pyqtSignal(str)
+
+    def flush(self):
+        pass
+
+    def fileno(self):
+        return -1
+
+    def write(self, msg):
+        if not self.signalsBlocked():
+            self.messageWritten.emit(unicode(msg))
+
+    @staticmethod
+    def stdout():
+        if not AnalysisStream._stdout:
+            AnalysisStream._stdout = AnalysisStream()
+            sys.stdout = AnalysisStream._stdout
+        return AnalysisStream._stdout
+
+    @staticmethod
+    def stderr():
+        if not AnalysisStream._stderr:
+            AnalysisStream._stderr = AnalysisStream()
+            sys.stderr = AnalysisStream._stderr
+        return AnalysisStream._stderr
+
 
 class AnalysisLogger(logging.Handler):
     """
-    Implements a logging handler which allows redirecting log
-    into QPlainTextEdit to display in AnalysisWindow
+    Implements a logging handler which allows redirecting log thread-safe
     """
 
     def __init__(self, parent):
 
         super(AnalysisLogger, self).__init__()
 
-        # Widget to display log in, we only want to read log
-        self.widget = QtWidgets.QPlainTextEdit(parent)
-        self.widget.setReadOnly(True)
-
-        # Dock in which text widget is placed to make it closable without losing log content
-        self.dock = QtWidgets.QDockWidget(parent)
-        self.dock.setWidget(self.widget)
-        self.dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
-        self.dock.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable)
-        self.dock.setWindowTitle('Logger')
-
     def emit(self, record):
         msg = self.format(record)
-        self.widget.appendPlainText(msg)
+        if msg:
+            AnalysisStream.stdout().write(msg)
 
 
 class AnalysisThread(QtCore.QThread):
+    """
+    Implements a class which allows to perform analysis / start vitables on an
+    extra thread to keep the GUI responsive during analysis / vitables
+    """
 
     analysisProgress = QtCore.pyqtSignal(int)
 
@@ -668,9 +776,13 @@ class AnalysisThread(QtCore.QThread):
 
         super(AnalysisThread, self).__init__(parent)
 
+        # Main function which will be executed on this thread
         self.main_func = func
-        self.funcs_args = funcs_args
+        # Arguments of main function
         self.args = args
+        # Functions and arguments to perform analysis function;
+        # if not None, main function is then AnalysisWidget.call_funcs()
+        self.funcs_args = funcs_args
 
     def run(self):
 
@@ -684,37 +796,5 @@ class AnalysisThread(QtCore.QThread):
             pool.join()
 
         else:
+            self.analysisProgress.emit(0)
             self.main_func(self.args)
-
-        self.finished.emit()
-
-
-class AnalysisWorker(QtCore.QObject):
-
-    finished = QtCore.pyqtSignal()
-
-    def __init__(self, func, args=None, funcs_args=None, parent=None):
-
-        super(AnalysisWorker, self).__init__(parent)
-
-        self.main_func = func
-        self.funcs_args = funcs_args
-        self.args = args
-
-    @QtCore.pyqtSlot()
-    def run_call_funcs(self):
-
-        pool = Pool()
-        for func, kwargs in self.funcs_args:
-            # self.main_func(func, kwargs)
-            pool.apply_async(self.main_func(func, kwargs))
-        pool.close()
-        pool.join()
-
-        self.finished.emit()
-
-    @QtCore.pyqtSlot()
-    def run_func(self):
-        self.main_func(self.args)
-
-        self.finished.emit()

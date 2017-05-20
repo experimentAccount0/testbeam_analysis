@@ -8,7 +8,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from data import DataTab
 from setup import SetupTab
 from settings import SettingsWindow
-from analysis_widgets import AnalysisLogger
+from analysis_widgets import AnalysisLogger, AnalysisStream
 
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
@@ -123,13 +123,29 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         logging.getLogger().addHandler(self.logger)
         logging.getLogger().setLevel(logging.INFO)
 
-        # Set visibility to false at init
-        self.logger.dock.setVisible(False)
+        # Add widget to display log and add it to dock
+        # Widget to display log in, we only want to read log
+        self.logger_console = QtWidgets.QPlainTextEdit(self)
+        self.logger_console.setReadOnly(True)
 
-        self.logger.dock.setMaximumHeight(0.25*self.height())
+        # Dock in which text widget is placed to make it closable without losing log content
+        self.console_dock = QtWidgets.QDockWidget(self)
+        self.console_dock.setWidget(self.logger_console)
+        self.console_dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
+        self.console_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable)
+        self.console_dock.setWindowTitle('Logger')
+
+        # Connect logger signal to logger console
+        AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+        AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+
+        # Set visibility to false at init
+        self.console_dock.setVisible(False)
+
+        self.console_dock.setMaximumHeight(0.25*self.height())
 
         # Add to main layout
-        self.main_layout.addWidget(self.logger.dock)
+        self.main_layout.addWidget(self.console_dock)
 
     def _init_menu(self):
         """
@@ -179,10 +195,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Handle whether logger is visible or not
         """
 
-        if self.logger.dock.isVisible():
-            self.logger.dock.setVisible(False)
+        if self.console_dock.isVisible():
+            self.console_dock.setVisible(False)
         else:
-            self.logger.dock.setVisible(True)
+            self.console_dock.setVisible(True)
 
     def handle_tabs(self, tabs=None, enable=True):
         """

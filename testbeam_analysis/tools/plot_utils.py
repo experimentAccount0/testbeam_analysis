@@ -666,9 +666,8 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
     '''
 
     if gui:
+        figs = []
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
-            fig = Figure()
-            _ = FigureCanvas(fig)
             for node in in_file_h5.root:
                 try:
                     indices = re.findall(r'\d+', node.name)
@@ -685,7 +684,8 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 if np.all(data <= 0):
                     logging.warning('All correlation entries for %s are zero, do not create plots', str(node.name))
                     continue
-
+                fig = Figure()
+                _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
                 cmap = cm.get_cmap('viridis')
                 cmap.set_bad('w')
@@ -702,7 +702,8 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 ax.set_ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
                 # do not append to axis to preserve aspect ratio
                 fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
-            return fig
+                figs.append(fig)
+            return figs
 
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_correlation.pdf'
