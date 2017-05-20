@@ -2,6 +2,7 @@ import os
 import inspect
 import logging
 import math
+
 from multiprocessing import Pool
 from subprocess import call, CalledProcessError
 from collections import OrderedDict
@@ -9,6 +10,11 @@ from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 from testbeam_analysis.gui import option_widget
+
+import matplotlib
+matplotlib.use('Qt5Agg')  # Make sure that we are using QT5
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 
 def get_default_args(func):
@@ -59,7 +65,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
         self.option_widgets = {}
+        self.splitter_size = [parent.width()/2, parent.width()/2]
         self._setup()
+        # Provide additional thread to do analysis on
+        self.analysis_thread = None
+        # Provide additional thread for vitables
+        self.vitables_thread = None
         # Holds functions with kwargs
         self.calls = OrderedDict()
         # List of tabs which will be enabled after analysis
@@ -71,7 +82,7 @@ class AnalysisWidget(QtWidgets.QWidget):
     def _setup(self):
         # Plot area
         self.left_widget = QtWidgets.QWidget()
-        self.plt = QtWidgets.QHBoxLayout()
+        self.plt = QtWidgets.QVBoxLayout()
         self.left_widget.setLayout(self.plt)
         # Options
         self.opt_needed = QtWidgets.QVBoxLayout()
@@ -106,8 +117,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.widget_splitter = QtWidgets.QSplitter(parent=self)
         self.widget_splitter.addWidget(self.left_widget)
         self.widget_splitter.addWidget(scroll)
-        self.widget_splitter.setStretchFactor(0, 10)
-        self.widget_splitter.setStretchFactor(1, 2.5)
+        self.widget_splitter.setSizes(self.splitter_size)
+#        self.widget_splitter.setStretchFactor(0, 10)
+#        self.widget_splitter.setStretchFactor(1, 2.5)
         self.widget_splitter.setChildrenCollapsible(False)
         # Add complete layout to this widget
         layout_widget = QtWidgets.QVBoxLayout()
@@ -362,6 +374,16 @@ class AnalysisWidget(QtWidgets.QWidget):
         except RuntimeError:
             pass
 
+        # Uncomment the following lines for multi-threading attempt
+
+        #self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
+        #self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
+        #self.analysis_thread.finished.connect(lambda: self.analysis_thread.quit())
+        #self.analysis_thread.start()
+        #return
+
+        # Comment rest of this function when trying multithreading
+
         pool = Pool()
         for func, kwargs in self.calls.iteritems():
             # print(func.__name__, kwargs)
@@ -390,7 +412,12 @@ class AnalysisWidget(QtWidgets.QWidget):
             vitables_paths = ['vitables', str(files)]
 
         try:
-            call(vitables_paths)
+
+            # Multi-threading attempt
+            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+            self.vitables_thread.start()
+
+            #call(vitables_paths)
 
         except CalledProcessError:
             msg = 'An error occurred during executing ViTables'
@@ -400,6 +427,16 @@ class AnalysisWidget(QtWidgets.QWidget):
             logging.warning(msg)
             self.btn_ok.setText('Ok')
             self.btn_ok.setDisabled(True)
+
+    def plot(self, input_file, plot_func, **kwargs):
+
+        fig = plot_func(input_file, **kwargs)
+        fig.set_facecolor('0.99')
+        canvas = FigureCanvas(fig)
+        canvas.setParent(self.left_widget)
+        toolbar = NavigationToolbar(canvas, self.left_widget)
+        self.plt.addWidget(toolbar)
+        self.plt.addWidget(canvas)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
@@ -442,6 +479,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         # Initialize options and setup
         self.setup = setup
         self.options = options
+
+        # Additional thread for vitables
+        self.vitables_thread = None
 
         # List of tabs which will be enabled after analysis
         if isinstance(tab_list, list):
@@ -522,6 +562,31 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                            optional=optional, default_value=default_value[i],
                                                            fixed=fixed, tooltip=tooltip)
 
+    def parallel_plot(self, input_files, plot_func, dut_names=None, **kwargs):
+
+        figs = {}
+        canvas = {}
+        toolbars = {}
+
+        if dut_names is not None:
+            if isinstance(dut_names, list):
+                names = dut_names
+            else:
+                names = [dut_names]
+        else:
+            names = list(self.tw.keys())
+            names.reverse()
+
+        for dut in names:
+            i = names.index(dut)
+            figs[dut] = plot_func(input_files[i], dut_name=dut, **kwargs)
+            figs[dut].set_facecolor('0.99')
+            canvas[dut] = FigureCanvas(figs[dut])
+            canvas[dut].setParent(self.tw[dut].left_widget)
+            toolbars[dut] = NavigationToolbar(canvas[dut], self.tw[dut].left_widget)
+            self.tw[dut].plt.addWidget(toolbars[dut])
+            self.tw[dut].plt.addWidget(canvas[dut])
+
     def _call_parallel_funcs(self):
 
         self.btn_ok.setDisabled(True)
@@ -553,7 +618,11 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             vitables_paths = ['vitables', str(files)]
 
         try:
-            call(vitables_paths)
+            # Multi-threading attempt
+            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+            self.vitables_thread.start()
+
+            # call(vitables_paths)
 
         except CalledProcessError:
             msg = 'An error occurred during executing ViTables'
@@ -590,3 +659,62 @@ class AnalysisLogger(logging.Handler):
         msg = self.format(record)
         self.widget.appendPlainText(msg)
 
+
+class AnalysisThread(QtCore.QThread):
+
+    analysisProgress = QtCore.pyqtSignal(int)
+
+    def __init__(self, func, args=None, funcs_args=None, parent=None):
+
+        super(AnalysisThread, self).__init__(parent)
+
+        self.main_func = func
+        self.funcs_args = funcs_args
+        self.args = args
+
+    def run(self):
+
+        if self.funcs_args is not None:
+
+            pool = Pool()
+            for func, kwargs in self.funcs_args:
+                self.analysisProgress.emit(1)
+                pool.apply_async(self.main_func(func, kwargs))
+            pool.close()
+            pool.join()
+
+        else:
+            self.main_func(self.args)
+
+        self.finished.emit()
+
+
+class AnalysisWorker(QtCore.QObject):
+
+    finished = QtCore.pyqtSignal()
+
+    def __init__(self, func, args=None, funcs_args=None, parent=None):
+
+        super(AnalysisWorker, self).__init__(parent)
+
+        self.main_func = func
+        self.funcs_args = funcs_args
+        self.args = args
+
+    @QtCore.pyqtSlot()
+    def run_call_funcs(self):
+
+        pool = Pool()
+        for func, kwargs in self.funcs_args:
+            # self.main_func(func, kwargs)
+            pool.apply_async(self.main_func(func, kwargs))
+        pool.close()
+        pool.join()
+
+        self.finished.emit()
+
+    @QtCore.pyqtSlot()
+    def run_func(self):
+        self.main_func(self.args)
+
+        self.finished.emit()

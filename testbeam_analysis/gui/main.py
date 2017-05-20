@@ -222,20 +222,23 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         for name in tab_list:
             try:
                 if name == 'Files':
-                    self.tw[name].proceedAnalysis.connect(lambda: self.update_tabs(tabs='Setup'))
-                    self.tw[name].proceedAnalysis.connect(lambda: self.tw['Setup'].input_data(self.tw['Files'].data))
+                    for x in [lambda: self.update_tabs(tabs='Setup'),
+                              lambda: self.tw['Setup'].input_data(self.tw['Files'].data),
+                              lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
+                        self.tw[name].proceedAnalysis.connect(x)
 
                 if name == 'Setup':
-                    for x in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
-                              lambda: self.setup_complete()]:
-                        self.tw[name].proceedAnalysis.connect(x)
+                    for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
+                               lambda: self.setup_complete(),
+                               lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
+                        self.tw[name].proceedAnalysis.connect(xx)
 
                 if name == 'Alignment':
                     self.tw[name].skipAlignment.connect(lambda: self.update_tabs(data={'skip_alignment': True},
                                                                                  tabs='Track fitting'))
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
-                self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
+                # self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
                 self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
             except (AttributeError, KeyError):

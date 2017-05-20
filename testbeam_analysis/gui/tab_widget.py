@@ -5,12 +5,15 @@
 '''
 
 from subprocess import call
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
 from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
 from testbeam_analysis.dut_alignment import correlate_cluster, prealignment, merge_cluster_data, apply_alignment, alignment
 from testbeam_analysis.track_analysis import find_tracks, fit_tracks
 from testbeam_analysis.result_analysis import calculate_efficiency, calculate_residuals
+
+# Plot related import
+from testbeam_analysis.tools import plot_utils
 
 
 class NoisyPixelsTab(ParallelAnalysisWidget):
@@ -21,6 +24,9 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
     def __init__(self, parent, setup, options, tab_list):
         super(NoisyPixelsTab, self).__init__(parent, setup, options, tab_list)
 
+        self.output_mask_file = [options['output_path'] + '/' + dut + options['noisy_suffix']
+                                 for dut in setup['dut_names']]
+
         self.add_parallel_function(func=generate_pixel_mask)
 
         self.add_parallel_option(option='input_hits_file',
@@ -28,7 +34,7 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='output_mask_file',
-                                 default_value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']],
+                                 default_value=self.output_mask_file,
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='n_pixel',
@@ -40,10 +46,12 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=False)
 
-        output_file = [options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']]
-
         self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.parallelAnalysisDone.connect(lambda: self._connect_vitables(files=output_file))
+        self.parallelAnalysisDone.connect(lambda: self._connect_vitables(files=self.output_mask_file))
+        self.parallelAnalysisDone.connect(lambda: self.parallel_plot(input_files=self.output_mask_file,
+                                                                     plot_func=plot_utils.plot_masked_pixels,
+                                                                     dut_names=setup['dut_names'],
+                                                                     gui=True))
 
 
 class ClusterPixelsTab(ParallelAnalysisWidget):
@@ -53,6 +61,9 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
 
     def __init__(self, parent, setup, options, tab_list):
         super(ClusterPixelsTab, self).__init__(parent, setup, options, tab_list)
+
+        self.output_cluster_file = [options['output_path'] + '/' + dut + options['cluster_suffix']
+                                    for dut in setup['dut_names']]
 
         self.add_parallel_function(func=cluster_hits)
 
@@ -76,10 +87,12 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
                                  func=cluster_hits,
                                  fixed=False)
 
-        output_file = [options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']]
-
         self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.parallelAnalysisDone.connect(lambda: self._connect_vitables(files=output_file))
+        self.parallelAnalysisDone.connect(lambda: self._connect_vitables(files=self.output_cluster_file))
+        self.parallelAnalysisDone.connect(lambda: self.parallel_plot(input_files=self.output_cluster_file,
+                                                                     plot_func=plot_utils.plot_cluster_size,
+                                                                     dut_names=setup['dut_names'],
+                                                                     gui=True))
 
 
 class PrealignmentTab(AnalysisWidget):
@@ -146,10 +159,10 @@ class PrealignmentTab(AnalysisWidget):
                         func=apply_alignment,
                         fixed=True)
 
-        output_files = [options['output_path'] + '/Correlation.h5',
-                        options['output_path'] + '/Alignment.h5',
-                        options['output_path'] + '/Merged.h5',
-                        options['output_path'] + '/Tracklets_prealigned.h5']
+        self.output_files = [options['output_path'] + '/Correlation.h5',
+                             options['output_path'] + '/Alignment.h5',
+                             options['output_path'] + '/Merged.h5',
+                             options['output_path'] + '/Tracklets_prealigned.h5']
 
         # Fix options that should not be changed
         self.add_option(option='use_duts', func=apply_alignment,
@@ -160,7 +173,11 @@ class PrealignmentTab(AnalysisWidget):
         self.add_option(option='no_z', func=apply_alignment, fixed=True)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self._connect_vitables(files=output_files))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=self.output_files))
+        self.analysisDone.connect(lambda: self.plot(input_file=self.output_files[0],
+                                                    plot_func=plot_utils.plot_correlations,
+                                                    dut_names=setup['dut_names'],
+                                                    gui=True))
 
 
 class TrackFindingTab(AnalysisWidget):
@@ -188,10 +205,10 @@ class TrackFindingTab(AnalysisWidget):
                         func=find_tracks,
                         fixed=True)
 
-        output_file = [options['output_path'] + '/TrackCandidates_prealignment.h5']
+        self.output_files = [options['output_path'] + '/TrackCandidates_prealignment.h5']
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self._connect_vitables(files=output_file))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=self.output_files))
 
 
 class AlignmentTab(AnalysisWidget):
@@ -246,10 +263,10 @@ class AlignmentTab(AnalysisWidget):
                         func=apply_alignment,
                         fixed=True)
 
-        output_files = [options['output_path'] + '/Tracklets.h5']
+        self.output_files = [options['output_path'] + '/Tracklets.h5']
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self._connect_vitables(files=output_files))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=self.output_files))
         self.analysisDone.connect(lambda: self.btn_skip.deleteLater())
 
         self.btn_skip = QtWidgets.QPushButton('Skip')
@@ -315,7 +332,7 @@ class TrackFittingTab(AnalysisWidget):
                         func=find_tracks,
                         fixed=True)
 
-        output_file = [options['output_path'] + '/TrackCandidates.h5']
+        self.output_files = [options['output_path'] + '/TrackCandidates.h5']
 
         # Set and fix options
         self.add_option(option='fit_duts', func=fit_tracks,
@@ -330,7 +347,7 @@ class TrackFittingTab(AnalysisWidget):
                         default_value=[200] * setup['n_duts'], optional=False)
 
         self.analysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
-        self.analysisDone.connect(lambda: self._connect_vitables(files=output_file))
+        self.analysisDone.connect(lambda: self._connect_vitables(files=self.output_files))
 
 
 class ResultTab(AnalysisWidget):

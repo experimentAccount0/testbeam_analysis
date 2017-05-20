@@ -43,7 +43,7 @@ def plot_2d_pixel_hist(fig, ax, hist2d, plot_range, title=None, x_axis_title=Non
     fig.colorbar(im, boundaries=bounds, ticks=np.linspace(start=z_min, stop=z_max, num=9, endpoint=True), fraction=0.04, pad=0.05)
 
 
-def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_pdf_file=None):
+def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_pdf_file=None, gui=False):
     with tb.open_file(input_mask_file, 'r') as input_file_h5:
         try:
             noisy_pixels = np.dstack(np.nonzero(input_file_h5.root.NoisyPixelMask[:].T))[0]
@@ -66,6 +66,34 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
 
     if dut_name is None:
         dut_name = os.path.split(input_mask_file)[1]
+
+    if gui:
+
+        cmap = cm.get_cmap('viridis')
+        cmap.set_bad('w')
+        c_max = np.percentile(occupancy, 99)
+
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.set_title('%s' % (dut_name,))
+        # plot noisy pixels
+        if noisy_pixels is not None:
+            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10)
+            ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (n_noisy_pixels,))
+        # plot disabled pixels
+        if disabled_pixels is not None:
+            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
+            ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
+        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, interpolation='none', origin='lower',
+                  clim=(0, c_max))
+        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
+
+        return fig
+
 
     if output_pdf_file is None:
         output_pdf_file = os.path.splitext(input_mask_file)[0] + '_masked_pixels.pdf'
@@ -107,7 +135,7 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         output_pdf.savefig(fig)
 
 
-def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, chunk_size=1000000):
+def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, chunk_size=1000000, gui=False):
     '''Plotting cluster size histogram.
 
     Parameters
@@ -123,6 +151,46 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
     '''
     if not dut_name:
         dut_name = os.path.split(input_cluster_file)[1]
+
+    if gui:
+
+        with tb.open_file(input_cluster_file, 'r') as input_file_h5:
+            hight = None
+            n_hits = 0
+            n_clusters = input_file_h5.root.Cluster.nrows
+            for start_index in range(0, n_clusters, chunk_size):
+                cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
+                # calculate cluster size histogram
+                if hight is None:
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                elif max_cluster_size < np.amax(cluster_n_hits):
+                    max_cluster_size = np.amax(cluster_n_hits)
+                    hight.resize(max_cluster_size + 1)
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                else:
+                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+                n_hits += np.sum(cluster_n_hits)
+
+        left = np.arange(max_cluster_size + 1)
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.bar(left, hight, align='center')
+        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
+        ax.set_xlabel('Cluster size')
+        ax.set_ylabel('#')
+        ax.grid()
+        ax.set_yscale('log')
+        ax.set_xlim(xmin=0.5)
+        ax.set_ylim(ymin=1e-1)
+        #output_pdf.savefig(fig)
+        ax.set_yscale('linear')
+        ax.set_ylim(ymax=np.amax(hight))
+        ax.set_xlim(0.5, min(10, max_cluster_size) + 0.5)
+
+        return fig
+
 
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_cluster_file)[0] + '_cluster_size.pdf'
@@ -586,7 +654,7 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     output_pdf.savefig(fig)
 
 
-def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None):
+def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None, gui=False):
     '''Takes the correlation histograms and plots them.
 
     Parameters
@@ -596,6 +664,46 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
     output_pdf_file : string
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
+
+    if gui:
+        with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            for node in in_file_h5.root:
+                try:
+                    indices = re.findall(r'\d+', node.name)
+                    dut_idx = int(indices[0])
+                    ref_idx = int(indices[1])
+                    if "column" in node.name.lower():
+                        column = True
+                    else:
+                        column = False
+                except AttributeError:
+                    continue
+                data = node[:]
+
+                if np.all(data <= 0):
+                    logging.warning('All correlation entries for %s are zero, do not create plots', str(node.name))
+                    continue
+
+                ax = fig.add_subplot(111)
+                cmap = cm.get_cmap('viridis')
+                cmap.set_bad('w')
+                norm = colors.LogNorm()
+                if pixel_size:
+                    aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
+                else:
+                    aspect = "auto"
+                im = ax.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
+                dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
+                ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
+                ax.set_title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", ref_name, dut_name))
+                ax.set_xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
+                ax.set_ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
+                # do not append to axis to preserve aspect ratio
+                fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
+            return fig
+
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_correlation.pdf'
 
