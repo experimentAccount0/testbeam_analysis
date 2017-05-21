@@ -96,26 +96,33 @@ class DataTab(QtWidgets.QWidget):
         layout_options.addLayout(sl_1)
 
         # Make proceed button
-        self.button_ok = QtWidgets.QPushButton('Ok')
-        self.button_ok.setDisabled(True)
-        self.button_ok.setToolTip('Select data of DUTs')
+        self.btn_ok = QtWidgets.QPushButton('Ok')
+        self.btn_ok.setDisabled(True)
+        self.btn_ok.setToolTip('Select data of DUTs')
 
         # Connect proceed button and inputFilesChanged signal
         message_ok = "Configuration for %d DUT(s) saved"
         for x in [lambda: self._data_table.update_setup(),
                   lambda: self._update_data(),
+                  lambda: self._disable_tab(),
                   lambda: self._emit_message(message_ok % (len(self._data_table.input_files)))]:
-            self.button_ok.clicked.connect(x)
+            self.btn_ok.clicked.connect(x)
 
         self._data_table.inputFilesChanged.connect(lambda: self._analysis_check())
 
         # Add to main layout
         layout_options.addStretch(0)
-        layout_options.addWidget(self.button_ok)
+
+        # Add container widget to disable widgets after ok is pressed
+        self.container = QtWidgets.QWidget()
+        self.container.setLayout(layout_options)
 
         # Add main layout to widget
         right_widget = QtWidgets.QWidget()
-        right_widget.setLayout(layout_options)
+        right_widget.setLayout(QtWidgets.QVBoxLayout())
+
+        right_widget.layout().addWidget(self.container)
+        right_widget.layout().addWidget(self.btn_ok)
 
         # Split table and option area
         widget_splitter = QtWidgets.QSplitter()
@@ -147,12 +154,12 @@ class DataTab(QtWidgets.QWidget):
         If not, respective messages are shown in QMainWindows statusBar
         """
         if self._data_table.input_files and not self._data_table.incompatible_data:
-            self.button_ok.setDisabled(False)
-            self.button_ok.setToolTip('Proceed')
+            self.btn_ok.setDisabled(False)
+            self.btn_ok.setToolTip('Proceed')
 
         else:
-            self.button_ok.setDisabled(True)
-            self.button_ok.setToolTip('Select data of DUTs')
+            self.btn_ok.setDisabled(True)
+            self.btn_ok.setToolTip('Select data of DUTs')
 
             if self._data_table.incompatible_data:
                 broken = []
@@ -182,6 +189,12 @@ class DataTab(QtWidgets.QWidget):
         self.data['n_duts'] = len(self._data_table.dut_names)
 
         self.proceedAnalysis.emit('Setup')
+
+    def _disable_tab(self):
+
+        self.container.setDisabled(True)
+        self._data_table.setDisabled(True)
+        self.btn_ok.setDisabled(True)
 
 
 class DataTable(QtWidgets.QTableWidget):

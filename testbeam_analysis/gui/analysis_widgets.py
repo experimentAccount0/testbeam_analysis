@@ -90,7 +90,6 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.opt_optional = QtWidgets.QVBoxLayout()
         self.opt_fixed = QtWidgets.QVBoxLayout()
         # Option area
-
         self.layout_options = QtWidgets.QVBoxLayout()
         self.label_option = QtWidgets.QLabel('Options')
         self.layout_options.addWidget(self.label_option)
@@ -102,11 +101,18 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Proceed button
         self.btn_ok = QtWidgets.QPushButton('OK')
         self.btn_ok.clicked.connect(self._call_funcs)
-        self.layout_options.addWidget(self.btn_ok)
+
+        # Container widget to disable all but ok button after perfoming analysis
+        self.container = QtWidgets.QWidget()
+        self.container.setLayout(self.layout_options)
 
         # Right widget
         self.right_widget = QtWidgets.QWidget()
-        self.right_widget.setLayout(self.layout_options)
+        self.right_widget.setLayout(QtWidgets.QVBoxLayout())
+
+        # Add container and ok button to right widget
+        self.right_widget.layout().addWidget(self.container)
+        self.right_widget.layout().addWidget(self.btn_ok)
 
         # Make right widget scroll able
         scroll = QtWidgets.QScrollArea()
@@ -377,6 +383,11 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # Should work but analysis_thread somehow returns "finished" signal before all task are done
 
+        #self.worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
+        #self.worker.moveToThread(self.analysis_thread)
+        #self.worker.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
+        #self.worker.run_call_funcs()
+
         #self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
         #self.analysis_thread.finished.connect(lambda: self.analysis_thread.quit())
         #self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
@@ -394,6 +405,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Emit signal to indicate end of analysis
         if self.tab_list is not None:
             self.analysisDone.emit(self.tab_list)
+            self.container.setDisabled(True)
 
     def _connect_vitables(self, files):
 
@@ -615,39 +627,78 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
 
 class AnalysisPlotter(QtWidgets.QWidget):
+    """
+    Implements plotting area widget. Takes one or multiple plotting functions and their input files
+    and displays figures from their return values. Supports single and multiple figures as return values.
+    Also supports plotting from multiple functions at once.
+    """
 
     def __init__(self, input_file, plot_func, dut_names=None, parent=None):
 
         super(AnalysisPlotter, self).__init__(parent)
 
+        # Main layout
         self.main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.main_layout)
 
+        # Input arguments
         self.input_file = input_file
         self.plot_func = plot_func
         self.dut_names = dut_names
-        self.stack = QtWidgets.QStackedWidget()
 
-        # FIXME: Add possibility to plot several functions at once
+        # Bool whether to plot from multiple functions at once
+        multi_plot = False
 
-        self.plot()
+        # Multiple plot_functions with respective input_data; function and input file must have same key
+        if isinstance(self.input_file, dict) and isinstance(self.plot_func, dict):
+            if self.input_file.keys() != self.plot_func.keys():
+                msg = 'Different sets of keys! Can not assign input data to respective plotting function!'
+                logging.error(msg=msg)
+                raise KeyError
+            else:
+                multi_plot = True
 
-    def plot(self):
+        # Whether to plot a single or multiple functions
+        if not multi_plot:
+            self.plot()
+        else:
+            self.multi_plot()
+
+    def plot(self, external_widget=None, figures=None):
         """
-        Function for plotting one or multiple plots from the given plot_func and input_data
+        Function for plotting one or multiple plots from a single plot_func.
+        If the function returns multiple plots, respective widgets for navigation
+        through plots are created.
+        
+        :param external_widget: None or QWidget; if None figs are plotted on self (single fig) or an internal
+                                plot_widget. If QWidget figs are plotted on this widget (must have layout)
+                                
+        :param figures: Figure() or list of Figures(); if None figures come from the return values of self.plot_func.
+                        If figures are given, just plot them onto widget.
         """
 
         # Get plots
-        try:
-            fig = self.plot_func(self.input_file, dut_names=self.dut_names, gui=True)
-        except TypeError:
-            fig = self.plot_func(self.input_file, dut_name=self.dut_names, gui=True)
+        if figures is None:
+            # Different kwarg for some plotting funcs: dut_name vs dut_names
+            try:
+                fig = self.plot_func(self.input_file, dut_names=self.dut_names, gui=True)
+            except TypeError:
+                fig = self.plot_func(self.input_file, dut_name=self.dut_names, gui=True)
+        else:
+            fig = figures
 
-        # Check for multiple plots
+        # Make list of figures if not already
         if isinstance(fig, list):
             fig_list = fig
         else:
             fig_list = [fig]
+
+        # Check for multiple plots and init plot widget
+        if len(fig_list) > 1:
+            plot_widget = QtWidgets.QStackedWidget()
+        else:
+            # Plots will be on self or external_widget
+            plot_widget = None
 
         # Create a dummy widget and add a figure canvas and a toolbar for each plot
         for f in fig_list:
@@ -660,12 +711,24 @@ class AnalysisPlotter(QtWidgets.QWidget):
             toolbar = NavigationToolbar(canvas, self)
             dummy_layout.addWidget(toolbar)
             dummy_layout.addWidget(canvas)
-            self.stack.addWidget(dummy_widget)
 
-        self.main_layout.addWidget(self.stack)
+            # Handle plot_widget and amount of figs
+            if isinstance(plot_widget, QtWidgets.QStackedWidget):  # Multiple figs
+                plot_widget.addWidget(dummy_widget)
+            else:  # Single fig
+                if external_widget is None:  # Plot on self
+                    self.main_layout.addWidget(dummy_widget)
+                else:  # Plot on external_widget
+                    external_widget.layout().addWidget(dummy_widget)
 
-        # If more than one plot, make navigation buttons
-        if self.stack.count() > 1:
+        # If more than one fig make navigation widgets and add everything to respective widgets
+        if isinstance(plot_widget, QtWidgets.QStackedWidget):
+
+            # Add plot widget to external widget or self
+            if external_widget is None:
+                self.main_layout.addWidget(plot_widget)
+            else:
+                external_widget.layout().addWidget(plot_widget)
 
             # Create buttons to navigate through different plots
             layout_btn = QtWidgets.QHBoxLayout()
@@ -677,30 +740,37 @@ class AnalysisPlotter(QtWidgets.QWidget):
             btn_back.setIcon(icon_back)
             btn_forward.setIconSize(QtCore.QSize(40, 40))
             btn_back.setIconSize(QtCore.QSize(40, 40))
+            label_count = QtWidgets.QLabel('1 of %d' % plot_widget.count())
             # Connect buttons
             btn_forward.clicked.connect(lambda: navigate(val=1))
             btn_back.clicked.connect(lambda: navigate(val=-1))
             # Add buttons to layout
             layout_btn.addStretch()
             layout_btn.addWidget(btn_back)
-            layout_btn.addStretch()
+            layout_btn.addSpacing(20)
+            layout_btn.addWidget(label_count)
+            layout_btn.addSpacing(20)
             layout_btn.addWidget(btn_forward)
             layout_btn.addStretch()
 
             # Disable back button when at first plot
-            if self.stack.currentIndex() == 0:
+            if plot_widget.currentIndex() == 0:
                 btn_back.setDisabled(True)
 
-            # Add all to main layout
-            self.main_layout.addLayout(layout_btn)
+            # Add all to main or external layout
+            if external_widget is None:
+                self.main_layout.addLayout(layout_btn)
+            else:
+                external_widget.layout().addLayout(layout_btn)
 
+            # button slot to change plots
             def navigate(val):
 
-                if 0 <= (self.stack.currentIndex() + val) <= self.stack.count():
-                    index = self.stack.currentIndex() + val
-                    self.stack.setCurrentIndex(index)
+                if 0 <= (plot_widget.currentIndex() + val) <= plot_widget.count():
+                    index = plot_widget.currentIndex() + val
+                    plot_widget.setCurrentIndex(index)
 
-                    if index == self.stack.count() - 1:
+                    if index == plot_widget.count() - 1:
                         btn_back.setDisabled(False)
                         btn_forward.setDisabled(True)
                     elif index == 0:
@@ -709,8 +779,36 @@ class AnalysisPlotter(QtWidgets.QWidget):
                     else:
                         btn_forward.setDisabled(False)
                         btn_back.setDisabled(False)
+
+                    label_count.setText('%d of %d' % (index+1, plot_widget.count()))
+
                 else:
                     pass
+
+    def multi_plot(self):
+        """
+        Function that allows plotting from multiple plot functions at once.
+        Creates a tab widget and one tab for every plot function. Uses self.plot() to plot
+        """
+
+        tabs = QtWidgets.QTabWidget()
+
+        for key in self.input_file.keys():
+
+            dummy_widget = QtWidgets.QWidget()
+            dummy_widget.setLayout(QtWidgets.QVBoxLayout())
+
+            # Different kwarg for some plotting funcs: dut_name vs dut_names
+            try:
+                fig = self.plot_func[key](self.input_file[key], dut_names=self.dut_names, gui=True)
+            except TypeError:
+                fig = self.plot_func[key](self.input_file[key], dut_name=self.dut_names, gui=True)
+
+            self.plot(external_widget=dummy_widget, figures=fig)
+
+            tabs.addTab(dummy_widget, str(key).capitalize())
+
+        self.main_layout.addWidget(tabs)
 
 
 class AnalysisStream(QtCore.QObject):
@@ -798,3 +896,34 @@ class AnalysisThread(QtCore.QThread):
         else:
             self.analysisProgress.emit(0)
             self.main_func(self.args)
+
+
+class AnalysisWorker(QtCore.QObject):
+
+    finished = QtCore.pyqtSignal()
+
+    def __init__(self, func, args=None, funcs_args=None, parent=None):
+
+        super(AnalysisWorker, self).__init__(parent)
+
+        self.main_func = func
+        self.funcs_args = funcs_args
+        self.args = args
+
+    @QtCore.pyqtSlot()
+    def run_call_funcs(self):
+
+        pool = Pool()
+        for func, kwargs in self.funcs_args:
+            # self.main_func(func, kwargs)
+            pool.apply_async(self.main_func(func, kwargs))
+        pool.close()
+        pool.join()
+
+        self.finished.emit()
+
+    @QtCore.pyqtSlot()
+    def run_func(self):
+        self.main_func(self.args)
+
+        self.finished.emit()

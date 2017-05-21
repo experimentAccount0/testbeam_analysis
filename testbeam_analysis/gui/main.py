@@ -48,6 +48,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Add bool to indicate whether setup tab has been executed
         self.setup_done = False
 
+        # Icon do indicate tab completed
+        self.icon_complete = QtWidgets.qApp.style().standardIcon(QtWidgets.qApp.style().SP_DialogApplyButton)
+
         self._init_UI()
 
     def _init_UI(self):
@@ -254,7 +257,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                                                                  tabs='Track fitting'))
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
-                # self.tw[name].proceedAnalysis.connect(lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex()+1))
+                self.tw[name].proceedAnalysis.connect(lambda tab_names: self.tab_completed(tab_names))
                 self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
             except (AttributeError, KeyError):
@@ -366,6 +369,20 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def setup_complete(self):
         self.setup_done = True
+
+    def tab_completed(self, tabs):
+
+        if isinstance(tabs, list):
+            if len(tabs) == 1:
+                tab = tabs[0]
+            else:
+                for t in tabs:
+                    self.tabs.setTabIcon(self.tab_order.index(t) - 1, self.icon_complete)
+
+        elif isinstance(tabs, unicode):
+            tab = tabs
+
+        self.tabs.setTabIcon(self.tab_order.index(tab) - 1, self.icon_complete)
 
     def global_settings(self):
         """

@@ -79,11 +79,11 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         ax.set_title('%s' % (dut_name,))
         # plot noisy pixels
         if noisy_pixels is not None:
-            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10)
+            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='r', ms=15, mew=1.25, label='Noisy pixels')
             ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (n_noisy_pixels,))
         # plot disabled pixels
         if disabled_pixels is not None:
-            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
+            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'x', mfc='none', mec='r', ms=15, mew=1.25, label='Disabled pixels')
             ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, interpolation='none', origin='lower',
                   clim=(0, c_max))
@@ -91,9 +91,21 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
         ax.set_xlabel("Column")
         ax.set_ylabel("Row")
+        leg = ax.legend(numpoints=1, bbox_to_anchor=(1.015, 1.135), loc='upper right')
+        leg.get_frame().set_facecolor('none')
 
-        return fig
+        fig_1 = Figure()
+        _ = FigureCanvas(fig_1)
+        ax = fig_1.add_subplot(111)
+        ax.set_title('%s\n occupancy' % (dut_name,))
+        ax.imshow(occupancy, aspect=aspect, cmap=cmap, interpolation='none', origin='lower', clim=(0, c_max))
+        #     np.ma.filled(occupancy, fill_value=0)
+        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
+        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
+        ax.set_xlabel("Column")
+        ax.set_ylabel("Row")
 
+        return [fig, fig_1]
 
     if output_pdf_file is None:
         output_pdf_file = os.path.splitext(input_mask_file)[0] + '_masked_pixels.pdf'
@@ -184,13 +196,20 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
         ax.set_yscale('log')
         ax.set_xlim(xmin=0.5)
         ax.set_ylim(ymin=1e-1)
-        #output_pdf.savefig(fig)
+
+        fig_1 = Figure()
+        _ = FigureCanvas(fig_1)
+        ax = fig_1.add_subplot(111)
+        ax.bar(left, hight, align='center')
+        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
+        ax.set_xlabel('Cluster size')
+        ax.set_ylabel('#')
+        ax.grid()
         ax.set_yscale('linear')
         ax.set_ylim(ymax=np.amax(hight))
         ax.set_xlim(0.5, min(10, max_cluster_size) + 0.5)
 
-        return fig
-
+        return [fig, fig_1]
 
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_cluster_file)[0] + '_cluster_size.pdf'

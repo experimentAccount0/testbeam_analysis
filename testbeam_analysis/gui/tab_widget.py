@@ -111,6 +111,9 @@ class PrealignmentTab(AnalysisWidget):
                         'merged': options['output_path'] + '/Merged.h5',
                         'tracklets': options['output_path'] + '/Tracklets_prealigned.h5'}
 
+        multiple_plotting_data = {'correlation': output_files['correlation']}
+        multiple_plotting_func = {'correlation': plot_correlations}
+
         self.add_function(func=correlate_cluster)
         self.add_function(func=prealignment)
         self.add_function(func=merge_cluster_data)
@@ -171,8 +174,8 @@ class PrealignmentTab(AnalysisWidget):
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_files.values()),
-                  lambda: self.plot(input_file=output_files['correlation'],
-                                    plot_func=plot_correlations,
+                  lambda: self.plot(input_file=multiple_plotting_data,
+                                    plot_func=multiple_plotting_func,
                                     dut_names=setup['dut_names'])]:
             self.analysisDone.connect(x)
 

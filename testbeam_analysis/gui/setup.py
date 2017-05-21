@@ -16,6 +16,9 @@ class SetupTab(QtWidgets.QWidget):
         # Make variable for data from DataTab and output data
         self.data = None
 
+        # Tab widgets
+        self.tw = {}
+
         # Make list of tabs that will be enabled after proceedAnalysis signal of this class
         self.tab_list = ['Noisy Pixel']
 
@@ -300,8 +303,11 @@ class SetupTab(QtWidgets.QWidget):
             # Add all button widgets to a dict with respective dut as key
             self._buttons[dut] = {'global': button_glob, 'clear': button_clear}
 
+            # Add to tab widget dict
+            self.tw[dut] = widget
+
             # Add tab to QTabWidget
-            self.tabs.addTab(widget, dut)
+            self.tabs.addTab(self.tw[dut], dut)
 
         # Connect tabs
         # self.tabs.currentChanged.connect(lambda tab: self._handle_dut_types(self.data['dut_names'][tab])) # FIXME
@@ -414,6 +420,7 @@ class SetupTab(QtWidgets.QWidget):
                     self.data[key] = self.dut_data[key]
 
             self.proceedAnalysis.emit(self.tab_list)
+            self._disable_tabs()
 
         # Read only dut properties of custom dut type or remove/overwrite predefined type
         else:
@@ -661,6 +668,13 @@ class SetupTab(QtWidgets.QWidget):
         """
 
         self.statusMessage.emit(message)
+
+    def _disable_tabs(self):
+
+        for dut in self.data['dut_names']:
+            self.tw[dut].setDisabled(True)
+
+        self.btn_ok.setDisabled(True)
 
 
 class SetupPainter(QtWidgets.QGraphicsView):
