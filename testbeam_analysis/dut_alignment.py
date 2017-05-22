@@ -189,6 +189,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 # Convert indices to positions, origin defined in the center of the sensor
                 merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[0][0]))
                 merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[0][1]))
+                merged_cluster_array['z_dut_0'][selection] = 0.0
                 xerr = np.zeros(selection.shape)
                 yerr = np.zeros(selection.shape)
                 zerr = np.zeros(selection.shape)
@@ -197,7 +198,6 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 merged_cluster_array['xerr_dut_0'][selection] = xerr[selection]
                 merged_cluster_array['yerr_dut_0'][selection] = yerr[selection]
                 merged_cluster_array['zerr_dut_0'][selection] = zerr[selection]
-                merged_cluster_array['z_dut_0'][selection] = 0.0
                 merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
                 merged_cluster_array['n_hits_dut_0'][selection] = actual_cluster['n_hits'][selection]
 
@@ -212,6 +212,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                             # Convert indices to positions, origin in the center of the sensor, remaining DUTs
                             merged_cluster_array['x_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
                             merged_cluster_array['y_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
+                            merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.0
                             xerr = np.zeros(selection.shape)
                             yerr = np.zeros(selection.shape)
                             zerr = np.zeros(selection.shape)
@@ -220,7 +221,6 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                             merged_cluster_array['xerr_dut_%d' % (dut_index)][selection] = xerr[selection]
                             merged_cluster_array['yerr_dut_%d' % (dut_index)][selection] = yerr[selection]
                             merged_cluster_array['zerr_dut_%d' % (dut_index)][selection] = zerr[selection]
-                            merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.0
                             merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
                             merged_cluster_array['n_hits_dut_%d' % (dut_index)][selection] = actual_cluster['n_hits'][selection]
 
