@@ -23,8 +23,8 @@ class SetupTab(QtWidgets.QWidget):
         self.tab_list = ['Noisy Pixel']
 
         # Make tuple of properties of each dut
-        self._dut_props = ('z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma',
-                           'pitch_col', 'pitch_row', 'n_cols', 'n_rows', 'thickness')
+        self._dut_props = ('z_positions', 'rot_alpha', 'rot_beta', 'rot_gamma', 'pitch_col',
+                           'pitch_row', 'n_cols', 'n_rows', 'thickness', 'rad_length')
 
         # Make dict for properties of each dut
         self.dut_data = {}
@@ -222,8 +222,14 @@ class SetupTab(QtWidgets.QWidget):
             edit_pixels_row = QtWidgets.QLineEdit()
             edit_pixels_row.setPlaceholderText('Row')
             label_thickness = QtWidgets.QLabel('Thickness / ' + u'\u03BC' + 'm :')
+            label_thickness.setToolTip('Overall thickness of DUT (e.g. sensor + PCB + ...)')
             label_thickness.setFixedWidth(label_width)
             edit_thickness = QtWidgets.QLineEdit()
+            label_rad = QtWidgets.QLabel('Radiation length / ' + u'\u03BC' + 'm :')
+            label_rad.setToolTip('Overall radiation length of compound')
+            label_rad.setFixedWidth(label_width)
+            edit_rad = QtWidgets.QLineEdit()
+            edit_rad.setPlaceholderText(u'X\u2080' + ' = 0 ' + u'\u03BC' + 'm')
 
             # Make buttons at the bottom to clear input and apply
             button_clear = QtWidgets.QPushButton('Clear properties')
@@ -262,10 +268,13 @@ class SetupTab(QtWidgets.QWidget):
             layout_props.addWidget(label_thickness, 3, 0, 1, 1)
             layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 3, 1, 1, 1)
             layout_props.addWidget(edit_thickness, 3, 2, 1, 2)
-            layout_props.addWidget(checkbox_handle, 4, 0, 1, 1)
+            layout_props.addWidget(label_rad, 4, 0, 1, 1)
             layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 4, 1, 1, 1)
-            layout_props.addWidget(edit_handle, 4, 2, 1, 1)
-            layout_props.addWidget(button_handle, 4, 3, 1, 1)
+            layout_props.addWidget(edit_rad, 4, 2, 1, 2)
+            layout_props.addWidget(checkbox_handle, 5, 0, 1, 1)
+            layout_props.addItem(QtWidgets.QSpacerItem(h_space, v_space), 5, 1, 1, 1)
+            layout_props.addWidget(edit_handle, 5, 2, 1, 1)
+            layout_props.addWidget(button_handle, 5, 3, 1, 1)
             # Button layout
             layout_buttons.addWidget(button_glob)
             layout_buttons.addWidget(button_clear)
@@ -280,7 +289,7 @@ class SetupTab(QtWidgets.QWidget):
 
             # Make tuple of all QLineEdit widgets
             edit_widgets = (edit_z, edit_alpha, edit_beta, edit_gamma, edit_pitch_col,
-                            edit_pitch_row, edit_pixels_col, edit_pixels_row, edit_thickness)
+                            edit_pitch_row, edit_pixels_col, edit_pixels_row, edit_thickness, edit_rad)
 
             # Add these QLineEdit widgets to dict with respective dut as key to access the user input
             self._dut_widgets[dut] = {}
@@ -400,12 +409,18 @@ class SetupTab(QtWidgets.QWidget):
                         tmp_n_pixel[prop] = int(self._dut_widgets[dut][prop].text())
                     elif prop in ['pitch_col', 'pitch_row']:
                         tmp_pixel_size[prop] = float(self._dut_widgets[dut][prop].text())
-                    elif prop in ['rot_alpha', 'rot_beta', 'rot_gamma']:
-                        # Default value for rotations is 0
+                    elif prop in ['rot_alpha', 'rot_beta', 'rot_gamma', 'rad_length']:
+                        # Default value for rotations and X_0 is 0
                         if not self._dut_widgets[dut][prop].text():
-                            tmp_rotation[prop] = 0.0
+                            if prop == 'rad_length':
+                                self.dut_data[prop].append(0.0)
+                            else:
+                                tmp_rotation[prop] = 0.0
                         else:
-                            tmp_rotation[prop] = float(self._dut_widgets[dut][prop].text())
+                            if prop == 'rad_length':
+                                self.dut_data[prop].append(float(self._dut_widgets[dut][prop].text()))
+                            else:
+                                tmp_rotation[prop] = float(self._dut_widgets[dut][prop].text())
                     else:
                         self.dut_data[prop].append(float(self._dut_widgets[dut][prop].text()))
 
@@ -441,7 +456,10 @@ class SetupTab(QtWidgets.QWidget):
                         if prop in ['n_cols', 'n_rows']:
                             self._dut_types[custom][prop] = int(self._dut_widgets[current_dut][prop].text())
                         else:
-                            self._dut_types[custom][prop] = float(self._dut_widgets[current_dut][prop].text())
+                            try:
+                                self._dut_types[custom][prop] = float(self._dut_widgets[current_dut][prop].text())
+                            except ValueError:  # rad_length has default value 0
+                                self._dut_types[custom][prop] = 0.0
 
             # Clear QLineEdit of tab where the custom dut was created or removed
             self._handle_widgets[current_dut]['edit_h'].clear()
@@ -604,7 +622,8 @@ class SetupTab(QtWidgets.QWidget):
         for dut in self.data['dut_names']:
             for prop in properties:
 
-                if prop in ['rot_alpha', 'rot_beta', 'rot_gamma']: #FIXME: test-wise excluding rotations from checking
+                # FIXME: test-wise excluding rotations and X_0 from checking
+                if prop in ['rot_alpha', 'rot_beta', 'rot_gamma', 'rad_length']:
                     continue
 
                 # Get input text of respective property

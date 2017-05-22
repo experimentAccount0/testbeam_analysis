@@ -3,10 +3,12 @@
   n_rows: 336
   pitch_col: 250.0
   pitch_row: 50.0
+  rad_length: 0.0
   thickness: 300.0
 !!python/unicode 'Mimosa26':
   n_cols: 1152
   n_rows: 576
   pitch_col: 18.4
   pitch_row: 18.4
+  rad_length: 0.0
   thickness: 50.0

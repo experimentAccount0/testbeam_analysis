@@ -372,12 +372,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def tab_completed(self, tabs):
 
+        # Sender is the one completed so only first dut in tabs matters
         if isinstance(tabs, list):
-            if len(tabs) == 1:
-                tab = tabs[0]
-            else:
-                for t in tabs:
-                    self.tabs.setTabIcon(self.tab_order.index(t) - 1, self.icon_complete)
+
+            sorted_tabs = {}
+            for dut in tabs:
+                sorted_tabs[self.tab_order.index(dut)] = dut
+            tab = sorted_tabs[min(sorted_tabs.iterkeys())]
 
         elif isinstance(tabs, unicode):
             tab = tabs
