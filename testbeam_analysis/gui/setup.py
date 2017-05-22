@@ -669,7 +669,16 @@ class SetupTab(QtWidgets.QWidget):
                     self.tabs.setTabIcon(self.data['dut_names'].index(dut), icon)
                     self.tabs.setTabToolTip(self.data['dut_names'].index(dut), 'Ready')
 
-                self._handle_widgets[dut]['button_h'].setDisabled(broken)
+                if broken:
+                    self._handle_widgets[dut]['button_h'].setDisabled(broken)
+                else:
+                    if self._handle_widgets[dut]['check_h'].isChecked():
+                        self._handle_widgets[dut]['button_h'].setDisabled(broken)
+                    else:
+                        self._handle_widgets[dut]['button_h'].setDisabled(not broken)
+
+                # FIXME: handle dut type buttons are enabled on (all) other tabs when clicking it on one tab. Something goes wrong with signals
+
 
             else:
                 if dut in broken_input:
