@@ -885,7 +885,7 @@ def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several t
             for j in range(i + 1, tracks_array.shape[0]):  # Loop over other event hits
                 if tracks_array[j]['event_number'] != actual_event:  # Next event reached, break loop
                     break
-                if sqrt((offset_x - tracks_array[j]['offset_0']) * (offset_x - tracks_array[j]['offset_0']) + (offset_y - tracks_array[j]['offset_1']) * (offset_y - tracks_array[j]['offset_1'])) < min_track_distance:
+                if sqrt((offset_x - tracks_array[j]['offset_0'])**2 + (offset_y - tracks_array[j]['offset_1'])**2) < min_track_distance:
                     tracks_array[i]['n_tracks'] = -1
                     tracks_array[j]['n_tracks'] = -1
             i += 1
@@ -1038,7 +1038,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
 
     # Calculate multiple scattering
     mass = 0.511  # mass in MeV (electrons)
-    momentum = np.sqrt(beam_energy * beam_energy - mass * mass)
+    momentum = np.sqrt(beam_energy**2 - mass**2)
     beta = momentum / beam_energy  # almost 1
 
     # rms angle of multiple scattering
