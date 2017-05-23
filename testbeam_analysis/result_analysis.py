@@ -1097,30 +1097,42 @@ def calculate_purity(input_tracks_file, input_alignment_file, bin_size, sensor_s
     return purities, pure_hits, total_hits
 
 
-def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bins=100, plot_range=((-0.01, +0.01), (-0.01, +0.01)), use_duts=None, dut_names=None, plot=True, chunk_size=499999):
+def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_track_angle_file=None, n_bins="auto", plot_range=(None, None), use_duts=None, dut_names=None, plot=True, chunk_size=499999):
     '''Calculates and histograms the track angle of the fitted tracks for selected DUTs.
 
     Parameters
     ----------
     input_tracks_file : string
         Filename of the input tracks file.
+    input_alignment_file : string
+        Filename of the input alignment file.
+        If None, the DUT planes are assumed to be perpendicular to the z axis.
     output_track_angle_file: string
         Filename of the output track angle file with track angle histogram and fitted means and sigmas of track angles for selected DUTs.
         If None, deduce filename from input tracks file.
     n_bins : uint
         Number of bins for the histogram.
+        If "auto", automatic binning is used.
     plot_range : iterable of tuples
         Tuple of the plot range in rad for alpha and beta angular distribution, e.g. ((-0.01, +0.01), -0.01, +0.01)).
+        If (None, None), plotting from minimum to maximum.
     use_duts : iterable
         Calculate the track angle for given DUTs. If None, all duts are used.
     dut_names : iterable
         Name of the DUTs. If None, DUT numbers will be used.
     plot : bool
         If True, create additional output plots.
-    chunk_size : int
+    chunk_size : uint
         Chunk size of the data when reading from file.
     '''
     logging.info('=== Calculating track angles ===')
+
+    if input_alignment_file:
+        with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+    else:
+        alignment = None
 
     if output_track_angle_file is None:
         output_track_angle_file = os.path.splitext(input_tracks_file)[0] + '_track_angles.h5'
@@ -1135,57 +1147,98 @@ def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bin
                 use_duts = use_duts
 
             for node in in_file_h5.root:  # loop through all DUTs in track table
-                x_angle_hist = None
-                y_angle_hist = None
+                initialize = True
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
                 if use_duts and actual_dut not in use_duts:
                     continue
 
+                if alignment is not None:
+                    rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
+                                                                     beta=alignment[actual_dut]['beta'],
+                                                                     gamma=alignment[actual_dut]['gamma'])
+                    basis_global = rotation_matrix.T.dot(np.eye(3))
+                    dut_plane_normal = basis_global[2]
+                else:
+                    dut_plane_normal = np.array([0.0, 0.0, 1.0])
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # only store track slopes of selected DUTs
-                    if x_angle_hist is None:
-                        x_angle_hist, x_angle_hist_edges = np.histogram(np.arctan(tracks_chunk['slope_0']), bins=n_bins, range=plot_range[0])
+                    track_slopes = np.column_stack((tracks_chunk['slope_0'],
+                                                    tracks_chunk['slope_1'],
+                                                    tracks_chunk['slope_2']))
+
+                    # TODO: alpha/beta wrt DUT col / row
+                    total_angles = np.arccos(np.inner(dut_plane_normal, track_slopes))
+                    alpha_angles = 0.5 * np.pi - np.arccos(np.inner(track_slopes, np.cross(dut_plane_normal, np.array([1.0, 0.0, 0.0]))))
+                    beta_angles = 0.5 * np.pi - np.arccos(np.inner(track_slopes, np.cross(dut_plane_normal, np.array([0.0, 1.0, 0.0]))))
+
+                    if initialize:
+                        total_angle_hist, total_angle_hist_edges = np.histogram(total_angles, bins=n_bins, range=None)
                     else:
-                        x_angle_hist += np.histogram(np.arctan(tracks_chunk['slope_0']), bins=n_bins, range=plot_range[0])[0]
-                    if y_angle_hist is None:
-                        y_angle_hist, y_angle_hist_edges = np.histogram(np.arctan(tracks_chunk['slope_1']), bins=n_bins, range=plot_range[1])
+                        total_angle_hist += np.histogram(total_angles, bins=total_angle_hist_edges)[0]
+                    if initialize:
+                        beta_angle_hist, beta_angle_hist_edges = np.histogram(beta_angles, bins=n_bins, range=plot_range[0])
                     else:
-                        y_angle_hist += np.histogram(np.arctan(tracks_chunk['slope_1']), bins=n_bins, range=plot_range[1])[0]
+                        beta_angle_hist += np.histogram(beta_angles, bins=beta_angle_hist_edges)[0]
+                    if initialize:
+                        alpha_angle_hist, alpha_angle_hist_edges = np.histogram(alpha_angles, bins=n_bins, range=plot_range[1])
+                    else:
+                        alpha_angle_hist += np.histogram(alpha_angles, bins=alpha_angle_hist_edges)[0]
+                    initialize = False
 
                 # write results
-                track_angle_x = out_file_h5.create_carray(where=out_file_h5.root,
-                                                          name='Track_Angle_Hist_x_DUT%s' % (actual_dut),
-                                                          title='Track angle distribution in x-direction for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(x_angle_hist.dtype),
-                                                          shape=x_angle_hist.shape,
+                track_angle_total = out_file_h5.create_carray(where=out_file_h5.root,
+                                                              name='Total_Track_Angle_Hist_DUT%s' % (actual_dut),
+                                                              title='Total track angle distribution for DUT%s' % (actual_dut),
+                                                              atom=tb.Atom.from_dtype(total_angle_hist.dtype),
+                                                              shape=total_angle_hist.shape,
+                                                              filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                track_angle_beta = out_file_h5.create_carray(where=out_file_h5.root,
+                                                          name='Beta_Track_Angle_Hist_DUT%s' % (actual_dut),
+                                                          title='Beta track angle distribution for DUT%s' % (actual_dut),
+                                                          atom=tb.Atom.from_dtype(beta_angle_hist.dtype),
+                                                          shape=beta_angle_hist.shape,
                                                           filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                track_angle_y = out_file_h5.create_carray(where=out_file_h5.root,
-                                                          name='Track_Angle_Hist_y_DUT%s' % (actual_dut),
-                                                          title='Track angle distribution in y-direction for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(y_angle_hist.dtype),
-                                                          shape=x_angle_hist.shape,
+                track_angle_alpha = out_file_h5.create_carray(where=out_file_h5.root,
+                                                          name='Alpha_Track_Angle_Hist_DUT%s' % (actual_dut),
+                                                          title='Alpha track angle distribution for DUT%s' % (actual_dut),
+                                                          atom=tb.Atom.from_dtype(alpha_angle_hist.dtype),
+                                                          shape=alpha_angle_hist.shape,
                                                           filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
                 # fit histograms for x and y direction
-                bin_center = (x_angle_hist_edges[1:] + x_angle_hist_edges[:-1]) / 2.0
-                mean = analysis_utils.get_mean_from_histogram(x_angle_hist, bin_center)
-                rms = analysis_utils.get_rms_from_histogram(x_angle_hist, bin_center)
-                fit_x, cov = curve_fit(analysis_utils.gauss, bin_center, x_angle_hist, p0=[np.amax(x_angle_hist), mean, rms])
+                bin_center = (total_angle_hist_edges[1:] + total_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(total_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(total_angle_hist, bin_center)
+                fit_total, cov = curve_fit(analysis_utils.gauss, bin_center, total_angle_hist, p0=[np.amax(total_angle_hist), mean, rms])
 
-                bin_center = (y_angle_hist_edges[1:] + y_angle_hist_edges[:-1]) / 2.0
-                mean = analysis_utils.get_mean_from_histogram(y_angle_hist, bin_center)
-                rms = analysis_utils.get_rms_from_histogram(y_angle_hist, bin_center)
-                fit_y, cov = curve_fit(analysis_utils.gauss, bin_center, y_angle_hist, p0=[np.amax(y_angle_hist), mean, rms])
+                bin_center = (beta_angle_hist_edges[1:] + beta_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(beta_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(beta_angle_hist, bin_center)
+                fit_beta, cov = curve_fit(analysis_utils.gauss, bin_center, beta_angle_hist, p0=[np.amax(beta_angle_hist), mean, rms])
 
-                track_angle_x.attrs.edges = x_angle_hist_edges
-                track_angle_x.attrs.amp = fit_x[0]
-                track_angle_x.attrs.mean = fit_x[1]
-                track_angle_x.attrs.sigma = fit_x[2]
-                track_angle_y.attrs.edges = y_angle_hist_edges
-                track_angle_y.attrs.amp = fit_y[0]
-                track_angle_y.attrs.mean = fit_y[1]
-                track_angle_y.attrs.sigma = fit_y[2]
-                track_angle_x[:] = x_angle_hist
-                track_angle_y[:] = y_angle_hist
+                bin_center = (alpha_angle_hist_edges[1:] + alpha_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(alpha_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(alpha_angle_hist, bin_center)
+                fit_alpha, cov = curve_fit(analysis_utils.gauss, bin_center, alpha_angle_hist, p0=[np.amax(alpha_angle_hist), mean, rms])
+
+                # total
+                track_angle_total.attrs.edges = total_angle_hist_edges
+                track_angle_total.attrs.edges = total_angle_hist_edges
+                track_angle_total.attrs.amp = fit_total[0]
+                track_angle_total.attrs.mean = fit_total[1]
+                track_angle_total.attrs.sigma = fit_total[2]
+                track_angle_total[:] = total_angle_hist
+                # x
+                track_angle_beta.attrs.edges = beta_angle_hist_edges
+                track_angle_beta.attrs.amp = fit_beta[0]
+                track_angle_beta.attrs.mean = fit_beta[1]
+                track_angle_beta.attrs.sigma = fit_beta[2]
+                track_angle_beta[:] = beta_angle_hist
+                # y
+                track_angle_alpha.attrs.edges = alpha_angle_hist_edges
+                track_angle_alpha.attrs.amp = fit_alpha[0]
+                track_angle_alpha.attrs.mean = fit_alpha[1]
+                track_angle_alpha.attrs.sigma = fit_alpha[2]
+                track_angle_alpha[:] = alpha_angle_hist
 
     if plot:
         plot_utils.plot_track_angle(input_track_angle_file=output_track_angle_file, output_pdf_file=None, dut_names=dut_names)
