@@ -532,7 +532,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             quality_index += 1
         logging.info("Use track quality for track selection: %s", ', '.join(info_quality))
 
-        return dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts
+        return dut_selection, dut_fit_selection, track_quality_mask
 
     pool = Pool()
     with PdfPages(os.path.splitext(output_tracks_file)[0] + '.pdf') as output_pdf:
@@ -553,7 +553,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                 for fit_dut_index, actual_fit_dut in enumerate(fit_duts):  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT%d', actual_fit_dut)
-                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut_index)
+                    dut_selection, dut_fit_selection, track_quality_mask = select_data(fit_dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
                         logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT%d', actual_fit_dut)
