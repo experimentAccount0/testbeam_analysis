@@ -865,35 +865,35 @@ def calculate_purity(input_tracks_file, input_alignment_file, bin_size, sensor_s
     Parameters
     ----------
     input_tracks_file : string
-        file name with the tracks table
+        Filename with the tracks table.
     input_alignment_file : pytables file
-        File name of the input aligment data
+        Filename of the input aligment data.
     bin_size : iterable
-        sizes of bins (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes
+        Bins sizes (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes.
     sensor_size : Tuple or list of tuples
-        Describes the sensor size for each DUT. If one tuple is given it is (size x, size y)
-        If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...]
+        Describes the sensor size for each DUT. If one tuple is given it is (size x, size y).
+        If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...].
     output_purity_file : string
         Filename of the output purity file. If None, the filename will be derived from the input hits file.
     minimum_hit_density : int
-        minimum hit density required to consider bin for purity calculation
+        Minimum hit density required to consider bin for purity calculation.
     use_duts : iterable
-        the DUTs to calculate purity for. If None all duts are used
+        The DUTs to calculate purity for. If None all duts are used.
     max_chi2 : int
-        only use track with a chi2 <= max_chi2
+        Only use track with a chi2 <= max_chi2.
     force_prealignment : boolean
-        Take the prealignment, although if a coarse alignment is availale
+        Take the prealignment, although if a coarse alignment is availale.
     cut_distance : int
-        hit - track intersection <= cut_distance = pure hit (hit assigned to track)
-        hit - track intersection > cut_distance = inpure hit (hit without a track)
+        Hit - track intersection <= cut_distance = pure hit (hit assigned to track).
+        Hit - track intersection > cut_distance = inpure hit (hit without a track).
     max_distance : int
-        defines binnig of distance values
+        Defines binnig of distance values.
     col_range, row_range : iterable
-        column / row value to calculate purity for (to neglect noisy edge pixels for purity calculation)
+        Column / row value to calculate purity for (to neglect noisy edge pixels for purity calculation).
     plot : bool
         If True, create additional output plots.
-    chunk_size : integer
-        The size of data in RAM
+    chunk_size : int
+        Chunk size of the data when reading from file.
     '''
     logging.info('=== Calculate purity ===')
 
