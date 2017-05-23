@@ -845,16 +845,16 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                                                              dut_row_sigma=actual_row_sigma)
                             shortest_hit_distance = hit_distance
                             n_track_hits += 1
-            curr_x, curr_y = x[track_index][dut_index], y[track_index][dut_index]
-            _set_dut_track_quality(dut_x=actual_x,
-                                   dut_y=actual_y,
-                                   curr_x=curr_x,
-                                   curr_y=curr_y,
-                                   track_quality=track_quality,
-                                   track_index=track_index,
-                                   dut_index=dut_index,
-                                   dut_column_sigma=actual_column_sigma,
-                                   dut_row_sigma=actual_row_sigma)
+                curr_x, curr_y = x[track_index][dut_index], y[track_index][dut_index]
+                _set_dut_track_quality(dut_x=actual_x,
+                                       dut_y=actual_y,
+                                       curr_x=curr_x,
+                                       curr_y=curr_y,
+                                       track_quality=track_quality,
+                                       track_index=track_index,
+                                       dut_index=dut_index,
+                                       dut_column_sigma=actual_column_sigma,
+                                       dut_row_sigma=actual_row_sigma)
 
         # Set number of tracks of last event
         _set_n_tracks(x=x,
