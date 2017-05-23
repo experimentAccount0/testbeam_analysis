@@ -99,7 +99,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.layout_options.addStretch(0)
 
         # Proceed button
-        self.btn_ok = QtWidgets.QPushButton('OK')
+        self.btn_ok = QtWidgets.QPushButton('Ok')
         self.btn_ok.clicked.connect(self._call_funcs)
 
         # Container widget to disable all but ok button after perfoming analysis
@@ -423,24 +423,44 @@ class AnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        try:
+        self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+        self.vitables_thread.exceptionSignal.connect(lambda exception: self.handle_exceptions(exception=exception,
+                                                                                              cause='vitables'))
+        self.vitables_thread.exceptionSignal.connect(lambda: self.vitables_thread.quit())
+        self.vitables_thread.start()
 
-            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-            self.vitables_thread.start()
+    def plot(self, input_file, plot_func, dut_names=None, figures=None):
 
-        except CalledProcessError:
-            msg = 'An error occurred during executing ViTables'
-            logging.warning(msg)
-        except OSError:
-            msg = 'ViTables not found'
-            logging.warning(msg)
-            self.btn_ok.setText('Ok')
-            self.btn_ok.setDisabled(True)
-
-    def plot(self, input_file, plot_func, dut_names=None):
-
-        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, dut_names=dut_names, parent=self.left_widget)
+        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, dut_names=dut_names, figures=figures, parent=self.left_widget)
         self.plt.addWidget(plot)
+
+    def handle_exceptions(self, exception, cause=None):
+
+        if cause is not None:
+
+            if cause == 'vitables':
+
+                if exception is CalledProcessError:
+                    msg = 'An error occurred during executing ViTables'
+                elif type(exception) is OSError:
+                    msg = 'ViTables not found. Try installing ViTables'
+                    self.btn_ok.setToolTip('Try installing or re-installing ViTables')
+                    self.btn_ok.setText('ViTables not found')
+                    self.btn_ok.setDisabled(True)
+                else:
+                    raise exception
+
+            elif cause == 'analysis':
+
+                if exception is CalledProcessError:
+                    msg = 'An error occurred during analysis'
+                else:
+                    raise exception
+
+            logging.error(msg)
+
+        else:
+            raise exception
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
@@ -596,21 +616,13 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        try:
+        self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+        self.vitables_thread.exceptionSignal.connect(lambda exception: self.handle_exceptions(exception=exception,
+                                                                                              cause='vitables'))
+        self.vitables_thread.exceptionSignal.connect(lambda: self.vitables_thread.quit())
+        self.vitables_thread.start()
 
-            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-            self.vitables_thread.start()
-
-        except CalledProcessError:
-            msg = 'An error occurred during executing ViTables'
-            logging.error(msg)
-        except OSError:
-            msg = 'ViTables not found. Try (re)installing ViTables'
-            logging.error(msg)
-            self.btn_ok.setText('Ok')
-            self.btn_ok.setDisabled(True)
-
-    def plot(self, input_files, plot_func, dut_names=None, **kwargs):
+    def plot(self, input_files, plot_func, dut_names=None, figures=None):
 
         if dut_names is not None:
             if isinstance(dut_names, list):
@@ -622,18 +634,46 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             names.reverse()
 
         for dut in names:
-            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_names=dut)
+            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_names=dut, figures=figures)
             self.tw[dut].plt.addWidget(plot)
+
+    def handle_exceptions(self, exception, cause=None):
+
+        if cause is not None:
+
+            if cause == 'vitables':
+
+                if exception is CalledProcessError:
+                    msg = 'An error occurred during executing ViTables'
+                elif type(exception) is OSError:
+                    msg = 'ViTables not found. Try installing ViTables'
+                    self.btn_ok.setToolTip('Try installing or re-installing ViTables')
+                    self.btn_ok.setText('ViTables not found')
+                    self.btn_ok.setDisabled(True)
+                else:
+                    raise exception
+
+            elif cause == 'analysis':
+
+                if exception is CalledProcessError:
+                    msg = 'An error occurred during analysis'
+                else:
+                    raise exception
+
+            logging.error(msg)
+
+        else:
+            raise exception
 
 
 class AnalysisPlotter(QtWidgets.QWidget):
     """
     Implements plotting area widget. Takes one or multiple plotting functions and their input files
     and displays figures from their return values. Supports single and multiple figures as return values.
-    Also supports plotting from multiple functions at once.
+    Also supports plotting from multiple functions at once and input of predefined figures
     """
 
-    def __init__(self, input_file, plot_func, dut_names=None, parent=None):
+    def __init__(self, input_file, plot_func, dut_names=None, figures=None, parent=None):
 
         super(AnalysisPlotter, self).__init__(parent)
 
@@ -645,11 +685,13 @@ class AnalysisPlotter(QtWidgets.QWidget):
         self.input_file = input_file
         self.plot_func = plot_func
         self.dut_names = dut_names
+        self.figures = figures
 
         # Bool whether to plot from multiple functions at once
         multi_plot = False
 
         # Multiple plot_functions with respective input_data; function and input file must have same key
+        # If figures are given, they must be given as a dict with a key that is in the plot function keys
         if isinstance(self.input_file, dict) and isinstance(self.plot_func, dict):
             if self.input_file.keys() != self.plot_func.keys():
                 msg = 'Different sets of keys! Can not assign input data to respective plotting function!'
@@ -660,7 +702,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         # Whether to plot a single or multiple functions
         if not multi_plot:
-            self.plot()
+            if self.figures is None:
+                self.plot()
+            else:
+                self.plot(figures=self.figures)
         else:
             self.multi_plot()
 
@@ -791,6 +836,15 @@ class AnalysisPlotter(QtWidgets.QWidget):
         Creates a tab widget and one tab for every plot function. Uses self.plot() to plot
         """
 
+        if self.figures is not None:
+
+            if isinstance(self.figures, dict):
+                pass
+            else:
+                msg = 'Input figures must be in dictionary! Can not assign figure(s) to respective plotting function!'
+                logging.error(msg=msg)
+                raise KeyError
+
         tabs = QtWidgets.QTabWidget()
 
         for key in self.input_file.keys():
@@ -798,11 +852,17 @@ class AnalysisPlotter(QtWidgets.QWidget):
             dummy_widget = QtWidgets.QWidget()
             dummy_widget.setLayout(QtWidgets.QVBoxLayout())
 
-            # Different kwarg for some plotting funcs: dut_name vs dut_names
-            try:
-                fig = self.plot_func[key](self.input_file[key], dut_names=self.dut_names, gui=True)
-            except TypeError:
-                fig = self.plot_func[key](self.input_file[key], dut_name=self.dut_names, gui=True)
+            if self.figures is not None and key in self.figures.keys():
+
+                fig = self.figures[key]
+
+            else:
+
+                # Different kwarg for some plotting funcs: dut_name vs dut_names
+                try:
+                    fig = self.plot_func[key](self.input_file[key], dut_names=self.dut_names, gui=True)
+                except TypeError:
+                    fig = self.plot_func[key](self.input_file[key], dut_name=self.dut_names, gui=True)
 
             self.plot(external_widget=dummy_widget, figures=fig)
 
@@ -869,6 +929,7 @@ class AnalysisThread(QtCore.QThread):
     """
 
     analysisProgress = QtCore.pyqtSignal(int)
+    exceptionSignal = QtCore.pyqtSignal(Exception)
 
     def __init__(self, func, args=None, funcs_args=None, parent=None):
 
@@ -884,18 +945,23 @@ class AnalysisThread(QtCore.QThread):
 
     def run(self):
 
-        if self.funcs_args is not None:
+        try:
 
-            pool = Pool()
-            for func, kwargs in self.funcs_args:
-                self.analysisProgress.emit(1)
-                pool.apply_async(self.main_func(func, kwargs))
-            pool.close()
-            pool.join()
+            if self.funcs_args is not None:
 
-        else:
-            self.analysisProgress.emit(0)
-            self.main_func(self.args)
+                pool = Pool()
+                for func, kwargs in self.funcs_args:
+                    self.analysisProgress.emit(1)
+                    pool.apply_async(self.main_func(func, kwargs))
+                pool.close()
+                pool.join()
+
+            else:
+                self.analysisProgress.emit(0)
+                self.main_func(self.args)
+
+        except Exception as e:
+            self.exceptionSignal.emit(e)
 
 
 class AnalysisWorker(QtCore.QObject):

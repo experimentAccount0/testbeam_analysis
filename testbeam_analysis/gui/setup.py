@@ -72,7 +72,7 @@ class SetupTab(QtWidgets.QWidget):
         layout_right.addSpacing(10)
 
         # Proceed button
-        self.btn_ok = QtWidgets.QPushButton('OK')
+        self.btn_ok = QtWidgets.QPushButton('Ok')
         self.btn_ok.clicked.connect(lambda: self._handle_input())
         self.btn_ok.setDisabled(True)
         layout_right.addWidget(self.btn_ok)
@@ -139,7 +139,7 @@ class SetupTab(QtWidgets.QWidget):
 
         # Spacing related numbers
         h_space = 10
-        v_space = 30
+        v_space = 25
         label_width = 175  # Fixed width for alignment
 
         for i, dut in enumerate(self.data['dut_names']):
@@ -222,11 +222,11 @@ class SetupTab(QtWidgets.QWidget):
             edit_pixels_row = QtWidgets.QLineEdit()
             edit_pixels_row.setPlaceholderText('Row')
             label_thickness = QtWidgets.QLabel('Thickness / ' + u'\u03BC' + 'm :')
-            label_thickness.setToolTip('Overall thickness of DUT (e.g. sensor + PCB + ...)')
+            label_thickness.setToolTip('Thickness of sensor or compound (e.g. sensor + PCB + ...)')
             label_thickness.setFixedWidth(label_width)
             edit_thickness = QtWidgets.QLineEdit()
             label_rad = QtWidgets.QLabel('Radiation length / ' + u'\u03BC' + 'm :')
-            label_rad.setToolTip('Overall radiation length of compound')
+            label_rad.setToolTip('Radiation length of sensor or compound')
             label_rad.setFixedWidth(label_width)
             edit_rad = QtWidgets.QLineEdit()
             edit_rad.setPlaceholderText(u'X\u2080' + ' = 0 ' + u'\u03BC' + 'm')
@@ -677,14 +677,14 @@ class SetupTab(QtWidgets.QWidget):
                     else:
                         self._handle_widgets[dut]['button_h'].setDisabled(not broken)
 
-                # FIXME: handle dut type buttons are enabled on (all) other tabs when clicking it on one tab. Something goes wrong with signals
-
-
             else:
                 if dut in broken_input:
                     self._handle_widgets[dut]['button_h'].setDisabled(True)
                 else:
-                    self._handle_widgets[dut]['button_h'].setDisabled(False)
+                    if self._handle_widgets[dut]['check_h'].isChecked():
+                        self._handle_widgets[dut]['button_h'].setDisabled(False)
+                    else:
+                        self._handle_widgets[dut]['button_h'].setDisabled(True)
 
         # Set the status of the proceed button
         if skip_props is None:

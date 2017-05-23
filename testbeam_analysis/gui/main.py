@@ -158,6 +158,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.file_quit,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
+        self.file_menu.addAction('&New', self.new_analysis,
+                                 QtCore.Qt.CTRL + QtCore.Qt.Key_N)
         self.menuBar().addMenu(self.file_menu)
 
         self.settings_menu = QtWidgets.QMenu('&Settings', self)
@@ -248,7 +250,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
                 if name == 'Setup':
                     for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
-                               lambda: self.setup_complete(),
+                               lambda: self.setup_completed(),
                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(xx)
 
@@ -367,7 +369,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Connect updated tabs
         self.connect_tabs(tabs)
 
-    def setup_complete(self):
+    def setup_completed(self):
         self.setup_done = True
 
     def tab_completed(self, tabs):
@@ -433,6 +435,36 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                   ' ...if we had implemented loading sessions, which we have not.' % session
         logging.info(message)
         pass
+
+    def new_analysis(self):
+
+        # Get default settings
+        self.setup = SettingsWindow().default_setup
+        self.options = SettingsWindow().default_options
+
+        # Make variable for SettingsWindow
+        self.settings_window = None
+
+        # Make dict to access tab widgets
+        self.tw = {}
+
+        # Add bool to indicate whether setup tab has been executed
+        self.setup_done = False
+
+        self.tabs.clear()
+
+        for i in reversed(range(self.main_layout.count())):
+            w = self.main_layout.itemAt(i).widget()
+            self.main_layout.removeWidget(w)
+            w.setParent(None)
+
+        self.logger = None
+        self.logger_console = None
+
+        self._init_tabs()
+        self._init_logger()
+        self.connect_tabs()
+        self.tabs.setCurrentIndex(0)
 
     def file_quit(self):
         self.close()
