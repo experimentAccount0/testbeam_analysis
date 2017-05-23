@@ -415,7 +415,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
                                                              beta=alignment[fit_dut]['beta'],
                                                              gamma=alignment[fit_dut]['gamma'])
-            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+            basis_global = rotation_matrix.T.dot(np.eye(3))
             dut_plane_normal = basis_global[2]
 
         # Set the offset to the track intersection with the tilted plane
