@@ -1139,13 +1139,6 @@ def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_t
 
     with tb.open_file(input_tracks_file, 'r') as in_file_h5:
         with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
-            n_duts = len(in_file_h5.list_nodes("/"))  # determine number of max DUTs
-
-            if use_duts is None:
-                use_duts = range(n_duts)
-            else:
-                use_duts = use_duts
-
             for node in in_file_h5.root:  # loop through all DUTs in track table
                 initialize = True
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
