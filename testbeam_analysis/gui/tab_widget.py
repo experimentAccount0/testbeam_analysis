@@ -278,6 +278,7 @@ class AlignmentTab(AnalysisWidget):
         self.btn_skip.setToolTip('Skip alignment and use pre-alignment for further analysis')
         self.btn_skip.clicked.connect(lambda: self._skip_alignment())
         self.layout_options.addWidget(self.btn_skip)
+        self.btn_ok.clicked.connect(lambda: self.btn_skip.setDisabled(True))
 
         # When global settings are updated, recreate state of alignment tab
         if options['skip_alignment']:

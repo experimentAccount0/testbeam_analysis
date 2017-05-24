@@ -12,6 +12,8 @@ from PyQt5 import QtWidgets, QtCore, QtGui
 
 from testbeam_analysis.gui import option_widget
 
+import time
+
 import matplotlib
 matplotlib.use('Qt5Agg')  # Make sure that we are using QT5
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -69,9 +71,11 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.splitter_size = [parent.width()/2, parent.width()/2]
         self._setup()
         # Provide additional thread to do analysis on
-        self.analysis_thread = None
+        self.analysis_thread = QtCore.QThread()  # no parent
+        self.analysis_worker = None
         # Provide additional thread for vitables
-        self.vitables_thread = None
+        self.vitables_thread = QtCore.QThread()  # no parent
+        self.vitables_worker = None
         # Holds functions with kwargs
         self.calls = OrderedDict()
         # List of tabs which will be enabled after analysis
@@ -98,9 +102,14 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.layout_options.addLayout(self.opt_fixed)
         self.layout_options.addStretch(0)
 
-        # Proceed button
+        # Proceed button and progressbar
         self.btn_ok = QtWidgets.QPushButton('Ok')
-        self.btn_ok.clicked.connect(self._call_funcs)
+        self.p_bar = QtWidgets.QProgressBar()
+        self.p_bar.setVisible(False)
+
+        for x in [self._call_funcs,
+                  lambda: scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())]:
+            self.btn_ok.clicked.connect(x)
 
         # Container widget to disable all but ok button after perfoming analysis
         self.container = QtWidgets.QWidget()
@@ -113,6 +122,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Add container and ok button to right widget
         self.right_widget.layout().addWidget(self.container)
         self.right_widget.layout().addWidget(self.btn_ok)
+        self.right_widget.layout().addWidget(self.p_bar)
 
         # Make right widget scroll able
         scroll = QtWidgets.QScrollArea()
@@ -371,41 +381,32 @@ class AnalysisWidget(QtWidgets.QWidget):
         # print(func.__name__, kwargs)
         func(**kwargs)
 
-    def _call_funcs(self):
+    def _call_funcs(self, parallel=False):
         """ 
         Call all functions in a row
         """
 
         try:
             self.btn_ok.setDisabled(True)
+            self.p_bar.setVisible(True)
+            self.p_bar.setRange(0, 0)
         except RuntimeError:
             pass
 
-        # Should work but analysis_thread somehow returns "finished" signal before all task are done
+        self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
+        self.analysis_worker.moveToThread(self.analysis_thread)
 
-        #self.worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
-        #self.worker.moveToThread(self.analysis_thread)
-        #self.worker.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
-        #self.worker.run_call_funcs()
+        self.analysis_worker.finished.connect(self.analysis_thread.quit)
+        self.analysis_thread.started.connect(self.analysis_worker.work)
 
-        #self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
-        #self.analysis_thread.finished.connect(lambda: self.analysis_thread.quit())
-        #self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
-        #self.analysis_thread.start()
+        if not parallel:
+            self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
+            self.analysis_thread.finished.connect(lambda: self.p_bar.setRange(0, 1))
+            self.analysis_thread.finished.connect(lambda: self.p_bar.setValue(1))
 
-        # Comment rest of this function when trying multithreading
+        self.analysis_thread.finished.connect(lambda: self.container.setDisabled(True))
 
-        pool = Pool()
-        for func, kwargs in self.calls.iteritems():
-            # print(func.__name__, kwargs)
-            pool.apply_async(self._call_func(func, kwargs))
-        pool.close()
-        pool.join()
-
-        # Emit signal to indicate end of analysis
-        if self.tab_list is not None:
-            self.analysisDone.emit(self.tab_list)
-            self.container.setDisabled(True)
+        self.analysis_thread.start()
 
     def _connect_vitables(self, files):
 
@@ -423,10 +424,19 @@ class AnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-        self.vitables_thread.exceptionSignal.connect(lambda exception: self.handle_exceptions(exception=exception,
-                                                                                              cause='vitables'))
-        self.vitables_thread.exceptionSignal.connect(lambda: self.vitables_thread.quit())
+        # Create worker for vitables and move to thread
+        self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
+        self.vitables_worker.moveToThread(self.vitables_thread)
+
+        # Connect exceptions signal from worker on different thread to main thread
+        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+        self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
+
+        # Connect workers work method to the start of the thread, quit thread when worker finishes
+        self.vitables_worker.finished.connect(self.vitables_thread.quit)
+        self.vitables_thread.started.connect(self.vitables_worker.work)
+
+        # Start thread
         self.vitables_thread.start()
 
     def plot(self, input_file, plot_func, dut_names=None, figures=None):
@@ -442,7 +452,7 @@ class AnalysisWidget(QtWidgets.QWidget):
 
                 if exception is CalledProcessError:
                     msg = 'An error occurred during executing ViTables'
-                elif type(exception) is OSError:
+                elif type(exception) in [OSError, ImportError]:
                     msg = 'ViTables not found. Try installing ViTables'
                     self.btn_ok.setToolTip('Try installing or re-installing ViTables')
                     self.btn_ok.setText('ViTables not found')
@@ -505,7 +515,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.options = options
 
         # Additional thread for vitables
-        self.vitables_thread = None
+        self.vitables_thread = QtCore.QThread()  # no parent
+        self.vitables_worker = None
+        self.count = 0
 
         # List of tabs which will be enabled after analysis
         if isinstance(tab_list, list):
@@ -549,6 +561,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
             widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, tab_list=self.tab_list)
             widget.btn_ok.deleteLater()
+            widget.p_bar.deleteLater()
 
             self.tw[self.setup['dut_names'][i]] = widget
             self.tabs.addTab(self.tw[self.setup['dut_names'][i]], self.setup['dut_names'][i])
@@ -590,14 +603,25 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         self.btn_ok.setDisabled(True)
 
-        self.p_bar.setRange(0, len(self.tw.keys()))
+        self.p_bar.setRange(0, 0)
         self.p_bar.setVisible(True)
 
-        for i, tab in enumerate(self.tw.keys()):
-            self.p_bar.setValue(i+1)
-            self.tw[tab]._call_funcs()
+        for tab in self.tw.keys():
+            self.tw[tab].analysis_thread.finished.connect(self._check_parallel_analysis_status)
+            self.tw[tab]._call_funcs(parallel=True)
 
-        if self.tab_list is not None:
+    def _check_parallel_analysis_status(self):
+
+        self.p_bar.setRange(0, len(self.tw.keys()))
+
+        analysis_status = []
+        for tab in self.tw.keys():
+            status = self.tw[tab].analysis_thread.isRunning()
+            analysis_status.append(status)
+
+        self.p_bar.setValue(analysis_status.count(False))
+
+        if True not in analysis_status:
             self.parallelAnalysisDone.emit(self.tab_list)
 
     def _connect_vitables(self, files):
@@ -616,10 +640,19 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-        self.vitables_thread.exceptionSignal.connect(lambda exception: self.handle_exceptions(exception=exception,
-                                                                                              cause='vitables'))
-        self.vitables_thread.exceptionSignal.connect(lambda: self.vitables_thread.quit())
+        # Create worker for vitables and move to thread
+        self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
+        self.vitables_worker.moveToThread(self.vitables_thread)
+
+        # Connect exceptions signal from worker on different thread to main thread
+        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+        self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
+
+        # Connect workers work method to the start of the thread, quit thread when worker finishes
+        self.vitables_worker.finished.connect(self.vitables_thread.quit)
+        self.vitables_thread.started.connect(self.vitables_worker.work)
+
+        # Start thread
         self.vitables_thread.start()
 
     def plot(self, input_files, plot_func, dut_names=None, figures=None):
@@ -645,7 +678,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
                 if exception is CalledProcessError:
                     msg = 'An error occurred during executing ViTables'
-                elif type(exception) is OSError:
+                elif type(exception) in [OSError, ImportError]:
                     msg = 'ViTables not found. Try installing ViTables'
                     self.btn_ok.setToolTip('Try installing or re-installing ViTables')
                     self.btn_ok.setText('ViTables not found')
@@ -967,29 +1000,35 @@ class AnalysisThread(QtCore.QThread):
 class AnalysisWorker(QtCore.QObject):
 
     finished = QtCore.pyqtSignal()
+    exceptionSignal = QtCore.pyqtSignal(Exception)
 
-    def __init__(self, func, args=None, funcs_args=None, parent=None):
+    def __init__(self, func, args=None, funcs_args=None):
+        QtCore.QObject.__init__(self)
 
-        super(AnalysisWorker, self).__init__(parent)
-
+        # Main function which will be executed on this thread
         self.main_func = func
-        self.funcs_args = funcs_args
+        # Arguments of main function
         self.args = args
+        # Functions and arguments to perform analysis function;
+        # if not None, main function is then AnalysisWidget.call_funcs()
+        self.funcs_args = funcs_args
 
-    @QtCore.pyqtSlot()
-    def run_call_funcs(self):
+    def work(self):
 
-        pool = Pool()
-        for func, kwargs in self.funcs_args:
-            # self.main_func(func, kwargs)
-            pool.apply_async(self.main_func(func, kwargs))
-        pool.close()
-        pool.join()
+        try:
 
-        self.finished.emit()
+            if self.funcs_args is not None:
 
-    @QtCore.pyqtSlot()
-    def run_func(self):
-        self.main_func(self.args)
+                pool = Pool()
+                for func, kwargs in self.funcs_args:
+                    pool.apply_async(self.main_func(func, kwargs))
+                pool.close()
+                pool.join()
 
-        self.finished.emit()
+            else:
+                self.main_func(self.args)
+
+            self.finished.emit()
+
+        except Exception as e:
+            self.exceptionSignal.emit(e)
