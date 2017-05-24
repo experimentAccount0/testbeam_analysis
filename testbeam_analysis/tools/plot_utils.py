@@ -1103,11 +1103,14 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_track_angle_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
-                actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                if dut_names is not None:
-                    dut_name = dut_names[actual_dut]
+                if 'DUT' in node.name:
+                    actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                    if dut_names is not None:
+                        dut_name = dut_names[actual_dut]
+                    else:
+                        dut_name = "DUT%d" % actual_dut
                 else:
-                    dut_name = "DUT%d" % actual_dut
+                    dut_name = None
                 track_angle_hist = node[:]
                 edges = node._v_attrs.edges * 1000  # conversion to mrad
                 mean = node._v_attrs.mean * 1000  # conversion to mrad
@@ -1117,20 +1120,17 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                ax.bar(bin_center, track_angle_hist, label=('Angular Distribution for %s' % dut_name), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
+                ax.bar(bin_center, track_angle_hist, label='Angular Distribution%s' % ((" for %s" % dut_name) if dut_name else ""), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
                 x_gauss = np.arange(np.min(edges), np.max(edges), step=0.0001)
                 ax.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, amp, mean, sigma), color='r', label='Gauss-Fit:\nMean: %.5f mrad,\nSigma: %.5f mrad' % (mean, sigma))
                 ax.set_ylabel('#')
                 if 'Alpha' in node.name:
-                    direction = "y"
                     angle = "alpha"
                 elif 'Beta' in node.name:
-                    direction = "x"
                     angle = "beta"
                 else:
-                    direction = None
                     angle = "total"
-                ax.set_title('%s angular distribution of fitted tracks for %s%s' % (angle.title(), dut_name, (" (%s-direction)" % direction) if direction else ""))
+                ax.set_title('%s angular distribution of fitted tracks%s' % (angle.title(), (" for %s" % dut_name) if dut_name else ""))
                 ax.set_xlabel('Track angle [mrad]')
                 ax.legend(loc=1, fancybox=True, frameon=True)
                 ax.grid()

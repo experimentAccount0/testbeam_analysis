@@ -1139,13 +1139,22 @@ def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_t
 
     with tb.open_file(input_tracks_file, 'r') as in_file_h5:
         with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
-            for node in in_file_h5.root:  # loop through all DUTs in track table
+            nodes = in_file_h5.list_nodes("/")
+            if not nodes:
+                return
+            extended_nodes = nodes[:1]
+            extended_nodes.extend(nodes)
+            for index, node in enumerate(extended_nodes):  # loop through all DUTs in track table
                 initialize = True
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                if use_duts and actual_dut not in use_duts:
+                if index == 0:
+                    dut_name = None
+                else:
+                    dut_name = "DUT%d" % actual_dut
+                if use_duts is not None and actual_dut not in use_duts:
                     continue
 
-                if alignment is not None:
+                if alignment is not None and index != 0:
                     rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
                                                                      beta=alignment[actual_dut]['beta'],
                                                                      gamma=alignment[actual_dut]['gamma'])
@@ -1165,37 +1174,33 @@ def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_t
 
                     if initialize:
                         total_angle_hist, total_angle_hist_edges = np.histogram(total_angles, bins=n_bins, range=None)
+                        alpha_angle_hist, alpha_angle_hist_edges = np.histogram(alpha_angles, bins=n_bins, range=plot_range[1])
+                        beta_angle_hist, beta_angle_hist_edges = np.histogram(beta_angles, bins=n_bins, range=plot_range[0])
+                        initialize = False
                     else:
                         total_angle_hist += np.histogram(total_angles, bins=total_angle_hist_edges)[0]
-                    if initialize:
-                        beta_angle_hist, beta_angle_hist_edges = np.histogram(beta_angles, bins=n_bins, range=plot_range[0])
-                    else:
-                        beta_angle_hist += np.histogram(beta_angles, bins=beta_angle_hist_edges)[0]
-                    if initialize:
-                        alpha_angle_hist, alpha_angle_hist_edges = np.histogram(alpha_angles, bins=n_bins, range=plot_range[1])
-                    else:
                         alpha_angle_hist += np.histogram(alpha_angles, bins=alpha_angle_hist_edges)[0]
-                    initialize = False
+                        beta_angle_hist += np.histogram(beta_angles, bins=beta_angle_hist_edges)[0]
 
                 # write results
                 track_angle_total = out_file_h5.create_carray(where=out_file_h5.root,
-                                                              name='Total_Track_Angle_Hist_DUT%s' % (actual_dut),
-                                                              title='Total track angle distribution for DUT%s' % (actual_dut),
+                                                              name='Total_Track_Angle_Hist%s' % (("_%s" % dut_name) if dut_name else ""),
+                                                              title='Total track angle distribution%s' % (("_for_%s" % dut_name) if dut_name else ""),
                                                               atom=tb.Atom.from_dtype(total_angle_hist.dtype),
                                                               shape=total_angle_hist.shape,
                                                               filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 track_angle_beta = out_file_h5.create_carray(where=out_file_h5.root,
-                                                          name='Beta_Track_Angle_Hist_DUT%s' % (actual_dut),
-                                                          title='Beta track angle distribution for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(beta_angle_hist.dtype),
-                                                          shape=beta_angle_hist.shape,
-                                                          filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                                                             name='Beta_Track_Angle_Hist%s' % (("_%s" % dut_name) if dut_name else ""),
+                                                             title='Beta track angle distribution%s' % (("_for_%s" % dut_name) if dut_name else ""),
+                                                             atom=tb.Atom.from_dtype(beta_angle_hist.dtype),
+                                                             shape=beta_angle_hist.shape,
+                                                             filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
                 track_angle_alpha = out_file_h5.create_carray(where=out_file_h5.root,
-                                                          name='Alpha_Track_Angle_Hist_DUT%s' % (actual_dut),
-                                                          title='Alpha track angle distribution for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(alpha_angle_hist.dtype),
-                                                          shape=alpha_angle_hist.shape,
-                                                          filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                                                              name='Alpha_Track_Angle_Hist%s' % (("_%s" % dut_name) if dut_name else ""),
+                                                              title='Alpha track angle distribution%s' % (("_for_%s" % dut_name) if dut_name else ""),
+                                                              atom=tb.Atom.from_dtype(alpha_angle_hist.dtype),
+                                                              shape=alpha_angle_hist.shape,
+                                                              filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
                 # fit histograms for x and y direction
                 bin_center = (total_angle_hist_edges[1:] + total_angle_hist_edges[:-1]) / 2.0
