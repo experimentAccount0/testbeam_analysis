@@ -707,7 +707,8 @@ def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
         ax.grid()
         ax.set_xlabel('Track Chi2 [um*um]')
         ax.set_ylabel('#')
-        ax.set_yscale('log')
+        if np.any(chi2s):  # Avoid crash for all values == 0 and log plot
+            ax.set_yscale('log')
         ax.set_title('Track Chi2 for DUT%d tracks' % fit_dut)
         output_pdf.savefig(fig)
 
