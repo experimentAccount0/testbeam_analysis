@@ -115,6 +115,7 @@ class TestTrackAnalysis(unittest.TestCase):
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracks_merged_result.h5'), os.path.join(self.output_folder, 'Tracks_merged.h5'), exact=False)
         self.assertTrue(data_equal, msg=error_msg)
 
+
 if __name__ == '__main__':
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")

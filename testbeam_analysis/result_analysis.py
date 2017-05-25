@@ -17,7 +17,7 @@ from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, plot=True, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=True, plot=True, cluster_size_selection=None, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
 
     Parameters
@@ -50,6 +50,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
         Take the prealignment, although if a coarse alignment is availale.
     plot : bool
         If True, create additional output plots.
+    cluster_size_selection : uint
+        Select which cluster sizes should be included for residual calculation. If None all cluster sizes are taken.
     chunk_size : int
         Chunk size of the data when reading from file.
     '''
@@ -91,6 +93,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     # select good hits and tracks
                     selection = np.logical_and(~np.isnan(tracks_chunk['x_dut_%d' % actual_dut]), ~np.isnan(tracks_chunk['track_chi2']))
                     tracks_chunk = tracks_chunk[selection]  # Take only tracks where actual dut has a hit, otherwise residual wrong
+                    if cluster_size_selection is not None:
+                        tracks_chunk = tracks_chunk[tracks_chunk['n_hits_dut_%d' % actual_dut] == cluster_size_selection]
                     if max_chi2[actual_dut] is not None:
                         tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2[actual_dut]]
 
@@ -864,95 +868,383 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     return efficiencies, pass_tracks, total_tracks
 
 
-def histogram_track_angle(input_tracks_file, output_track_angle_file=None, n_bins=100, plot_range=((-0.01, +0.01), (-0.01, +0.01)), use_duts=None, dut_names=None, plot=True, chunk_size=499999):
+def calculate_purity(input_tracks_file, input_alignment_file, bin_size, sensor_size, output_purity_file=None, pixel_size=None, n_pixels=None, minimum_hit_density=10, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, output_file=None, plot=True, chunk_size=1000000):
+    '''Takes the tracks and calculates the hit purity and hit/track hit distance for selected DUTs.
+    Parameters
+    ----------
+    input_tracks_file : string
+        Filename with the tracks table.
+    input_alignment_file : pytables file
+        Filename of the input aligment data.
+    bin_size : iterable
+        Bins sizes (i.e. (virtual) pixel size). Give one tuple (x, y) for every plane or list of tuples for different planes.
+    sensor_size : Tuple or list of tuples
+        Describes the sensor size for each DUT. If one tuple is given it is (size x, size y).
+        If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT1 size y), ...].
+    output_purity_file : string
+        Filename of the output purity file. If None, the filename will be derived from the input hits file.
+    minimum_hit_density : int
+        Minimum hit density required to consider bin for purity calculation.
+    use_duts : iterable
+        The DUTs to calculate purity for. If None all duts are used.
+    max_chi2 : int
+        Only use track with a chi2 <= max_chi2.
+    force_prealignment : boolean
+        Take the prealignment, although if a coarse alignment is availale.
+    cut_distance : int
+        Hit - track intersection <= cut_distance = pure hit (hit assigned to track).
+        Hit - track intersection > cut_distance = inpure hit (hit without a track).
+    max_distance : int
+        Defines binnig of distance values.
+    col_range, row_range : iterable
+        Column / row value to calculate purity for (to neglect noisy edge pixels for purity calculation).
+    plot : bool
+        If True, create additional output plots.
+    chunk_size : int
+        Chunk size of the data when reading from file.
+    '''
+    logging.info('=== Calculate purity ===')
+
+    if output_purity_file is None:
+        output_purity_file = os.path.splitext(input_tracks_file)[0] + '_purity.h5'
+
+    if plot is True:
+        output_pdf = PdfPages(os.path.splitext(output_purity_file)[0] + '.pdf')
+    else:
+        output_pdf = None
+
+    use_prealignment = True if force_prealignment else False
+
+    with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+        prealignment = in_file_h5.root.PreAlignment[:]
+        n_duts = prealignment.shape[0]
+        if not use_prealignment:
+            try:
+                alignment = in_file_h5.root.Alignment[:]
+                logging.info('Use alignment data')
+            except tb.exceptions.NodeError:
+                use_prealignment = True
+                logging.info('Use prealignment data')
+
+    if not isinstance(max_chi2, Iterable):
+        max_chi2 = [max_chi2] * n_duts
+
+    purities = []
+    pure_hits = []
+    total_hits = []
+    with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
+        with tb.open_file(output_purity_file, 'w') as out_file_h5:
+            for index, node in enumerate(in_file_h5.root):
+                actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                if use_duts and actual_dut not in use_duts:
+                    continue
+                logging.info('Calculate purity for DUT %d', actual_dut)
+
+                # Calculate histogram properties (bins size and number of bins)
+                bin_size = [bin_size, ] if not isinstance(bin_size, Iterable) else bin_size
+                if len(bin_size) != 1:
+                    actual_bin_size_x = bin_size[index][0]
+                    actual_bin_size_y = bin_size[index][1]
+                else:
+                    actual_bin_size_x = bin_size[0][0]
+                    actual_bin_size_y = bin_size[0][1]
+                dimensions = [sensor_size, ] if not isinstance(sensor_size, Iterable) else sensor_size  # Sensor dimensions for each DUT
+                if len(dimensions) == 1:
+                    dimensions = dimensions[0]
+                else:
+                    dimensions = dimensions[index]
+                n_bin_x = int(dimensions[0] / actual_bin_size_x)
+                n_bin_y = int(dimensions[1] / actual_bin_size_y)
+
+                # Define result histograms, these are filled for each hit chunk
+                total_hit_hist = np.zeros(shape=(n_bin_x, n_bin_y), dtype=np.uint32)
+                total_pure_hit_hist = np.zeros(shape=(n_bin_x, n_bin_y), dtype=np.uint32)
+
+                actual_max_chi2 = max_chi2[index]
+
+                for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
+                    # Take only tracks where actual dut has a hit, otherwise residual wrong
+                    selection = np.logical_and(~np.isnan(tracks_chunk['x_dut_%d' % actual_dut]), ~np.isnan(tracks_chunk['track_chi2']))
+                    selection_hit = ~np.isnan(tracks_chunk['x_dut_%d' % actual_dut])
+                    # Cut in Chi 2 of the track fit
+                    if actual_max_chi2:
+                        tracks_chunk = tracks_chunk[tracks_chunk['track_chi2'] <= max_chi2]
+
+                    # Transform the hits and track intersections into the local coordinate system
+                    # Coordinates in global coordinate system (x, y, z)
+                    hit_x_dut, hit_y_dut, hit_z_dut = tracks_chunk['x_dut_%d' % actual_dut][selection_hit], tracks_chunk['y_dut_%d' % actual_dut][selection_hit], tracks_chunk['z_dut_%d' % actual_dut][selection_hit]
+                    hit_x, hit_y, hit_z = tracks_chunk['x_dut_%d' % actual_dut][selection], tracks_chunk['y_dut_%d' % actual_dut][selection], tracks_chunk['z_dut_%d' % actual_dut][selection]
+                    intersection_x, intersection_y, intersection_z = tracks_chunk['offset_0'][selection], tracks_chunk['offset_1'][selection], tracks_chunk['offset_2'][selection]
+
+                    # Transform to local coordinate system
+                    if use_prealignment:
+                        hit_x_local_dut, hit_y_local_dut, hit_z_local_dut = geometry_utils.apply_alignment(hit_x_dut, hit_y_dut, hit_z_dut,
+                                                                                                           dut_index=actual_dut,
+                                                                                                           prealignment=prealignment,
+                                                                                                           inverse=True)
+                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                               dut_index=actual_dut,
+                                                                                               prealignment=prealignment,
+                                                                                               inverse=True)
+                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                          dut_index=actual_dut,
+                                                                                                                          prealignment=prealignment,
+                                                                                                                          inverse=True)
+                    else:  # Apply transformation from alignment information
+                        hit_x_local_dut, hit_y_local_dut, hit_z_local_dut = geometry_utils.apply_alignment(hit_x_dut, hit_y_dut, hit_z_dut,
+                                                                                                           dut_index=actual_dut,
+                                                                                                           alignment=alignment,
+                                                                                                           inverse=True)
+                        hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hit_x, hit_y, hit_z,
+                                                                                               dut_index=actual_dut,
+                                                                                               alignment=alignment,
+                                                                                               inverse=True)
+                        intersection_x_local, intersection_y_local, intersection_z_local = geometry_utils.apply_alignment(intersection_x, intersection_y, intersection_z,
+                                                                                                                          dut_index=actual_dut,
+                                                                                                                          alignment=alignment,
+                                                                                                                          inverse=True)
+                    # Quickfix that center of sensor is local system is in the center and not at the edge
+                    hit_x_local_dut, hit_y_local_dut = hit_x_local_dut + pixel_size[actual_dut][0] / 2. * n_pixels[actual_dut][0], hit_y_local_dut + pixel_size[actual_dut][1] / 2. * n_pixels[actual_dut][1]
+                    hit_x_local, hit_y_local = hit_x_local + pixel_size[actual_dut][0] / 2. * n_pixels[actual_dut][0], hit_y_local + pixel_size[actual_dut][1] / 2. * n_pixels[actual_dut][1]
+                    intersection_x_local, intersection_y_local = intersection_x_local + pixel_size[actual_dut][0] / 2. * n_pixels[actual_dut][0], intersection_y_local + pixel_size[actual_dut][1] / 2. * n_pixels[actual_dut][1]
+
+                    intersections_local = np.column_stack((intersection_x_local, intersection_y_local, intersection_z_local))
+                    hits_local = np.column_stack((hit_x_local, hit_y_local, hit_z_local))
+                    hits_local_dut = np.column_stack((hit_x_local_dut, hit_y_local_dut, hit_z_local_dut))
+
+                    if not np.allclose(hits_local[np.isfinite(hits_local[:, 2]), 2], 0.0) or not np.allclose(intersection_z_local, 0.0):
+                        raise RuntimeError('The transformation to the local coordinate system did not give all z = 0. Wrong alignment used?')
+
+                    # Usefull for debugging, print some inpure events that can be cross checked
+                    # Select virtual hits
+                    sel_virtual = np.isnan(tracks_chunk['x_dut_%d' % actual_dut])
+                    if show_inefficient_events:
+                        logging.info('These events are unpure: %s', str(tracks_chunk['event_number'][sel_virtual]))
+
+                    # Select hits from column, row range (e.g. to supress edge pixels)
+                    col_range = [col_range, ] if not isinstance(col_range, Iterable) else col_range
+                    row_range = [row_range, ] if not isinstance(row_range, Iterable) else row_range
+                    if len(col_range) == 1:
+                        index = 0
+                    if len(row_range) == 1:
+                        index = 0
+
+                    if col_range[index] is not None:
+                        selection = np.logical_and(intersections_local[:, 0] >= col_range[index][0], intersections_local[:, 0] <= col_range[index][1])  # Select real hits
+                        hits_local, intersections_local = hits_local[selection], intersections_local[selection]
+                    if row_range[index] is not None:
+                        selection = np.logical_and(intersections_local[:, 1] >= row_range[index][0], intersections_local[:, 1] <= row_range[index][1])  # Select real hits
+                        hits_local, intersections_local = hits_local[selection], intersections_local[selection]
+
+                    # Calculate distance between track hit and DUT hit
+                    scale = np.square(np.array((1, 1, 0)))  # Regard pixel size for calculating distances
+                    distance = np.sqrt(np.dot(np.square(intersections_local - hits_local), scale))  # Array with distances between DUT hit and track hit for each event. Values in um
+
+                    total_hit_hist += (np.histogram2d(hits_local_dut[:, 0], hits_local_dut[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]).astype(np.uint32)
+
+                    # Calculate purity
+                    pure_hits_local = hits_local[distance < cut_distance]
+
+                    if not np.any(pure_hits_local):
+                        logging.warning('No pure hits in DUT %d, cannot calculate purity', actual_dut)
+                        continue
+                    total_pure_hit_hist += (np.histogram2d(pure_hits_local[:, 0], pure_hits_local[:, 1], bins=(n_bin_x, n_bin_y), range=[[0, dimensions[0]], [0, dimensions[1]]])[0]).astype(np.uint32)
+
+                purity = np.zeros_like(total_hit_hist)
+                purity[total_hit_hist != 0] = total_pure_hit_hist[total_hit_hist != 0].astype(np.float) / total_hit_hist[total_hit_hist != 0].astype(np.float) * 100.
+                purity = np.ma.array(purity, mask=total_hit_hist < minimum_hit_density)
+
+                if not np.any(purity):
+                    raise RuntimeError('No pure hit for DUT%d, consider changing cut values or check track building!', actual_dut)
+
+                # Calculate distances between hit and intersection
+#                 distance_mean_array = np.average(total_distance_array, axis=2, weights=range(0, max_distance)) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+#                 distance_mean_array = np.ma.masked_invalid(distance_mean_array)
+#                 distance_max_array = np.amax(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+#                 distance_min_array = np.amin(total_distance_array, axis=2) * sum(range(0, max_distance)) / total_hit_hist.astype(np.float)
+#                 distance_max_array = np.ma.masked_invalid(distance_max_array)
+#                 distance_min_array = np.ma.masked_invalid(distance_min_array)
+
+#                 plot_utils.plot_track_distances(distance_min_array, distance_max_array, distance_mean_array)
+                plot_utils.purity_plots(total_pure_hit_hist, total_hit_hist, purity, actual_dut, minimum_hit_density, plot_range=dimensions, cut_distance=cut_distance, output_pdf=output_pdf)
+
+                logging.info('Purity =  %1.4f +- %1.4f', np.ma.mean(purity), np.ma.std(purity))
+                purities.append(np.ma.mean(purity))
+
+                dut_group = out_file_h5.create_group(out_file_h5.root, 'DUT_%d' % actual_dut)
+
+                out_purity = out_file_h5.create_carray(dut_group, name='Purity', title='Purity map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(purity.dtype), shape=purity.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                out_purity_mask = out_file_h5.create_carray(dut_group, name='Purity_mask', title='Masked pixel map of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(purity.mask.dtype), shape=purity.mask.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+                # For correct statistical error calculation the number of pure hits over total hits is needed
+                out_pure_hits = out_file_h5.create_carray(dut_group, name='Pure_hits', title='Passing events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_pure_hit_hist.dtype), shape=total_pure_hit_hist.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                out_total_total = out_file_h5.create_carray(dut_group, name='Total_hits', title='Total events of DUT%d' % actual_dut, atom=tb.Atom.from_dtype(total_hit_hist.dtype), shape=total_hit_hist.T.shape, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+                pure_hits.append(total_pure_hit_hist.sum())
+                total_hits.append(total_hit_hist.sum())
+                logging.info('Pure hits / total hits: %d / %d, Purity = %.2f', total_pure_hit_hist.sum(), total_hit_hist.sum(), total_pure_hit_hist.sum()/total_hit_hist.sum() * 100)
+
+                # Store parameters used for purity calculation
+                out_purity.attrs.bin_size = bin_size
+                out_purity.attrs.minimum_hit_density = minimum_hit_density
+                out_purity.attrs.sensor_size = sensor_size
+                out_purity.attrs.use_duts = use_duts
+                out_purity.attrs.max_chi2 = max_chi2
+                out_purity.attrs.cut_distance = cut_distance
+                out_purity.attrs.max_distance = max_distance
+                out_purity.attrs.col_range = col_range
+                out_purity.attrs.row_range = row_range
+                out_purity[:] = purity.T
+                out_purity_mask[:] = purity.mask.T
+                out_pure_hits[:] = total_pure_hit_hist.T
+                out_total_total[:] = total_hit_hist.T
+
+    if output_pdf is not None:
+        output_pdf.close()
+
+    return purities, pure_hits, total_hits
+
+
+def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_track_angle_file=None, n_bins="auto", plot_range=(None, None), use_duts=None, dut_names=None, plot=True, chunk_size=499999):
     '''Calculates and histograms the track angle of the fitted tracks for selected DUTs.
 
     Parameters
     ----------
     input_tracks_file : string
         Filename of the input tracks file.
+    input_alignment_file : string
+        Filename of the input alignment file.
+        If None, the DUT planes are assumed to be perpendicular to the z axis.
     output_track_angle_file: string
         Filename of the output track angle file with track angle histogram and fitted means and sigmas of track angles for selected DUTs.
         If None, deduce filename from input tracks file.
     n_bins : uint
         Number of bins for the histogram.
+        If "auto", automatic binning is used.
     plot_range : iterable of tuples
         Tuple of the plot range in rad for alpha and beta angular distribution, e.g. ((-0.01, +0.01), -0.01, +0.01)).
+        If (None, None), plotting from minimum to maximum.
     use_duts : iterable
         Calculate the track angle for given DUTs. If None, all duts are used.
     dut_names : iterable
         Name of the DUTs. If None, DUT numbers will be used.
     plot : bool
         If True, create additional output plots.
-    chunk_size : int
+    chunk_size : uint
         Chunk size of the data when reading from file.
     '''
     logging.info('=== Calculating track angles ===')
+
+    if input_alignment_file:
+        with tb.open_file(input_alignment_file, mode="r") as in_file_h5:  # Open file with alignment data
+            logging.info('Use alignment data')
+            alignment = in_file_h5.root.Alignment[:]
+    else:
+        alignment = None
 
     if output_track_angle_file is None:
         output_track_angle_file = os.path.splitext(input_tracks_file)[0] + '_track_angles.h5'
 
     with tb.open_file(input_tracks_file, 'r') as in_file_h5:
         with tb.open_file(output_track_angle_file, mode="w") as out_file_h5:
-            n_duts = len(in_file_h5.list_nodes("/"))  # determine number of max DUTs
-
-            if use_duts is None:
-                use_duts = range(n_duts)
-            else:
-                use_duts = use_duts
-
-            for node in in_file_h5.root:  # loop through all DUTs in track table
-                x_angle_hist = None
-                y_angle_hist = None
+            nodes = in_file_h5.list_nodes("/")
+            if not nodes:
+                return
+            extended_nodes = nodes[:1]
+            extended_nodes.extend(nodes)
+            for index, node in enumerate(extended_nodes):  # loop through all DUTs in track table
+                initialize = True
                 actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                if use_duts and actual_dut not in use_duts:
+                if index == 0:
+                    dut_name = None
+                else:
+                    dut_name = "DUT%d" % actual_dut
+                if use_duts is not None and actual_dut not in use_duts:
                     continue
 
+                if alignment is not None and index != 0:
+                    rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[actual_dut]['alpha'],
+                                                                     beta=alignment[actual_dut]['beta'],
+                                                                     gamma=alignment[actual_dut]['gamma'])
+                    basis_global = rotation_matrix.T.dot(np.eye(3))
+                    dut_plane_normal = basis_global[2]
+                else:
+                    dut_plane_normal = np.array([0.0, 0.0, 1.0])
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # only store track slopes of selected DUTs
-                    if x_angle_hist is None:
-                        x_angle_hist, x_angle_hist_edges = np.histogram(np.arctan(tracks_chunk['slope_0']), bins=n_bins, range=plot_range[0])
+                    track_slopes = np.column_stack((tracks_chunk['slope_0'],
+                                                    tracks_chunk['slope_1'],
+                                                    tracks_chunk['slope_2']))
+
+                    # TODO: alpha/beta wrt DUT col / row
+                    total_angles = np.arccos(np.inner(dut_plane_normal, track_slopes))
+                    alpha_angles = 0.5 * np.pi - np.arccos(np.inner(track_slopes, np.cross(dut_plane_normal, np.array([1.0, 0.0, 0.0]))))
+                    beta_angles = 0.5 * np.pi - np.arccos(np.inner(track_slopes, np.cross(dut_plane_normal, np.array([0.0, 1.0, 0.0]))))
+
+                    if initialize:
+                        total_angle_hist, total_angle_hist_edges = np.histogram(total_angles, bins=n_bins, range=None)
+                        alpha_angle_hist, alpha_angle_hist_edges = np.histogram(alpha_angles, bins=n_bins, range=plot_range[1])
+                        beta_angle_hist, beta_angle_hist_edges = np.histogram(beta_angles, bins=n_bins, range=plot_range[0])
+                        initialize = False
                     else:
-                        x_angle_hist += np.histogram(np.arctan(tracks_chunk['slope_0']), bins=n_bins, range=plot_range[0])[0]
-                    if y_angle_hist is None:
-                        y_angle_hist, y_angle_hist_edges = np.histogram(np.arctan(tracks_chunk['slope_1']), bins=n_bins, range=plot_range[1])
-                    else:
-                        y_angle_hist += np.histogram(np.arctan(tracks_chunk['slope_1']), bins=n_bins, range=plot_range[1])[0]
+                        total_angle_hist += np.histogram(total_angles, bins=total_angle_hist_edges)[0]
+                        alpha_angle_hist += np.histogram(alpha_angles, bins=alpha_angle_hist_edges)[0]
+                        beta_angle_hist += np.histogram(beta_angles, bins=beta_angle_hist_edges)[0]
 
                 # write results
-                track_angle_x = out_file_h5.create_carray(where=out_file_h5.root,
-                                                          name='Track_Angle_Hist_x_DUT%s' % (actual_dut),
-                                                          title='Track angle distribution in x-direction for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(x_angle_hist.dtype),
-                                                          shape=x_angle_hist.shape,
-                                                          filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
-                track_angle_y = out_file_h5.create_carray(where=out_file_h5.root,
-                                                          name='Track_Angle_Hist_y_DUT%s' % (actual_dut),
-                                                          title='Track angle distribution in y-direction for DUT%s' % (actual_dut),
-                                                          atom=tb.Atom.from_dtype(y_angle_hist.dtype),
-                                                          shape=x_angle_hist.shape,
-                                                          filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                track_angle_total = out_file_h5.create_carray(where=out_file_h5.root,
+                                                              name='Total_Track_Angle_Hist%s' % (("_%s" % dut_name) if dut_name else ""),
+                                                              title='Total track angle distribution%s' % (("_for_%s" % dut_name) if dut_name else ""),
+                                                              atom=tb.Atom.from_dtype(total_angle_hist.dtype),
+                                                              shape=total_angle_hist.shape,
+                                                              filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                track_angle_beta = out_file_h5.create_carray(where=out_file_h5.root,
+                                                             name='Beta_Track_Angle_Hist%s' % (("_%s" % dut_name) if dut_name else ""),
+                                                             title='Beta track angle distribution%s' % (("_for_%s" % dut_name) if dut_name else ""),
+                                                             atom=tb.Atom.from_dtype(beta_angle_hist.dtype),
+                                                             shape=beta_angle_hist.shape,
+                                                             filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+                track_angle_alpha = out_file_h5.create_carray(where=out_file_h5.root,
+                                                              name='Alpha_Track_Angle_Hist%s' % (("_%s" % dut_name) if dut_name else ""),
+                                                              title='Alpha track angle distribution%s' % (("_for_%s" % dut_name) if dut_name else ""),
+                                                              atom=tb.Atom.from_dtype(alpha_angle_hist.dtype),
+                                                              shape=alpha_angle_hist.shape,
+                                                              filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
                 # fit histograms for x and y direction
-                bin_center = (x_angle_hist_edges[1:] + x_angle_hist_edges[:-1]) / 2.0
-                mean = analysis_utils.get_mean_from_histogram(x_angle_hist, bin_center)
-                rms = analysis_utils.get_rms_from_histogram(x_angle_hist, bin_center)
-                fit_x, cov = curve_fit(analysis_utils.gauss, bin_center, x_angle_hist, p0=[np.amax(x_angle_hist), mean, rms])
+                bin_center = (total_angle_hist_edges[1:] + total_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(total_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(total_angle_hist, bin_center)
+                fit_total, cov = curve_fit(analysis_utils.gauss, bin_center, total_angle_hist, p0=[np.amax(total_angle_hist), mean, rms])
 
-                bin_center = (y_angle_hist_edges[1:] + y_angle_hist_edges[:-1]) / 2.0
-                mean = analysis_utils.get_mean_from_histogram(y_angle_hist, bin_center)
-                rms = analysis_utils.get_rms_from_histogram(y_angle_hist, bin_center)
-                fit_y, cov = curve_fit(analysis_utils.gauss, bin_center, y_angle_hist, p0=[np.amax(y_angle_hist), mean, rms])
+                bin_center = (beta_angle_hist_edges[1:] + beta_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(beta_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(beta_angle_hist, bin_center)
+                fit_beta, cov = curve_fit(analysis_utils.gauss, bin_center, beta_angle_hist, p0=[np.amax(beta_angle_hist), mean, rms])
 
-                track_angle_x.attrs.edges = x_angle_hist_edges
-                track_angle_x.attrs.amp = fit_x[0]
-                track_angle_x.attrs.mean = fit_x[1]
-                track_angle_x.attrs.sigma = fit_x[2]
-                track_angle_y.attrs.edges = y_angle_hist_edges
-                track_angle_y.attrs.amp = fit_y[0]
-                track_angle_y.attrs.mean = fit_y[1]
-                track_angle_y.attrs.sigma = fit_y[2]
-                track_angle_x[:] = x_angle_hist
-                track_angle_y[:] = y_angle_hist
+                bin_center = (alpha_angle_hist_edges[1:] + alpha_angle_hist_edges[:-1]) / 2.0
+                mean = analysis_utils.get_mean_from_histogram(alpha_angle_hist, bin_center)
+                rms = analysis_utils.get_rms_from_histogram(alpha_angle_hist, bin_center)
+                fit_alpha, cov = curve_fit(analysis_utils.gauss, bin_center, alpha_angle_hist, p0=[np.amax(alpha_angle_hist), mean, rms])
+
+                # total
+                track_angle_total.attrs.edges = total_angle_hist_edges
+                track_angle_total.attrs.edges = total_angle_hist_edges
+                track_angle_total.attrs.amp = fit_total[0]
+                track_angle_total.attrs.mean = fit_total[1]
+                track_angle_total.attrs.sigma = fit_total[2]
+                track_angle_total[:] = total_angle_hist
+                # x
+                track_angle_beta.attrs.edges = beta_angle_hist_edges
+                track_angle_beta.attrs.amp = fit_beta[0]
+                track_angle_beta.attrs.mean = fit_beta[1]
+                track_angle_beta.attrs.sigma = fit_beta[2]
+                track_angle_beta[:] = beta_angle_hist
+                # y
+                track_angle_alpha.attrs.edges = alpha_angle_hist_edges
+                track_angle_alpha.attrs.amp = fit_alpha[0]
+                track_angle_alpha.attrs.mean = fit_alpha[1]
+                track_angle_alpha.attrs.sigma = fit_alpha[2]
+                track_angle_alpha[:] = alpha_angle_hist
 
     if plot:
         plot_utils.plot_track_angle(input_track_angle_file=output_track_angle_file, output_pdf_file=None, dut_names=dut_names)

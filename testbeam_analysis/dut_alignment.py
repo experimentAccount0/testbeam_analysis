@@ -116,9 +116,10 @@ def correlate_cluster(input_cluster_files, output_correlation_file, n_pixels, pi
 
 def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_size, chunk_size=4999999):
     '''Takes the cluster from all cluster files and merges them into one big table aligned at a common event number.
-    
+
     Empty entries are signaled with column = row = charge = nan. Position is translated from indices to um. The
     local coordinate system origin (0, 0) is defined in the sensor center, to decouple translation and rotation.
+    Cluster position errors are calculated from cluster dimensions.
 
     Parameters
     ----------
@@ -147,7 +148,15 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
         description.append(('z_dut_%d' % index, np.float))
     for index, _ in enumerate(input_cluster_files):
         description.append(('charge_dut_%d' % index, np.float))
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('n_hits_dut_%d' % index, np.int8))
     description.extend([('track_quality', np.uint32), ('n_tracks', np.int8)])
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('xerr_dut_%d' % index, np.float))
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('yerr_dut_%d' % index, np.float))
+    for index, _ in enumerate(input_cluster_files):
+        description.append(('zerr_dut_%d' % index, np.float))
 
     start_indices_merging_loop = [None] * len(input_cluster_files)  # Store the merging loop indices for speed up
     start_indices_data_loop = [None] * len(input_cluster_files)  # Additional store indices for the data loop
@@ -181,7 +190,16 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[0][0]))
                 merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[0][1]))
                 merged_cluster_array['z_dut_0'][selection] = 0.0
+                xerr = np.zeros(selection.shape)
+                yerr = np.zeros(selection.shape)
+                zerr = np.zeros(selection.shape)
+                xerr[selection] = actual_cluster['err_column'][selection] * pixel_size[0][0]
+                yerr[selection] = actual_cluster['err_row'][selection] * pixel_size[0][1]
+                merged_cluster_array['xerr_dut_0'][selection] = xerr[selection]
+                merged_cluster_array['yerr_dut_0'][selection] = yerr[selection]
+                merged_cluster_array['zerr_dut_0'][selection] = zerr[selection]
                 merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
+                merged_cluster_array['n_hits_dut_0'][selection] = actual_cluster['n_hits'][selection]
 
                 # Fill result array with other DUT data
                 # Second loop: get the cluster from all files and merge them to the common event number
@@ -195,7 +213,16 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                             merged_cluster_array['x_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
                             merged_cluster_array['y_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
                             merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.0
+                            xerr = np.zeros(selection.shape)
+                            yerr = np.zeros(selection.shape)
+                            zerr = np.zeros(selection.shape)
+                            xerr[selection] = actual_cluster['err_column'][selection] * pixel_size[dut_index][0]
+                            yerr[selection] = actual_cluster['err_row'][selection] * pixel_size[dut_index][1]
+                            merged_cluster_array['xerr_dut_%d' % (dut_index)][selection] = xerr[selection]
+                            merged_cluster_array['yerr_dut_%d' % (dut_index)][selection] = yerr[selection]
+                            merged_cluster_array['zerr_dut_%d' % (dut_index)][selection] = zerr[selection]
                             merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
+                            merged_cluster_array['n_hits_dut_%d' % (dut_index)][selection] = actual_cluster['n_hits'][selection]
 
                 merged_cluster_table.append(merged_cluster_array)
                 actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read
@@ -422,7 +449,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                 x_fit = np.linspace(start=x_ref.min(), stop=x_ref.max(), num=500, endpoint=True)
                 indices_lower = np.arange(plot_index)
                 indices_higher = np.arange(plot_index, n_pixel_dut)
-                alternating_indices = np.vstack((np.hstack([indices_higher, indices_lower[::-1]]), np.hstack([indices_lower[::-1], indices_higher]))).reshape((-1,),order='F')
+                alternating_indices = np.vstack((np.hstack([indices_higher, indices_lower[::-1]]), np.hstack([indices_lower[::-1], indices_higher]))).reshape((-1,), order='F')
                 unique_indices = np.unique(alternating_indices, return_index=True)[1]
                 alternating_indices = alternating_indices[np.sort(unique_indices)]
                 for plot_index in alternating_indices:
@@ -483,6 +510,7 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
     if output_pdf is not None:
         output_pdf.close()
+
 
 def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):
 
@@ -638,13 +666,17 @@ def refit_advanced(x_data, y_data, y_fit, p0):
     return coeff, var_matrix
 
 
-def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inverse=False, force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
-    ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hits positions. The alignment data is used. If this is not
-    available a fallback to the pre-alignment is done.
+def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inverse=False,
+                    force_prealignment=False, no_z=False, use_duts=None, chunk_size=1000000):
+    ''' Takes a file with tables containing hit information (x, y, z) and applies the alignment to each DUT hit (positions and errors).
+    The alignment data is used. If this is not available a fallback to the pre-alignment is done.
     One can also inverse the alignment or apply the alignment without changing the z position.
 
-    This function cannot be easily made faster with multiprocessing since the computation function (apply_alignment_to_chunk) does not contribute significantly to the runtime (< 20 %),
-    but the copy overhead for not shared memory needed for multipgrocessing is higher. Also the hard drive IO can be limiting (30 Mb/s read, 20 Mb/s write to the same disk)
+    Note:
+    -----
+    This function cannot be easily made faster with multiprocessing since the computation function (apply_alignment_to_chunk) does not
+    contribute significantly to the runtime (< 20 %), but the copy overhead for not shared memory needed for multipgrocessing is higher.
+    Also the hard drive IO can be limiting (30 Mb/s read, 20 Mb/s write to the same disk)
 
     Parameters
     ----------
@@ -693,18 +725,34 @@ def apply_alignment(input_hit_file, input_alignment_file, output_hit_file, inver
 
     def apply_alignment_to_chunk(hits_chunk, dut_index, use_prealignment, alignment, inverse, no_z):
         if use_prealignment:  # Apply transformation from pre-alignment information
-            hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
+            (hits_chunk['x_dut_%d' % dut_index],
+             hits_chunk['y_dut_%d' % dut_index],
+             hit_z,
+             hits_chunk['xerr_dut_%d' % dut_index],
+             hits_chunk['yerr_dut_%d' % dut_index],
+             hits_chunk['zerr_dut_%d' % dut_index]) = geometry_utils.apply_alignment(
                 hits_x=hits_chunk['x_dut_%d' % dut_index],
                 hits_y=hits_chunk['y_dut_%d' % dut_index],
                 hits_z=hits_chunk['z_dut_%d' % dut_index],
+                hits_xerr=hits_chunk['xerr_dut_%d' % dut_index],
+                hits_yerr=hits_chunk['yerr_dut_%d' % dut_index],
+                hits_zerr=hits_chunk['zerr_dut_%d' % dut_index],
                 dut_index=dut_index,
                 prealignment=prealignment,
                 inverse=inverse)
         else:  # Apply transformation from fine alignment information
-            hits_chunk['x_dut_%d' % dut_index], hits_chunk['y_dut_%d' % dut_index], hit_z = geometry_utils.apply_alignment(
+            (hits_chunk['x_dut_%d' % dut_index],
+             hits_chunk['y_dut_%d' % dut_index],
+             hit_z,
+             hits_chunk['xerr_dut_%d' % dut_index],
+             hits_chunk['yerr_dut_%d' % dut_index],
+             hits_chunk['zerr_dut_%d' % dut_index]) = geometry_utils.apply_alignment(
                 hits_x=hits_chunk['x_dut_%d' % dut_index],
                 hits_y=hits_chunk['y_dut_%d' % dut_index],
                 hits_z=hits_chunk['z_dut_%d' % dut_index],
+                hits_xerr=hits_chunk['xerr_dut_%d' % dut_index],
+                hits_yerr=hits_chunk['yerr_dut_%d' % dut_index],
+                hits_zerr=hits_chunk['zerr_dut_%d' % dut_index],
                 dut_index=dut_index,
                 alignment=alignment,
                 inverse=inverse)
@@ -1136,8 +1184,6 @@ def _calculate_translation_alignment(track_candidates_file, alignment_file, fit_
                                                   select_duts=fit_duts)
 
 
-
-
 # Helper functions for the alignment. Not to be used directly.
 def _create_alignment_array(n_duts):
     # Result Translation / rotation table
@@ -1309,11 +1355,11 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
                                     slopes)
             residuals_before.append(residual)
             logging.info('Optimize angles / z of DUT%d with start parameters: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
-                                                                                                                                             alpha,
-                                                                                                                                             beta,
-                                                                                                                                             gamma,
-                                                                                                                                             z_position_in_m * 1e6,
-                                                                                                                                             residual))
+                                                                                                                                            alpha,
+                                                                                                                                            beta,
+                                                                                                                                            gamma,
+                                                                                                                                            z_position_in_m * 1e6,
+                                                                                                                                            residual))
 
             # FIXME:
             # Has to be heavily restricted otherwise converges to unphysical solutions since the scoring with residuals is not really working well
@@ -1337,11 +1383,11 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
             residuals_after.append(residual)
 
             logging.info('Found angles of DUT%d with best angles: %1.2e, %1.2e, %1.2e Rad and z = %d um with residual %1.2e' % (actual_dut,
-                                                                                                                                 alpha,
-                                                                                                                                 beta,
-                                                                                                                                 gamma,
-                                                                                                                                 z_position_in_m * 1e6,
-                                                                                                                                 residual))
+                                                                                                                                alpha,
+                                                                                                                                beta,
+                                                                                                                                gamma,
+                                                                                                                                z_position_in_m * 1e6,
+                                                                                                                                residual))
             # Rotation start values of minimizer
             alignment_result[actual_dut]['alpha'] = alpha
             alignment_result[actual_dut]['beta'] = beta

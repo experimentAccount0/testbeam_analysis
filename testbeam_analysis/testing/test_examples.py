@@ -34,6 +34,39 @@ def copy_alignment(path, out_folder, **kwarg):
                           os.path.join(out_folder, 'Alignment.h5')))
 
 
+# Wrapps the original fit tracks call to reduce the number of fitted DUTs
+# when using Kalman filter to save time
+orig_fit_track = testbeam_analysis.track_analysis.fit_tracks
+
+
+def fit_tracks_fast(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None,
+                    selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1,
+                    pixel_size=None, beam_energy=None, total_thickness=None, radiation_length=None, max_tracks=None,
+                    force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit',
+                    full_track_info=False, chunk_size=1000000):
+    orig_fit_track(
+        input_track_candidates_file,
+        input_alignment_file,
+        output_tracks_file,
+        fit_duts=fit_duts if method == 'Fit' else [2],
+        selection_hit_duts=selection_hit_duts,
+        selection_fit_duts=selection_fit_duts,
+        exclude_dut_hit=exclude_dut_hit,
+        selection_track_quality=selection_track_quality,
+        pixel_size=pixel_size,
+        beam_energy=beam_energy,
+        total_thickness=total_thickness,
+        radiation_length=radiation_length,
+        max_tracks=max_tracks,
+        force_prealignment=force_prealignment,
+        use_correlated=use_correlated,
+        min_track_distance=min_track_distance,
+        keep_data=keep_data,
+        method=method,
+        full_track_info=full_track_info,
+        chunk_size=chunk_size)
+
+
 class TestExamples(unittest.TestCase):
 
     @classmethod
@@ -72,10 +105,12 @@ class TestExamples(unittest.TestCase):
         # Remove old files and rename reduced files
         for file_name in cls.examples_fei4_hit_files:
             os.remove(file_name)
-            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5', file_name)
+            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
+                      file_name)
         for file_name in cls.examples_mimosa_hit_files:
             os.remove(file_name)
-            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5', file_name)
+            os.rename(os.path.splitext(file_name)[0] + '_reduced.h5',
+                      file_name)
 
     # Alignments do not converge for reduced data set
     # Thus mock out the alignment steps
@@ -86,8 +121,10 @@ class TestExamples(unittest.TestCase):
                 )
     @mock.patch('testbeam_analysis.dut_alignment.alignment')
     # TODO: Analysis fails, to be checked why
+    @mock.patch('testbeam_analysis.track_analysis.fit_tracks',
+                side_effect=fit_tracks_fast)
     @mock.patch('testbeam_analysis.result_analysis.calculate_residuals')
-    def test_mimosa_example(self, m1, m2, m3):
+    def test_mimosa_example(self, m1, m2, m3, m4):
         eutelescope.run_analysis()
 
     # Prealignment does not converge for reduced data set
@@ -112,6 +149,7 @@ class TestExamples(unittest.TestCase):
                 eff = in_file_h5.get_node('/DUT_%d/Efficiency' % i)[:]
                 mask = in_file_h5.get_node('/DUT_%d/Efficiency_mask' % i)[:]
                 self.assertAlmostEqual(eff[~mask].mean(), 100., delta=0.0001)
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestExamples)

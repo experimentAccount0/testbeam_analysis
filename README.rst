@@ -2,7 +2,7 @@
 Introduction
 ===============================================
 
-|travis-status|  |appveyor-status|  |doc|  |coverage|
+|travis-status|  |appveyor-status|  |coverage|  |doc|
 
 Testbeam analysis is a simple to use software to analyse pixel-sensor data taken in a particle-beam telescope-setup. All steps of a complete analysis
 are implemented with a few independent python functions. For a quick first impression check the examples in the documentation.
@@ -51,11 +51,11 @@ In the examples folder type e.g.:
     :target: https://travis-ci.org/SiLab-Bonn/testbeam_analysis
     :alt: Build status
     
-.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis
-    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis
+.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis/branch/development
+    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis/branch/development
     :alt: Build status
 
-.. |doc| image:: https://img.shields.io/badge/documentation--green.svg
+.. |doc| image:: https://img.shields.io/badge/documentation--blue.svg
     :target: http://silab-bonn.github.io/testbeam_analysis
     :alt: Documentation
     

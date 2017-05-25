@@ -1,6 +1,8 @@
 ''' Example script to run a full analysis on telescope data. The original data
     can be found in the example folder of the EUTelescope framework.
 
+    Data in https://github.com/eutelescope/eutelescope/tree/v1.0-tag/jobsub/examples/datura-150mm-DAF
+
     The residuals are calculated with different cuts on prealigned and aligned data
     for demonstration purpose:
 
@@ -18,12 +20,15 @@
       plane position. This is an effect of multiple scattering. The outer most plans
       have a rather high residual (~ 18 um)
 
+    - When using a Kalman Filter for track builing instead of an interpolation
+      which takes no correlations between the measurements into account, the
+      residuals can be improved by ~ 30 percent for the inner planes.
 
     Setup
     -----
 
     The telescope consists of 6 planes with 15 cm clearance between the planes.
-    The data was taken at Desy with ~ 3-4 GeV/c (to be checked).
+    The data was taken at Desy with ~ 5 GeV/c (Run number 36).
 
     The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix
     consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
@@ -64,7 +69,7 @@ def run_analysis():
     pixel_size = [(18.4, 18.4)] * 6  # Column, row pixel pitch in um
     n_pixels = [(1152, 576)] * 6  # Number of pixel on column, row
 
-    z_positions = [0., 15000, 30000, 45000, 60000, 75000]  # z position in um
+    z_positions = [0., 150000, 300000, 450000, 600000, 750000]  # z position in um
     # Friendly names for plotting
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
 
@@ -148,7 +153,7 @@ def run_analysis():
         input_hit_file=os.path.join(output_folder, 'Merged.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_hit_file=os.path.join(output_folder,
-                                             'Tracklets_prealigned.h5'),
+                                     'Tracklets_prealigned.h5'),
         force_prealignment=True)
 
     # Find tracks from the prealigned tracklets and stores them with quality
@@ -232,16 +237,24 @@ def run_analysis():
         # We do not cut on track quality but on chi2 later
         selection_track_quality=0)
 
-    # Create unconstrained residuals
+    # Create unconstrained residuals with chi2 cut
     result_analysis.calculate_residuals(
         input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_residuals_file=os.path.join(output_folder, 'Residuals_all.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all_chi2_cut.h5'),
         # The chi2 cut has a large influence on
         # the residuals and number of tracks,
         # since the resolution is dominated by
         # multiple scattering
         max_chi2=500,
+        n_pixels=n_pixels,
+        pixel_size=pixel_size)
+
+    # Create unconstrained residuals
+    result_analysis.calculate_residuals(
+        input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all.h5'),
         n_pixels=n_pixels,
         pixel_size=pixel_size)
 
@@ -271,6 +284,31 @@ def run_analysis():
         output_residuals_file=os.path.join(output_folder, 'Residuals_some.h5'),
         n_pixels=n_pixels,
         pixel_size=pixel_size)
+
+    # Example 3: Use a Kalman Filter to build tracks. This is the best way to build
+    # tracks in case of heavily scattered tracks.
+    track_analysis.fit_tracks(
+        input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
+        exclude_dut_hit=True,
+        pixel_size=pixel_size,
+        beam_energy=5000.,
+        total_thickness=[100., 100., 100., 100., 100., 100.],
+        radiation_length=[125390., 125390., 125390., 125390., 125390., 125390.],
+        selection_track_quality=0,
+        method='Kalman')
+
+    # Create unconstrained residuals
+    result_analysis.calculate_residuals(
+        input_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
+        input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
+        output_residuals_file=os.path.join(output_folder, 'Residuals_all_Kalman.h5'),
+        n_pixels=n_pixels,
+        pixel_size=pixel_size,
+        npixels_per_bin=10,
+        nbins_per_pixel=50)
+
 
 # Main entry point is needed for multiprocessing under windows
 if __name__ == '__main__':

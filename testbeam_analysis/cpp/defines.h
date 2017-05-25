@@ -43,6 +43,8 @@ typedef struct ClusterInfo{
   unsigned short int seed_row;//seed pixel row value (unsigned short int: 0 to 65.535)
   float mean_column;		  //column value (unsigned short int: 0 to 65.535)
   float mean_row;			  //row value (unsigned short int: 0 to 65.535)
+  float err_column; 		  //column position error
+  float err_row; 		  //row position error
 } ClusterInfo;
 
 #pragma pack(pop)  // pop needed to suppress VS C4103 compiler warning

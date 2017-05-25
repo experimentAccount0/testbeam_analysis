@@ -858,7 +858,8 @@ def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
         ax.grid()
         ax.set_xlabel('Track Chi2 [um*um]')
         ax.set_ylabel('#')
-        ax.set_yscale('log')
+        if np.any(chi2s):  # Avoid crash for all values == 0 and log plot
+            ax.set_yscale('log')
         ax.set_title('Track Chi2 for DUT%d tracks' % fit_dut)
         output_pdf.savefig(fig)
 
@@ -1182,6 +1183,57 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         logging.warning('Cannot create efficiency plots, all pixels are masked')
 
 
+def purity_plots(pure_hit_hist, hit_hist, purity, actual_dut, minimum_hit_density, plot_range, cut_distance, mask_zero=True, output_pdf=None):
+    # get number of entries for every histogram
+    n_pure_hit_hist = np.count_nonzero(pure_hit_hist)
+    n_hits_hit_density = np.sum(hit_hist)
+    n_hits_purity = np.count_nonzero(purity)
+
+    # for better readability allow masking of entries that are zero
+    if mask_zero:
+        pure_hit_hist = np.ma.array(pure_hit_hist, mask=(pure_hit_hist == 0))
+        hit_hist = np.ma.array(hit_hist, mask=hit_hist == 0)
+
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    plot_2d_pixel_hist(fig, ax, pure_hit_hist.T, plot_range, title='Pure hit density for DUT %d (%d Pure Hits)' % (actual_dut, n_pure_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
+    fig.tight_layout()
+    output_pdf.savefig(fig)
+
+    fig = Figure()
+    _ = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT %d (%d Hits)' % (actual_dut, n_hits_hit_density), x_axis_title="column [um]", y_axis_title="row [um]")
+    fig.tight_layout()
+    output_pdf.savefig(fig)
+
+    if np.any(~purity.mask):
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        z_min = np.ma.min(purity)
+        if z_min == 100.:  # One cannot plot with 0 z axis range
+            z_min = 90.
+        plot_2d_pixel_hist(fig, ax, purity.T, plot_range, title='Purity for DUT %d (%d Entries)' % (actual_dut, n_hits_purity), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
+        fig.tight_layout()
+        output_pdf.savefig(fig)
+
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.grid()
+        ax.set_title('Purity per pixel for DUT %d: %1.4f +- %1.4f' % (actual_dut, np.ma.mean(purity), np.ma.std(purity)))
+        ax.set_xlabel('Purity [%]')
+        ax.set_ylabel('#')
+        ax.set_yscale('log')
+        ax.set_xlim([-0.5, 101.5])
+        ax.hist(purity.ravel()[purity.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel purity
+        output_pdf.savefig(fig)
+    else:
+        logging.warning('Cannot create purity plots, since all pixels are masked')
+
+
 def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=None):
     ''' Plot track slopes.
 
@@ -1202,11 +1254,14 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
     with PdfPages(output_pdf_file) as output_pdf:
         with tb.open_file(input_track_angle_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
-                actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                if dut_names is not None:
-                    dut_name = dut_names[actual_dut]
+                if 'DUT' in node.name:
+                    actual_dut = int(re.findall(r'\d+', node.name)[-1])
+                    if dut_names is not None:
+                        dut_name = dut_names[actual_dut]
+                    else:
+                        dut_name = "DUT%d" % actual_dut
                 else:
-                    dut_name = "DUT%d" % actual_dut
+                    dut_name = None
                 track_angle_hist = node[:]
                 edges = node._v_attrs.edges * 1000  # conversion to mrad
                 mean = node._v_attrs.mean * 1000  # conversion to mrad
@@ -1216,15 +1271,17 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                ax.bar(bin_center, track_angle_hist, label=('Angular Distribution for %s' % dut_name), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
-                x_gauss = np.arange(np.min(edges), np.max(edges), step=0.00001)
+                ax.bar(bin_center, track_angle_hist, label='Angular Distribution%s' % ((" for %s" % dut_name) if dut_name else ""), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
+                x_gauss = np.arange(np.min(edges), np.max(edges), step=0.0001)
                 ax.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, amp, mean, sigma), color='r', label='Gauss-Fit:\nMean: %.5f mrad,\nSigma: %.5f mrad' % (mean, sigma))
                 ax.set_ylabel('#')
-                if 'x' in node.name:
-                    direction = "X"
+                if 'Alpha' in node.name:
+                    angle = "alpha"
+                elif 'Beta' in node.name:
+                    angle = "beta"
                 else:
-                    direction = "Y"
-                ax.set_title('Angular distribution of fitted tracks for %s in %s-direction (beta)' % (dut_name, direction))
+                    angle = "total"
+                ax.set_title('%s angular distribution of fitted tracks%s' % (angle.title(), (" for %s" % dut_name) if dut_name else ""))
                 ax.set_xlabel('Track angle [mrad]')
                 ax.legend(loc=1, fancybox=True, frameon=True)
                 ax.grid()

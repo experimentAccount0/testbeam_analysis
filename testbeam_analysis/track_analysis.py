@@ -7,15 +7,18 @@ from math import sqrt
 import progressbar
 import os
 from collections import Iterable
+import functools
 
 import tables as tb
 import numpy as np
 from numba import njit
 from matplotlib.backends.backend_pdf import PdfPages
+from numpy import ma
 
 from testbeam_analysis.tools import plot_utils
 from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools import geometry_utils
+from testbeam_analysis.tools import kalman
 
 
 def find_tracks(input_tracklets_file, input_alignment_file, output_track_candidates_file, min_cluster_distance=False, chunk_size=1000000):
@@ -69,7 +72,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 min_cluster_distance = np.array(min_cluster_distance)
             column_sigma = np.zeros(shape=n_duts)
             row_sigma = np.zeros(shape=n_duts)
-            column_sigma[0], row_sigma[0] = 0., 0.  # DUT0 has no correlation error
+            column_sigma[0], row_sigma[0] = 0.0, 0.0  # DUT0 has no correlation error
             for index in range(1, n_duts):
                 column_sigma[index] = correlations[index]['column_sigma']
                 row_sigma[index] = correlations[index]['row_sigma']
@@ -93,23 +96,45 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(tracklets_node, chunk_size=chunk_size):
                 # Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data
                 # This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format
-                tr_x = tracklets_data_chunk['x_dut_0']
-                tr_y = tracklets_data_chunk['y_dut_0']
-                tr_z = tracklets_data_chunk['z_dut_0']
-                tr_charge = tracklets_data_chunk['charge_dut_0']
+                x = tracklets_data_chunk['x_dut_0']
+                y = tracklets_data_chunk['y_dut_0']
+                z = tracklets_data_chunk['z_dut_0']
+                x_err = tracklets_data_chunk['xerr_dut_0']
+                y_err = tracklets_data_chunk['yerr_dut_0']
+                z_err = tracklets_data_chunk['zerr_dut_0']
+                charge = tracklets_data_chunk['charge_dut_0']
+                n_hits = tracklets_data_chunk['n_hits_dut_0']
                 for dut_index in range(1, n_duts):
-                    tr_x = np.column_stack((tr_x, tracklets_data_chunk['x_dut_%d' % (dut_index)]))
-                    tr_y = np.column_stack((tr_y, tracklets_data_chunk['y_dut_%d' % (dut_index)]))
-                    tr_z = np.column_stack((tr_z, tracklets_data_chunk['z_dut_%d' % (dut_index)]))
-                    tr_charge = np.column_stack((tr_charge, tracklets_data_chunk['charge_dut_%d' % (dut_index)]))
+                    x = np.column_stack((x, tracklets_data_chunk['x_dut_%d' % (dut_index)]))
+                    y = np.column_stack((y, tracklets_data_chunk['y_dut_%d' % (dut_index)]))
+                    z = np.column_stack((z, tracklets_data_chunk['z_dut_%d' % (dut_index)]))
+                    x_err = np.column_stack((x_err, tracklets_data_chunk['xerr_dut_%d' % (dut_index)]))
+                    y_err = np.column_stack((y_err, tracklets_data_chunk['yerr_dut_%d' % (dut_index)]))
+                    z_err = np.column_stack((z_err, tracklets_data_chunk['zerr_dut_%d' % (dut_index)]))
+                    charge = np.column_stack((charge, tracklets_data_chunk['charge_dut_%d' % (dut_index)]))
+                    n_hits = np.column_stack((n_hits, tracklets_data_chunk['n_hits_dut_%d' % (dut_index)]))
 
-                tracklets_data_chunk['track_quality'] = np.zeros(shape=tracklets_data_chunk.shape[0])  # If find tracks is called on already found tracks the track quality has to be reset
+                event_number = tracklets_data_chunk['event_number']
+                track_quality = np.zeros_like(tracklets_data_chunk['track_quality'])
+                n_tracks = tracklets_data_chunk['n_tracks']
 
                 # Perform the track finding with jitted loop
-                _find_tracks_loop(tracklets_data_chunk, tr_x, tr_y, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance)
+                _find_tracks_loop(event_number=event_number,
+                                  x=x,
+                                  y=y,
+                                  z=z,
+                                  x_err=x_err,
+                                  y_err=y_err,
+                                  z_err=z_err,
+                                  charge=charge,
+                                  track_quality=track_quality,
+                                  n_tracks=n_tracks,
+                                  column_sigma=column_sigma,
+                                  row_sigma=row_sigma,
+                                  min_cluster_distance=min_cluster_distance)
 
                 # Merge result data from arrays into one recarray
-                combined = np.column_stack((tracklets_data_chunk['event_number'], tr_x, tr_y, tr_z, tr_charge, tracklets_data_chunk['track_quality'], tracklets_data_chunk['n_tracks']))
+                combined = np.column_stack((event_number, x, y, z, charge, n_hits, track_quality, n_tracks, x_err, y_err, z_err))
                 combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
 
                 track_candidates.append(combined)
@@ -117,9 +142,11 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, chunk_size=1000000):
-    '''Fits a line through selected DUT hits for selected DUTs. The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
-    The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts). Bad DUTs can be always ignored in the fit (ignore_duts).
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, beam_energy=None, total_thickness=None, radiation_length=None ,max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
+    '''Fits either a line through selected DUT hits for selected DUTs (method=Fit) or uses a Kalman Filter to build tracks (method=Kalman).
+    The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
+    The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts).
+    Bad DUTs can be always ignored in the fit (ignore_duts).
 
     Parameters
     ----------
@@ -161,19 +188,43 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         E.g. 0000 0101 assigns hits in DUT0 and DUT2 to the corresponding track quality.
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension (column/row),
-        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)]. Only needed for Kalman Filter.
+    beam_energy : uint
+        Energy of electron beam in MeV. Only needed for Kalman Filter.
+    total_thickness : iterable
+        Total thickness of all DUTs in um. (Sensor + other materials)
+    radiation_length : iterable
+        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
+    keep_data : bool
+        Keep all track candidates in data and add track info only to fitted tracks. Needed for purity calculations!
+    method : string
+        Available methods are 'Kalman' which uses a Kalman Filter for track building or 'Fit' which uses a simple
+        straight line fit for track building.
+    full_track_info : bool
+        If True predicted state vector of all DUTs is appended to track table in order to get full information on track.
+        If False only state vector of DUT for which the track is fitted is appended to track table.
+        This option is only possible if the Kalman Filter method is choosen.
     min_track_distance : iterable, boolean
         A minimum distance all track intersection at the DUT have to be apart, otherwise these tracks are deleted.
-        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone and will not be implemented.
+        This is needed to get a correct efficiency number, since assigning the same cluster to several tracks is error prone
+        and will not be implemented.
         If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
         e.g.: For two devices: min_track_distance = (50, 250)
         If False, the minimum track distance is not considered.
     chunk_size : uint
         Chunk size of the data when reading from file.
     '''
-    logging.info('=== Fitting tracks ===')
+
+    logging.info('=== Fitting tracks (Method: %s) ===' % method)
+
+    if method != "Fit" and method != "Kalman":
+        raise ValueError('Method "%s" not recognized!' % method)
+    if method == "Kalman" and not pixel_size:
+        raise ValueError('Kalman filter requires pixel size for covariance matrix!')
+    if method != "Kalman" and full_track_info is True:
+        raise ValueError('Full track information option only possible for Kalman Filter method.')
 
     # Load alignment data
     use_prealignment = True if force_prealignment else False
@@ -183,10 +234,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             logging.info('Use pre-alignment data')
             prealignment = in_file_h5.root.PreAlignment[:]
             n_duts = prealignment.shape[0]
+            z_positions = prealignment['z']
         else:
             logging.info('Use alignment data')
             alignment = in_file_h5.root.Alignment[:]
             n_duts = alignment.shape[0]
+            z_positions = alignment['translation_z']
 
     if fit_duts is None:
         fit_duts = range(n_duts)  # standard setting: fit tracks for all DUTs
@@ -274,7 +327,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     else:
         same_tracks_for_all_duts = False
 
-    def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts):
+    def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk=None):
         # Define description
         description = [('event_number', np.int64)]
         for index in range(n_duts):
@@ -285,26 +338,77 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             description.append(('z_dut_%d' % index, np.float))
         for index in range(n_duts):
             description.append(('charge_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('n_hits_dut_%d' % index, np.int8))
         for dimension in range(3):
             description.append(('offset_%d' % dimension, np.float))
         for dimension in range(3):
             description.append(('slope_%d' % dimension, np.float))
-        description.extend([('track_chi2', np.float), ('track_quality', np.uint32), ('n_tracks', np.int8)])
-
-        # Define structure of track_array
-        tracks_array = np.zeros((n_tracks,), dtype=description)
-        tracks_array['event_number'] = good_track_candidates['event_number']
-        tracks_array['track_quality'] = good_track_candidates['track_quality']
-        tracks_array['n_tracks'] = good_track_candidates['n_tracks']
+        if full_track_info is True and method == "Kalman":
+            for index in range(n_duts):
+                description.append(('predicted_x_dut_%d' % index, np.float))
+            for index in range(n_duts):
+                description.append(('predicted_y_dut_%d' % index, np.float))
+            for index in range(n_duts):
+                description.append(('slope_x_dut_%d' % index, np.float))
+            for index in range(n_duts):
+                description.append(('slope_y_dut_%d' % index, np.float))
+        description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.int8)])
         for index in range(n_duts):
-            tracks_array['x_dut_%d' % index] = good_track_candidates['x_dut_%d' % index]
-            tracks_array['y_dut_%d' % index] = good_track_candidates['y_dut_%d' % index]
-            tracks_array['z_dut_%d' % index] = good_track_candidates['z_dut_%d' % index]
-            tracks_array['charge_dut_%d' % index] = good_track_candidates['charge_dut_%d' % index]
-        for dimension in range(3):
-            tracks_array['offset_%d' % dimension] = offsets[:, dimension]
-            tracks_array['slope_%d' % dimension] = slopes[:, dimension]
-        tracks_array['track_chi2'] = chi2s
+            description.append(('xerr_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('yerr_dut_%d' % index, np.float))
+        for index in range(n_duts):
+            description.append(('zerr_dut_%d' % index, np.float))
+
+        # Select only fitted tracks (keep data = False) or keep all track candidates (keep data = True)
+        if keep_data:
+            tracks_array = np.full(track_candidates_chunk.shape[0], dtype=description, fill_value=np.nan)
+            track_candidates_chunk[good_track_selection] = good_track_candidates
+        else:
+            tracks_array = np.full((n_tracks,), dtype=description, fill_value=np.nan)
+            track_candidates_chunk = good_track_candidates
+        # print len(tracks_array)
+        # Define structure of track_array
+        tracks_array['event_number'] = track_candidates_chunk['event_number']
+        tracks_array['track_quality'] = track_candidates_chunk['track_quality']
+        tracks_array['n_tracks'] = track_candidates_chunk['n_tracks']
+        for index in range(n_duts):
+            # print track_candidates_chunk['x_dut_%d' % index]
+            tracks_array['x_dut_%d' % index] = track_candidates_chunk['x_dut_%d' % index]
+            tracks_array['y_dut_%d' % index] = track_candidates_chunk['y_dut_%d' % index]
+            tracks_array['z_dut_%d' % index] = track_candidates_chunk['z_dut_%d' % index]
+            tracks_array['xerr_dut_%d' % index] = track_candidates_chunk['xerr_dut_%d' % index]
+            tracks_array['yerr_dut_%d' % index] = track_candidates_chunk['yerr_dut_%d' % index]
+            tracks_array['zerr_dut_%d' % index] = track_candidates_chunk['zerr_dut_%d' % index]
+            tracks_array['charge_dut_%d' % index] = track_candidates_chunk['charge_dut_%d' % index]
+            tracks_array['n_hits_dut_%d' % index] = track_candidates_chunk['n_hits_dut_%d' % index]
+
+        # New track fit info
+        if keep_data:
+            for dimension in range(3):
+                # print len(tracks_array['offset_%d' % dimension]), len(offsets[:, dimension])
+                tracks_array['offset_%d' % dimension][good_track_selection] = offsets[:, dimension]
+                tracks_array['slope_%d' % dimension][good_track_selection] = slopes[:, dimension]
+            if full_track_info is True and method == "Kalman":
+                for index in range(n_duts):
+                    tracks_array['predicted_x_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 0]
+                    tracks_array['predicted_y_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 1]
+                    tracks_array['slope_x_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 2]
+                    tracks_array['slope_y_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 3]
+            tracks_array['track_chi2'][good_track_selection] = chi2s
+        else:
+            for dimension in range(3):
+                # print len(tracks_array['offset_%d' % dimension]), len(offsets[:, dimension])
+                tracks_array['offset_%d' % dimension] = offsets[:, dimension]
+                tracks_array['slope_%d' % dimension] = slopes[:, dimension]
+            if full_track_info is True and method == "Kalman":
+                for index in range(n_duts):
+                    tracks_array['predicted_x_dut_%d' % index] = track_estimates_chunk[:, index, 0]
+                    tracks_array['predicted_y_dut_%d' % index] = track_estimates_chunk[:, index, 1]
+                    tracks_array['slope_x_dut_%d' % index] = track_estimates_chunk[:, index, 2]
+                    tracks_array['slope_y_dut_%d' % index] = track_estimates_chunk[:, index, 3]
+            tracks_array['track_chi2'] = chi2s
 
         return tracks_array
 
@@ -317,7 +421,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
                                                              beta=alignment[fit_dut]['beta'],
                                                              gamma=alignment[fit_dut]['gamma'])
-            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+            basis_global = rotation_matrix.T.dot(np.eye(3))
             dut_plane_normal = basis_global[2]
 
         # Set the offset to the track intersection with the tilted plane
@@ -326,12 +430,60 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                                                                           position_plane=dut_position,
                                                                           normal_plane=dut_plane_normal)
 
-        tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts)
+        tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
 
         try:  # Check if table exists already, than append data
             tracklets_table = out_file_h5.get_node('/Tracks_DUT_%d' % fit_dut)
         except tb.NoSuchNodeError:  # Table does not exist, thus create new
             tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+
+        # Remove tracks that are too close when extrapolated to the actual DUT
+        # All merged track are signaled by n_tracks = -1
+        actual_min_track_distance = min_track_distance[fit_dut]
+        if actual_min_track_distance > 0:
+            _find_merged_tracks(tracks_array, actual_min_track_distance)
+            selection = tracks_array['n_tracks'] > 0
+            logging.info('Removed %d merged tracks (%1.1f%%)', np.count_nonzero(~selection), float(np.count_nonzero(~selection)) / selection.shape[0] * 100.)
+            tracks_array = tracks_array[selection]
+
+        tracklets_table.append(tracks_array)
+
+        # Plot chi2 distribution
+        plot_utils.plot_track_chi2(chi2s=chi2s, fit_dut=fit_dut, output_pdf=output_pdf)
+
+    def store_track_data_kalman(fit_dut, min_track_distance):  # Set the offset to the track intersection with the tilted plane and store the data
+        if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+            dut_position = np.array([0., 0., prealignment['z'][fit_dut]])
+            dut_plane_normal = np.array([0., 0., 1.])
+        else:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
+            dut_position = np.array([alignment[fit_dut]['translation_x'], alignment[fit_dut]['translation_y'], alignment[fit_dut]['translation_z']])
+            rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[fit_dut]['alpha'],
+                                                             beta=alignment[fit_dut]['beta'],
+                                                             gamma=alignment[fit_dut]['gamma'])
+            basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+            dut_plane_normal = basis_global[2]
+
+        slopes = np.column_stack((track_estimates_chunk[:, fit_dut, 2],
+                                  track_estimates_chunk[:, fit_dut, 3],
+                                  np.ones((track_estimates_chunk.shape[0],)).reshape(track_estimates_chunk.shape[0], 1)))
+        offsets = np.column_stack((track_estimates_chunk[:, fit_dut, 0],
+                                   track_estimates_chunk[:, fit_dut, 1],
+                                   np.repeat(dut_position[-1], track_estimates_chunk.shape[0]).reshape(track_estimates_chunk.shape[0], 1)))
+
+        actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                          line_directions=slopes,
+                                                                          position_plane=dut_position,
+                                                                          normal_plane=dut_plane_normal)
+
+        if full_track_info is True and method == "Kalman":
+            tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk)
+        else:
+            tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
+
+        try:  # Check if table exists already, than append data
+            tracklets_table = out_file_h5.get_node('/Kalman_Tracks_DUT_%d' % fit_dut)
+        except tb.NoSuchNodeError:  # Table does not exist, thus create new
+            tracklets_table = out_file_h5.create_table(out_file_h5.root, name='Kalman_Tracks_DUT_%d' % fit_dut, description=np.zeros((1,), dtype=tracks_array.dtype).dtype, title='Tracks fitted for DUT_%d_with_Kalman_Filter' % fit_dut, filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
 
         # Remove tracks that are too close when extrapolated to the actual DUT
         # All merged track are signaled by n_tracks = -1
@@ -386,7 +538,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             quality_index += 1
         logging.info("Use track quality for track selection: %s", ', '.join(info_quality))
 
-        return dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts
+        return dut_selection, dut_fit_selection, track_quality_mask
 
     pool = Pool()
     with PdfPages(os.path.splitext(output_tracks_file)[0] + '.pdf') as output_pdf:
@@ -407,7 +559,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                 for fit_dut_index, actual_fit_dut in enumerate(fit_duts):  # Loop over the DUTs where tracks shall be fitted for
                     logging.info('Fit tracks for DUT%d', actual_fit_dut)
-                    dut_selection, dut_fit_selection, track_quality_mask, same_tracks_for_all_duts = select_data(fit_dut_index)
+                    dut_selection, dut_fit_selection, track_quality_mask = select_data(fit_dut_index)
                     n_fit_duts = bin(dut_fit_selection)[2:].count("1")
                     if n_fit_duts < 2:
                         logging.warning('Insufficient track hits to do the fit (< 2). Omit DUT%d', actual_fit_dut)
@@ -462,31 +614,60 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
                         # Prepare track hits array to be fitted
                         index, n_tracks = 0, good_track_candidates['event_number'].shape[0]  # Index of tmp track hits array
-                        track_hits = np.full((n_tracks, n_fit_duts, 3), np.nan)
+                        if method == "Fit":
+                            track_hits = np.full((n_tracks, n_fit_duts, 3), np.nan)
+                        elif method == "Kalman":
+                            track_hits = np.full((n_tracks, n_duts, 3), np.inf)
 
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
-                            if ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
-                                xyz = np.column_stack((good_track_candidates['x_dut_%s' % dut_index], good_track_candidates['y_dut_%s' % dut_index], good_track_candidates['z_dut_%s' % dut_index]))
+                            if method == "Fit" and ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
+                                xyz = np.column_stack((good_track_candidates['x_dut_%s' % dut_index],
+                                                       good_track_candidates['y_dut_%s' % dut_index],
+                                                       good_track_candidates['z_dut_%s' % dut_index]))
+                                track_hits[:, index, :] = xyz
+                                index += 1
+                            elif method == "Kalman":
+                                xyz = np.column_stack(np.ma.array((good_track_candidates['x_dut_%s' % dut_index],
+                                                                   good_track_candidates['y_dut_%s' % dut_index],
+                                                                   good_track_candidates['z_dut_%s' % dut_index])))
                                 track_hits[:, index, :] = xyz
                                 index += 1
 
                         # Split data and fit on all available cores
                         n_slices = cpu_count()
                         slices = np.array_split(track_hits, n_slices)
-                        results = pool.map(_fit_tracks_loop, slices)
+                        if method == "Fit":
+                            results = pool.map(_fit_tracks_loop, slices)
+                        elif method == "Kalman":
+                            results = pool.map(functools.partial(
+                                _function_wrapper_fit_tracks_kalman_loop, pixel_size,
+                                dut_fit_selection, z_positions,
+                                beam_energy, total_thickness, radiation_length), slices)
                         del track_hits
 
                         # Store results
-                        offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
-                        slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
-                        chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
+                        if method == "Fit":
+                            offsets = np.concatenate([i[0] for i in results])  # Merge offsets from all cores in results
+                            slopes = np.concatenate([i[1] for i in results])  # Merge slopes from all cores in results
+                            chi2s = np.concatenate([i[2] for i in results])  # Merge chi2 from all cores in results
 
-                        # Store the data
-                        if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
-                            store_track_data(actual_fit_dut, min_track_distance)
-                        else:
-                            for dut_index in fit_duts:
-                                store_track_data(dut_index, min_track_distance)
+                            # Store the data
+                            if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
+                                store_track_data(actual_fit_dut, min_track_distance)
+                            else:
+                                for dut_index in fit_duts:
+                                    store_track_data(dut_index, min_track_distance)
+
+                        if method == "Kalman":
+                            track_estimates_chunk = np.concatenate([i[0] for i in results])  # merge predicted x,y pos from all cores in results
+                            chi2s = np.concatenate([i[1] for i in results])  # merge chi2 from all cores in results
+
+                            # Store the data
+                            if not same_tracks_for_all_duts:  # Check if all DUTs were fitted at once
+                                store_track_data_kalman(actual_fit_dut, min_track_distance)
+                            else:
+                                for dut_index in fit_duts:
+                                    store_track_data_kalman(dut_index, min_track_distance)
 
                         progress_bar.update(index_candidates)
                     progress_bar.finish()
@@ -496,61 +677,58 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     pool.join()
 
 
-# Helper functions that are not meant to be called during analysis
+# Helper functions that are not meant to be called directly during analysis
 @njit
-def _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma):
+def _set_dut_track_quality(dut_x, dut_y, curr_x, curr_y, track_quality, track_index, dut_index, dut_column_sigma, dut_row_sigma):
     # Set track quality of actual DUT from actual DUT hit
-    column, row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
-    if not np.isnan(column):  # column = nan is no hit
-        actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
-        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
-            actual_track['track_quality'] |= (65793 << dut_index)
-        elif column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # Low quality track hits
-            actual_track['track_quality'] |= (257 << dut_index)
+    if not np.isnan(curr_x):  # curr_x = nan is no hit
+        track_quality[track_index] |= (1 << dut_index)  # Set track with hit
+        x_distance, y_distance = abs(curr_x - dut_x), abs(curr_y - dut_y)
+        if x_distance < 1 * dut_column_sigma and y_distance < 1 * dut_row_sigma:  # High quality track hits
+            track_quality[track_index] |= (65793 << dut_index)
+        elif x_distance < 2 * dut_column_sigma and y_distance < 2 * dut_row_sigma:  # Low quality track hits
+            track_quality[track_index] |= (257 << dut_index)
     else:
-        actual_track['track_quality'] &= (~(65793 << dut_index))  # Unset track quality
+        track_quality[track_index] &= (~(65793 << dut_index))  # Unset track quality
 
 
 @njit
-def _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, hit_index, actual_column_sigma, actual_row_sigma):
-    # Recalculate track quality of already assigned hit, needed if hits are swapped
-    first_dut_index = _get_first_dut_index(tr_column, hit_index)
-
-    actual_track_column, actual_track_row = tr_column[hit_index][first_dut_index], tr_row[hit_index][first_dut_index]
-    actual_track = tracklets[hit_index]
-    column, row = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index]
-
-    actual_track['track_quality'] &= ~(65793 << dut_index)  # Reset track quality to zero
-    if not np.isnan(column):  # column = nan is no hit
-        actual_track['track_quality'] |= (1 << dut_index)  # Set track with hit
-        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-        if column_distance < 1 * actual_column_sigma and row_distance < 1 * actual_row_sigma:  # High quality track hits
-            actual_track['track_quality'] |= (65793 << dut_index)
-        elif column_distance < 2 * actual_column_sigma and row_distance < 2 * actual_row_sigma:  # Low quality track hits
-            actual_track['track_quality'] |= (257 << dut_index)
+def _reset_dut_track_quality(dut_x, dut_y, first_dut_x, first_dut_y, track_quality, hit_index, dut_index, dut_column_sigma, dut_row_sigma):
+    track_quality[hit_index] &= ~(65793 << dut_index)  # Reset track quality to zero
+    if not np.isnan(dut_x):  # x = nan is no hit
+        track_quality[hit_index] |= (1 << dut_index)  # Set track with hit
+        x_distance, y_distance = abs(dut_x - first_dut_x), abs(dut_y - first_dut_y)
+        if x_distance < 1 * dut_column_sigma and y_distance < 1 * dut_row_sigma:  # High quality track hits
+            track_quality[hit_index] |= (65793 << dut_index)
+        elif x_distance < 2 * dut_column_sigma and y_distance < 2 * dut_row_sigma:  # Low quality track hits
+            track_quality[hit_index] |= (257 << dut_index)
 
 
 @njit
-def _get_first_dut_index(tr_column, index):
+def _get_first_dut_index(x, index):
     ''' Returns the first DUT that has a hit for the track at index '''
     dut_index = 0
-    for dut_index in range(tr_column.shape[1]):  # Loop over duts, to get first DUT hit of track
-        if not np.isnan(tr_column[index][dut_index]):
+    for dut_index in range(x.shape[1]):  # Loop over duts, to get first DUT hit of track
+        if not np.isnan(x[index][dut_index]):
             break
     return dut_index
 
 
 @njit
-def _swap_hits(tr_column, tr_row, tr_z, tr_charge, track_index, dut_index, hit_index, column, row, z, charge):
-    #     print 'Swap hits', tr_column[track_index][dut_index], tr_column[hit_index][dut_index]
-    tmp_column, tmp_row, tmp_z, tmp_charge = tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_z[track_index][dut_index], tr_charge[track_index][dut_index]
-    tr_column[track_index][dut_index], tr_row[track_index][dut_index], tr_z[track_index][dut_index], tr_charge[track_index][dut_index] = column, row, z, charge
-    tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index] = tmp_column, tmp_row, tmp_z, tmp_charge
+def _swap_hits(x, y, z, charge, x_err, y_err, z_err, track_index, dut_index, hit_index, swap_x, swap_y, swap_z, swap_charge, swap_x_err, swap_y_err, swap_z_err):
+    #     print 'Swap hits', x[track_index][dut_index], x[hit_index][dut_index]
+    tmp_x, tmp_y, tmp_z, tmp_charge = x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index], charge[track_index][dut_index]
+    tmp_x_err, tmp_y_err, tmp_z_err = x_err[track_index][dut_index], y_err[track_index][dut_index], z_err[track_index][dut_index]
+
+    x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index], charge[track_index][dut_index] = swap_x, swap_y, swap_z, swap_charge
+    x_err[track_index][dut_index], y_err[track_index][dut_index], z_err[track_index][dut_index] = swap_x_err, swap_y_err, swap_z_err
+
+    x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index], charge[hit_index][dut_index] = tmp_x, tmp_y, tmp_z, tmp_charge
+    x_err[hit_index][dut_index], y_err[hit_index][dut_index], z_err[hit_index][dut_index] = tmp_x_err, tmp_y_err, tmp_z_err
 
 
 @njit
-def _set_n_tracks(start_index, stop_index, tracklets, n_actual_tracks, tr_column, tr_row, min_cluster_distance, n_duts):
+def _set_n_tracks(x, y, start_index, stop_index, n_tracks, n_actual_tracks, min_cluster_distance, n_duts):
     if start_index < 0:
         start_index = 0
 
@@ -558,48 +736,44 @@ def _set_n_tracks(start_index, stop_index, tracklets, n_actual_tracks, tr_column
         for dut_index in range(n_duts):
             if min_cluster_distance[dut_index] != 0:  # Check if minimum track distance evaluation is set, 0 is no mimimum track distance cut
                 for i in range(start_index, stop_index):  # Loop over all event hits
-                    actual_column, actual_row = tr_column[i][dut_index], tr_row[i][dut_index]
+                    actual_column, actual_row = x[i][dut_index], y[i][dut_index]
                     if np.isnan(actual_column):  # Omit virtual hit
                         continue
                     for j in range(i + 1, stop_index):  # Loop over other event hits
-                        if sqrt((actual_column - tr_column[j][dut_index]) * (actual_column - tr_column[j][dut_index]) + (actual_row - tr_row[j][dut_index]) * (actual_row - tr_row[j][dut_index])) < min_cluster_distance[dut_index]:
+                        if sqrt((actual_column - x[j][dut_index])**2 + (actual_row - y[j][dut_index])**2) < min_cluster_distance[dut_index]:
                             for i in range(start_index, stop_index):  # Set number of tracks of this event to -1 to signal merged hits, thus merged tracks
-                                tracklets[i]['n_tracks'] = -1
+                                n_tracks[i] = -1
                             return
 
     # Called if no merged track is found
     for i in range(start_index, stop_index):  # Set number of tracks of previous event
-        tracklets[i]['n_tracks'] = n_actual_tracks
+        n_tracks[i] = n_actual_tracks
 
 
 @njit
-def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigma, row_sigma, min_cluster_distance):
+def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_quality, n_tracks, column_sigma, row_sigma, min_cluster_distance):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Each hit is put to the best fitting track. Tracks are assumed to have
     no big angle, otherwise this approach does not work.
     Optimizations included to make it compile with numba. Can be called from
     several real threads if they work on different areas of the array'''
-    n_duts = tr_column.shape[1]
-    actual_event_number = tracklets[0]['event_number']
+    n_duts = x.shape[1]
+    actual_event_number = event_number[0]
 
     # Numba uses c scopes, thus define all used variables here
     n_actual_tracks = 0
     track_index, actual_hit_track_index = 0, 0  # Track index of table and first track index of actual event
 
-    for track_index, actual_track in enumerate(tracklets):  # Loop over all possible tracks
-        #         print '== ACTUAL TRACK  ==', track_index
+    for track_index, curr_event_number in enumerate(event_number):  # Loop over all possible tracks
         # Set variables for new event
-        if actual_track['event_number'] != actual_event_number:  # Detect new event
-            actual_event_number = actual_track['event_number']
-# for i in range(n_actual_tracks):  # Set number of tracks of previous event
-#                 print 'old', track_index - 1 - i
-# print 'track_index', track_index
-#             tracklets[track_index - 1 - i]['n_tracks'] = n_actual_tracks
-            _set_n_tracks(start_index=track_index - n_actual_tracks,
-                          stop_index=track_index, tracklets=tracklets,
+        if curr_event_number != actual_event_number:  # Detect new event
+            actual_event_number = curr_event_number
+            _set_n_tracks(x=x,
+                          y=y,
+                          start_index=track_index - n_actual_tracks,
+                          stop_index=track_index,
+                          n_tracks=n_tracks,
                           n_actual_tracks=n_actual_tracks,
-                          tr_column=tr_column,
-                          tr_row=tr_row,
                           min_cluster_distance=min_cluster_distance,
                           n_duts=n_duts)
             n_actual_tracks = 0
@@ -610,70 +784,94 @@ def _find_tracks_loop(tracklets, tr_column, tr_row, tr_z, tr_charge, column_sigm
         n_track_hits = 0
 
         for dut_index in range(n_duts):  # loop over all DUTs in the actual track
-#             print '== ACTUAL DUT ==', dut_index
             actual_column_sigma, actual_row_sigma = column_sigma[dut_index], row_sigma[dut_index]
 
-            if not reference_hit_set and not np.isnan(tr_column[track_index][dut_index]):  # Search for first DUT that registered a hit
-                actual_track_column, actual_track_row = tr_column[track_index][dut_index], tr_row[track_index][dut_index]
+            if not reference_hit_set and not np.isnan(x[track_index][dut_index]):  # Search for first DUT that registered a hit
+                actual_x, actual_y = x[track_index][dut_index], y[track_index][dut_index]
                 reference_hit_set = True
-                tracklets[track_index]['track_quality'] |= (65793 << dut_index)  # First track hit has best quality by definition
+                track_quality[track_index] |= (65793 << dut_index)  # First track hit has best quality by definition
                 n_track_hits += 1
-#                 print 'ACTUAL REFERENCE HIT', actual_track_column, actual_track_row
             elif reference_hit_set:  # First hit found, now find best (closest) DUT hit
                 # Calculate the hit distance of the actual assigned DUT hit towards the actual reference hit
-                current_column_distance, current_row_distance = abs(tr_column[track_index][dut_index] - actual_track_column), abs(tr_row[track_index][dut_index] - actual_track_row)
-                current_hit_distance = sqrt(current_column_distance * current_column_distance + current_row_distance * current_row_distance)  # The hit distance of the actual assigned hit
-                if np.isnan(tr_column[track_index][dut_index]):
-                    current_hit_distance = -1  # Signal no hit
+                actual_x_distance, actual_y_distance = abs(x[track_index][dut_index] - actual_x), abs(y[track_index][dut_index] - actual_y)
+                actual_hit_distance = sqrt(actual_x_distance**2 + actual_y_distance**2)  # The hit distance of the actual assigned hit
+                if np.isnan(x[track_index][dut_index]):
+                    actual_hit_distance = -1  # Signal no hit
                 shortest_hit_distance = -1  # The shortest hit distance to the actual hit; -1 means not assigned
-                for hit_index in range(actual_hit_track_index, tracklets.shape[0]):  # Loop over all not sorted hits of actual DUT
-                    if tracklets[hit_index]['event_number'] != actual_event_number:  # Abort condition
+                for hit_index in range(actual_hit_track_index, event_number.shape[0]):  # Loop over all not sorted hits of actual DUT
+                    if event_number[hit_index] != actual_event_number:  # Abort condition
                         break
-                    column, row, z, charge = tr_column[hit_index][dut_index], tr_row[hit_index][dut_index], tr_z[hit_index][dut_index], tr_charge[hit_index][dut_index]
-                    if not np.isnan(column):  # column = nan is no hit
+                    curr_x, curr_y, curr_z, curr_charge = x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index], charge[hit_index][dut_index]
+                    curr_x_err, curr_y_err, curr_z_err = x_err[hit_index][dut_index], y_err[hit_index][dut_index], z_err[hit_index][dut_index]
+                    if not np.isnan(curr_x):  # x = nan is no hit
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
-                        column_distance, row_distance = abs(column - actual_track_column), abs(row - actual_track_row)
-                        hit_distance = sqrt(column_distance * column_distance + row_distance * row_distance)
+                        x_distance, y_distance = abs(curr_x - actual_x), abs(curr_y - actual_y)
+                        hit_distance = sqrt(x_distance**2 + y_distance**2)
                         if shortest_hit_distance < 0 or hit_distance < shortest_hit_distance:  # Check if the hit is closer to reference hit
-                            #                             print 'FOUND MATCHING HIT', column, row
                             if track_index != hit_index:  # Check if hit swapping is needed
                                 if track_index > hit_index:  # Check if hit is already assigned to other track
-                                    #                                     print 'BUT HIT ALREADY ASSIGNED TO TRACK', hit_index
-                                    first_dut_index = _get_first_dut_index(tr_column, hit_index)  # Get reference DUT index of other track
+                                    first_dut_index = _get_first_dut_index(x, hit_index)  # Get reference DUT index of other track
+                                    first_dut_x, first_dut_y = x[hit_index][first_dut_index], y[hit_index][first_dut_index]
                                     # Calculate hit distance to reference hit of other track
-                                    column_distance_old, row_distance_old = abs(column - tr_column[hit_index][first_dut_index]), abs(row - tr_row[hit_index][first_dut_index])
-                                    hit_distance_old = sqrt(column_distance_old * column_distance_old + row_distance_old * row_distance_old)
-                                    if current_hit_distance > 0 and current_hit_distance < hit_distance:  # Check if actual assigned hit is better
-                                        #                                         print 'CURRENT ASSIGNED HIT FITS BETTER, DO NOT SWAP', hit_index
+                                    x_distance_tmp, y_distance_tmp = abs(curr_x - first_dut_x), abs(curr_y - first_dut_y)
+                                    hit_distance_old = sqrt(x_distance_tmp**2 + y_distance_tmp**2)
+                                    if actual_hit_distance >= 0 and actual_hit_distance < hit_distance:  # Check if actual assigned hit is better
                                         continue
                                     if hit_distance > hit_distance_old:  # Only take hit if it fits better to actual track; otherwise leave it with other track
-                                        #                                         print 'IT FIT BETTER WITH OLD TRACK, DO NOT SWAP', hit_index
                                         continue
-#                                 print 'SWAP HIT'
-                                _swap_hits(tr_column, tr_row, tr_z, tr_charge, track_index, dut_index, hit_index, column, row, z, charge)
+                                _swap_hits(x=x,
+                                           y=y,
+                                           z=z,
+                                           charge=charge,
+                                           x_err=x_err,
+                                           y_err=y_err,
+                                           z_err=z_err,
+                                           track_index=track_index,
+                                           dut_index=dut_index,
+                                           hit_index=hit_index,
+                                           swap_x=curr_x,
+                                           swap_y=curr_y,
+                                           swap_z=curr_z,
+                                           swap_charge=curr_charge,
+                                           swap_x_err=curr_x_err,
+                                           swap_y_err=curr_y_err,
+                                           swap_z_err=curr_z_err)
                                 if track_index > hit_index:  # Check if hit is already assigned to other track
-                                    #                                     print 'RESET DUT TRACK QUALITY'
-                                    _reset_dut_track_quality(tracklets, tr_column, tr_row, track_index, dut_index, hit_index, actual_column_sigma, actual_row_sigma)
+                                    dut_x, dut_y = x[hit_index][dut_index], y[hit_index][dut_index]
+                                    first_dut_index = _get_first_dut_index(x, hit_index)  # Get reference DUT index of other track
+                                    first_dut_x, first_dut_y = x[hit_index][first_dut_index], y[hit_index][first_dut_index]
+                                    _reset_dut_track_quality(dut_x=dut_x,
+                                                             dut_y=dut_y,
+                                                             first_dut_x=first_dut_x,
+                                                             first_dut_y=first_dut_y,
+                                                             track_quality=track_quality,
+                                                             hit_index=hit_index,
+                                                             dut_index=dut_index,
+                                                             dut_column_sigma=actual_column_sigma,
+                                                             dut_row_sigma=actual_row_sigma)
                             shortest_hit_distance = hit_distance
                             n_track_hits += 1
+                curr_x, curr_y = x[track_index][dut_index], y[track_index][dut_index]
+                _set_dut_track_quality(dut_x=actual_x,
+                                       dut_y=actual_y,
+                                       curr_x=curr_x,
+                                       curr_y=curr_y,
+                                       track_quality=track_quality,
+                                       track_index=track_index,
+                                       dut_index=dut_index,
+                                       dut_column_sigma=actual_column_sigma,
+                                       dut_row_sigma=actual_row_sigma)
 
-# if reference_dut_index == n_duts - 1:  # Special case: If there is only one hit in the last DUT, check if this hit fits better to any other track of this event
-#                 pass
-#             print 'SET DUT TRACK QUALITY'
-            _set_dut_track_quality(tr_column, tr_row, track_index, dut_index, actual_track, actual_track_column, actual_track_row, actual_column_sigma, actual_row_sigma)
-
-#         print 'TRACK', track_index
-#         for dut_index in range(n_duts):
-#             print tr_row[track_index][dut_index],
-#         print
         # Set number of tracks of last event
-        _set_n_tracks(start_index=track_index - n_actual_tracks + 1,
-                      stop_index=track_index + 1, tracklets=tracklets,
+        _set_n_tracks(x=x,
+                      y=y,
+                      start_index=track_index - n_actual_tracks + 1,
+                      stop_index=track_index + 1,
+                      n_tracks=n_tracks,
                       n_actual_tracks=n_actual_tracks,
-                      tr_column=tr_column,
-                      tr_row=tr_row,
                       min_cluster_distance=min_cluster_distance,
                       n_duts=n_duts)
+
 
 @njit
 def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several tracks are less than min_track_distance apart. Then exclude these tracks (set n_tracks = -1)
@@ -693,7 +891,7 @@ def _find_merged_tracks(tracks_array, min_track_distance):  # Check if several t
             for j in range(i + 1, tracks_array.shape[0]):  # Loop over other event hits
                 if tracks_array[j]['event_number'] != actual_event:  # Next event reached, break loop
                     break
-                if sqrt((offset_x - tracks_array[j]['offset_0']) * (offset_x - tracks_array[j]['offset_0']) + (offset_y - tracks_array[j]['offset_1']) * (offset_y - tracks_array[j]['offset_1'])) < min_track_distance:
+                if sqrt((offset_x - tracks_array[j]['offset_0'])**2 + (offset_y - tracks_array[j]['offset_1'])**2) < min_track_distance:
                     tracks_array[i]['n_tracks'] = -1
                     tracks_array[j]['n_tracks'] = -1
             i += 1
@@ -721,3 +919,233 @@ def _fit_tracks_loop(track_hits):
             offset[index], slope[index], chi2[index] = np.nan, np.nan, np.nan
 
     return offset, slope, chi2
+
+
+def _function_wrapper_fit_tracks_kalman_loop(*args):  # Needed for multiprocessing call with arguments
+    '''
+    Function for multiprocessing call with arguments for speed up.
+    '''
+    pixel_size, dut_fit_selection, z_positions, beam_energy, total_thickness, radiation_length, track_hits = args
+
+    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length)[0:2]
+
+
+def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance):
+    '''
+    This function calls the Kalman Filter. It returns track by track the smoothed state vector which contains in the first two components
+    the smoothed hit positions and in the last two components the respective slopes. Additionally the chi square of the track is calculated
+    and returned.
+
+    Parameters
+    ----------
+    hits : array_like
+        Array which contains the x, y and z hit position of each DUT for one track.
+    dut_fit_selection : iterable
+        List of DUTs which should be included in Kalman Filter. DUTs which are not in list
+        were treated as missing measurements and will not be included in the Filtering step.
+    transition_matrix : array_like
+        Transition matrix for each DUT except the last one. The transition matrix transports the state vector from one DUT to another DUT.
+    transition_covariance : array_like
+        Matrix which describes for each DUT except the last one the covariance of the transition matrix.
+    transition_offset : array_like
+        Vector which array_like the offset of each transition.
+    observation_matrix : array_like
+        Matrix which converts the state vector to the actual measurement vector.
+    observation_covariance : array_like
+        Matrix which describes the covariance of the measurement.
+    observation_offset : array_like
+        Vector which describes the offset of each measurement.
+    initial_state_mean : array_like
+        Vector which describes the starting point of the state vector.
+    initial_state_covariance : array_like
+        Error on the starting pointin of the state vector.
+
+    Returns
+    -------
+    smoothed_state_estimates : array_like
+        Smoothed state vectors.
+    chi2 : uint
+        Chi2 of track.
+    x_err : array_like
+        Error of smoothed hit position in x direction. Calculated from smoothed
+        state covariance matrix.
+    y_err : array_like
+        Error of smoothed hit position in y direction. Calculated from smoothed
+        state covariance matrix.
+    '''
+    kf = kalman.KalmanFilter()
+
+    measurements = ma.array(np.append(hits[:, :, 0:2], (np.repeat([np.zeros((hits.shape[1], 2))], hits.shape[0], axis=0)), axis=-1))
+
+    # mask duts which should not used in fit
+    for dut_index in range(0, measurements.shape[1]):
+        if dut_index not in dut_fit_selection:
+            measurements[:, dut_index, ] = ma.masked
+
+    smoothed_state_estimates, cov = kf.smooth(transition_matrix, transition_offset, transition_covariance,
+                                              observation_matrix, observation_offset, observation_covariance,
+                                              initial_state_mean, initial_state_covariance, measurements)
+
+    chi2 = np.sum(np.square(measurements[:, :, 0:2] - smoothed_state_estimates[:, :,  0:2]), dtype=np.uint32, axis=(1, 2))
+    x_err = np.sqrt(np.diagonal(cov, axis1=3, axis2=2))[:, :, 0]
+    y_err = np.sqrt(np.diagonal(cov, axis1=3, axis2=2))[:, :, 1]
+
+    return smoothed_state_estimates, chi2, x_err, y_err
+
+
+def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length):
+    '''
+    Loop over the selected tracks. In this function all matrices for the Kalman Filter are calculated track by track
+    and the Kalman Filter is started. With dut_fit_selection only the duts which are selected are included in the Kalman Filter.
+    Not included DUTs are masked.
+
+    Parameters
+    ----------
+    track_hits : array_like
+        Array which contains the x, y and z hit position of each DUT for all tracks.
+    dut_fit_selection : uint
+        8-bit- integer in binary representation. E.g. dut_fit_selection = 61 (0b111101) means that measurements of DUT 1 and
+        DUT 6 are treated as missing measurements and will not be included in the Filtering step.
+    pixel_size : iterable of tuples
+        One tuple per DUT describing the pixel dimension (column/row),
+        e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
+    z_positions : iterable
+        The z positions of the DUTs in um. Here, needed for Kalman Filter.
+    beam_energy : uint
+        Energy of electron beam in MeV.
+    total_thickness : iterable
+        Total thickness of all DUTs in um. (Sensor + other materials)
+    radiation_length : iterable
+        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
+
+    Returns
+    -------
+    smoothed_state_estimates : array_like
+        Smoothed state vectors.
+    chi2 : uint
+        Chi2 of track.
+    x_err : array_like
+        Error of smoothed hit position in x direction. Calculated from smoothed
+        state covariance matrix.
+    y_err : array_like
+        Error of smoothed hit position in y direction. Calculated from smoothed
+        state covariance matrix.
+    '''
+    z_positions = np.array(z_positions)
+    n_duts = track_hits.shape[1]
+    chunk_size = track_hits.shape[0]
+    dut_selection = np.array(range(0, n_duts))
+
+    # set multiple scattering environment
+    total_thickness = np.array(total_thickness)
+    radiation_length = np.array(radiation_length)
+
+    pixel_resolution = pixel_size / np.sqrt(12.)  # Resolution of each telescope plane
+
+    # Calculate multiple scattering
+    mass = 0.511  # mass in MeV (electrons)
+    momentum = np.sqrt(beam_energy**2 - mass**2)
+    beta = momentum / beam_energy  # almost 1
+
+    # rms angle of multiple scattering
+    theta = np.array(((13.6 / momentum / beta) * np.sqrt(total_thickness / radiation_length) * (1. + 0.038 * np.log(total_thickness / radiation_length))))
+    # express transition covariance matrix
+    transition_covariance = np.zeros((chunk_size, n_duts - 1, 4, 4))
+
+    # express transition matrix
+    transition_matrix = np.zeros((chunk_size, n_duts - 1, 4, 4))
+
+    # express state vector
+    state_vector = np.zeros((n_duts - 1, 4,))
+
+    # express transition and observation offset matrices
+    transition_offset = np.zeros((chunk_size, n_duts - 1, 4))
+    observation_offset = np.zeros((chunk_size, n_duts, 4))
+
+    initial_state_mean = np.zeros((chunk_size, 4))
+
+    # express observatipon matrix
+    observation_matrix = np.zeros((chunk_size, n_duts, 4, 4))
+
+    # express observation covariance matrices
+    observation_covariance = np.zeros((chunk_size, n_duts, 4, 4))
+    # observation matrix: only observe x and y position
+    observation_matrix[:, :, 0, 0] = 1.
+    observation_matrix[:, :, 1, 1] = 1.
+
+    # express initial state covariance matrices: x and y pos have initial error of pixel resolution and x and y slopes have large error
+    initial_state_covariance = np.zeros((4, 4))
+    initial_state_covariance[0, 0] = pixel_resolution[0, 0]**2
+    initial_state_covariance[1, 1] = pixel_resolution[0, 1]**2
+    initial_state_covariance[2, 2] = 0.01  # 0.01
+    initial_state_covariance[3, 3] = 0.01  # 0.01
+
+    # create a list of duts which should be included in the fit
+    dut_list = np.full(shape=(n_duts), fill_value=np.nan)
+    for index in range(n_duts):
+        dut_n = index
+        if np.bitwise_and(1 << index, dut_fit_selection) == 2 ** index:
+            dut_list[dut_n] = dut_n
+    dut_fit_selection = dut_list[~np.isnan(dut_list)].astype(int)
+
+    for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
+        x_positions = np.array(actual_hits[:, 0])
+        y_positions = np.array(actual_hits[:, 1])
+
+        # initial state: first two components x and y hit position in first dut, slopes all zero
+        initial_state_mean[index] = np.array([actual_hits[0, 0], actual_hits[0, 1], 0., 0.])
+
+        # express observation covariance
+        observation_covariance[index, dut_selection, 0, 0] = np.square(pixel_resolution[dut_selection][:, 0])
+        observation_covariance[index, dut_selection, 1, 1] = np.square(pixel_resolution[dut_selection][:, 1])
+
+        # express transition matrices
+        transition_matrix[index, dut_selection[:-1], :, 0] = np.array([1., 0., 0., 0.])
+        transition_matrix[index, dut_selection[:-1], :, 1] = np.array([0., 1., 0., 0.])
+        transition_matrix[index, dut_selection[:-1], :, 2] = np.array([
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]), np.zeros((len(dut_selection[:-1]),)),
+            np.ones((len(dut_selection[:-1]),)), np.zeros((len(dut_selection[:-1]),))]).T
+        transition_matrix[index, dut_selection[:-1], :, 3] = np.array([
+            np.zeros((len(dut_selection[:-1]),)), -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]),
+            np.zeros((len(dut_selection[:-1]),)), np.ones((len(dut_selection[:-1]),))]).T
+
+        state_vector[dut_fit_selection[:-1]] = np.array([x_positions[dut_fit_selection[:-1]],
+                                                         y_positions[dut_fit_selection[:-1]],
+                                                         np.zeros(x_positions[dut_fit_selection[:-1]].shape),
+                                                         np.zeros(x_positions[dut_fit_selection[:-1]].shape)]).T
+
+        cov_33 = theta[dut_selection[:-1]]**2 * (1 + state_vector[dut_selection[:-1], 2]**2) * (1 + state_vector[dut_selection[:-1], 2]**2 + state_vector[dut_selection[:-1], 3]**2).T
+        cov_44 = theta[dut_selection[:-1]]**2 * (1 + state_vector[dut_selection[:-1], 3]**2) * (1 + state_vector[dut_selection[:-1], 2]**2 + state_vector[dut_selection[:-1], 3]**2).T
+        cov_34 = theta[dut_selection[:-1]]**2 * state_vector[dut_selection[:-1], 2] * state_vector[dut_selection[:-1], 3] * (1 + state_vector[dut_selection[:-1], 2]**2 + state_vector[dut_selection[:-1], 3]**2).T
+
+        # express transition covariance matrices, according to http://web-docs.gsi.de/~ikisel/reco/Methods/CovarianceMatrices-NIMA329-1993.pdf
+        transition_covariance[index, dut_selection[:-1], :, 0] = np.array([(
+            z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_33,
+            (z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_34,
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_33,
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34]).T
+
+        transition_covariance[index, dut_selection[:-1], :, 1] = np.array([
+            (z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_34,
+            (z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_44,
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34,
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_44]).T
+        transition_covariance[index, dut_selection[:-1], :, 2] = np.array([
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_33,
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34,
+            cov_33,
+            cov_34]).T
+        transition_covariance[index, dut_selection[:-1], :, 3] = np.array([
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34,
+            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_44,
+            cov_34,
+            cov_44]).T
+
+    # run kalman filter
+    track_estimate_chunks, chi2, x_err, y_err = _kalman_fit_3d(track_hits, dut_fit_selection,
+                                                               transition_matrix, transition_covariance,
+                                                               transition_offset, observation_matrix,
+                                                               observation_covariance, observation_offset,
+                                                               initial_state_mean, initial_state_covariance)
+
+    return track_estimate_chunks, chi2, x_err, y_err

@@ -65,7 +65,7 @@ class TestHitAnalysis(unittest.TestCase):
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.noisy_data_file, create_cluster_hits_table=False, input_disabled_pixel_mask_file=output_mask_file, min_hit_charge=1, max_hit_charge=1, column_cluster_distance=2, row_cluster_distance=2, frame_cluster_distance=1, chunk_size=4999)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(self.output_folder, 'Mimosa26_disabled_pixels_cluster_result.h5'), output_cluster_file, exact=False)
         self.assertTrue(data_equal, msg=error_msg)
-
+ 
     def test_hit_clustering(self):
         # Test 1:
         output_cluster_file = hit_analysis.cluster_hits(input_hits_file=self.data_files[0], min_hit_charge=0, max_hit_charge=13, column_cluster_distance=1, row_cluster_distance=2, frame_cluster_distance=2)

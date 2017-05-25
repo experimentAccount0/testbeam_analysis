@@ -123,22 +123,46 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
     if output_cluster_file is None:
         output_cluster_file = os.path.splitext(input_hits_file)[0] + '_clustered.h5'
 
+    # Calculate the size in col/row for each cluster
+    def calc_cluster_dimensions(hits, clusters, cluster_size, cluster_hit_indices, cluster_index, cluster_id, charge_correction, noisy_pixels, disabled_pixels, seed_hit_index):
+        min_col = hits[cluster_hit_indices[0]].column
+        max_col = hits[cluster_hit_indices[0]].column
+        min_row = hits[cluster_hit_indices[0]].row
+        max_row = hits[cluster_hit_indices[0]].row
+        for i in cluster_hit_indices[1:]:
+            if i < 0:  # Not used indeces = -1
+                break
+            if hits[i].column < min_col:
+                min_col = hits[i].column
+            if hits[i].column > max_col:
+                max_col = hits[i].column
+            if hits[i].row < min_row:
+                min_row = hits[i].row
+            if hits[i].row > max_row:
+                max_row = hits[i].row
+        clusters[cluster_index].err_cols = max_col - min_col + 1
+        clusters[cluster_index].err_rows = max_row - min_row + 1
+
     with tb.open_file(input_hits_file, 'r') as input_file_h5:
         with tb.open_file(output_cluster_file, 'w') as output_file_h5:
             if input_disabled_pixel_mask_file is not None:
                 with tb.open_file(input_disabled_pixel_mask_file, 'r') as input_mask_file_h5:
-                     disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
-                     input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
+                    disabled_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.DisabledPixelMask[:]))[0] + 1
+                    input_mask_file_h5.root.DisabledPixelMask._f_copy(newparent=output_file_h5.root)
             else:
                 disabled_pixels = None
             if input_noisy_pixel_mask_file is not None:
                 with tb.open_file(input_noisy_pixel_mask_file, 'r') as input_mask_file_h5:
-                     noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
-                     input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
+                    noisy_pixels = np.dstack(np.nonzero(input_mask_file_h5.root.NoisyPixelMask[:]))[0] + 1
+                    input_mask_file_h5.root.NoisyPixelMask._f_copy(newparent=output_file_h5.root)
             else:
                 noisy_pixels = None
 
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance, row_cluster_distance=row_cluster_distance, frame_cluster_distance=frame_cluster_distance, min_hit_charge=min_hit_charge, max_hit_charge=max_hit_charge)
+            clusterizer.add_cluster_field(description=('err_cols', '<f4'))  # Add an additional field to hold the cluster size in x
+            clusterizer.add_cluster_field(description=('err_rows', '<f4'))  # Add an additional field to hold the cluster size in y
+            clusterizer.set_end_of_cluster_function(calc_cluster_dimensions)  # Set the new function to the clusterizer
+
             cluster_hits_table = None
             cluster_table = None
             for hits, _ in analysis_utils.data_aligned_at_events(input_file_h5.root.Hits, chunk_size=chunk_size):
@@ -158,7 +182,54 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                     cluster_hits_table.append(cluster_hits)
                 cluster_table.append(clusters)
 
+    def get_eff_pitch(hist, cluster_size):
+        ''' Effective pitch to describe the cluster
+            size propability distribution
+
+        hist : array like
+            Histogram with cluster size distribution
+        cluster_size : Cluster size to calculate the pitch for
+        '''
+
+        return np.sqrt(hight[int(cluster_size)].astype(np.float) / hight.sum())
+
+    # Calculate cluster size histogram
+    with tb.open_file(output_cluster_file, 'r') as input_file_h5:
+        hight = None
+        n_hits = 0
+        n_clusters = input_file_h5.root.Cluster.nrows
+        for start_index in range(0, n_clusters, chunk_size):
+            cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
+            # calculate cluster size histogram
+            if hight is None:
+                max_cluster_size = np.amax(cluster_n_hits)
+                hight = analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+            elif max_cluster_size < np.amax(cluster_n_hits):
+                max_cluster_size = np.amax(cluster_n_hits)
+                hight.resize(max_cluster_size + 1)
+                hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+            else:
+                hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
+            n_hits += np.sum(cluster_n_hits)
+
+    # Calculate cluster size histogram
+    with tb.open_file(output_cluster_file, 'r+') as io_file_h5:
+        for start_index in range(0, io_file_h5.root.Cluster.nrows, chunk_size):
+            clusters = io_file_h5.root.Cluster[start_index:start_index + chunk_size]
+            # Set errors for small clusters, where charge sharing enhances resolution
+            for css in [(1, 1), (1, 2), (2, 1), (2, 2)]:
+                sel = np.logical_and(clusters['err_cols'] == css[0], clusters['err_rows'] == css[1])
+                clusters['err_cols'][sel] = get_eff_pitch(hist=hight, cluster_size=css[0]) / np.sqrt(12)
+                clusters['err_rows'][sel] = get_eff_pitch(hist=hight, cluster_size=css[1]) / np.sqrt(12)
+            # Set errors for big clusters, where delta electrons reduce resolution
+            sel = np.logical_or(clusters['err_cols'] > 2, clusters['err_rows'] > 2)
+            clusters['err_cols'][sel] = clusters['err_cols'][sel] / np.sqrt(12)
+            clusters['err_rows'][sel] = clusters['err_rows'][sel] / np.sqrt(12)
+            io_file_h5.root.Cluster[start_index:start_index + chunk_size] = clusters
+
     if plot:
-        plot_cluster_size(input_cluster_file=output_cluster_file, dut_name=dut_name)
+        plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size,
+                          dut_name=os.path.split(output_cluster_file)[1],
+                          output_pdf_file=os.path.splitext(output_cluster_file)[0] + '_cluster_size.pdf')
 
     return output_cluster_file

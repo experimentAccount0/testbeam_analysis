@@ -3,8 +3,8 @@ Contents:
 .. toctree::
    :maxdepth: 2
    
-   TBA
-   installation
+   Introduction
+   Installation
    Examples
    GUI
    API
