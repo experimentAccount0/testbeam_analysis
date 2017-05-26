@@ -130,7 +130,7 @@ class PrealignmentTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_correlation_file',
-                        default_value=options['output_path'] + '/Correlation.h5',
+                        default_value=output_files['correlation'],
                         func=prealignment,
                         fixed=True)
 
@@ -150,12 +150,12 @@ class PrealignmentTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_hit_file',
-                        default_value=options['output_path'] + '/Merged.h5',
+                        default_value=output_files['merged'],
                         func=apply_alignment,
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=output_files['alignment'],
                         func=apply_alignment,
                         fixed=True)
 
