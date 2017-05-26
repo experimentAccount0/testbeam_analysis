@@ -344,7 +344,7 @@ class DataTable(QtWidgets.QTableWidget):
                         self.incompatible_data[i] = 'Error! Data does not contain field(s):\n' + ', '.join(missing)
 
                 except tb.exceptions.NoSuchNodeError:
-                    self.incompatible_data[i] = 'NoSuchNodeError: Nodes:\n' + str(f.root)
+                    self.incompatible_data[i] = 'No Hits! Existing nodes:\n' + ', '.join([node.name for node in f.root])
 
         font = QtGui.QFont()
         font.setBold(True)
