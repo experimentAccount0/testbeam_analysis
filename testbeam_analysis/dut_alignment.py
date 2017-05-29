@@ -1321,7 +1321,7 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
             dut_position = np.array([alignment_last_iteration[actual_dut]['translation_x'], alignment_last_iteration[actual_dut]['translation_y'], alignment_last_iteration[actual_dut]['translation_z']])
 
             # Hits with the actual alignment
-            hits = np.vstack((node[:]['x_dut_%d' % actual_dut], node[:]['y_dut_%d' % actual_dut], node[:]['z_dut_%d' % actual_dut])).T
+            hits = np.column_stack((node[:]['x_dut_%d' % actual_dut], node[:]['y_dut_%d' % actual_dut], node[:]['z_dut_%d' % actual_dut]))
 
             # Transform hits to the local coordinate system
             hit_x_local, hit_y_local, hit_z_local = geometry_utils.apply_alignment(hits_x=hits[:, 0],
@@ -1332,8 +1332,8 @@ def _optimize_alignment(tracks_file, alignment_last_iteration, new_alignment_par
                                                                                    inverse=True)
 
             # Track infos
-            offsets = np.vstack((node[:]['offset_0'], node[:]['offset_1'], node[:]['offset_2'])).T
-            slopes = np.vstack((node[:]['slope_0'], node[:]['slope_1'], node[:]['slope_2'])).T
+            offsets = np.column_stack((node[:]['offset_0'], node[:]['offset_1'], node[:]['offset_2']))
+            slopes = np.column_stack((node[:]['slope_0'], node[:]['slope_1'], node[:]['slope_2']))
 
             # Rotation start values of minimizer
             alpha = alignment_result[actual_dut]['alpha']
