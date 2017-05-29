@@ -1160,6 +1160,8 @@ def histogram_track_angle(input_tracks_file, input_alignment_file=None, output_t
                                                                      gamma=alignment[actual_dut]['gamma'])
                     basis_global = rotation_matrix.T.dot(np.eye(3))
                     dut_plane_normal = basis_global[2]
+                    if dut_plane_normal[2] < 0:
+                        dut_plane_normal = -dut_plane_normal
                 else:
                     dut_plane_normal = np.array([0.0, 0.0, 1.0])
                 for tracks_chunk, _ in analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):  # only store track slopes of selected DUTs
