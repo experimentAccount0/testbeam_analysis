@@ -36,6 +36,7 @@ class TestTrackAnalysis(unittest.TestCase):
         # pixel size of sensor
         pixel_size = np.array([(18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (250., 50.)])
         pixel_resolution = pixel_size / np.sqrt(12)
+        material_budget = np.array([100., 100., 100., 100., 100., 100., 250.]) / np.array([125390., 125390., 125390., 125390., 125390., 125390., 93700.])
         kwargs = {'track_hits': np.array([[[-1229.22372954, 2828.19616302, 0., pixel_resolution[0][0], pixel_resolution[0][1]],
                                            [np.nan, np.nan, np.nan, np.nan, np.nan],  # [-1254.51224282, 2827.4291421, 29900.],
                                            [-1285.6117892, 2822.34536687, 60300., pixel_resolution[2][0], pixel_resolution[2][1]],
@@ -48,8 +49,8 @@ class TestTrackAnalysis(unittest.TestCase):
                   'pixel_size': pixel_size,
                   'n_pixels': ((576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (80, 336)),
                   'beam_energy': 2500.,
-                  'total_thickness': [[100., 100., 100., 100., 100., 100., 250.]],
-                  'radiation_length': [[125390., 125390., 125390., 125390., 125390., 125390., 93700.]]}
+                  'material_budget': material_budget,
+                  'add_scattering_plane': None}
 
         # expected result array: (state estimates, chi, x error, y errors)
         result = np.array([[[-1.23045812e+03, 2.82684464e+03, 9.54189393e-04, 5.78723069e-05],

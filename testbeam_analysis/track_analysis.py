@@ -140,7 +140,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, n_pixels=None, beam_energy=None, total_thickness=None, radiation_length=None, add_scattering_center=None, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, n_pixels=None, beam_energy=None, material_budget=None, add_scattering_plane=None, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
     '''Fits either a line through selected DUT hits for selected DUTs (method=Fit) or uses a Kalman Filter to build tracks (method=Kalman).
     The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts).
@@ -190,18 +190,15 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]. Only needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV. Only needed for Kalman Filter.
-    total_thickness : iterable
-        Total thickness of all DUTs in um (Sensor + other materials). Only needed for Kalman Filter.
-    radiation_length : iterable
-        Radiation length of all DUTs in um (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um).
-        Only needed for Kalman Filter.
-    add_scattering_center : kwarg
-        Specifies an additional scattering center in case of additional DUTs which are not used.
+    material_budget : iterable
+        Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
+        devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um). Only needed for Kalman Filter.
+    add_scattering_plane : kwarg
+        Specifies an additional scattering plane in case of additional DUTs which are not used.
         The dictionary must contain:
-            index_scatter: dut index of scattering center
-            z_scatter: z position of scattering center in um
-            rad_len_scatter: radiation lenght of scattering center
-            thickness_scatter: thickness of scattering center in um
+            index_scatter: dut index of scattering plane
+            z_scatter: z position of scattering plane in um
+            material_budget: material budget of scattering plane
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     keep_data : bool
@@ -649,7 +646,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                             results = pool.map(functools.partial(
                                 _function_wrapper_fit_tracks_kalman_loop, pixel_size,
                                 n_pixels, dut_fit_selection, z_positions,
-                                beam_energy, total_thickness, radiation_length, add_scattering_center), slices)
+                                beam_energy, material_budget, add_scattering_plane), slices)
                         del track_hits
 
                         # Store results
@@ -932,9 +929,9 @@ def _function_wrapper_fit_tracks_kalman_loop(*args):  # Needed for multiprocessi
     '''
     Function for multiprocessing call with arguments for speed up.
     '''
-    pixel_size, n_pixels, dut_fit_selection, z_positions, beam_energy, total_thickness, radiation_length, add_scattering_center, track_hits = args
+    pixel_size, n_pixels, dut_fit_selection, z_positions, beam_energy, material_budget, add_scattering_plane, track_hits = args
 
-    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, total_thickness, radiation_length, add_scattering_center)[0:2]
+    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, material_budget, add_scattering_plane)[0:2]
 
 
 def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance):
@@ -1008,7 +1005,7 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     return smoothed_state_estimates, chi2, x_err, y_err
 
 
-def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, total_thickness, radiation_length, add_scattering_center=None):
+def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, material_budget, add_scattering_plane):
     '''
     Loop over the selected tracks. In this function all matrices for the Kalman Filter are calculated track by track
     and the Kalman Filter is started. With dut_fit_selection only the duts which are selected are included in the Kalman Filter.
@@ -1031,17 +1028,15 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
         The z positions of the DUTs in um. Here, needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV.
-    total_thickness : iterable
-        Total thickness of all DUTs in um. (Sensor + other materials)
-    radiation_length : iterable
-        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
-    add_scattering_center : kwarg
-        Specifies an additional scattering center in case of additional DUTs which are not used.
+    material_budget : iterable
+        Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
+        devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um).
+    add_scattering_plane : kwarg
+        Specifies an additional scattering plane in case of additional DUTs which are not used.
         The dictionary must contain:
-            index_scatter: dut index of scattering center
-            z_scatter: z position of scattering center in um
-            rad_len_scatter: radiation lenght of scattering center
-            thickness_scatter: thickness of scattering center in um
+            index_scatter: dut index of scattering plane
+            z_scatter: z position of scattering plane in um
+            material_budget_scatter: material budget of scattering plane
 
     Returns
     -------
@@ -1063,22 +1058,19 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     dut_selection = np.array(range(0, n_duts))
 
     # set multiple scattering environment
-    total_thickness = np.array(total_thickness)
-    radiation_length = np.array(radiation_length)
+    material_budget = np.array(material_budget)
 
     additional_scatter = False
-    if add_scattering_center is not None:
+    if add_scattering_plane is not None:
         additional_scatter = True
         n_duts = n_duts + 1
         dut_selection = np.array(range(0, n_duts))
-        # initialize scattering center values
-        index_scatter = add_scattering_center['index_scatter']
-        z_scatter = add_scattering_center['z_scatter']
-        rad_len_scatter = add_scattering_center['rad_len_scatter']
-        thickness_scatter = add_scattering_center['thickness_scatter']
+        # initialize scattering plane values
+        index_scatter = add_scattering_plane['index_scatter']
+        z_scatter = add_scattering_plane['z_scatter']
+        material_budget_scatter = add_scattering_plane['material_budget_scatter']
         # append new values
-        total_thickness = np.insert(total_thickness, index_scatter, thickness_scatter)
-        radiation_length = np.insert(radiation_length, index_scatter, rad_len_scatter)
+        material_budget = np.insert(material_budget, index_scatter, material_budget_scatter)
         z_positions = np.insert(z_positions, index_scatter, z_scatter)
         track_hits = np.insert(track_hits, index_scatter, np.full((track_hits.shape[0], track_hits.shape[2]), fill_value=np.nan), axis=1)
 
@@ -1088,7 +1080,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     beta = momentum / beam_energy  # almost 1
 
     # rms angle of multiple scattering
-    theta = np.array(((13.6 / momentum / beta) * np.sqrt(total_thickness / radiation_length) * (1. + 0.038 * np.log(total_thickness / radiation_length))))
+    theta = np.array(((13.6 / momentum / beta) * np.sqrt(material_budget) * (1. + 0.038 * np.log(material_budget))))
 
     # express transition covariance matrix
     transition_covariance = np.zeros((chunk_size, n_duts - 1, 4, 4))
@@ -1131,7 +1123,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     sel = dut_selection[:-1]
     z_diff = z_positions[sel + 1] - z_positions[sel]
 
-    if additional_scatter is True:  # need to shift dut fit selection in case of additional scattering center
+    if additional_scatter is True:  # need to shift dut fit selection in case of additional scattering plane
         dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] = dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] + 1
 
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
@@ -1192,7 +1184,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
                                                                observation_covariance, observation_offset,
                                                                initial_state_mean, initial_state_covariance)
 
-    if additional_scatter is True:  # delete estimated state vector at scattering center
+    if additional_scatter is True:  # delete estimated state vector at scattering plane
         track_estimate_chunks = np.delete(track_estimate_chunks, index_scatter, axis=1)
         x_err = np.delete(x_err, index_scatter, axis=1)
         y_err = np.delete(y_err, index_scatter, axis=1)

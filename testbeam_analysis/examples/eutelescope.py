@@ -295,8 +295,7 @@ def run_analysis():
         pixel_size=pixel_size,
         n_pixels=n_pixels,
         beam_energy=5000.,
-        total_thickness=[100., 100., 100., 100., 100., 100.],
-        radiation_length=[125390., 125390., 125390., 125390., 125390., 125390.],
+        material_budget=[100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390.],
         selection_track_quality=0,
         method='Kalman')
 

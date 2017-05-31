@@ -113,7 +113,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     # the cluster position errors which depends on cluster size
     pixel_resolution = pixel_size / np.sqrt(12)
 
-    # measurements: (x, y, z, xerr, yerr), taken from event 2518600 of run 118
+    # measurements: (x, y, z, xerr, yerr), data is taken from measurement
     measurements = np.array([[[-1229.22372954, 2828.19616302, 0., pixel_resolution[0][0], pixel_resolution[0][1]],
                               [-1254.51224282, 2827.4291421, 29900., pixel_resolution[1][0], pixel_resolution[1][1]],
                               [-1285.6117892, 2822.34536687, 60300., pixel_resolution[2][0], pixel_resolution[2][1]],
@@ -160,9 +160,8 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
             measurements, dut_fit_selection,
             pixel_size, n_pixels, measurements_plot[0, :, -1],
             beam_energy=2500.,
-            total_thickness=[100., 100., 100., 100., 100., 100., 250.],
-            radiation_length=[125390., 125390., 125390., 125390., 125390., 125390., 93700.])
-
+            material_budget=[100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 250. / 93700],
+            add_scattering_plane=None)
         # interpolate hits with straight line
         fit_x, _ = curve_fit(straight_line, measurements_plot[0, :, -1][fit_selection] / 1000., measurements[0, :, 0][fit_selection])
         fit_y, _ = curve_fit(straight_line, measurements_plot[0, :, -1][fit_selection] / 1000., measurements[0, :, 1][fit_selection])
