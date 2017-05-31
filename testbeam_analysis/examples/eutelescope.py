@@ -293,6 +293,7 @@ def run_analysis():
         output_tracks_file=os.path.join(output_folder, 'Tracks_all_Kalman.h5'),
         exclude_dut_hit=True,
         pixel_size=pixel_size,
+        n_pixels=n_pixels,
         beam_energy=5000.,
         total_thickness=[100., 100., 100., 100., 100., 100.],
         radiation_length=[125390., 125390., 125390., 125390., 125390., 125390.],

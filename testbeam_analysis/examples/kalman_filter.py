@@ -104,25 +104,33 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # measurements: (x, y, z) hit positions, taken from event 2518600 of run 118
-    measurements = np.array([[[-1229.22372954, 2828.19616302, 0.],
-                              [-1254.51224282, 2827.4291421, 29900.],
-                              [-1285.6117892, 2822.34536687, 60300.],
-                              [-1311.31083616, 2823.56121414, 82100.],
-                              [-1335.8529645, 2828.43359043, 118700.],
-                              [-1357.81872222, 2840.86947964, 160700.],
-                              [-1396.35698339, 2843.76799577, 197800.]]])
-
-    # copy of measurements for plotting, needed if actual measurements contains NaNs
-    measurements_2 = np.array([[[-1229.22372954, 2828.19616302, 0.],
-                              [-1254.51224282, 2827.4291421, 29900.],
-                              [-1285.6117892, 2822.34536687, 60300.],
-                              [-1311.31083616, 2823.56121414, 82100.],
-                              [-1335.8529645, 2828.43359043, 118700.],
-                              [-1357.81872222, 2840.86947964, 160700.],
-                              [-1396.35698339, 2843.76799577, 197800.]]])
     # pixel size of sensor
     pixel_size = np.array([(18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (18.5, 18.5), (250., 50.)])
+    # number of pixels of each sensor
+    n_pixels = np.array([(576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (80, 336)])
+
+    # pixel resolution: need error on measurements. For real data, the error comes from
+    # the cluster position errors which depends on cluster size
+    pixel_resolution = pixel_size / np.sqrt(12)
+
+    # measurements: (x, y, z, xerr, yerr), taken from event 2518600 of run 118
+    measurements = np.array([[[-1229.22372954, 2828.19616302, 0., pixel_resolution[0][0], pixel_resolution[0][1]],
+                              [-1254.51224282, 2827.4291421, 29900., pixel_resolution[1][0], pixel_resolution[1][1]],
+                              [-1285.6117892, 2822.34536687, 60300., pixel_resolution[2][0], pixel_resolution[2][1]],
+                              [-1311.31083616, 2823.56121414, 82100., pixel_resolution[3][0], pixel_resolution[3][1]],
+                              [-1335.8529645, 2828.43359043, 118700., pixel_resolution[4][0], pixel_resolution[4][1]],
+                              [-1357.81872222, 2840.86947964, 160700., pixel_resolution[5][0], pixel_resolution[5][1]],
+                              [-1396.35698339, 2843.76799577, 197800., pixel_resolution[6][0], pixel_resolution[6][1]]]])
+
+    # copy of measurements for plotting, needed if actual measurements contains NaNs
+    measurements_plot = np.array([[[-1229.22372954, 2828.19616302, 0.],
+                                   [-1254.51224282, 2827.4291421, 29900.],
+                                   [-1285.6117892, 2822.34536687, 60300.],
+                                   [-1311.31083616, 2823.56121414, 82100.],
+                                   [-1335.8529645, 2828.43359043, 118700.],
+                                   [-1357.81872222, 2840.86947964, 160700.],
+                                   [-1396.35698339, 2843.76799577, 197800.]]])
+
     # duts to fit tracks for
     fit_duts = np.array([0])
     # dut_fit_selection
@@ -150,14 +158,14 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
     for fit_dut_index, actual_fit_dut in enumerate(fit_duts):
         track_estimates_chunk, chi2, x_errs, y_errs = track_analysis._fit_tracks_kalman_loop(
             measurements, dut_fit_selection,
-            pixel_size, measurements_2[0, :, -1],
+            pixel_size, n_pixels, measurements_plot[0, :, -1],
             beam_energy=2500.,
             total_thickness=[100., 100., 100., 100., 100., 100., 250.],
             radiation_length=[125390., 125390., 125390., 125390., 125390., 125390., 93700.])
 
         # interpolate hits with straight line
-        fit_x, _ = curve_fit(straight_line, measurements_2[0, :, -1][fit_selection] / 1000., measurements[0, :, 0][fit_selection])
-        fit_y, _ = curve_fit(straight_line, measurements_2[0, :, -1][fit_selection] / 1000., measurements[0, :, 1][fit_selection])
+        fit_x, _ = curve_fit(straight_line, measurements_plot[0, :, -1][fit_selection] / 1000., measurements[0, :, 0][fit_selection])
+        fit_y, _ = curve_fit(straight_line, measurements_plot[0, :, -1][fit_selection] / 1000., measurements[0, :, 1][fit_selection])
 
         # store
         track_estimates_chunk_all[fit_dut_index] = track_estimates_chunk
@@ -170,8 +178,8 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
         if actual_fit_dut in plot_dut:  # plot only for selected DUT
 
             # duts which are unused for fit
-            unused_duts = np.setdiff1d(range(measurements_2.shape[1]), fit_selection)
-            x_fit = np.arange(measurements_2[0, :, -1][0], measurements_2[0, :, -1][-1], 1.) / 1000.
+            unused_duts = np.setdiff1d(range(measurements_plot.shape[1]), fit_selection)
+            x_fit = np.arange(measurements_plot[0, :, -1][0], measurements_plot[0, :, -1][-1], 1.) / 1000.
 
             # plot tracks in x-direction
             plt.title('Tracks in x-direction for DUT_%d' % plot_dut)
@@ -179,7 +187,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
             plt.ylabel('x / $\mathrm{\mu}$m')
             plt.grid()
 
-            plt.errorbar(measurements_2[0, :, -1] / 1000.,
+            plt.errorbar(measurements_plot[0, :, -1] / 1000.,
                          track_estimates_chunk_all[np.where(fit_duts == plot_dut)[0], :, 0].reshape(measurements.shape[1],),
                          yerr=x_errs_all[np.where(fit_duts == plot_dut)[0]].reshape(measurements.shape[1],),
                          marker='o', linestyle='-', label='Smoothed estimates', zorder=2)
@@ -187,7 +195,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
                      track_estimates_chunk_all[np.where(fit_duts == plot_dut)[0], unused_duts, 0].reshape(len(unused_duts),),
                      'o', color='indianred', zorder=4)
             plt.plot(measurements[0, :, -1] / 1000.,
-                     measurements_2[0, :, 0],
+                     measurements_plot[0, :, 0],
                      marker='o', linestyle='-', label='Hit positions', color='green', zorder=3)
             plt.plot(x_fit,
                      straight_line(x_fit, fit_results_x[np.where(fit_duts == plot_dut)[0], 0], fit_results_x[np.where(fit_duts == plot_dut)[0], 1]),
@@ -201,15 +209,15 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
             plt.xlabel('z / mm')
             plt.ylabel('y / $\mathrm{\mu}$m')
             plt.grid()
-            plt.errorbar(measurements_2[0, :, -1] / 1000.,
+            plt.errorbar(measurements_plot[0, :, -1] / 1000.,
                          track_estimates_chunk_all[np.where(fit_duts == plot_dut)[0], :, 1].reshape(measurements.shape[1],),
                          yerr=y_errs_all[np.where(fit_duts == plot_dut)[0]].reshape(measurements.shape[1],),
                          marker='o', linestyle='-', label='Smoothed estimates', zorder=2)
-            plt.plot(measurements_2[0, :, -1][unused_duts] / 1000.,
+            plt.plot(measurements_plot[0, :, -1][unused_duts] / 1000.,
                      track_estimates_chunk_all[np.where(fit_duts == plot_dut)[0], unused_duts, 1].reshape(len(unused_duts), ),
                      'o', color='indianred', zorder=4)
-            plt.plot(measurements_2[0, :, -1] / 1000.,
-                     measurements_2[0, :, 1],
+            plt.plot(measurements_plot[0, :, -1] / 1000.,
+                     measurements_plot[0, :, 1],
                      marker='o', linestyle='-', label='Hit positions', zorder=3)
             plt.plot(x_fit,
                      straight_line(x_fit, fit_results_y[np.where(fit_duts == plot_dut)[0], 0], fit_results_y[np.where(fit_duts == plot_dut)[0], 1]),
