@@ -142,7 +142,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, beam_energy=None, total_thickness=None, radiation_length=None ,max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, n_pixels=None, beam_energy=None, material_budget=None, add_scattering_plane=None, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
     '''Fits either a line through selected DUT hits for selected DUTs (method=Fit) or uses a Kalman Filter to build tracks (method=Kalman).
     The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts).
@@ -189,12 +189,20 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension (column/row),
         e.g. for two FE-I4 DUTs [(250, 50), (250, 50)]. Only needed for Kalman Filter.
+    n_pixels : iterable of tuples
+        One tuple per DUT describing the number of pixels in column, row direction
+        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]. Only needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV. Only needed for Kalman Filter.
-    total_thickness : iterable
-        Total thickness of all DUTs in um. (Sensor + other materials)
-    radiation_length : iterable
-        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
+    material_budget : iterable
+        Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
+        devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um). Only needed for Kalman Filter.
+    add_scattering_plane : kwarg
+        Specifies an additional scattering plane in case of additional DUTs which are not used.
+        The dictionary must contain:
+            index_scatter: dut index of scattering plane
+            z_scatter: z position of scattering plane in um
+            material_budget: material budget of scattering plane
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     keep_data : bool
@@ -617,7 +625,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         if method == "Fit":
                             track_hits = np.full((n_tracks, n_fit_duts, 3), np.nan)
                         elif method == "Kalman":
-                            track_hits = np.full((n_tracks, n_duts, 3), np.inf)
+                            track_hits = np.full((n_tracks, n_duts, 5), np.inf)
 
                         for dut_index in range(0, n_duts):  # Fill index loop of new array
                             if method == "Fit" and ((1 << dut_index) & dut_fit_selection) == (1 << dut_index):  # True if DUT is used in fit
@@ -629,7 +637,9 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                             elif method == "Kalman":
                                 xyz = np.column_stack(np.ma.array((good_track_candidates['x_dut_%s' % dut_index],
                                                                    good_track_candidates['y_dut_%s' % dut_index],
-                                                                   good_track_candidates['z_dut_%s' % dut_index])))
+                                                                   good_track_candidates['z_dut_%s' % dut_index],
+                                                                   good_track_candidates['xerr_dut_%s' % dut_index],
+                                                                   good_track_candidates['yerr_dut_%s' % dut_index])))
                                 track_hits[:, index, :] = xyz
                                 index += 1
 
@@ -641,8 +651,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         elif method == "Kalman":
                             results = pool.map(functools.partial(
                                 _function_wrapper_fit_tracks_kalman_loop, pixel_size,
-                                dut_fit_selection, z_positions,
-                                beam_energy, total_thickness, radiation_length), slices)
+                                n_pixels, dut_fit_selection, z_positions,
+                                beam_energy, material_budget, add_scattering_plane), slices)
                         del track_hits
 
                         # Store results
@@ -925,9 +935,9 @@ def _function_wrapper_fit_tracks_kalman_loop(*args):  # Needed for multiprocessi
     '''
     Function for multiprocessing call with arguments for speed up.
     '''
-    pixel_size, dut_fit_selection, z_positions, beam_energy, total_thickness, radiation_length, track_hits = args
+    pixel_size, n_pixels, dut_fit_selection, z_positions, beam_energy, material_budget, add_scattering_plane, track_hits = args
 
-    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length)[0:2]
+    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, material_budget, add_scattering_plane)[0:2]
 
 
 def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance):
@@ -982,6 +992,10 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
         if dut_index not in dut_fit_selection:
             measurements[:, dut_index, ] = ma.masked
 
+    # Check for invalid values (NaN)
+    if np.any(np.isnan(measurements)):
+        logging.warning('Not all measurements have valid values (Array contains NANs).')
+
     smoothed_state_estimates, cov = kf.smooth(transition_matrix, transition_offset, transition_covariance,
                                               observation_matrix, observation_offset, observation_covariance,
                                               initial_state_mean, initial_state_covariance, measurements)
@@ -990,10 +1004,14 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     x_err = np.sqrt(np.diagonal(cov, axis1=3, axis2=2))[:, :, 0]
     y_err = np.sqrt(np.diagonal(cov, axis1=3, axis2=2))[:, :, 1]
 
+    # Check for invalid values (NaN)
+    if np.any(np.isnan(smoothed_state_estimates)):
+        logging.warning('Not all smoothed state estimates have valid values (Array contains NANs)! Check input of  Kalman Filter.')
+
     return smoothed_state_estimates, chi2, x_err, y_err
 
 
-def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positions, beam_energy, total_thickness, radiation_length):
+def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, material_budget, add_scattering_plane):
     '''
     Loop over the selected tracks. In this function all matrices for the Kalman Filter are calculated track by track
     and the Kalman Filter is started. With dut_fit_selection only the duts which are selected are included in the Kalman Filter.
@@ -1009,38 +1027,58 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
     pixel_size : iterable of tuples
         One tuple per DUT describing the pixel dimension (column/row),
         e.g. for two FE-I4 DUTs [(250, 50), (250, 50)].
+    n_pixels : iterable of tuples
+        One tuple per DUT describing the number of pixels in column, row direction
+        e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]. Only needed for Kalman Filter.
     z_positions : iterable
         The z positions of the DUTs in um. Here, needed for Kalman Filter.
     beam_energy : uint
         Energy of electron beam in MeV.
-    total_thickness : iterable
-        Total thickness of all DUTs in um. (Sensor + other materials)
-    radiation_length : iterable
-        Radiation length of all DUTs in um. (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um)
+    material_budget : iterable
+        Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
+        devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um).
+    add_scattering_plane : kwarg
+        Specifies an additional scattering plane in case of additional DUTs which are not used.
+        The dictionary must contain:
+            index_scatter: dut index of scattering plane
+            z_scatter: z position of scattering plane in um
+            material_budget_scatter: material budget of scattering plane
 
     Returns
     -------
     smoothed_state_estimates : array_like
-        Smoothed state vectors.
+        Smoothed state vectors, which contains (smoothed x position, smoothed y position, slope_x, slope_y).
     chi2 : uint
         Chi2 of track.
     x_err : array_like
         Error of smoothed hit position in x direction. Calculated from smoothed
-        state covariance matrix.
+        state covariance matrix. Only approximation, since only diagonal element is taken.
     y_err : array_like
         Error of smoothed hit position in y direction. Calculated from smoothed
-        state covariance matrix.
+        state covariance matrix. Only approximation, since only diagonal element is taken.
     '''
     z_positions = np.array(z_positions)
+    n_pixels = np.array(n_pixels)
     n_duts = track_hits.shape[1]
     chunk_size = track_hits.shape[0]
     dut_selection = np.array(range(0, n_duts))
 
     # set multiple scattering environment
-    total_thickness = np.array(total_thickness)
-    radiation_length = np.array(radiation_length)
+    material_budget = np.array(material_budget)
 
-    pixel_resolution = pixel_size / np.sqrt(12.)  # Resolution of each telescope plane
+    additional_scatter = False
+    if add_scattering_plane is not None:
+        additional_scatter = True
+        n_duts = n_duts + 1
+        dut_selection = np.array(range(0, n_duts))
+        # initialize scattering plane values
+        index_scatter = add_scattering_plane['index_scatter']
+        z_scatter = add_scattering_plane['z_scatter']
+        material_budget_scatter = add_scattering_plane['material_budget_scatter']
+        # append new values
+        material_budget = np.insert(material_budget, index_scatter, material_budget_scatter)
+        z_positions = np.insert(z_positions, index_scatter, z_scatter)
+        track_hits = np.insert(track_hits, index_scatter, np.full((track_hits.shape[0], track_hits.shape[2]), fill_value=np.nan), axis=1)
 
     # Calculate multiple scattering
     mass = 0.511  # mass in MeV (electrons)
@@ -1048,20 +1086,19 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
     beta = momentum / beam_energy  # almost 1
 
     # rms angle of multiple scattering
-    theta = np.array(((13.6 / momentum / beta) * np.sqrt(total_thickness / radiation_length) * (1. + 0.038 * np.log(total_thickness / radiation_length))))
+    theta = np.array(((13.6 / momentum / beta) * np.sqrt(material_budget) * (1. + 0.038 * np.log(material_budget))))
+
     # express transition covariance matrix
     transition_covariance = np.zeros((chunk_size, n_duts - 1, 4, 4))
 
     # express transition matrix
     transition_matrix = np.zeros((chunk_size, n_duts - 1, 4, 4))
 
-    # express state vector
-    state_vector = np.zeros((n_duts - 1, 4,))
-
     # express transition and observation offset matrices
     transition_offset = np.zeros((chunk_size, n_duts - 1, 4))
     observation_offset = np.zeros((chunk_size, n_duts, 4))
 
+    # express initial state. Contains (x_pos, y_pos, slope_x, slope_y).
     initial_state_mean = np.zeros((chunk_size, 4))
 
     # express observatipon matrix
@@ -1069,16 +1106,15 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
 
     # express observation covariance matrices
     observation_covariance = np.zeros((chunk_size, n_duts, 4, 4))
-    # observation matrix: only observe x and y position
+    # only observe x and y position
     observation_matrix[:, :, 0, 0] = 1.
     observation_matrix[:, :, 1, 1] = 1.
 
     # express initial state covariance matrices: x and y pos have initial error of pixel resolution and x and y slopes have large error
-    initial_state_covariance = np.zeros((4, 4))
-    initial_state_covariance[0, 0] = pixel_resolution[0, 0]**2
-    initial_state_covariance[1, 1] = pixel_resolution[0, 1]**2
-    initial_state_covariance[2, 2] = 0.01  # 0.01
-    initial_state_covariance[3, 3] = 0.01  # 0.01
+    initial_state_covariance = np.zeros((chunk_size, 4, 4))
+    # error on initial slope is roughly divergence of beam (5 mrad). Error on initial x-y position depends on fit selection
+    initial_state_covariance[:, 2, 2] = np.square(5e-3)
+    initial_state_covariance[:, 3, 3] = np.square(5e-3)
 
     # create a list of duts which should be included in the fit
     dut_list = np.full(shape=(n_duts), fill_value=np.nan)
@@ -1088,64 +1124,75 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, z_positio
             dut_list[dut_n] = dut_n
     dut_fit_selection = dut_list[~np.isnan(dut_list)].astype(int)
 
+    # This selection is needed for matrices for the kalman filter.
+    # It selects all duts, except the last one.
+    sel = dut_selection[:-1]
+    z_diff = z_positions[sel + 1] - z_positions[sel]
+
+    if additional_scatter is True:  # need to shift dut fit selection in case of additional scattering plane
+        dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] = dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] + 1
+
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
-        x_positions = np.array(actual_hits[:, 0])
-        y_positions = np.array(actual_hits[:, 1])
+        # cluster hit position error
+        x_err = np.array(actual_hits[:, 3])
+        y_err = np.array(actual_hits[:, 4])
 
-        # initial state: first two components x and y hit position in first dut, slopes all zero
-        initial_state_mean[index] = np.array([actual_hits[0, 0], actual_hits[0, 1], 0., 0.])
+        # Take cluster hit position error as measurement error for duts which have a hit.
+        # For those who have no hit, need no error, since the should not be included in fit via fit selection
+        observation_covariance[index, dut_selection[~np.isnan(x_err)], 0, 0] = np.square(x_err[dut_selection[~np.isnan(x_err)]])
+        observation_covariance[index, dut_selection[~np.isnan(x_err)], 1, 1] = np.square(y_err[dut_selection[~np.isnan(x_err)]])
 
-        # express observation covariance
-        observation_covariance[index, dut_selection, 0, 0] = np.square(pixel_resolution[dut_selection][:, 0])
-        observation_covariance[index, dut_selection, 1, 1] = np.square(pixel_resolution[dut_selection][:, 1])
+        if dut_selection[0] in dut_fit_selection:  # first dut is in fit selection
+            # If first dut is used in track building, take first dut hit as initial value and
+            # its corresponding cluster position error as the error on the measurement.
+            initial_state_mean[index] = np.array([actual_hits[0, 0], actual_hits[0, 1], 0., 0.])
+            initial_state_covariance[index, 0, 0] = np.square(x_err[0])  # np.square(pixel_resolution[0, 0])  # np.square(x_err[0])
+            initial_state_covariance[index, 1, 1] = np.square(y_err[0])  # np.square(pixel_resolution[0, 1])  # np.square(y_err[0])
+        else:  # first dut is not in fit selction
+            # Take hit from first dut which is in fit selection. Cannot take hit from first dut,
+            # since do not want to pass measurement to kalman filter (unbiased).
+            # Due to the fact that this hit position can be very off through multiple scattering,
+            # take whole sensor as error (this error must be very large).
+            initial_state_mean[index] = np.array([actual_hits[dut_fit_selection[0], 0], actual_hits[dut_fit_selection[0], 1], 0., 0.])
+            initial_state_covariance[index, 0, 0] = np.square(n_pixels * pixel_size)[dut_fit_selection[0], 0]
+            initial_state_covariance[index, 1, 1] = np.square(n_pixels * pixel_size)[dut_fit_selection[0], 1]
 
         # express transition matrices
-        transition_matrix[index, dut_selection[:-1], :, 0] = np.array([1., 0., 0., 0.])
-        transition_matrix[index, dut_selection[:-1], :, 1] = np.array([0., 1., 0., 0.])
-        transition_matrix[index, dut_selection[:-1], :, 2] = np.array([
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]), np.zeros((len(dut_selection[:-1]),)),
-            np.ones((len(dut_selection[:-1]),)), np.zeros((len(dut_selection[:-1]),))]).T
-        transition_matrix[index, dut_selection[:-1], :, 3] = np.array([
-            np.zeros((len(dut_selection[:-1]),)), -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]),
-            np.zeros((len(dut_selection[:-1]),)), np.ones((len(dut_selection[:-1]),))]).T
-
-        state_vector[dut_fit_selection[:-1]] = np.array([x_positions[dut_fit_selection[:-1]],
-                                                         y_positions[dut_fit_selection[:-1]],
-                                                         np.zeros(x_positions[dut_fit_selection[:-1]].shape),
-                                                         np.zeros(x_positions[dut_fit_selection[:-1]].shape)]).T
-
-        cov_33 = theta[dut_selection[:-1]]**2 * (1 + state_vector[dut_selection[:-1], 2]**2) * (1 + state_vector[dut_selection[:-1], 2]**2 + state_vector[dut_selection[:-1], 3]**2).T
-        cov_44 = theta[dut_selection[:-1]]**2 * (1 + state_vector[dut_selection[:-1], 3]**2) * (1 + state_vector[dut_selection[:-1], 2]**2 + state_vector[dut_selection[:-1], 3]**2).T
-        cov_34 = theta[dut_selection[:-1]]**2 * state_vector[dut_selection[:-1], 2] * state_vector[dut_selection[:-1], 3] * (1 + state_vector[dut_selection[:-1], 2]**2 + state_vector[dut_selection[:-1], 3]**2).T
+        transition_matrix[index, sel, :, 0] = np.array([1., 0., 0., 0.])
+        transition_matrix[index, sel, :, 1] = np.array([0., 1., 0., 0.])
+        transition_matrix[index, sel, :, 2] = np.array([-(z_diff), np.zeros((len(sel),)),
+                                                        np.ones((len(sel),)), np.zeros((len(sel),))]).T
+        transition_matrix[index, sel, :, 3] = np.array([np.zeros((len(sel),)), -(z_diff),
+                                                        np.zeros((len(sel),)), np.ones((len(sel),))]).T
 
         # express transition covariance matrices, according to http://web-docs.gsi.de/~ikisel/reco/Methods/CovarianceMatrices-NIMA329-1993.pdf
-        transition_covariance[index, dut_selection[:-1], :, 0] = np.array([(
-            z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_33,
-            (z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_34,
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_33,
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34]).T
-
-        transition_covariance[index, dut_selection[:-1], :, 1] = np.array([
-            (z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_34,
-            (z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]])**2 * cov_44,
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34,
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_44]).T
-        transition_covariance[index, dut_selection[:-1], :, 2] = np.array([
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_33,
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34,
-            cov_33,
-            cov_34]).T
-        transition_covariance[index, dut_selection[:-1], :, 3] = np.array([
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_34,
-            -(z_positions[dut_selection[:-1] + 1] - z_positions[dut_selection[:-1]]) * cov_44,
-            cov_34,
-            cov_44]).T
+        transition_covariance[index, sel, :, 0] = np.array([(z_diff)**2 * theta[sel]**2,
+                                                            np.zeros((len(sel),)),
+                                                            -(z_diff) * theta[sel]**2,
+                                                            np.zeros((len(sel),))]).T
+        transition_covariance[index, sel, :, 1] = np.array([np.zeros((len(sel),)),
+                                                            (z_diff)**2 * theta[sel]**2,
+                                                            np.zeros((len(sel),)),
+                                                            -(z_diff) * theta[sel]**2]).T
+        transition_covariance[index, sel, :, 2] = np.array([-(z_diff) * theta[sel]**2,
+                                                            np.zeros((len(sel),)),
+                                                            theta[sel]**2,
+                                                            np.zeros((len(sel),))]).T
+        transition_covariance[index, sel, :, 3] = np.array([np.zeros((len(sel),)),
+                                                            -(z_diff) * theta[sel]**2,
+                                                            np.zeros((len(sel),)),
+                                                            theta[sel]**2]).T
 
     # run kalman filter
-    track_estimate_chunks, chi2, x_err, y_err = _kalman_fit_3d(track_hits, dut_fit_selection,
+    track_estimate_chunks, chi2, x_err, y_err = _kalman_fit_3d(track_hits[:, :, 0:2], dut_fit_selection,
                                                                transition_matrix, transition_covariance,
                                                                transition_offset, observation_matrix,
                                                                observation_covariance, observation_offset,
                                                                initial_state_mean, initial_state_covariance)
+
+    if additional_scatter is True:  # delete estimated state vector at scattering plane
+        track_estimate_chunks = np.delete(track_estimate_chunks, index_scatter, axis=1)
+        x_err = np.delete(x_err, index_scatter, axis=1)
+        y_err = np.delete(y_err, index_scatter, axis=1)
 
     return track_estimate_chunks, chi2, x_err, y_err
