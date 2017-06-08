@@ -329,7 +329,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     else:
         same_tracks_for_all_duts = False
 
-    def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk=None):
+    def create_results_array(good_track_candidates, slopes, offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk_full=None):
         # Define description
         description = [('event_number', np.int64)]
         for index in range(n_duts):
@@ -352,9 +352,13 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             for index in range(n_duts):
                 description.append(('predicted_y_dut_%d' % index, np.float))
             for index in range(n_duts):
+                description.append(('predicted_z_dut_%d' % index, np.float))
+            for index in range(n_duts):
                 description.append(('slope_x_dut_%d' % index, np.float))
             for index in range(n_duts):
                 description.append(('slope_y_dut_%d' % index, np.float))
+            for index in range(n_duts):
+                description.append(('slope_z_dut_%d' % index, np.float))
         description.extend([('track_chi2', np.uint32), ('track_quality', np.uint32), ('n_tracks', np.int8)])
         for index in range(n_duts):
             description.append(('xerr_dut_%d' % index, np.float))
@@ -394,10 +398,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 tracks_array['slope_%d' % dimension][good_track_selection] = slopes[:, dimension]
             if full_track_info is True and method == "Kalman":
                 for index in range(n_duts):
-                    tracks_array['predicted_x_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 0]
-                    tracks_array['predicted_y_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 1]
-                    tracks_array['slope_x_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 2]
-                    tracks_array['slope_y_dut_%d' % index][good_track_selection] = track_estimates_chunk[:, index, 3]
+                    tracks_array['predicted_x_dut_%d' % index][good_track_selection] = track_estimates_chunk_full[:, index, 0]
+                    tracks_array['predicted_y_dut_%d' % index][good_track_selection] = track_estimates_chunk_full[:, index, 1]
+                    tracks_array['predicted_z_dut_%d' % index][good_track_selection] = track_estimates_chunk_full[:, index, 2]
+                    tracks_array['slope_x_dut_%d' % index][good_track_selection] = track_estimates_chunk_full[:, index, 3]
+                    tracks_array['slope_y_dut_%d' % index][good_track_selection] = track_estimates_chunk_full[:, index, 4]
+                    tracks_array['slope_z_dut_%d' % index][good_track_selection] = track_estimates_chunk_full[:, index, 5]
             tracks_array['track_chi2'][good_track_selection] = chi2s
         else:
             for dimension in range(3):
@@ -406,10 +412,12 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 tracks_array['slope_%d' % dimension] = slopes[:, dimension]
             if full_track_info is True and method == "Kalman":
                 for index in range(n_duts):
-                    tracks_array['predicted_x_dut_%d' % index] = track_estimates_chunk[:, index, 0]
-                    tracks_array['predicted_y_dut_%d' % index] = track_estimates_chunk[:, index, 1]
-                    tracks_array['slope_x_dut_%d' % index] = track_estimates_chunk[:, index, 2]
-                    tracks_array['slope_y_dut_%d' % index] = track_estimates_chunk[:, index, 3]
+                    tracks_array['predicted_x_dut_%d' % index] = track_estimates_chunk_full[:, index, 0]
+                    tracks_array['predicted_y_dut_%d' % index] = track_estimates_chunk_full[:, index, 1]
+                    tracks_array['predicted_z_dut_%d' % index] = track_estimates_chunk_full[:, index, 2]
+                    tracks_array['slope_x_dut_%d' % index] = track_estimates_chunk_full[:, index, 3]
+                    tracks_array['slope_y_dut_%d' % index] = track_estimates_chunk_full[:, index, 4]
+                    tracks_array['slope_z_dut_%d' % index] = track_estimates_chunk_full[:, index, 5]
             tracks_array['track_chi2'] = chi2s
 
         return tracks_array
@@ -465,20 +473,76 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
             dut_plane_normal = basis_global[2]
 
+        # FIXME: calculate real slope in z direction
         slopes = np.column_stack((track_estimates_chunk[:, fit_dut, 2],
                                   track_estimates_chunk[:, fit_dut, 3],
                                   np.ones((track_estimates_chunk.shape[0],)).reshape(track_estimates_chunk.shape[0], 1)))
+
+        # z position of each track estimate
+        z_position = geometry_utils.get_line_intersections_with_plane(line_origins=np.column_stack((track_estimates_chunk[:, fit_dut, 0],
+                                                                                                    track_estimates_chunk[:, fit_dut, 1],
+                                                                                                    np.ones(track_estimates_chunk[:, fit_dut, 0].shape))),
+                                                                      line_directions=np.column_stack((np.zeros((track_estimates_chunk[:, fit_dut, 0].shape)),
+                                                                                                       np.zeros(track_estimates_chunk[:, fit_dut, 0].shape),
+                                                                                                       np.ones(track_estimates_chunk[:, fit_dut, 0].shape))),
+                                                                      position_plane=dut_position,
+                                                                      normal_plane=dut_plane_normal)[:, -1]
+
         offsets = np.column_stack((track_estimates_chunk[:, fit_dut, 0],
                                    track_estimates_chunk[:, fit_dut, 1],
-                                   np.repeat(dut_position[-1], track_estimates_chunk.shape[0]).reshape(track_estimates_chunk.shape[0], 1)))
-
-        actual_offsets = geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
-                                                                          line_directions=slopes,
-                                                                          position_plane=dut_position,
-                                                                          normal_plane=dut_plane_normal)
+                                   z_position))
+        # do not need to calculate intersection with plane, since track parameters are estimated at the respective plane in kalman filter.
+        # This is different than for straight line fit, where intersection calculation is needed.
+        actual_offsets = offsets
 
         if full_track_info is True and method == "Kalman":
-            tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk)
+            # array to store x,y,z position and respective slopes of other DUTs
+            track_estimates_chunk_full = np.full(shape=(track_estimates_chunk.shape[0], n_duts, 6), fill_value=np.nan)
+            for dut_index in range(n_duts):
+                if dut_index == fit_dut:  # do not need to transform data of actual fit dut, this is already done,
+                    continue
+                if use_prealignment:  # Pre-alignment does not set any plane rotations thus plane normal = (0, 0, 1) and position = (0, 0, z)
+                    dut_position = np.array([0., 0., prealignment['z'][dut_index]])
+                    dut_plane_normal = np.array([0., 0., 1.])
+                else:  # Deduce plane orientation in 3D for track extrapolation; not needed if rotation info is not available (e.g. only prealigned data)
+                    dut_position = np.array([alignment[dut_index]['translation_x'], alignment[dut_index]['translation_y'], alignment[dut_index]['translation_z']])
+                    rotation_matrix = geometry_utils.rotation_matrix(alpha=alignment[dut_index]['alpha'],
+                                                                     beta=alignment[dut_index]['beta'],
+                                                                     gamma=alignment[dut_index]['gamma'])
+                    basis_global = rotation_matrix.T.dot(np.eye(3))  # TODO: why transposed?
+                    dut_plane_normal = basis_global[2]
+
+                # FIXME: calculate real slope in z direction
+                slopes_full = np.column_stack((track_estimates_chunk[:, dut_index, 2],
+                                               track_estimates_chunk[:, dut_index, 3],
+                                               np.ones((track_estimates_chunk.shape[0],)).reshape(track_estimates_chunk.shape[0], 1)))
+
+                # z position of each track estimate
+                z_position = geometry_utils.get_line_intersections_with_plane(line_origins=np.column_stack((track_estimates_chunk[:, dut_index, 0],
+                                                                                                            track_estimates_chunk[:, dut_index, 1],
+                                                                                                            np.ones(track_estimates_chunk[:, dut_index, 0].shape))),
+                                                                              line_directions=np.column_stack((np.zeros((track_estimates_chunk[:, dut_index, 0].shape)), 
+                                                                                                               np.zeros(track_estimates_chunk[:, dut_index, 0].shape), 
+                                                                                                               np.ones(track_estimates_chunk[:, dut_index, 0].shape))),
+                                                                              position_plane=dut_position,
+                                                                              normal_plane=dut_plane_normal)[:, -1]
+
+                offsets_full = np.column_stack((track_estimates_chunk[:, dut_index, 0],
+                                                track_estimates_chunk[:, dut_index, 1],
+                                                z_position))
+
+                # do not need to calculate intersection with plane, since track parameters are estimated at the respective plane in kalman filter.
+                # This is different than for straight line fit, where intersection calculation is needed.
+                actual_offsets_full = offsets_full
+
+                track_estimates_chunk_full[:, dut_index] = np.column_stack((actual_offsets_full[:, 0],
+                                                                           actual_offsets_full[:, 1],
+                                                                           actual_offsets_full[:, 2],
+                                                                           slopes_full[:, 0],
+                                                                           slopes_full[:, 1],
+                                                                           slopes_full[:, 2]))
+
+            tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk, track_estimates_chunk_full)
         else:
             tracks_array = create_results_array(good_track_candidates, slopes, actual_offsets, chi2s, n_duts, good_track_selection, track_candidates_chunk)
 
@@ -643,9 +707,15 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                         if method == "Fit":
                             results = pool.map(_fit_tracks_loop, slices)
                         elif method == "Kalman":
+                            if use_prealignment:
+                                # if prealignment is used, planes are not rotated, thus do not have to correct
+                                # rotation in kalman filter
+                                alignment = None
+                            else:
+                                alignment = alignment
                             results = pool.map(functools.partial(
                                 _function_wrapper_fit_tracks_kalman_loop, pixel_size,
-                                n_pixels, dut_fit_selection, z_positions,
+                                n_pixels, dut_fit_selection, z_positions, alignment,
                                 beam_energy, material_budget, add_scattering_plane), slices)
                         del track_hits
 
@@ -929,12 +999,12 @@ def _function_wrapper_fit_tracks_kalman_loop(*args):  # Needed for multiprocessi
     '''
     Function for multiprocessing call with arguments for speed up.
     '''
-    pixel_size, n_pixels, dut_fit_selection, z_positions, beam_energy, material_budget, add_scattering_plane, track_hits = args
+    pixel_size, n_pixels, dut_fit_selection, z_positions, alignment, beam_energy, material_budget, add_scattering_plane, track_hits = args
 
-    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, material_budget, add_scattering_plane)[0:2]
+    return _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, alignment, beam_energy, material_budget, add_scattering_plane)[0:2]
 
 
-def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance):
+def _kalman_fit_3d(hits, alignment, dut_fit_selection, transition_matrix, transition_covariance, transition_offset, observation_matrix, observation_covariance, observation_offset, initial_state_mean, initial_state_covariance):
     '''
     This function calls the Kalman Filter. It returns track by track the smoothed state vector which contains in the first two components
     the smoothed hit positions and in the last two components the respective slopes. Additionally the chi square of the track is calculated
@@ -944,6 +1014,10 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     ----------
     hits : array_like
         Array which contains the x, y and z hit position of each DUT for one track.
+    alignment : array_like or None
+        Aligment data, which contains rotations and translations for each DUT. Needed to take rotations of DUTs into account,
+        in order to get correct transition matrices. If pre-alignment data is used, this is set to None since no rotations have to be
+        taken into account.
     dut_fit_selection : iterable
         List of DUTs which should be included in Kalman Filter. DUTs which are not in list
         were treated as missing measurements and will not be included in the Filtering step.
@@ -990,7 +1064,7 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     if np.any(np.isnan(measurements)):
         logging.warning('Not all measurements have valid values (Array contains NANs).')
 
-    smoothed_state_estimates, cov = kf.smooth(transition_matrix, transition_offset, transition_covariance,
+    smoothed_state_estimates, cov = kf.smooth(alignment, transition_matrix, transition_offset, transition_covariance,
                                               observation_matrix, observation_offset, observation_covariance,
                                               initial_state_mean, initial_state_covariance, measurements)
 
@@ -1005,7 +1079,7 @@ def _kalman_fit_3d(hits, dut_fit_selection, transition_matrix, transition_covari
     return smoothed_state_estimates, chi2, x_err, y_err
 
 
-def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, beam_energy, material_budget, add_scattering_plane):
+def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels, z_positions, alignment, beam_energy, material_budget, add_scattering_plane):
     '''
     Loop over the selected tracks. In this function all matrices for the Kalman Filter are calculated track by track
     and the Kalman Filter is started. With dut_fit_selection only the duts which are selected are included in the Kalman Filter.
@@ -1026,6 +1100,10 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
         e.g. for 2 DUTs: n_pixels = [(80, 336), (80, 336)]. Only needed for Kalman Filter.
     z_positions : iterable
         The z positions of the DUTs in um. Here, needed for Kalman Filter.
+    alignment : array_like or None
+        Aligment data, which contains rotations and translations for each DUT. Needed to take rotations of DUTs into account,
+        in order to get correct transition matrices. If pre-alignment data is used, this is set to None since no rotations have to be
+        taken into account.
     beam_energy : uint
         Energy of electron beam in MeV.
     material_budget : iterable
@@ -1152,6 +1230,9 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
             initial_state_covariance[index, 1, 1] = np.square(n_pixels * pixel_size)[dut_fit_selection[0], 1]
 
         # express transition matrices
+        # transition matrices are filled already here. In case of prealignment matrices will not be updated.
+        # If alignment is used, transition matrices are updated (in Kalman Filter) before each prediction step in order to take
+        # rotations of planes into account.
         transition_matrix[index, sel, :, 0] = np.array([1., 0., 0., 0.])
         transition_matrix[index, sel, :, 1] = np.array([0., 1., 0., 0.])
         transition_matrix[index, sel, :, 2] = np.array([-(z_diff), np.zeros((len(sel),)),
@@ -1178,7 +1259,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
                                                             theta[sel]**2]).T
 
     # run kalman filter
-    track_estimate_chunks, chi2, x_err, y_err = _kalman_fit_3d(track_hits[:, :, 0:2], dut_fit_selection,
+    track_estimate_chunks, chi2, x_err, y_err = _kalman_fit_3d(track_hits[:, :, 0:2], alignment, dut_fit_selection,
                                                                transition_matrix, transition_covariance,
                                                                transition_offset, observation_matrix,
                                                                observation_covariance, observation_offset,
