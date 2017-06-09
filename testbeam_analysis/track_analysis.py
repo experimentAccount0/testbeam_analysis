@@ -198,7 +198,9 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         The dictionary must contain:
             index_scatter: dut index of scattering plane
             z_scatter: z position of scattering plane in um
-            material_budget: material budget of scattering plane
+            material_budget_scatter: material budget of scattering plane
+            alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
+                               If None, no rotation will be considered.
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     keep_data : bool
@@ -1115,6 +1117,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
             index_scatter: dut index of scattering plane
             z_scatter: z position of scattering plane in um
             material_budget_scatter: material budget of scattering plane
+            alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
+                               If None, no rotation will be considered.
 
     Returns
     -------
@@ -1147,9 +1151,17 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
         index_scatter = add_scattering_plane['index_scatter']
         z_scatter = add_scattering_plane['z_scatter']
         material_budget_scatter = add_scattering_plane['material_budget_scatter']
+        if add_scattering_plane['alignment_scatter'] is not None:
+            alignment_scatter = [(index_scatter, 0., 0., z_scatter, add_scattering_plane['alignment_scatter'][0],
+                                 add_scattering_plane['alignment_scatter'][1], add_scattering_plane['alignment_scatter'][2], 0., 0.)]
+        else:
+            alignment_scatter = [(index_scatter, 0., 0., z_scatter, 0., 0., 0., 0., 0.)]
         # append new values
         material_budget = np.insert(material_budget, index_scatter, material_budget_scatter)
         z_positions = np.insert(z_positions, index_scatter, z_scatter)
+        alignment = np.insert(alignment, index_scatter, [alignment_scatter])
+        for index in range(index_scatter + 1, alignment.shape[0]):
+            alignment[index][0] = alignment[index][0] + 1
         track_hits = np.insert(track_hits, index_scatter, np.full((track_hits.shape[0], track_hits.shape[2]), fill_value=np.nan), axis=1)
 
     # Calculate multiple scattering
