@@ -2,9 +2,10 @@ import numpy as np
 
 from numba import njit
 from numpy import linalg
-import logging
+from testbeam_analysis.tools import geometry_utils
 
 
+@njit
 def _filter_predict(transition_matrix, transition_covariance,
                     transition_offset, current_filtered_state,
                     current_filtered_state_covariance):
@@ -171,12 +172,12 @@ def _filter(alignment, transition_matrices, observation_matrices, transition_cov
                 dut_position = [np.array([alignment[t - 1]['translation_x'], alignment[t - 1]['translation_y'], alignment[t - 1]['translation_z']]),
                                 np.array([alignment[t]['translation_x'], alignment[t]['translation_y'], alignment[t]['translation_z']])]
 
-                rotation_matrix = [_rotation_matrix(alpha=alignment[t - 1]['alpha'],
-                                                    beta=alignment[t - 1]['beta'],
-                                                    gamma=alignment[t - 1]['gamma']),
-                                   _rotation_matrix(alpha=alignment[t]['alpha'],
-                                                    beta=alignment[t]['beta'],
-                                                    gamma=alignment[t]['gamma'])]
+                rotation_matrix = [geometry_utils.rotation_matrix(alpha=alignment[t - 1]['alpha'],
+                                                                  beta=alignment[t - 1]['beta'],
+                                                                  gamma=alignment[t - 1]['gamma']),
+                                   geometry_utils.rotation_matrix(alpha=alignment[t]['alpha'],
+                                                                  beta=alignment[t]['beta'],
+                                                                  gamma=alignment[t]['gamma'])]
 
                 basis_global = [rotation_matrix[0].T.dot(np.eye(3)), rotation_matrix[1].T.dot(np.eye(3))]
                 dut_plane_normal = [basis_global[0][2], basis_global[1][2]]
@@ -185,27 +186,27 @@ def _filter(alignment, transition_matrices, observation_matrices, transition_cov
                 slopes = np.column_stack((filtered_states[:, t - 1, 2], filtered_states[:, t - 1, 3], np.ones((filtered_states.shape[0], 1))))
 
                 # z position of the filtered states
-                z_position = get_line_intersections_with_plane(line_origins=np.column_stack((filtered_states[:, t - 1, 0],
-                                                                                             filtered_states[:, t - 1, 1],
-                                                                                             np.ones(filtered_states[:, t - 1, 1].shape))),
-                                                               line_directions=np.column_stack((np.zeros((filtered_states[:, t - 1, 1].shape)),
-                                                                                                np.zeros(filtered_states[:, t - 1, 1].shape),
-                                                                                                np.ones(filtered_states[:, t - 1, 1].shape))),
-                                                               position_plane=dut_position[0],
-                                                               normal_plane=dut_plane_normal[0])[:, -1]
+                z_position = geometry_utils.get_line_intersections_with_plane(line_origins=np.column_stack((filtered_states[:, t - 1, 0],
+                                                                                                            filtered_states[:, t - 1, 1],
+                                                                                                            np.ones(filtered_states[:, t - 1, 1].shape))),
+                                                                              line_directions=np.column_stack((np.zeros((filtered_states[:, t - 1, 1].shape)),
+                                                                                                               np.zeros(filtered_states[:, t - 1, 1].shape),
+                                                                                                               np.ones(filtered_states[:, t - 1, 1].shape))),
+                                                                              position_plane=dut_position[0],
+                                                                              normal_plane=dut_plane_normal[0])[:, -1]
 
                 # offsets (supoort vectors) of the filtered states
                 offsets = np.column_stack((filtered_states[:, t - 1, 0], filtered_states[:, t - 1, 1], z_position))
 
                 # calculate intersection of state which should be predicted (filtered state of plane before) with plane t - 1 and t
-                offsets_rotated = [get_line_intersections_with_plane(line_origins=offsets,
-                                                                     line_directions=slopes,
-                                                                     position_plane=dut_position[0],
-                                                                     normal_plane=dut_plane_normal[0]),
-                                   get_line_intersections_with_plane(line_origins=offsets,
-                                                                     line_directions=slopes,
-                                                                     position_plane=dut_position[1],
-                                                                     normal_plane=dut_plane_normal[1])]
+                offsets_rotated = [geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                                    line_directions=slopes,
+                                                                                    position_plane=dut_position[0],
+                                                                                    normal_plane=dut_plane_normal[0]),
+                                   geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                                    line_directions=slopes,
+                                                                                    position_plane=dut_position[1],
+                                                                                    normal_plane=dut_plane_normal[1])]
 
                 z_diff = offsets_rotated[1][:, 2] - offsets_rotated[0][:, 2]
 
@@ -390,160 +391,6 @@ def _mat_inverse(X):
     for i in range(X.shape[0]):
             inv[i] = linalg.pinv(X[i])
     return inv
-
-
-def get_line_intersections_with_plane(line_origins, line_directions,
-                                      position_plane, normal_plane):
-    ''' Calculates the intersection of n lines with one plane.
-
-    If there is no intersection point (line is parallel to plane or the line is
-    in the plane) the intersection point is set to nan.
-
-    Notes
-    -----
-    Further information:
-    http://stackoverflow.com/questions/4938332/line-plane-intersection-based-on-points
-
-    Parameters
-    ----------
-    line_origins : array
-        A point (x, y and z) on the line for each of the n lines.
-    line_directions : array
-        The direction vector of the line for n lines.
-    position_plane : array
-        A array (x, y and z) to the plane.
-    normal_plane : array
-        The normal vector (x, y and z) of the plane.
-
-
-    Returns
-    -------
-    Array with shape (n, 3) with the intersection point.
-    '''
-    # Calculate offsets and extend in missing dimension
-    offsets = position_plane[np.newaxis, :] - line_origins
-
-    # Precalculate to be able to avoid division by 0
-    # (line is parallel to the plane or in the plane)
-    norm_dot_off = np.dot(normal_plane, offsets.T)
-    # Dot product is transformed to be at least 1D for special n = 1
-    norm_dot_dir = np.atleast_1d(np.dot(normal_plane,
-                                        line_directions.T))
-
-    # Initialize result to nan
-    t = np.full_like(norm_dot_off, fill_value=np.nan)
-
-    # Warn if some intersection cannot be calculated
-    if np.any(norm_dot_dir == 0):
-        logging.warning('Some line plane intersection could not be calculated')
-
-    # Calculate t scalar for each line simultaniously, avoid division by 0
-    sel = norm_dot_dir != 0
-    t[sel] = norm_dot_off[sel] / norm_dot_dir[sel]
-
-    # Calculate the intersections for each line with the plane
-    intersections = line_origins + line_directions * t[:, np.newaxis]
-
-    return intersections
-
-
-def rotation_matrix_x(alpha):
-    ''' Calculates the rotation matrix for the rotation around the x axis by an angle alpha in a cartesian right-handed coordinate system.
-
-    Note
-    ----
-    Rotation in a cartesian right-handed coordinate system.
-
-    Parameters
-    ----------
-    alpha : float
-        Angle in radians.
-
-    Returns
-    -------
-    Array with shape (3, 3).
-    '''
-    return np.array([[1., 0., 0.],
-                     [0., np.cos(alpha), np.sin(alpha)],
-                     [0., -np.sin(alpha), np.cos(alpha)]])
-
-
-def rotation_matrix_y(beta):
-    ''' Calculates the rotation matrix for the rotation around the y axis by an angle beta in a cartesian right-handed coordinate system.
-
-    Note
-    ----
-    Rotation in a cartesian right-handed coordinate system.
-
-
-    Parameters
-    ----------
-    beta : float
-        Angle in radians.
-
-    Returns
-    -------
-    Array with shape (3, 3).
-    '''
-    return np.array([[np.cos(beta), 0, - np.sin(beta)],
-                     [0, 1, 0],
-                     [np.sin(beta), 0, np.cos(beta)]])
-
-
-def rotation_matrix_z(gamma):
-    ''' Calculates the rotation matrix for the rotation around the z axis by an angle gamma in a cartesian right-handed coordinate system.
-
-    Note
-    ----
-    Rotation in a cartesian right-handed coordinate system.
-
-
-    Parameters
-    ----------
-    gamma : float
-        Angle in radians.
-
-    Returns
-    -------
-    Array with shape (3, 3).
-    '''
-    return np.array([[np.cos(gamma), np.sin(gamma), 0],
-                     [-np.sin(gamma), np.cos(gamma), 0],
-                     [0, 0, 1]])
-
-
-def _rotation_matrix(alpha, beta, gamma):
-    ''' Calculates the rotation matrix for the rotation around the three cartesian axis x, y, z in a right-handed system.
-
-    Note
-    ----
-    In a right-handed system. The rotation is done around x then y then z.
-
-    Remember:
-        - Transform to the locale coordinate system before applying rotations
-        - Rotations are associative but not commutative
-
-    Usage
-    -----
-        A rotation by (alpha, beta, gamma) of the vector (x, y, z) in the local
-        coordinate system can be done by:
-          np.dot(rotation_matrix(alpha, beta, gamma), np.array([x, y, z]))
-
-
-    Parameters
-    ----------
-    alpha : float
-        Angle in radians for rotation around x.
-    beta : float
-        Angle in radians for rotation around y.
-    gamma : float
-        Angle in radians for rotation around z.
-
-    Returns
-    -------
-    Array with shape (3, 3).
-    '''
-    return np.dot(rotation_matrix_x(alpha=alpha), np.dot(rotation_matrix_y(beta=beta), rotation_matrix_z(gamma=gamma)))
 
 
 class KalmanFilter():
