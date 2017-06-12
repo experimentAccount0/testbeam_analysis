@@ -17,7 +17,8 @@ which then describes the track correctly.
 
     .. NOTE::
        Missing measurements are supported to obtain unbiased residuals. The respective DUT hit can be masked in the measurement array and
-       will then be excluded in the filtering process.
+       will then be excluded in the filtering process. In addition to that the Kalman Filter can handle rotated planes (especially around x and y axes)
+       by updating the transition matrix before each prediction step in order to take different z-positions of the measurements into account.
 
 Within the Kalman Filter the state vector
 :math:`\\boldsymbol{x}_k= \\begin{pmatrix} x_k, y_k, \\tan\\theta_x, \\tan\\theta_y\\end{pmatrix}^{\\mathrm{T}}`,
@@ -159,6 +160,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
         track_estimates_chunk, chi2, x_errs, y_errs = track_analysis._fit_tracks_kalman_loop(
             measurements, dut_fit_selection,
             pixel_size, n_pixels, measurements_plot[0, :, -1],
+            alignment=None,
             beam_energy=2500.,
             material_budget=[100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 250. / 93700],
             add_scattering_plane=None)
