@@ -121,7 +121,7 @@ class TestAlignmentAnalysis(unittest.TestCase):
         dut_alignment.apply_alignment(input_hit_file=os.path.join(tests_data_folder, 'Merged_result.h5'),
                                       input_alignment_file=os.path.join(self.output_folder, 'Prealignment_result.h5'),
                                       output_hit_file=os.path.join(tests_data_folder, 'Tracklets.h5'),
-                                      force_prealignment=True)
+                                      use_prealignment=True)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets.h5'))
         self.assertTrue(data_equal, msg=error_msg)
  
@@ -129,7 +129,7 @@ class TestAlignmentAnalysis(unittest.TestCase):
         dut_alignment.apply_alignment(input_hit_file=os.path.join(tests_data_folder, 'Merged_result.h5'),
                                       input_alignment_file=os.path.join(self.output_folder, 'Prealignment_result.h5'),
                                       output_hit_file=os.path.join(tests_data_folder, 'Tracklets_2.h5'),
-                                      force_prealignment=True,
+                                      use_prealignment=True,
                                       chunk_size=293)
         data_equal, error_msg = test_tools.compare_h5_files(os.path.join(tests_data_folder, 'Tracklets_result.h5'), os.path.join(self.output_folder, 'Tracklets_2.h5'))
         self.assertTrue(data_equal, msg=error_msg)
