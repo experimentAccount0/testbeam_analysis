@@ -180,7 +180,7 @@ def select_hits(hit_file, max_hits=None, condition=None, track_quality=None,
 
 
 def _select_hits_with_condition(hits_array, condition):
-    for variable in set(re.findall(r'[a-zA-Z_]+', condition)):
-        exec(variable + ' = hits_array[\'' + variable + '\']')
+    for variable in set(re.findall(r'(\d*[a-zA-Z_]+\d*)', condition)):
+        exec(variable + ' = hits_array[\'' + variable + '\']')  # expose variables; not a copy, this is just a reference
 
     return hits_array[ne.evaluate(condition)]
