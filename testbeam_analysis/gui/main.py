@@ -70,6 +70,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.main_layout = QtWidgets.QVBoxLayout(self.main_widget)
         self.setCentralWidget(self.main_widget)
 
+        # main splitter
+        self.main_splitter = QtWidgets.QSplitter()
+        self.main_splitter.setOrientation(QtCore.Qt.Vertical)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.setSizes([int(0.75*self.height()), int(0.25*self.height())])
+
+        self.main_layout.addWidget(self.main_splitter)
+
         # Init widgets and add to main window
         self._init_menu()
         self._init_tabs()
@@ -85,7 +93,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment', 'Track finding',
-                          'Alignment', 'Track fitting', 'Result')  # 'Analysis' missing
+                          'Alignment', 'Track fitting', 'Result')
 
         # Add QTabWidget for tab_widget
         self.tabs = QtWidgets.QTabWidget()
@@ -109,7 +117,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             #self.update_tabs()
 
         # Add to main layout
-        self.main_layout.addWidget(self.tabs)
+        self.main_splitter.addWidget(self.tabs)
 
     def _init_logger(self):
         """
@@ -145,10 +153,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Set visibility to false at init
         self.console_dock.setVisible(False)
 
-        self.console_dock.setMaximumHeight(0.25*self.height())
-
         # Add to main layout
-        self.main_layout.addWidget(self.console_dock)
+        self.main_splitter.addWidget(self.console_dock)
 
     def _init_menu(self):
         """
@@ -451,19 +457,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Add bool to indicate whether setup tab has been executed
         self.setup_done = False
 
-        self.tabs.clear()
-
-        for i in reversed(range(self.main_layout.count())):
-            w = self.main_layout.itemAt(i).widget()
-            self.main_layout.removeWidget(w)
-            w.setParent(None)
-
-        self.logger = None
-        self.logger_console = None
+        for i in reversed(range(self.main_splitter.count())):
+            w = self.main_splitter.widget(i)
+            w.hide()
+            w.deleteLater()
 
         self._init_tabs()
-        self._init_logger()
         self.connect_tabs()
+        self._init_logger()
         self.tabs.setCurrentIndex(0)
 
     def file_quit(self):

@@ -20,7 +20,8 @@ class SettingsWindow(QtWidgets.QMainWindow):
                               'n_pixels': None,
                               'pixel_size': None,
                               'z_positions': None,
-                              'rotations': None}
+                              'rotations': None,
+                              'scatter_planes': None}
 
         self.default_options = {'input_files': None,
                                 'output_path': None,
