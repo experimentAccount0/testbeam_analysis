@@ -46,6 +46,7 @@ class TestTrackAnalysis(unittest.TestCase):
                                            [-1396.35698339, 2843.76799577, 197800., pixel_resolution[6][0], pixel_resolution[6][1]]]]),
                   'dut_fit_selection': 61,
                   'z_positions': [[0., 29900, 60300, 82100, 118700, 160700, 197800]],
+                  'alignment': [None],
                   'pixel_size': pixel_size,
                   'n_pixels': ((576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (80, 336)),
                   'beam_energy': 2500.,

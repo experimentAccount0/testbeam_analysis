@@ -2,6 +2,7 @@ import numpy as np
 
 from numba import njit
 from numpy import linalg
+from testbeam_analysis.tools import geometry_utils
 
 
 @njit
@@ -102,7 +103,7 @@ def _filter_correct(observation_matrix, observation_covariance,
     return kalman_gain, filtered_state, filtered_state_covariance
 
 
-def _filter(transition_matrices, observation_matrices, transition_covariances,
+def _filter(alignment, transition_matrices, observation_matrices, transition_covariances,
             observation_covariances, transition_offsets, observation_offsets,
             initial_state, initial_state_covariance, observations, mask):
     """Apply the Kalman Filter. First a prediction of the state is done, then a filtering is
@@ -110,6 +111,10 @@ def _filter(transition_matrices, observation_matrices, transition_covariances,
 
     Parameters
     ----------
+    alignment : array_like or None
+        Aligment data, which contains rotations and translations for each DUT. Needed to take rotations of DUTs into account,
+        in order to get correct transition matrices. If pre-alignment data is used, this is set to None since no rotations have to be
+        taken into account.
     transition_matrices : [chunk_size, n_timesteps-1, n_dim_state, n_dim_state] array-like
         matrices to transport states from t to t+1.
     observation_matrices : [chunk_size, n_timesteps, n_dim_obs, n_dim_state] array-like
@@ -143,6 +148,8 @@ def _filter(transition_matrices, observation_matrices, transition_covariances,
         filtered states of times [0...t].
     filtered_state_covariances : [chunk_size, n_timesteps, n_dim_state] array
         covariance matrices of filtered states of times [0...t].
+    transition_matrices_update : [chunk_size, n_timesteps-1, n_dim_state, n_dim_state] array-like
+        updated transition matrices in case of rotated planes.
     """
     chunk_size, n_timesteps, n_dim_obs = observations.shape
     n_dim_state = transition_covariances.shape[2]
@@ -152,12 +159,63 @@ def _filter(transition_matrices, observation_matrices, transition_covariances,
     kalman_gains = np.zeros((chunk_size, n_timesteps, n_dim_state, n_dim_obs))
     filtered_states = np.zeros((chunk_size, n_timesteps, n_dim_state))
     filtered_state_covariances = np.zeros((chunk_size, n_timesteps, n_dim_state, n_dim_state))
+    # array where new transition matrices are stored, needed to pass it to kalman smoother
+    transition_matrices_update = np.zeros_like(transition_covariances)
 
     for t in range(n_timesteps):
         if t == 0:
             predicted_states[:, t] = initial_state
             predicted_state_covariances[:, t] = initial_state_covariance
         else:
+            if alignment is not None:
+                # get position of plane t - 1 and t
+                dut_position = [np.array([alignment[t - 1]['translation_x'], alignment[t - 1]['translation_y'], alignment[t - 1]['translation_z']]),
+                                np.array([alignment[t]['translation_x'], alignment[t]['translation_y'], alignment[t]['translation_z']])]
+
+                rotation_matrix = [geometry_utils.rotation_matrix(alpha=alignment[t - 1]['alpha'],
+                                                                  beta=alignment[t - 1]['beta'],
+                                                                  gamma=alignment[t - 1]['gamma']),
+                                   geometry_utils.rotation_matrix(alpha=alignment[t]['alpha'],
+                                                                  beta=alignment[t]['beta'],
+                                                                  gamma=alignment[t]['gamma'])]
+
+                basis_global = [rotation_matrix[0].T.dot(np.eye(3)), rotation_matrix[1].T.dot(np.eye(3))]
+                dut_plane_normal = [basis_global[0][2], basis_global[1][2]]
+
+                # slopes (directional vectors))o f the filtered estimates
+                slopes = np.column_stack((filtered_states[:, t - 1, 2], filtered_states[:, t - 1, 3], np.ones((filtered_states.shape[0], 1))))
+
+                # z position of the filtered states
+                z_position = geometry_utils.get_line_intersections_with_plane(line_origins=np.column_stack((filtered_states[:, t - 1, 0],
+                                                                                                            filtered_states[:, t - 1, 1],
+                                                                                                            np.ones(filtered_states[:, t - 1, 1].shape))),
+                                                                              line_directions=np.column_stack((np.zeros((filtered_states[:, t - 1, 1].shape)),
+                                                                                                               np.zeros(filtered_states[:, t - 1, 1].shape),
+                                                                                                               np.ones(filtered_states[:, t - 1, 1].shape))),
+                                                                              position_plane=dut_position[0],
+                                                                              normal_plane=dut_plane_normal[0])[:, -1]
+
+                # offsets (supoort vectors) of the filtered states
+                offsets = np.column_stack((filtered_states[:, t - 1, 0], filtered_states[:, t - 1, 1], z_position))
+
+                # calculate intersection of state which should be predicted (filtered state of plane before) with plane t - 1 and t
+                offsets_rotated = [geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                                    line_directions=slopes,
+                                                                                    position_plane=dut_position[0],
+                                                                                    normal_plane=dut_plane_normal[0]),
+                                   geometry_utils.get_line_intersections_with_plane(line_origins=offsets,
+                                                                                    line_directions=slopes,
+                                                                                    position_plane=dut_position[1],
+                                                                                    normal_plane=dut_plane_normal[1])]
+
+                z_diff = offsets_rotated[1][:, 2] - offsets_rotated[0][:, 2]
+
+                # update transition matrix, only need to change these value in case for rotated planes
+                transition_matrices[:, t - 1, 0, 2] = - z_diff
+                transition_matrices[:, t - 1, 1, 3] = - z_diff
+
+            # store updated transition matrix for smoothing function
+            transition_matrices_update[:, t - 1] = transition_matrices[:, t - 1]
             transition_matrix = transition_matrices[:, t - 1]
             transition_covariance = transition_covariances[:, t - 1]
             transition_offset = transition_offsets[:, t - 1]
@@ -180,7 +238,7 @@ def _filter(transition_matrices, observation_matrices, transition_covariances,
             observations[:, t],
             np.ma.getmask(observations[:, t]))
 
-    return predicted_states, predicted_state_covariances, kalman_gains, filtered_states, filtered_state_covariances
+    return predicted_states, predicted_state_covariances, kalman_gains, filtered_states, filtered_state_covariances, transition_matrices_update
 
 
 @njit
@@ -336,7 +394,7 @@ def _mat_inverse(X):
 
 
 class KalmanFilter():
-    def smooth(self, transition_matrices, transition_offsets, transition_covariance,
+    def smooth(self, alignment, transition_matrices, transition_offsets, transition_covariance,
                observation_matrices, observation_offsets, observation_covariances,
                initial_state, initial_state_covariance, observations):
         """Apply the Kalman Smoother to the observations. In the first step a filtering is done,
@@ -344,6 +402,10 @@ class KalmanFilter():
 
         Parameters
         ----------
+        alignment : array_like or None
+            Aligment data, which contains rotations and translations for each DUT. Needed to take rotations of DUTs into account,
+            in order to get correct transition matrices. If pre-alignment data is used, this is set to None since no rotations have to be
+            taken into account.
         transition_matrices : [chunk_size, n_timesteps-1, n_dim_state, n_dim_state] array-like
             matrices to transport states from t to t+1.
         transition_offsets : [chunk_size, n_timesteps-1, n_dim_state] array-like
@@ -372,8 +434,8 @@ class KalmanFilter():
         smoothed_state_covariances : [chunk_size, n_timesteps, n_dim_state, n_dim_state] array
             covariance matrices of smoothed states for times [0...n_timesteps-1].
         """
-        predicted_states, predicted_state_covariances, _, filtered_states, filtered_state_covariances = _filter(
-            transition_matrices, observation_matrices,
+        predicted_states, predicted_state_covariances, _, filtered_states, filtered_state_covariances, transition_matrices = _filter(
+            alignment, transition_matrices, observation_matrices,
             transition_covariance, observation_covariances,
             transition_offsets, observation_offsets,
             initial_state, initial_state_covariance, observations,

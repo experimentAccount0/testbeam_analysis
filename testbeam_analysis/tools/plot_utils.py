@@ -8,12 +8,13 @@ from math import ceil
 
 import numpy as np
 import tables as tb
+import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.backends.backend_agg import FigureCanvas
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib import colors, cm
-import matplotlib as mpl
+
 from mpl_toolkits.mplot3d import Axes3D  # needed for 3d plotting although it is shown as not used
 from matplotlib.widgets import Slider, Button
 from scipy.optimize import curve_fit
@@ -590,7 +591,6 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     if non_interactive:
         update_auto(None)
     else:
-        plt.get_current_fig_manager().window.showMaximized()  # Plot needs to be large, so maximize
         plt.show()
 
     return selected_data, fit, do_refit  # Return cut data for further processing
