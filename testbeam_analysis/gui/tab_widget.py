@@ -12,7 +12,7 @@ from testbeam_analysis.track_analysis import find_tracks, fit_tracks
 from testbeam_analysis.result_analysis import calculate_efficiency, calculate_residuals
 
 # Plot related import
-from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size, plot_correlations
+from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size, plot_correlations, plot_events
 
 
 class NoisyPixelsTab(ParallelAnalysisWidget):
@@ -47,8 +47,7 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_files),
                   lambda: self.plot(input_files=output_files,
-                                    plot_func=plot_masked_pixels,
-                                    dut_names=setup['dut_names'])]:
+                                    plot_func=plot_masked_pixels)]:
             self.parallelAnalysisDone.connect(x)
 
 
@@ -87,8 +86,7 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_files),
                   lambda: self.plot(input_files=output_files,
-                                    plot_func=plot_cluster_size,
-                                    dut_names=setup['dut_names'])]:
+                                    plot_func=plot_cluster_size)]:
             self.parallelAnalysisDone.connect(x)
 
 
@@ -207,11 +205,9 @@ class TrackFindingTab(AnalysisWidget):
                         func=find_tracks,
                         fixed=True)
 
-        # No plotting necessary here
-        self.widget_splitter.setSizes([0, parent.width()])
-
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
-                  lambda: self._connect_vitables(files=output_file)]:
+                  lambda: self._connect_vitables(files=output_file),
+                  lambda: self.plot(input_file=output_file, plot_func=plot_events, dut=0, event_range=(0, 10))]:
             self.analysisDone.connect(x)
 
 
@@ -302,7 +298,6 @@ class AlignmentTab(AnalysisWidget):
             if ask:
                 self.skipAlignment.emit()
                 self.proceedAnalysis.emit(self.tl)
-
         else:
             pass
 
@@ -317,30 +312,45 @@ class TrackFittingTab(AnalysisWidget):
 
         if options['skip_alignment']:
             input_tracks = options['output_path'] + '/TrackCandidates_prealignment.h5'
+            output_file = options['output_path'] + '/Tracks_prealigned.h5'
         else:
-            input_tracks = options['output_path'] + '/Tracklets.h5'
+            output_file = options['output_path'] + '/Tracks_aligned.h5'
 
-        output_file = options['output_path'] + '/TrackCandidates.h5'
+            self.add_function(func=find_tracks)
 
-        self.add_function(func=find_tracks)
+            self.add_option(option='input_tracklets_file',
+                            default_value=options['output_path'] + '/Tracklets.h5',  # from alignment
+                            func=find_tracks,
+                            fixed=True)
+
+            self.add_option(option='input_alignment_file',
+                            default_value=options['output_path'] + '/Alignment.h5',
+                            func=find_tracks,
+                            fixed=True)
+
+            self.add_option(option='output_track_candidates_file',
+                            default_value=options['output_path'] + '/TrackCandidates.h5',
+                            func=find_tracks,
+                            fixed=True)
+
+            input_tracks = options['output_path'] + '/TrackCandidates.h5'
+
         self.add_function(func=fit_tracks)
 
-        self.add_option(option='input_tracklets_file',
+        self.add_option(option='input_track_candidates_file',
                         default_value=input_tracks,
-                        func=find_tracks,
+                        func=fit_tracks,
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
                         default_value=options['output_path'] + '/Alignment.h5',
-                        func=find_tracks,
+                        func=fit_tracks,
                         fixed=True)
 
-        self.add_option(option='output_track_candidates_file',
+        self.add_option(option='output_tracks_file',
                         default_value=output_file,
-                        func=find_tracks,
+                        func=fit_tracks,
                         fixed=True)
-
-
 
         # Set and fix options
         self.add_option(option='fit_duts', func=fit_tracks,
@@ -354,16 +364,100 @@ class TrackFittingTab(AnalysisWidget):
         self.add_option(option='min_track_distance', func=fit_tracks,
                         default_value=[200] * setup['n_duts'], optional=False)
 
+        if setup['scatter_planes'] is not None:
+            self.add_option(option='add_scattering_plane',
+                            default_value=[setup['scatter_planes'][sct] for sct in setup['scatter_planes'].keys()],
+                            func=fit_tracks,
+                            fixed=True)
+
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
             self.analysisDone.connect(x)
 
 
-class ResultTab(AnalysisWidget):
+class ResidualTab(AnalysisWidget):
     ''' Implements the result analysis gui'''
 
+    proceedAnalysis = QtCore.pyqtSignal()
+
     def __init__(self, parent, setup, options):
-        super(ResultTab, self).__init__(parent, setup, options)
+        super(ResidualTab, self).__init__(parent, setup, options)
+
+        if options['skip_alignment']:
+            input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
+        else:
+            input_tracks = options['output_path'] + '/Tracks_aligned.h5'
+
+        self.add_function(func=calculate_residuals)
+
+        output_file = options['output_path'] + '/Residuals.h5'
+
+        self.add_option(option='input_tracks_file',
+                        default_value=input_tracks,
+                        func=calculate_residuals,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=calculate_residuals,
+                        fixed=True)
+
+        self.add_option(option='output_residuals_file',
+                        default_value=output_file,
+                        func=calculate_residuals,
+                        fixed=True)
+
+        for x in [lambda: self.proceedAnalysis.emit(),
+                  lambda: self._connect_vitables(files=output_file)]:
+            self.analysisDone.connect(x)
+
+
+class EfficiencyTab(AnalysisWidget):
+    """
+    Implements the efficiency results tab
+    """
+
+    proceedAnalysis = QtCore.pyqtSignal()
+
+    def __init__(self, parent, setup, options):
+        super(EfficiencyTab, self).__init__(parent, setup, options)
+
+        if options['skip_alignment']:
+            input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
+        else:
+            input_tracks = options['output_path'] + '/Tracks_aligned.h5'
 
         self.add_function(func=calculate_efficiency)
-        self.add_function(func=calculate_residuals)
+
+        output_file = options['output_path'] + '/Efficiency.h5'
+
+        self.add_option(option='input_tracks_file',
+                        default_value=input_tracks,
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        self.add_option(option='input_alignment_file',
+                        default_value=options['output_path'] + '/Alignment.h5',
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        self.add_option(option='output_residuals_file',
+                        default_value=output_file,
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        self.add_option(option='bin_size',
+                        default_value=setup['pixel_size'],
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        self.add_option(option='sensor_size',
+                        default_value=[(setup['pixel_size'][i][0] * setup['n_pixels'][i][0],
+                                        setup['pixel_size'][i][1] * setup['n_pixels'][i][1])
+                                       for i in range(len(setup['dut_names']))],
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        for x in [lambda: self.proceedAnalysis.emit(),
+                  lambda: self._connect_vitables(files=output_file)]:
+            self.analysisDone.connect(x)

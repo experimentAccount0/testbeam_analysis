@@ -93,7 +93,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Add tab_widget and widgets for the different analysis steps
         self.tab_order = ('Files', 'Setup', 'Noisy Pixel', 'Clustering', 'Pre-alignment', 'Track finding',
-                          'Alignment', 'Track fitting', 'Result')
+                          'Alignment', 'Track fitting', 'Residuals', 'Efficiency')
 
         # Add QTabWidget for tab_widget
         self.tabs = QtWidgets.QTabWidget()
@@ -261,8 +261,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[name].proceedAnalysis.connect(xx)
 
                 if name == 'Alignment':
-                    self.tw[name].skipAlignment.connect(lambda: self.update_tabs(data={'skip_alignment': True},
-                                                                                 tabs='Track fitting'))
+                    for xxx in [lambda: self.update_tabs(data={'skip_alignment': True}, tabs='Track fitting'),
+                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
+                        self.tw[name].skipAlignment.connect(xxx)
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.tab_completed(tab_names))
@@ -284,7 +285,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         current_tab = self.tabs.currentIndex()
 
         if data is not None:
-
+            print data
             for key in data:
 
                 # Store setup data in self.setup and everything else in self.options
@@ -345,11 +346,15 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.TrackFittingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options,
-                                                    tab_list='Result')
-            elif name == 'Result':
-                widget = tab_widget.ResultTab(parent=self.tabs,
-                                              setup=self.setup,
-                                              options=self.options)
+                                                    tab_list=['Efficiency','Residuals'])
+            elif name == 'Residuals':
+                widget = tab_widget.ResidualTab(parent=self.tabs,
+                                                setup=self.setup,
+                                                options=self.options)
+            elif name == 'Efficiency':
+                widget = tab_widget.EfficiencyTab(parent=self.tabs,
+                                                  setup=self.setup,
+                                                  options=self.options)
             else:
                 continue
 

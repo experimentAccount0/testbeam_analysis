@@ -484,9 +484,9 @@ class AnalysisWidget(QtWidgets.QWidget):
 #        # Start thread
 #        self.vitables_thread.start()
 
-    def plot(self, input_file, plot_func, dut_names=None, figures=None):
+    def plot(self, input_file, plot_func, **kwargs):
 
-        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, dut_names=dut_names, figures=figures, parent=self.left_widget)
+        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, parent=self.left_widget, **kwargs)
         self.plt.addWidget(plot)
 
     def handle_exceptions(self, exception, cause=None):
@@ -705,19 +705,13 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 #        # Start thread
 #        self.vitables_thread.start()
 
-    def plot(self, input_files, plot_func, dut_names=None, figures=None):
+    def plot(self, input_files, plot_func, **kwargs):
 
-        if dut_names is not None:
-            if isinstance(dut_names, list):
-                names = dut_names
-            else:
-                names = [dut_names]
-        else:
-            names = list(self.tw.keys())
-            names.reverse()
+        names = list(self.tw.keys())
+        names.reverse()
 
         for dut in names:
-            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_names=dut, figures=figures)
+            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_name=dut, **kwargs)
             self.tw[dut].plt.addWidget(plot)
 
     def handle_exceptions(self, exception, cause=None):
@@ -756,7 +750,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
     Also supports plotting from multiple functions at once and input of predefined figures
     """
 
-    def __init__(self, input_file, plot_func, dut_names=None, figures=None, parent=None):
+    def __init__(self, input_file, plot_func, parent=None, **kwargs):
 
         super(AnalysisPlotter, self).__init__(parent)
 
@@ -767,8 +761,12 @@ class AnalysisPlotter(QtWidgets.QWidget):
         # Input arguments
         self.input_file = input_file
         self.plot_func = plot_func
-        self.dut_names = dut_names
-        self.figures = figures
+        self.kwargs = kwargs
+
+        if 'figures' in self.kwargs:
+            self.figures = self.kwargs.get('figures')
+        else:
+            self.figures = None
 
         # Bool whether to plot from multiple functions at once
         multi_plot = False
@@ -807,11 +805,12 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         # Get plots
         if figures is None:
+            fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
             # Different kwarg for some plotting funcs: dut_name vs dut_names
-            try:
-                fig = self.plot_func(self.input_file, dut_names=self.dut_names, gui=True)
-            except TypeError:
-                fig = self.plot_func(self.input_file, dut_name=self.dut_names, gui=True)
+            #try:
+                #fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
+            #except TypeError:
+                #fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
         else:
             fig = figures
 
@@ -940,12 +939,12 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 fig = self.figures[key]
 
             else:
-
+                fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs)
                 # Different kwarg for some plotting funcs: dut_name vs dut_names
-                try:
-                    fig = self.plot_func[key](self.input_file[key], dut_names=self.dut_names, gui=True)
-                except TypeError:
-                    fig = self.plot_func[key](self.input_file[key], dut_name=self.dut_names, gui=True)
+                #try:
+                    #fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs)
+                #except TypeError:
+                    #fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs)
 
             self.plot(external_widget=dummy_widget, figures=fig)
 

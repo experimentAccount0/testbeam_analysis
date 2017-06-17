@@ -767,7 +767,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 output_pdf.savefig(fig)
 
 
-def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_file=None):
+def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_file=None, gui=False):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -783,6 +783,58 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
     output_pdf_file : string
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
+
+    if gui:
+        with tb.open_file(input_tracks_file, "r") as in_file_h5:
+            fitted_tracks = False
+            try:  # data has track candidates
+                table = in_file_h5.root.TrackCandidates
+            except tb.NoSuchNodeError:  # data has fitted tracks
+                table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % dut)
+                fitted_tracks = True
+
+            n_duts = sum(['charge' in col for col in table.dtype.names])
+            array = table[:]
+            tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+            if tracks.shape[0] == 0:
+                logging.warning('No tracks in event selection, cannot plot events!')
+                return
+            if max_chi2:
+                tracks = tracks[tracks['track_chi2'] <= max_chi2]
+            mpl.rcParams['legend.fontsize'] = 10
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            ax = fig.gca(projection='3d')
+            for track in tracks:
+                x, y, z = [], [], []
+                for dut_index in range(0, n_duts):
+                    if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
+                        x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
+                        y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
+                        z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
+
+                if fitted_tracks:
+                    offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
+                    slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
+                    linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
+
+                n_hits = bin(track['track_quality'] & 0xFF).count('1')
+                n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
+
+                if n_hits > 2:  # only plot tracks with more than 2 hits
+                    if fitted_tracks:
+                        ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
+                        ax.plot3D(*linepts.T)
+                    else:
+                        ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
+
+            ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
+            ax.set_xlabel('x [mm]')
+            ax.set_ylabel('y [mm]')
+            ax.set_zlabel('z [mm]')
+            ax.set_title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
+            return fig
+
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_events.pdf'
 

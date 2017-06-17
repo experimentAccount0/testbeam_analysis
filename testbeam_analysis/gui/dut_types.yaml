@@ -1,11 +1,11 @@
 !!python/unicode 'FE-I4':
-  material_budget: 93700.0
+  material_budget: 0.001067236
   n_cols: 80
   n_rows: 336
   pitch_col: 250.0
   pitch_row: 50.0
 !!python/unicode 'Mimosa26':
-  material_budget: 125390.0
+  material_budget: 0.000797512
   n_cols: 1152
   n_rows: 576
   pitch_col: 18.4
