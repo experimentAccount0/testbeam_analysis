@@ -4,13 +4,11 @@ Introduction
 
 |travis-status|  |appveyor-status|  |coverage|  |doc|
 
-Testbeam analysis is a simple to use software to analyse pixel-sensor data taken in a particle-beam telescope-setup. All steps of a complete analysis
-are implemented with a few independent python functions. For a quick first impression check the examples in the documentation.
+Testbeam analysis is a simple to use software to analyse pixel-sensor data taken in a particle-beam telescope-setup.
+All steps of a complete analysis are implemented with a few independent python functions.
+For a quick first impression check the examples in the documentation.
 
-In future releases it is forseen to:
-  - Implement a Kalman Filter
-  - Enhance the alignments
-  - Add a GUI
+In a future release it is forseen to enhance the alignment to work more reliable.
 
 Installation
 ============
@@ -47,20 +45,20 @@ In the examples folder type e.g.:
    
    python fei4_telescope_example.py
 
-.. |travis-status| image:: https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=development
+.. |travis-status| image:: https://travis-ci.org/SiLab-Bonn/testbeam_analysis.svg?branch=gui
     :target: https://travis-ci.org/SiLab-Bonn/testbeam_analysis
     :alt: Build status
     
-.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis/branch/development
-    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis/branch/development
+.. |appveyor-status| image:: https://ci.appveyor.com/api/projects/status/github/SiLab-Bonn/testbeam_analysis/branch/gui
+    :target: https://ci.appveyor.com/project/DavidLP/testbeam-analysis/branch/gui
     :alt: Build status
 
 .. |doc| image:: https://img.shields.io/badge/documentation--blue.svg
     :target: http://silab-bonn.github.io/testbeam_analysis
     :alt: Documentation
     
-.. |coverage| image:: https://coveralls.io/repos/SiLab-Bonn/testbeam_analysis/badge.svg?branch=development
-    :target: https://coveralls.io/github/SiLab-Bonn/testbeam_analysis?branch=development
+.. |coverage| image:: https://coveralls.io/repos/SiLab-Bonn/testbeam_analysis/badge.svg?branch=gui
+    :target: https://coveralls.io/github/SiLab-Bonn/testbeam_analysis?branch=gui
     :alt: Coverage
 
 
