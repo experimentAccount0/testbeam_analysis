@@ -125,6 +125,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                                   y_err=y_err,
                                   z_err=z_err,
                                   charge=charge,
+                                  n_hits=n_hits,
                                   track_quality=track_quality,
                                   n_tracks=n_tracks,
                                   column_sigma=column_sigma,
@@ -791,15 +792,18 @@ def _get_first_dut_index(x, index):
 
 
 @njit
-def _swap_hits(x, y, z, charge, x_err, y_err, z_err, track_index, dut_index, hit_index, swap_x, swap_y, swap_z, swap_charge, swap_x_err, swap_y_err, swap_z_err):
+def _swap_hits(x, y, z, charge, n_hits, x_err, y_err, z_err, track_index, dut_index, hit_index, swap_x, swap_y, swap_z, swap_charge, swap_n_hits, swap_x_err, swap_y_err, swap_z_err):
     #     print 'Swap hits', x[track_index][dut_index], x[hit_index][dut_index]
-    tmp_x, tmp_y, tmp_z, tmp_charge = x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index], charge[track_index][dut_index]
+    tmp_x, tmp_y, tmp_z = x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index]
+    tmp_charge, tmp_n_hits = charge[track_index][dut_index], n_hits[track_index][dut_index]
     tmp_x_err, tmp_y_err, tmp_z_err = x_err[track_index][dut_index], y_err[track_index][dut_index], z_err[track_index][dut_index]
 
-    x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index], charge[track_index][dut_index] = swap_x, swap_y, swap_z, swap_charge
+    x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index] = swap_x, swap_y, swap_z
+    charge[track_index][dut_index], n_hits[track_index][dut_index] = swap_charge, swap_n_hits
     x_err[track_index][dut_index], y_err[track_index][dut_index], z_err[track_index][dut_index] = swap_x_err, swap_y_err, swap_z_err
 
-    x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index], charge[hit_index][dut_index] = tmp_x, tmp_y, tmp_z, tmp_charge
+    x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index] = tmp_x, tmp_y, tmp_z
+    charge[hit_index][dut_index], n_hits[hit_index][dut_index] = tmp_charge, tmp_n_hits
     x_err[hit_index][dut_index], y_err[hit_index][dut_index], z_err[hit_index][dut_index] = tmp_x_err, tmp_y_err, tmp_z_err
 
 
@@ -827,7 +831,7 @@ def _set_n_tracks(x, y, start_index, stop_index, n_tracks, n_actual_tracks, min_
 
 
 @njit
-def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_quality, n_tracks, column_sigma, row_sigma, min_cluster_distance):
+def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, n_hits, track_quality, n_tracks, column_sigma, row_sigma, min_cluster_distance):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Each hit is put to the best fitting track. Tracks are assumed to have
     no big angle, otherwise this approach does not work.
@@ -877,7 +881,8 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                 for hit_index in range(actual_hit_track_index, event_number.shape[0]):  # Loop over all not sorted hits of actual DUT
                     if event_number[hit_index] != actual_event_number:  # Abort condition
                         break
-                    curr_x, curr_y, curr_z, curr_charge = x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index], charge[hit_index][dut_index]
+                    curr_x, curr_y, curr_z = x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index]
+                    curr_charge, curr_n_hits = charge[hit_index][dut_index], n_hits[hit_index][dut_index]
                     curr_x_err, curr_y_err, curr_z_err = x_err[hit_index][dut_index], y_err[hit_index][dut_index], z_err[hit_index][dut_index]
                     if not np.isnan(curr_x):  # x = nan is no hit
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
@@ -899,6 +904,7 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                                            y=y,
                                            z=z,
                                            charge=charge,
+                                           n_hits=n_hits,
                                            x_err=x_err,
                                            y_err=y_err,
                                            z_err=z_err,
@@ -909,6 +915,7 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                                            swap_y=curr_y,
                                            swap_z=curr_z,
                                            swap_charge=curr_charge,
+                                           swap_n_hits=curr_n_hits,
                                            swap_x_err=curr_x_err,
                                            swap_y_err=curr_y_err,
                                            swap_z_err=curr_z_err)
