@@ -421,6 +421,9 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.analysis_worker.finished.connect(self.analysis_thread.quit)
             self.analysis_thread.started.connect(self.analysis_worker.work)
 
+            # Connect exceptions signal
+            self.analysis_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='analysis'))
+
             # When this method is not called from the ParallelAnalysisWidget
             if not parallel:
                 self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
@@ -434,12 +437,16 @@ class AnalysisWidget(QtWidgets.QWidget):
         elif THREADING_MODE == 'Thread':
             self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
 
+            # Connect exceptions signal
+            self.analysis_thread.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='analysis'))
+
             if not parallel:
                 for x in [lambda: self.analysisDone.emit(self.tab_list),
                           lambda: self.p_bar.setRange(0, 1),
                           lambda: self.p_bar.setValue(1)]:
                     self.analysis_thread.finished.connect(x)
 
+            # Start thread
             self.analysis_thread.start()
 
     def _connect_vitables(self, files):
@@ -465,8 +472,7 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.vitables_worker.moveToThread(self.vitables_thread)
 
             # Connect exceptions signal from worker on different thread to main thread
-            self.vitables_worker.exceptionSignal.connect(
-                lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+            self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
             self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
 
             # Connect workers work method to the start of the thread, quit thread when worker finishes
@@ -479,6 +485,12 @@ class AnalysisWidget(QtWidgets.QWidget):
         # FIXME: This is the approach of subclassing QThread which is controversial
         elif THREADING_MODE == 'Thread':
             self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+
+            # Connect exceptions signal from worker on different thread to main thread
+            self.vitables_thread.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+            self.vitables_thread.exceptionSignal.connect(self.vitables_thread.quit)
+
+            # Start thread
             self.vitables_thread.start()
 
     def plot(self, input_file, plot_func, **kwargs):
@@ -701,8 +713,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             self.vitables_worker.moveToThread(self.vitables_thread)
 
             # Connect exceptions signal from worker on different thread to main thread
-            self.vitables_worker.exceptionSignal.connect(
-                lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+            self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
             self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
 
             # Connect workers work method to the start of the thread, quit thread when worker finishes
@@ -715,6 +726,12 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         # FIXME: This is the approach of subclassing QThread which is controversial
         elif THREADING_MODE == 'Thread':
             self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+
+            # Connect exceptions signal from worker on different thread to main thread
+            self.vitables_thread.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+            self.vitables_thread.exceptionSignal.connect(self.vitables_thread.quit)
+
+            # Start thread
             self.vitables_thread.start()
 
     def plot(self, input_files, plot_func, **kwargs):
