@@ -285,7 +285,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         current_tab = self.tabs.currentIndex()
 
         if data is not None:
-            print data
             for key in data:
 
                 # Store setup data in self.setup and everything else in self.options
@@ -346,15 +345,17 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.TrackFittingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options,
-                                                    tab_list=['Efficiency','Residuals'])
+                                                    tab_list=['Residuals', 'Efficiency'])
             elif name == 'Residuals':
                 widget = tab_widget.ResidualTab(parent=self.tabs,
                                                 setup=self.setup,
-                                                options=self.options)
+                                                options=self.options,
+                                                tab_list='Efficiency')
             elif name == 'Efficiency':
                 widget = tab_widget.EfficiencyTab(parent=self.tabs,
                                                   setup=self.setup,
-                                                  options=self.options)
+                                                  options=self.options,
+                                                  tab_list='Last')
             else:
                 continue
 
@@ -385,18 +386,24 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def tab_completed(self, tabs):
 
-        # Sender is the one completed so only first dut in tabs matters
-        if isinstance(tabs, list):
+        if 'Last' not in tabs:
 
-            sorted_tabs = {}
-            for dut in tabs:
-                sorted_tabs[self.tab_order.index(dut)] = dut
-            tab = sorted_tabs[min(sorted_tabs.iterkeys())]
+            # Sender is the one completed so only first dut in tabs matters
+            if isinstance(tabs, list):
 
-        elif isinstance(tabs, unicode):
-            tab = tabs
+                sorted_tabs = {}
+                for dut in tabs:
+                    sorted_tabs[self.tab_order.index(dut)] = dut
+                tab = sorted_tabs[min(sorted_tabs.iterkeys())]
 
-        self.tabs.setTabIcon(self.tab_order.index(tab) - 1, self.icon_complete)
+            elif isinstance(tabs, unicode):
+                tab = tabs
+
+            self.tabs.setTabIcon(self.tab_order.index(tab) - 1, self.icon_complete)
+
+        else:
+
+            self.tabs.setTabIcon(len(self.tab_order) - 1, self.icon_complete)
 
     def global_settings(self):
         """

@@ -356,7 +356,7 @@ class TrackFittingTab(AnalysisWidget):
         self.add_option(option='fit_duts', func=fit_tracks,
                         default_value=[0] * setup['n_duts'], optional=True)
         self.add_option(option='force_prealignment', func=fit_tracks,
-                        default_value=False, fixed=True)
+                        default_value=options['skip_alignment'], fixed=True)
         self.add_option(option='exclude_dut_hit', func=fit_tracks,
                         default_value=False, fixed=True)
         self.add_option(option='use_correlated', func=fit_tracks,
@@ -364,11 +364,16 @@ class TrackFittingTab(AnalysisWidget):
         self.add_option(option='min_track_distance', func=fit_tracks,
                         default_value=[200] * setup['n_duts'], optional=False)
 
-        if setup['scatter_planes'] is not None:
+        if setup['scatter_planes']:
             self.add_option(option='add_scattering_plane',
                             default_value=[setup['scatter_planes'][sct] for sct in setup['scatter_planes'].keys()],
                             func=fit_tracks,
                             fixed=True)
+        #else:
+            #self.add_option(option='add_scattering_plane',
+                            #default_value=False,
+                            #func=fit_tracks,
+                            #fixed=True)
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
@@ -378,10 +383,10 @@ class TrackFittingTab(AnalysisWidget):
 class ResidualTab(AnalysisWidget):
     ''' Implements the result analysis gui'''
 
-    proceedAnalysis = QtCore.pyqtSignal()
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(ResidualTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(ResidualTab, self).__init__(parent, setup, options, tab_list)
 
         if options['skip_alignment']:
             input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
@@ -407,7 +412,7 @@ class ResidualTab(AnalysisWidget):
                         func=calculate_residuals,
                         fixed=True)
 
-        for x in [lambda: self.proceedAnalysis.emit(),
+        for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
             self.analysisDone.connect(x)
 
@@ -417,10 +422,10 @@ class EfficiencyTab(AnalysisWidget):
     Implements the efficiency results tab
     """
 
-    proceedAnalysis = QtCore.pyqtSignal()
+    proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options):
-        super(EfficiencyTab, self).__init__(parent, setup, options)
+    def __init__(self, parent, setup, options, tab_list):
+        super(EfficiencyTab, self).__init__(parent, setup, options, tab_list)
 
         if options['skip_alignment']:
             input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
@@ -458,6 +463,6 @@ class EfficiencyTab(AnalysisWidget):
                         func=calculate_efficiency,
                         fixed=True)
 
-        for x in [lambda: self.proceedAnalysis.emit(),
+        for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
             self.analysisDone.connect(x)

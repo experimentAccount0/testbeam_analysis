@@ -13,9 +13,13 @@ from PyQt5 import QtWidgets, QtCore, QtGui
 from testbeam_analysis.gui import option_widget
 
 import matplotlib
+
 matplotlib.use('Qt5Agg')  # Make sure that we are using QT5
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
+# Set way analysis is done; Can be 'Worker' or 'Thread'
+THREADING_MODE = 'Worker'
 
 
 def get_default_args(func):
@@ -66,21 +70,21 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
         self.option_widgets = {}
-        self.splitter_size = [parent.width()/2, parent.width()/2]
+        self.splitter_size = [parent.width() / 2, parent.width() / 2]
         self._setup()
-        # Provide additional thread to do analysis on
-        self.analysis_thread = None
 
-#        # FIXME: QThread + WorkerObject
-#        self.analysis_thread = QtCore.QThread()  # no parent
-#        self.analysis_worker = None
+        # FIXME: QThread + WorkerObject
+        if THREADING_MODE == 'Worker':
+            self.analysis_thread = QtCore.QThread()  # no parent
+            self.analysis_worker = None
+            self.vitables_thread = QtCore.QThread()  # no parent
+            self.vitables_worker = None
 
-        # Provide additional thread for vitables
-        self.vitables_thread = None
-
-#        # FIXME: QThread + WorkerObject
-#        self.vitables_thread = QtCore.QThread()  # no parent
-#        self.vitables_worker = None
+        # FIXME: Subclassing QThread
+        elif THREADING_MODE == 'Thread':
+            # Provide additional thread to do analysis on
+            self.analysis_thread = None
+            self.vitables_thread = None
 
         # Holds functions with kwargs
         self.calls = OrderedDict()
@@ -113,8 +117,9 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.p_bar = QtWidgets.QProgressBar()
         self.p_bar.setVisible(False)
 
-        for x in [self._call_funcs,
-                  lambda: scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())]:
+        for x in [lambda: self._call_funcs(),
+                  lambda: scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum()),
+                  lambda: self.container.setDisabled(True)]:
             self.btn_ok.clicked.connect(x)
 
         # Container widget to disable all but ok button after perfoming analysis
@@ -147,9 +152,8 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.widget_splitter.addWidget(self.left_widget)
         self.widget_splitter.addWidget(self.right_widget)
         self.widget_splitter.setSizes(self.splitter_size)
-#        self.widget_splitter.setStretchFactor(0, 10)
-#        self.widget_splitter.setStretchFactor(1, 2.5)
         self.widget_splitter.setChildrenCollapsible(False)
+
         # Add complete layout to this widget
         layout_widget = QtWidgets.QVBoxLayout()
         layout_widget.addWidget(self.widget_splitter)
@@ -188,7 +192,8 @@ class AnalysisWidget(QtWidgets.QWidget):
             else:
                 self.add_option(func=func, option=name)
 
-    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, fixed=False, tooltip=None):
+    def add_option(self, option, func, dtype=None, name=None, optional=None, default_value=None, fixed=False,
+                   tooltip=None):
         """
         Add an option to the gui to set function arguments
 
@@ -243,7 +248,8 @@ class AnalysisWidget(QtWidgets.QWidget):
                 dtype = str(type(default_value).__name__)
             else:
                 raise RuntimeError(
-                    'Cannot deduce data type for %s in function %s, because no default parameter exists', option, func.__name__)
+                    'Cannot deduce data type for %s in function %s, because no default parameter exists', option,
+                    func.__name__)
 
         # Get optional argument from default function argument
         if optional is None and default_value is None:
@@ -299,7 +305,7 @@ class AnalysisWidget(QtWidgets.QWidget):
     def _select_widget(self, dtype, name, default_value, optional, tooltip):
         # Create widget according to data type
         if ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
-                'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
+                        'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
                 ('iterable' in dtype and 'iterable of iterable' not in dtype)):
             widget = option_widget.OptionMultiSlider(
                 name=name, labels=self.setup['dut_names'],
@@ -405,48 +411,36 @@ class AnalysisWidget(QtWidgets.QWidget):
         except RuntimeError:
             pass
 
-#        # FIXME: Approach without multi-threading
-#        pool = Pool()
-#        for func, kwarg in self.calls.iteritems():
-#            pool.apply_async(self._call_func(func, kwarg))
-#        pool.close()
-#        pool.join()
-#
-#        if not parallel:
-#            self.analysisDone.emit(self.tab_list)
+        # FIXME: This is the QThread + WorkerObject approach which is supposed to be the correct approach
+        if THREADING_MODE == 'Worker':
+            # Create worker for vitables and move to thread
+            self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
+            self.analysis_worker.moveToThread(self.analysis_thread)
+
+            # Connect workers work method to the start of the thread, quit thread when worker finishes
+            self.analysis_worker.finished.connect(self.analysis_thread.quit)
+            self.analysis_thread.started.connect(self.analysis_worker.work)
+
+            # When this method is not called from the ParallelAnalysisWidget
+            if not parallel:
+                self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
+                self.analysis_thread.finished.connect(lambda: self.p_bar.setRange(0, 1))
+                self.analysis_thread.finished.connect(lambda: self.p_bar.setValue(1))
+
+            # Start thread
+            self.analysis_thread.start()
 
         # FIXME: This is the approach of subclassing QThread which is controversial
-        self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
-        self.analysis_thread.started.connect(lambda: self.container.setDisabled(True))
+        elif THREADING_MODE == 'Thread':
+            self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
 
-        if not parallel:
-            for x in [lambda: self.analysisDone.emit(self.tab_list),
-                      lambda: self.p_bar.setRange(0, 1),
-                      lambda: self.p_bar.setValue(1)]:
-                self.analysis_thread.finished.connect(x)
+            if not parallel:
+                for x in [lambda: self.analysisDone.emit(self.tab_list),
+                          lambda: self.p_bar.setRange(0, 1),
+                          lambda: self.p_bar.setValue(1)]:
+                    self.analysis_thread.finished.connect(x)
 
-        self.analysis_thread.start()
-
-#        # FIXME: This is the QThread + WorkerObject approach which is supposed to be the correct approach
-#        # Create worker for vitables and move to thread
-#        self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
-#        self.analysis_worker.moveToThread(self.analysis_thread)
-#
-#        # Connect workers work method to the start of the thread, quit thread when worker finishes
-#        self.analysis_worker.finished.connect(self.analysis_thread.quit)
-#        self.analysis_thread.started.connect(self.analysis_worker.work)
-#
-#        # When this method is not called from the ParallelAnalysisWidget
-#        if not parallel:
-#            self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
-#            self.analysis_thread.finished.connect(lambda: self.p_bar.setRange(0, 1))
-#            self.analysis_thread.finished.connect(lambda: self.p_bar.setValue(1))
-#
-#        # Disable all widgets in container when starting analysis
-#        self.analysis_thread.finished.connect(lambda: self.container.setDisabled(True))
-#
-#        # Start thread
-#        self.analysis_thread.start()
+            self.analysis_thread.start()
 
     def _connect_vitables(self, files):
 
@@ -464,25 +458,28 @@ class AnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        # FIXME: This is the approach of subclassing QThread which is controversial
-        self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-        self.vitables_thread.start()
+        # FIXME: This is the QThread + WorkerObject approach which should be the correct approach
+        if THREADING_MODE == 'Worker':
+            # Create worker for vitables and move to thread
+            self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
+            self.vitables_worker.moveToThread(self.vitables_thread)
 
-#        # FIXME: This is the QThread + WorkerObject approach which should be the correct approach
-#        # Create worker for vitables and move to thread
-#        self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
-#        self.vitables_worker.moveToThread(self.vitables_thread)
-#
-#        # Connect exceptions signal from worker on different thread to main thread
-#        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
-#        self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
-#
-#        # Connect workers work method to the start of the thread, quit thread when worker finishes
-#        self.vitables_worker.finished.connect(self.vitables_thread.quit)
-#        self.vitables_thread.started.connect(self.vitables_worker.work)
-#
-#        # Start thread
-#        self.vitables_thread.start()
+            # Connect exceptions signal from worker on different thread to main thread
+            self.vitables_worker.exceptionSignal.connect(
+                lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+            self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
+
+            # Connect workers work method to the start of the thread, quit thread when worker finishes
+            self.vitables_worker.finished.connect(self.vitables_thread.quit)
+            self.vitables_thread.started.connect(self.vitables_worker.work)
+
+            # Start thread
+            self.vitables_thread.start()
+
+        # FIXME: This is the approach of subclassing QThread which is controversial
+        elif THREADING_MODE == 'Thread':
+            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+            self.vitables_thread.start()
 
     def plot(self, input_file, plot_func, **kwargs):
 
@@ -559,10 +556,16 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
 
+        # Flag to check if all analysis threads are finsihed
+        self.threads_finished = False
+
         # Additional thread for vitables
-        self.vitables_thread = None
-#        self.vitables_thread = QtCore.QThread()  # no parent
-#        self.vitables_worker = None
+        if THREADING_MODE == 'Worker':
+            self.vitables_thread = QtCore.QThread()  # no parent
+            self.vitables_worker = None
+
+        elif THREADING_MODE == 'Thread':
+            self.vitables_thread = None
 
         # List of tabs which will be enabled after analysis
         if isinstance(tab_list, list):
@@ -637,7 +640,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_function(func=func)
 
-    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False, tooltip=None):
+    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False,
+                            tooltip=None):
 
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_option(option=option, func=func, dtype=dtype, name=name,
@@ -652,12 +656,14 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.p_bar.setVisible(True)
 
         for tab in self.tw.keys():
+            self.tw[tab].container.setDisabled(True)
             self.tw[tab]._call_funcs(parallel=True)
             self.tw[tab].analysis_thread.finished.connect(self._check_parallel_analysis_status)
 
     def _check_parallel_analysis_status(self):
 
-        self.p_bar.setRange(0, len(self.tw.keys()))
+        if self.p_bar.value() == -1:
+            self.p_bar.setRange(0, len(self.tw.keys()))
 
         analysis_status = []
         for tab in self.tw.keys():
@@ -667,7 +673,10 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.p_bar.setValue(analysis_status.count(False))
 
         if True not in analysis_status:
-            self.parallelAnalysisDone.emit(self.tab_list)
+            # Due to timing, all analysis threads can be finished while some finished signals are still in queue
+            if not self.threads_finished:
+                self.parallelAnalysisDone.emit(self.tab_list)
+                self.threads_finished = True
 
     def _connect_vitables(self, files):
 
@@ -685,25 +694,28 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        # FIXME: This is the approach of subclassing QThread which is controversial
-        self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-        self.vitables_thread.start()
+        # FIXME: This is the QThread + WorkerObject approach which should be the correct approach
+        if THREADING_MODE == 'Worker':
+            # Create worker for vitables and move to thread
+            self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
+            self.vitables_worker.moveToThread(self.vitables_thread)
 
-#        # FIXME: This is the QThread + WorkerObject approach which should be the correct approach
-#        # Create worker for vitables and move to thread
-#        self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
-#        self.vitables_worker.moveToThread(self.vitables_thread)
-#
-#        # Connect exceptions signal from worker on different thread to main thread
-#        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
-#        self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
-#
-#        # Connect workers work method to the start of the thread, quit thread when worker finishes
-#        self.vitables_worker.finished.connect(self.vitables_thread.quit)
-#        self.vitables_thread.started.connect(self.vitables_worker.work)
-#
-#        # Start thread
-#        self.vitables_thread.start()
+            # Connect exceptions signal from worker on different thread to main thread
+            self.vitables_worker.exceptionSignal.connect(
+                lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+            self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
+
+            # Connect workers work method to the start of the thread, quit thread when worker finishes
+            self.vitables_worker.finished.connect(self.vitables_thread.quit)
+            self.vitables_thread.started.connect(self.vitables_worker.work)
+
+            # Start thread
+            self.vitables_thread.start()
+
+        # FIXME: This is the approach of subclassing QThread which is controversial
+        elif THREADING_MODE == 'Thread':
+            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
+            self.vitables_thread.start()
 
     def plot(self, input_files, plot_func, **kwargs):
 
@@ -795,10 +807,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
         Function for plotting one or multiple plots from a single plot_func.
         If the function returns multiple plots, respective widgets for navigation
         through plots are created.
-        
+
         :param external_widget: None or QWidget; if None figs are plotted on self (single fig) or an internal
                                 plot_widget. If QWidget figs are plotted on this widget (must have layout)
-                                
+
         :param figures: Figure() or list of Figures(); if None figures come from the return values of self.plot_func.
                         If figures are given, just plot them onto widget.
         """
@@ -806,11 +818,6 @@ class AnalysisPlotter(QtWidgets.QWidget):
         # Get plots
         if figures is None:
             fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
-            # Different kwarg for some plotting funcs: dut_name vs dut_names
-            #try:
-                #fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
-            #except TypeError:
-                #fig = self.plot_func(self.input_file, gui=True, **self.kwargs)
         else:
             fig = figures
 
@@ -907,7 +914,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
                         btn_forward.setDisabled(False)
                         btn_back.setDisabled(False)
 
-                    label_count.setText('%d of %d' % (index+1, plot_widget.count()))
+                    label_count.setText('%d of %d' % (index + 1, plot_widget.count()))
 
                 else:
                     pass
@@ -935,16 +942,9 @@ class AnalysisPlotter(QtWidgets.QWidget):
             dummy_widget.setLayout(QtWidgets.QVBoxLayout())
 
             if self.figures is not None and key in self.figures.keys():
-
                 fig = self.figures[key]
-
             else:
                 fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs)
-                # Different kwarg for some plotting funcs: dut_name vs dut_names
-                #try:
-                    #fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs)
-                #except TypeError:
-                    #fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs)
 
             self.plot(external_widget=dummy_widget, figures=fig)
 
@@ -995,7 +995,6 @@ class AnalysisLogger(logging.Handler):
     """
 
     def __init__(self, parent):
-
         super(AnalysisLogger, self).__init__()
 
     def emit(self, record):
@@ -1043,7 +1042,6 @@ class AnalysisThread(QtCore.QThread):
 
 
 class AnalysisWorker(QtCore.QObject):
-
     finished = QtCore.pyqtSignal()
     exceptionSignal = QtCore.pyqtSignal(Exception)
 
