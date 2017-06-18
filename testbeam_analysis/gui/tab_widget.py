@@ -369,11 +369,11 @@ class TrackFittingTab(AnalysisWidget):
                             default_value=[setup['scatter_planes'][sct] for sct in setup['scatter_planes'].keys()],
                             func=fit_tracks,
                             fixed=True)
-        #else:
-            #self.add_option(option='add_scattering_plane',
-                            #default_value=False,
-                            #func=fit_tracks,
-                            #fixed=True)
+        else:
+            self.add_option(option='add_scattering_plane',
+                            default_value=False,
+                            func=fit_tracks,
+                            fixed=True)
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:

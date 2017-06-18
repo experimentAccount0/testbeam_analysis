@@ -142,7 +142,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
             progress_bar.finish()
 
 
-def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, n_pixels=None, beam_energy=None, material_budget=None, add_scattering_plane=None, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
+def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, n_pixels=None, beam_energy=None, material_budget=None, add_scattering_plane=False, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
     '''Fits either a line through selected DUT hits for selected DUTs (method=Fit) or uses a Kalman Filter to build tracks (method=Kalman).
     The selection criterion for the track candidates to fit is the track quality and the maximum number of hits per event.
     The fit is done for specified DUTs only (fit_duts). This DUT is then not included in the fit (include_duts).
@@ -197,10 +197,9 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
     material_budget : iterable
         Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
         devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um). Only needed for Kalman Filter.
-    add_scattering_plane : kwarg
+    add_scattering_plane : dict
         Specifies an additional scattering plane in case of additional DUTs which are not used.
         The dictionary must contain:
-            index_scatter: dut index of scattering plane
             z_scatter: z position of scattering plane in um
             material_budget_scatter: material budget of scattering plane
             alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
@@ -1117,10 +1116,9 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     material_budget : iterable
         Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
         devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um).
-    add_scattering_plane : kwarg
+    add_scattering_plane : dict
         Specifies an additional scattering plane in case of additional DUTs which are not used.
         The dictionary must contain:
-            index_scatter: dut index of scattering plane
             z_scatter: z position of scattering plane in um
             material_budget_scatter: material budget of scattering plane
             alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
@@ -1148,14 +1146,15 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     # set multiple scattering environment
     material_budget = np.array(material_budget)
 
-    additional_scatter = False
-    if add_scattering_plane is not None:
-        additional_scatter = True
+    if add_scattering_plane:
         n_duts = n_duts + 1
         dut_selection = np.array(range(0, n_duts))
         # initialize scattering plane values
-        index_scatter = add_scattering_plane['index_scatter']
         z_scatter = add_scattering_plane['z_scatter']
+        index_scatter = np.argmax(z_positions > z_scatter) # return first index that meets condition
+        if index_scatter == 0:  # if index is 0, z_scatter is greater than z_positions[-1]
+            msg = 'z position of scatter plane not in telescope! (z_scatter=%d, z_positions=%s)' % (z_scatter, ''.join(str(z_positions)))
+            raise IndexError(msg)
         material_budget_scatter = add_scattering_plane['material_budget_scatter']
         if add_scattering_plane['alignment_scatter'] is not None:
             alignment_scatter = [(index_scatter, 0., 0., z_scatter, add_scattering_plane['alignment_scatter'][0],
@@ -1219,7 +1218,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     sel = dut_selection[:-1]
     z_diff = z_positions[sel + 1] - z_positions[sel]
 
-    if additional_scatter is True:  # need to shift dut fit selection in case of additional scattering plane
+    if add_scattering_plane:  # need to shift dut fit selection in case of additional scattering plane
         dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] = dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] + 1
 
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
@@ -1283,7 +1282,7 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
                                                                observation_covariance, observation_offset,
                                                                initial_state_mean, initial_state_covariance)
 
-    if additional_scatter is True:  # delete estimated state vector at scattering plane
+    if add_scattering_plane:  # delete estimated state vector at scattering plane
         track_estimate_chunks = np.delete(track_estimate_chunks, index_scatter, axis=1)
         x_err = np.delete(x_err, index_scatter, axis=1)
         y_err = np.delete(y_err, index_scatter, axis=1)
