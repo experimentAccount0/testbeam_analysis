@@ -51,7 +51,7 @@ class TestTrackAnalysis(unittest.TestCase):
                   'n_pixels': ((576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (576, 1152), (80, 336)),
                   'beam_energy': 2500.,
                   'material_budget': material_budget,
-                  'add_scattering_plane': None}
+                  'add_scattering_plane': False}
 
         # expected result array: (state estimates, chi, x error, y errors)
         result = np.array([[[-1.23045812e+03, 2.82684464e+03, 9.54189393e-04, 5.78723069e-05],
