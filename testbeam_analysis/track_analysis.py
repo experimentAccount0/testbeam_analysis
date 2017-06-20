@@ -201,8 +201,8 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             material_budget_scatter: material budget of scattering plane
             alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
                                If None, no rotation will be considered.
-        In case of multiple scattering planes, each value of a key is a list, with items corresponding to each scatterong plane.
-        If whole dict is False, no scattering plane will be added.
+        In case of multiple scattering planes, each value of a key is a list, with items corresponding to each scattering plane.
+        If add_scattering_plane is False, no scattering plane will be added.
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     keep_data : bool
@@ -1126,8 +1126,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
             material_budget_scatter: material budget of scattering plane
             alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
                                If None, no rotation will be considered.
-        In case of multiple scattering planes, each value of a key is a list, with items corresponding to each scatterong plane.
-        If whole dict is False, no scattering plane will be added.
+        In case of multiple scattering planes, each value of a key is a list, with items corresponding to each scattering plane.
+        If add_scattering_plane is False, no scattering plane will be added.
     Returns
     -------
     smoothed_state_estimates : array_like
