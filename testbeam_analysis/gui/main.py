@@ -8,7 +8,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from data import DataTab
 from setup import SetupTab
 from settings import SettingsWindow
-from analysis_widgets import AnalysisLogger, AnalysisStream
+from analysis_logger import AnalysisLogger, AnalysisStream
 
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget

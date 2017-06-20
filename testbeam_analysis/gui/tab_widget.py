@@ -174,7 +174,7 @@ class PrealignmentTab(AnalysisWidget):
                   lambda: self._connect_vitables(files=output_files.values()),
                   lambda: self.plot(input_file=multiple_plotting_data,
                                     plot_func=multiple_plotting_func,
-                                    dut_names=setup['dut_names'])]:
+                                    correlation={'dut_names': setup['dut_names']})]:  # kwargs for correlation
             self.analysisDone.connect(x)
 
 
@@ -412,6 +412,11 @@ class ResidualTab(AnalysisWidget):
                         func=calculate_residuals,
                         fixed=True)
 
+        self.add_option(option='force_prealignment',
+                        default_value=options['skip_alignment'],
+                        func=calculate_residuals,
+                        fixed=True)
+
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
             self.analysisDone.connect(x)
@@ -460,6 +465,11 @@ class EfficiencyTab(AnalysisWidget):
                         default_value=[(setup['pixel_size'][i][0] * setup['n_pixels'][i][0],
                                         setup['pixel_size'][i][1] * setup['n_pixels'][i][1])
                                        for i in range(len(setup['dut_names']))],
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        self.add_option(option='force_prealignment',
+                        default_value=options['skip_alignment'],
                         func=calculate_efficiency,
                         fixed=True)
 
