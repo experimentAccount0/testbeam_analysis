@@ -236,8 +236,7 @@ def run_analysis():
     track_analysis.find_tracks(
         input_merged_file=os.path.join(output_folder, 'Merged.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-        output_track_candidates_file=os.path.join(
-            output_folder, 'TrackCandidates_alignment.h5'),
+        output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_alignment.h5'),
         use_prealignment=False,
         correct_beam_alignment=True)
 
@@ -247,7 +246,6 @@ def run_analysis():
                                                  'TrackCandidates_alignment.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
-        use_prealignment=False,
         fit_duts=[0, 1, 2, 3, 4, 5],
         selection_hit_duts=[0, 1, 2, 3, 4, 5],
         selection_fit_duts=[0, 1, 2, 3, 4, 5],
@@ -255,8 +253,7 @@ def run_analysis():
         # To get unconstrained residuals do not use DUT
         # hit for track fit
         exclude_dut_hit=True,
-        # We do not cut on track quality but on chi2 later
-        selection_track_quality=0)
+        use_prealignment=False)
 
     data_selection.select_tracks(input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
                                  output_tracks_file=os.path.join(output_folder, 'Tracks_selected.h5'),
@@ -279,7 +276,6 @@ def run_analysis():
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_residuals_file=os.path.join(output_folder, 'Residuals_all_chi2_cut.h5'),
         use_fit_limits=True,
-        use_prealignment=False,
         # The chi2 cut has a large influence on
         # the residuals and number of tracks,
         # since the resolution is dominated by
@@ -287,7 +283,8 @@ def run_analysis():
         max_chi2=500,
         n_pixels=n_pixels,
         pixel_size=pixel_size,
-        dut_names=dut_names)
+        dut_names=dut_names,
+        use_prealignment=False)
 
 # #     # Create unconstrained residuals
 # #     result_analysis.calculate_residuals(
