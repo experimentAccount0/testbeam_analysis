@@ -398,10 +398,13 @@ class AnalysisWidget(QtWidgets.QWidget):
         Call all functions in a row
         """
 
+        # Try to disable ok button and show progressbar
         try:
             self.btn_ok.setDisabled(True)
             self.p_bar.setVisible(True)
             self.p_bar.setRange(0, 0)
+
+        # AnalysisWidget is part of ParallelAnalysisWidget and ok button and progressbar have been removed
         except RuntimeError:
             pass
 
@@ -444,6 +447,11 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.analysis_thread.start()
 
     def _connect_vitables(self, files):
+        """
+        Disconnects ok button from running analysis and connects to calling "ViTables".
+        
+        :param files: HDF5-file or list of HDF5-files  
+        """
 
         self.btn_ok.setDisabled(False)
         self.btn_ok.setText('Open output file(s) via ViTables')
@@ -451,6 +459,11 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.btn_ok.clicked.connect(lambda: self._call_vitables(files=files))
 
     def _call_vitables(self, files):
+        """
+        Calls "ViTables" using subprocess' call.
+        
+        :param files: HDF5-file or list of HDF5-files
+        """
 
         if isinstance(files, list):
             vitables_paths = ['vitables']
@@ -488,11 +501,27 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.vitables_thread.start()
 
     def plot(self, input_file, plot_func, figures=None, **kwargs):
+        """
+        Function that creates the plot for the plotting area of the AnalysisWidget using AnalysisPlotter.
+        See AnalysisPlotters docstring for info on how plots are created.
+        
+        :param input_file: HDF5-file or dict with HDF5-files if plotting for multiple functions
+        :param plot_func: function or dict of functions if plotting for multiple functions
+        :param figures: None, matplotlib.Figure() or list of such figures or dict of both if plotting for multiple functions
+        :param kwargs: keyword arguments or keyword from dicts keys with another dict as argument if plotting for multiple functions
+        """
 
         plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget, **kwargs)
         self.plt.addWidget(plot)
 
     def handle_exceptions(self, exception, cause=None):
+        """
+        Handles exceptions which are raised on sub-thread where "ViTables" or analysis is done.
+        Re-raises unexpected exceptions and and handles expected ones.
+         
+        :param exception: Any Exception 
+        :param cause: "vitables" or "analysis"
+        """
 
         if cause is not None:
 
@@ -625,8 +654,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.tabs.currentChanged.connect(lambda tab: self.handle_sub_layout(tab=tab))
 
         for tab_name in self.tw.keys():
-            self.tw[tab_name].widget_splitter.splitterMoved.connect(
-                lambda: self.handle_sub_layout(tab=self.tabs.currentIndex()))
+            self.tw[tab_name].widget_splitter.splitterMoved.connect(lambda: self.handle_sub_layout(tab=self.tabs.currentIndex()))
 
     def resizeEvent(self, QResizeEvent):
         self.handle_sub_layout(tab=self.tabs.currentIndex())
@@ -646,8 +674,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_function(func=func)
 
-    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False,
-                            tooltip=None):
+    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False, tooltip=None):
 
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_option(option=option, func=func, dtype=dtype, name=name,
@@ -655,6 +682,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                            fixed=fixed, tooltip=tooltip)
 
     def _call_parallel_funcs(self):
+        """
+        Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets 
+        """
 
         self.btn_ok.setDisabled(True)
 
@@ -667,15 +697,22 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             self.tw[tab].analysis_thread.finished.connect(self._check_parallel_analysis_status)
 
     def _check_parallel_analysis_status(self):
+        """
+        Checks status of parallel analysis and emits the parallelAnalysisDone signal when all workers
+        or sub-threads on which the analysis runs have finished.
+        """
 
+        # Initialize the range of the progressbar
         if self.p_bar.value() == -1:
             self.p_bar.setRange(0, len(self.tw.keys()))
 
+        # Make list of the status of all sub-threads; if thread is running append True else False
         analysis_status = []
         for tab in self.tw.keys():
             status = self.tw[tab].analysis_thread.isRunning()
             analysis_status.append(status)
 
+        # Set progressbar to be value of all sub-threads that are finished
         self.p_bar.setValue(analysis_status.count(False))
 
         if True not in analysis_status:
@@ -685,13 +722,22 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                 self.threads_finished = True
 
     def _connect_vitables(self, files):
+        """
+        Disconnects ok button from running analysis and connects to calling "ViTables".
 
+        :param files: HDF5-file or list of HDF5-files  
+        """
         self.btn_ok.setDisabled(False)
         self.btn_ok.setText('Open output file(s) via ViTables')
         self.btn_ok.clicked.disconnect()
         self.btn_ok.clicked.connect(lambda: self._call_vitables(files=files))
 
     def _call_vitables(self, files):
+        """
+        Calls "ViTables" using subprocess' call.
+
+        :param files: HDF5-file or list of HDF5-files
+        """
 
         if isinstance(files, list):
             vitables_paths = ['vitables']
@@ -728,16 +774,36 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             # Start thread
             self.vitables_thread.start()
 
-    def plot(self, input_files, plot_func, **kwargs):
+    def plot(self, input_files, plot_func, dut_names=None, **kwargs):
+        """
+        Function that creates the plots for several input files with same plotting function for the plotting area
+        of the ParallelAnalysisWidget using AnalysisPlotter. See AnalysisPlotters docstring for info on how
+        plots are created.
 
-        names = list(self.tw.keys())
-        names.reverse()
+        :param input_files: list of HDF5-files or dict of lists
+        :param plot_func: function or dict of functions if plotting for multiple functions
+        :param dut_names: list of dut names
+        :param kwargs: keyword arguments or keyword from dicts keys with another dict as argument if plotting for multiple functions
+        """
+
+        if dut_names:
+            names = dut_names
+        else:
+            names = list(self.tw.keys())
+            names.reverse()
 
         for dut in names:
             plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_name=dut, **kwargs)
             self.tw[dut].plt.addWidget(plot)
 
     def handle_exceptions(self, exception, cause=None):
+        """
+        Handles exceptions which are raised on sub-thread where "ViTables" or analysis is done.
+        Re-raises unexpected exceptions and and handles expected ones.
+
+        :param exception: Any Exception 
+        :param cause: "vitables" or "analysis"
+        """
 
         if cause is not None:
 

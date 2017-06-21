@@ -85,6 +85,13 @@ class AnalysisPlotter(QtWidgets.QWidget):
             self.multi_plot()
 
     def check_kwargs(self, plot_func, kwargs):
+        """
+        Takes a function and keyword arguments passed to the init of this class and checks whether
+        or not the function takes these as arguments. If not, raise TypeError with message naming function and kwarg
+        
+        :param plot_func: function 
+        :param kwargs: dict of keyword arguments
+        """
 
         # Get plot_func's args
         args = inspect.getargspec(plot_func)[0]
@@ -105,8 +112,8 @@ class AnalysisPlotter(QtWidgets.QWidget):
         :param external_widget: None or QWidget; if None figs are plotted on self (single fig) or an internal
                                 plot_widget. If QWidget figs are plotted on this widget (must have layout)
 
-        :param figures: Figure() or list of Figures(); if None figures come from the return values of self.plot_func.
-                        If figures are given, just plot them onto widget.
+        :param figures: matplotlib.Figure() or list of such figures; if None, figures are return values
+                        of self.plot_func. If figures are given, just plot them onto widget.
         """
 
         # Get plots
