@@ -50,15 +50,12 @@ from multiprocessing import Pool
 from testbeam_analysis import (hit_analysis, dut_alignment, track_analysis,
                                result_analysis)
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s]\
-     (%(threadName)-10s) %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
 def run_analysis():
     # Get the absolute path of example data
-    tests_data_folder = os.path.join(os.path.dirname(
-        os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
+    tests_data_folder = os.path.join(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))), 'data')
 
     # The location of the example data files, one file per DUT
     data_files = [os.path.join(tests_data_folder,
@@ -74,8 +71,7 @@ def run_analysis():
     dut_names = ("Tel_0", "Tel_1", "Tel_2", "Tel_3", "Tel_4", "Tel_5")
 
     # Create output subfolder where all output data and plots are stored
-    output_folder = os.path.join(os.path.split(data_files[0])[0],
-                                 'output_eutel')
+    output_folder = os.path.join(os.path.split(data_files[0])[0], 'output_eutel')
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
@@ -120,8 +116,7 @@ def run_analysis():
 
     # Correlate the row / column of each DUT
     dut_alignment.correlate_cluster(input_cluster_files=input_cluster_files,
-                                    output_correlation_file=os.path.join(
-                                        output_folder, 'Correlation.h5'),
+                                    output_correlation_file=os.path.join(output_folder, 'Correlation.h5'),
                                     n_pixels=n_pixels,
                                     pixel_size=pixel_size,
                                     dut_names=dut_names)
@@ -129,8 +124,7 @@ def run_analysis():
     # Create prealignment relative to the first DUT from the correlation data
     input_correlation_file = os.path.join(output_folder, 'Correlation.h5')
     dut_alignment.prealignment(input_correlation_file=input_correlation_file,
-                               output_alignment_file=os.path.join(
-                                   output_folder, 'Alignment.h5'),
+                               output_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
                                z_positions=z_positions,
                                pixel_size=pixel_size,
                                dut_names=dut_names,
@@ -144,68 +138,9 @@ def run_analysis():
 
     # Merge the cluster tables to one merged table aligned at the event number
     dut_alignment.merge_cluster_data(input_cluster_files=input_cluster_files,
-                                     output_merged_file=os.path.join(
-                                         output_folder, 'Merged.h5'),
+                                     output_merged_file=os.path.join(output_folder, 'Merged.h5'),
                                      n_pixels=n_pixels,
                                      pixel_size=pixel_size)
-
-# #     # Apply the prealignment to the merged cluster table to create tracklets
-# #     dut_alignment.apply_alignment(
-# #         input_hit_file=os.path.join(output_folder, 'Merged.h5'),
-# #         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-# #         output_hit_file=os.path.join(output_folder,
-# #                                      'Tracklets_prealigned.h5'),
-# #         force_prealignment=True)
-# # 
-# #     # Find tracks from the prealigned tracklets and stores them with quality
-# #     # indicator into track candidates table
-# #     track_analysis.find_tracks(
-# #         input_tracklets_file=os.path.join(output_folder,
-# #                                           'Tracklets_prealigned.h5'),
-# #         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-# #         output_track_candidates_file=os.path.join(
-# #             output_folder, 'TrackCandidates_prealignment.h5')
-# #     )
-# # 
-# #     # The following two steps are for demonstration only.
-# #     # They show track fitting and residual calculation on
-# #     # prealigned hits. Usually you are not interested in this and will use
-# #     # the aligned hits directly.
-# # 
-# #     # Step 1.: Fit the track candidates and create new track table (using the
-# #     # prealignment!)
-# #     track_analysis.fit_tracks(
-# #         input_track_candidates_file=os.path.join(
-# #             output_folder, 'TrackCandidates_prealignment.h5'),
-# #         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-# #         output_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
-# #         # To get unconstrained residuals do not use DUT
-# #         # hit for track fit
-# #         exclude_dut_hit=True,
-# #         # This is just for demonstration purpose, usually
-# #         # uses fully aligned hits
-# #         force_prealignment=True,
-# #         selection_track_quality=0)  # We will cut on chi2
-# # 
-# #     # Step 2.:  Calculate the residuals to check the alignment (using the
-# #     # prealignment!)
-# #     result_analysis.calculate_residuals(
-# #         input_tracks_file=os.path.join(output_folder, 'Tracks_prealigned.h5'),
-# #         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-# #         output_residuals_file=os.path.join(output_folder,
-# #                                            'Residuals_prealigned.h5'),
-# #         n_pixels=n_pixels,
-# #         pixel_size=pixel_size,
-# #         max_chi2=2000,
-# #         # This is just for demonstration purpose
-# #         # you usually use fully aligned hits
-# #         force_prealignment=True)
-
-#     track_analysis.find_tracks(
-#         input_tracklets_file=os.path.join(output_folder, 'Merged.h5'),
-#         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-#         output_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_prealignment.h5'),
-#         use_prealignment=True)
 
     # Do an alignment step with the track candidates, corrects rotations and
     # is therefore much more precise than simple prealignment
@@ -224,13 +159,6 @@ def run_analysis():
         use_fit_limits=True,
         plot=True)
 
-# #     # Apply the alignment to the merged cluster table to create tracklets
-# #     dut_alignment.apply_alignment(
-# #         input_hit_file=os.path.join(output_folder, 'Merged.h5'),
-# #         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
-# #         output_hit_file=os.path.join(output_folder, 'Tracklets.h5')
-# #     )
-
     # Find tracks from the tracklets and stores the with quality indicator
     # into track candidates table
     track_analysis.find_tracks(
@@ -242,8 +170,7 @@ def run_analysis():
 
     # Example 1: use all DUTs in fit and cut on chi2
     track_analysis.fit_tracks(
-        input_track_candidates_file=os.path.join(output_folder,
-                                                 'TrackCandidates_alignment.h5'),
+        input_track_candidates_file=os.path.join(output_folder, 'TrackCandidates_alignment.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
         fit_duts=[0, 1, 2, 3, 4, 5],
@@ -257,7 +184,6 @@ def run_analysis():
 
     data_selection.select_tracks(input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
                                  output_tracks_file=os.path.join(output_folder, 'Tracks_selected.h5'),
-    #                              max_events=10000,
                                  select_duts=[0, 1, 2, 3, 4, 5],
                                  duts_hit_selection=None,
                                  duts_no_hit_selection=None,
@@ -275,6 +201,7 @@ def run_analysis():
         input_tracks_file=os.path.join(output_folder, 'Tracks_selected.h5'),
         input_alignment_file=os.path.join(output_folder, 'Alignment.h5'),
         output_residuals_file=os.path.join(output_folder, 'Residuals_all_chi2_cut.h5'),
+        select_duts=[0, 1, 2, 3, 4, 5],
         use_fit_limits=True,
         # The chi2 cut has a large influence on
         # the residuals and number of tracks,
@@ -286,6 +213,7 @@ def run_analysis():
         dut_names=dut_names,
         use_prealignment=False)
 
+# TBD:
 # #     # Create unconstrained residuals
 # #     result_analysis.calculate_residuals(
 # #         input_tracks_file=os.path.join(output_folder, 'Tracks_all.h5'),
