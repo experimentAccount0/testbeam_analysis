@@ -497,10 +497,10 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         for index in range(n_duts):
             description.append(('zerr_dut_%d' % index, np.float))
 
-        # Select only fitted tracks (keep data = False) or keep all track candidates (keep data = True)
+        # Select only fitted tracks (keep_data is False) or keep all track candidates (keep_data is True)
         if not keep_data:
             track_candidates_chunk = track_candidates_chunk[good_track_selection]
-            
+
         tracks_array = np.empty((track_candidates_chunk.shape[0],), dtype=description)
 
         tracks_array['hit_flag'] = track_candidates_chunk['hit_flag']
@@ -517,7 +517,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             tracks_array['charge_dut_%d' % index] = track_candidates_chunk['charge_dut_%d' % index]
             tracks_array['n_hits_dut_%d' % index] = track_candidates_chunk['n_hits_dut_%d' % index]
             tracks_array['n_cluster_dut_%d' % index] = track_candidates_chunk['n_cluster_dut_%d' % index]
-        
+
         if keep_data:
             for dimension in range(3):
                 tracks_array['offset_%d' % dimension][good_track_selection] = offsets[:, dimension]
@@ -556,7 +556,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
 
         return tracks_array
 
-    def store_track_data(fit_dut, fit_dut_index, min_track_distance):  # Set the offset to the track intersection with the tilted plane and store the data
+    def store_track_data(fit_dut, fit_dut_index, min_track_distance):  
         # reset quality flag
         track_candidates_chunk["quality_flag"] = 0
         for dut_index in range(n_duts):
@@ -572,7 +572,7 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
                 dut_plane_normal = basis_global[2]
                 if dut_plane_normal[2] < 0:
                     dut_plane_normal = -dut_plane_normal
-    
+
             # TODO: use plane at z=0
     #         dut_position = np.array([0.0, 0.0, 0.0])
     #         dut_plane_normal = np.array([0.0, 0.0, 1.0])
@@ -601,7 +601,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
             dut_quality_flag[dut_quality_flag_sel] |= (1 << dut_index)
             track_candidates_chunk["quality_flag"][good_track_selection] = dut_quality_flag
 
-            
             if dut_index == fit_dut:
                 # use offsets at the location of the fit DUT
                 dut_offsets = intersections
