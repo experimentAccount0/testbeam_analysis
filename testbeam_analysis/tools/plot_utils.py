@@ -698,8 +698,8 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
                     slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
                     linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
 
-                n_hits = bin(track['track_quality'] & 0xFF).count('1')
-                n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
+                n_hits = np.binary_repr(track['hit_flag']).count('1')
+                n_very_good_hits = np.binary_repr(track['quality_flag']).count('1')
 
                 if n_hits > 2:  # only plot tracks with more than 2 hits
                     if fitted_tracks:
