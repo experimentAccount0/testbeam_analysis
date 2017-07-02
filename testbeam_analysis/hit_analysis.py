@@ -179,8 +179,8 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                                       ('charge', '<f4'),
                                       ('seed_column', '<u2'),
                                       ('seed_row', '<u2'),
-                                      ('mean_column', '<f8'),
-                                      ('mean_row', '<f8')])
+                                      ('mean_column', '<f4'),
+                                      ('mean_row', '<f4')])
 
             clusterizer = HitClusterizer(column_cluster_distance=column_cluster_distance,
                                          row_cluster_distance=row_cluster_distance,
