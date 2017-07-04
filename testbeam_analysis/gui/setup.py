@@ -459,7 +459,7 @@ class SetupTab(QtWidgets.QWidget):
         # Read input parameters and make list of of each parameter for all duts, then save to output data
         if custom is None:
 
-            # Clear dut data dict before reading
+            # Clear and initialize dut data dict before reading
             self.dut_data = {'rotations': [], 'n_pixels': [], 'pixel_size': []}
 
             # make tmp dict for pixel_size and n_pixel to add tuple of (n_cols, n_rows) etc. to output data
@@ -498,27 +498,35 @@ class SetupTab(QtWidgets.QWidget):
                 self.dut_data['n_pixels'].append((tmp_n_pixel['n_cols'], tmp_n_pixel['n_rows']))
                 self.dut_data['pixel_size'].append((tmp_pixel_size['pitch_col'], tmp_pixel_size['pitch_row']))
 
+            # FIXME: Kind of hardcoded. Repeating same code for DUTs and scatter plane, should be function
+            # Clear and initialize scatter data dict with correct keys necessary for track analysis before reading
+            self.scatter_data = {'sct_names': [], 'alignment_scatter': [],
+                                 'z_scatter': [], 'material_budget_scatter': []}
             tmp_rotation = {}
 
-            for sct in self._scatter_widgets.keys():
-                self.scatter_data[sct] = {}
+            for sct in sorted(self._scatter_widgets.keys()):  # sorted to get correct order of scatter plane names
+
+                self.scatter_data['sct_names'].append(sct)  # make list of scatter plane names
+
                 for sct_prop in self._scatter_props:
+
                     if sct_prop in ['rot_alpha', 'rot_beta', 'rot_gamma', 'material_budget']:
                         if not self._scatter_widgets[sct][sct_prop].text():
                             if sct_prop == 'material_budget':
-                                self.scatter_data[sct][sct_prop] = 0.0
+                                self.scatter_data['material_budget_scatter'].append(0.0)
                             else:
                                 tmp_rotation[sct_prop] = 0.0
                         else:
                             if sct_prop == 'material_budget':
-                                self.scatter_data[sct][sct_prop] = float(self._scatter_widgets[sct][sct_prop].text())
+                                self.scatter_data['material_budget_scatter'].append(float(self._scatter_widgets[sct][sct_prop].text()))
                             else:
-                                tmp_rotation[prop] = float(self._dut_widgets[dut][prop].text())
-                    else:
-                        self.scatter_data[sct][sct_prop] = float(self._scatter_widgets[sct][sct_prop].text())
+                                tmp_rotation[sct_prop] = float(self._scatter_widgets[sct][sct_prop].text())
 
-                self.scatter_data[sct]['rotations'] = (tmp_rotation['rot_alpha'], tmp_rotation['rot_beta'],
-                                                       tmp_rotation['rot_gamma'])
+                    elif sct_prop in ['z_positions']:
+                        self.scatter_data['z_scatter'].append(float(self._scatter_widgets[sct][sct_prop].text()))
+
+                self.scatter_data['alignment_scatter'].append((tmp_rotation['rot_alpha'], tmp_rotation['rot_beta'],
+                                                               tmp_rotation['rot_gamma']))
 
             # Add property lists to output data dict
             for key in self.dut_data.keys():
@@ -612,7 +620,7 @@ class SetupTab(QtWidgets.QWidget):
 
                 new_type = self._handle_widgets[dut]['edit_h'].text()
 
-                if new_type:
+                if new_type:  # if len(new_type) > 0:
 
                     for key in self._handle_widgets[dut].keys():
 
@@ -644,7 +652,7 @@ class SetupTab(QtWidgets.QWidget):
 
                 else:
                     self._handle_widgets[dut]['button_h'].setText('Create')
-                    self._handle_widgets[dut]['label_h'].setText('Create DUT type')
+                    self._handle_widgets[dut]['label_h'].setText('Handle DUT type')
                     self._handle_widgets[dut]['button_h'].setDisabled(True)
 
             if mode is 'c':
@@ -727,7 +735,7 @@ class SetupTab(QtWidgets.QWidget):
                         in_put = self._scatter_widgets[dut][prop].text()
 
                 # Input not empty
-                if in_put:  # len(in_put) > 0:
+                if in_put:  # if len(in_put) > 0:
 
                     # Check whether required conversions of types are possible
                     try:
@@ -763,15 +771,14 @@ class SetupTab(QtWidgets.QWidget):
                     self.tabs.setTabIcon(dut_list.index(dut), icon)
                     self.tabs.setTabToolTip(dut_list.index(dut), 'Ready')
 
-                if dut in self.data['dut_names']:
-                    self._handle_widgets[dut]['button_h'].setDisabled(broken)
-
-            else:
-                if dut in self.data['dut_names']:
-                    if dut in broken_input:
-                        self._handle_widgets[dut]['button_h'].setDisabled(True)
-                    else:
+            if dut in self.data['dut_names']:
+                if self._handle_widgets[dut]['edit_h'].text():
+                    if dut not in broken_input:
                         self._handle_widgets[dut]['button_h'].setDisabled(False)
+                    else:
+                        self._handle_widgets[dut]['button_h'].setDisabled(True)
+                else:
+                    self._handle_widgets[dut]['button_h'].setDisabled(True)
 
         # Set the status of the proceed button
         if skip_props is None:
