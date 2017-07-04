@@ -4,6 +4,7 @@ import logging
 import math
 
 from subprocess import call, CalledProcessError
+from multiprocessing import Pool
 from collections import OrderedDict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -12,8 +13,8 @@ from testbeam_analysis.gui import option_widget
 from analysis_plotter import AnalysisPlotter
 from analysis_threading import AnalysisWorker, AnalysisThread
 
-# Set way analysis is done; Can be 'Worker' or 'Thread'
-THREADING_MODE = 'Worker'
+# Set way analysis is done; Can be 'Worker', 'Thread' or 'Pool'
+THREADING_MODE = 'Pool'
 
 
 def get_default_args(func):
@@ -446,6 +447,20 @@ class AnalysisWidget(QtWidgets.QWidget):
             # Start thread
             self.analysis_thread.start()
 
+        # FIXME: This is the non-multi-threading approach
+        elif THREADING_MODE == 'Pool':
+
+            pool = Pool()
+            for func, kwargs in self.calls.iteritems():
+                pool.apply_async(self._call_func(func, kwargs))
+            pool.close()
+            pool.join()
+
+            if not parallel:
+                self.p_bar.setRange(0, 1)
+                self.p_bar.setValue(1)
+                self.analysisDone.emit(self.tab_list)
+
     def _connect_vitables(self, files):
         """
         Disconnects ok button from running analysis and connects to calling "ViTables".
@@ -499,6 +514,11 @@ class AnalysisWidget(QtWidgets.QWidget):
 
             # Start thread
             self.vitables_thread.start()
+
+        # FIXME: This is the non-multi-threading approach
+        elif THREADING_MODE == 'Pool':
+
+            call(vitables_paths)
 
     def plot(self, input_file, plot_func, figures=None, **kwargs):
         """
@@ -694,7 +714,17 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         for tab in self.tw.keys():
             self.tw[tab].container.setDisabled(True)
             self.tw[tab]._call_funcs(parallel=True)
-            self.tw[tab].analysis_thread.finished.connect(self._check_parallel_analysis_status)
+
+            if THREADING_MODE in ['Worker', 'Thread']:
+                self.tw[tab].analysis_thread.finished.connect(self._check_parallel_analysis_status)
+            else:
+                pass
+
+        # FIXME: This is the non-multi-threading approach
+        if THREADING_MODE == 'Pool':
+            self.p_bar.setRange(0, 1)
+            self.p_bar.setValue(1)
+            self.parallelAnalysisDone.emit(self.tab_list)
 
     def _check_parallel_analysis_status(self):
         """
@@ -773,6 +803,11 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
             # Start thread
             self.vitables_thread.start()
+
+        # FIXME: This is the non-multi-threading approach
+        elif THREADING_MODE == 'Pool':
+
+            call(vitables_paths)
 
     def plot(self, input_files, plot_func, dut_names=None, **kwargs):
         """

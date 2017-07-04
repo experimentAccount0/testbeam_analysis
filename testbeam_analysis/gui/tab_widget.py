@@ -23,12 +23,15 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
     def __init__(self, parent, setup, options, tab_list):
         super(NoisyPixelsTab, self).__init__(parent, setup, options, tab_list)
 
+        # Make options and setup class variables
         self.options = options
         self.setup = setup
 
+        # Make variables for input of noisy pixel function
         self.output_files = [options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']]
         self.input_files = options['input_files']
-        self.duts = []
+        self.n_pixels = setup['n_pixels']
+        self.duts = setup['dut_names']
 
         self.add_parallel_function(func=generate_pixel_mask)
 
@@ -41,11 +44,11 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='n_pixel',
-                                 default_value=setup['n_pixels'],
+                                 default_value=self.n_pixels,
                                  func=generate_pixel_mask,
                                  fixed=True)
         self.add_parallel_option(option='dut_name',
-                                 default_value=setup['dut_names'],
+                                 default_value=self.duts,
                                  func=generate_pixel_mask,
                                  fixed=False)
 
@@ -58,29 +61,58 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
 
         # Disconnect ok button and reconnect
         self.btn_ok.disconnect()
-        for x in [lambda: self.check_skip_noisy(),
-                  lambda: self._call_parallel_funcs()]:
-            self.btn_ok.clicked.connect(x)
-
-        for xx in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
-                   lambda: self._connect_vitables(files=self.output_files),
-                   lambda: self.plot(input_files=self.output_files,
-                                     plot_func=plot_masked_pixels,
-                                     dut_names=self.duts)]:
-            self.parallelAnalysisDone.connect(xx)
+        self.btn_ok.clicked.connect(lambda: self.check_skip_noisy())
 
     def check_skip_noisy(self):
+        """
+        Checks whether or not the noisy pixel masking is skipped for specific DUTs. Changes the respective
+        input parameters for the analysis widget.
+        """
 
+        # Clear noisy pixel input variables
         self.input_files = []
         self.output_files = []
+        self.n_pixels = []
+        self.duts = []
 
+        # Loop over tabs and check the state of checkbox
         for dut in self.setup['dut_names']:
+
+            # Mask noisy pixels for files with un-checked boxes
             if not self.check_boxes[dut].isChecked():
+
                 self.input_files.append(self.options['input_files'][self.setup['dut_names'].index(dut)])
                 self.output_files.append(self.options['output_path'] + '/' + dut + self.options['noisy_suffix'])
                 self.duts.append(dut)
+                self.n_pixels.append(self.setup['n_pixels'][self.setup['dut_names'].index(dut)])
+
+            # Do nothing
             else:
                 pass
+
+        # Do plotting and connect vitables if masking is done for at least one DUT
+        if self.input_files:
+
+            for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
+                      lambda: self._connect_vitables(files=self.output_files),
+                      lambda: self.plot(input_files=self.output_files,
+                                        plot_func=plot_masked_pixels,
+                                        dut_names=self.duts)]:
+                self.parallelAnalysisDone.connect(x)
+
+            # Start masking
+            self._call_parallel_funcs()
+
+        # If all DUTs are skipped, disable container and enable next tab
+        else:
+
+            for key in self.tw.keys():
+                self.tw[key].container.setDisabled(True)
+
+            self.btn_ok.setDisabled(True)
+
+            self.parallelAnalysisDone.connect(lambda _tab_list: self.proceedAnalysis.emit(_tab_list))
+            self.parallelAnalysisDone.emit(self.tab_list)
 
 
 class ClusterPixelsTab(ParallelAnalysisWidget):
