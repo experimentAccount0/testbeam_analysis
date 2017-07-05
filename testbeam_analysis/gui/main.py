@@ -185,6 +185,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.menuBar().addSeparator()
         self.menuBar().addMenu(self.help_menu)
         self.help_menu.addAction('&About', self.about)
+        self.help_menu.addAction('&Documentation', self.open_docu)
 
     def about(self):
         QtWidgets.QMessageBox.about(self, "About",
@@ -193,6 +194,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                     "GUI authors\n%s" % (testbeam_analysis.VERSION,
                                                          AUTHORS.replace(', ', '\n'),
                                                          GUI_AUTHORS.replace(', ', '\n')))
+
+    def open_docu(self):
+        link = r'https://silab-bonn.github.io/testbeam_analysis/'
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(link))
 
     def handle_messages(self, message, ms):
         """
