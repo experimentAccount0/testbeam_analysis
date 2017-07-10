@@ -79,7 +79,10 @@ class SetupTab(QtWidgets.QWidget):
         layout_right = QtWidgets.QVBoxLayout()
         layout_tabs = QtWidgets.QVBoxLayout()
         self.tabs = QtWidgets.QTabWidget()
-        # self.tabs.setTabsClosable(True)
+        # Make tabs closable at first to gain possibility to remove scatter_plane tabs later on
+        self.tabs.setTabsClosable(True)
+        # Connect close request signal of QTabWidget to function
+        self.tabs.tabCloseRequested.connect(lambda index: self._remove_dut(index=index))
         self.tabs.setMinimumWidth(475)
         layout_tabs.addWidget(self.tabs)
         layout_right.addLayout(layout_tabs)
@@ -162,10 +165,7 @@ class SetupTab(QtWidgets.QWidget):
                 self._buttons[dut]['global'].setToolTip('')
 
             # Remove close buttons from actual DUT tabs
-            # self.tabs.tabBar().setTabButton(i, QtWidgets.QTabBar().RightSide, None)
-
-        # Connect tabs
-        # self.tabs.currentChanged.connect(lambda tab: self._handle_dut_types(self.data['dut_names'][tab])) # FIXME
+            self.tabs.tabBar().setTabButton(i, QtWidgets.QTabBar().RightSide, None)
 
         # Connect widgets of all tabs
         for dut in self.data['dut_names']:
@@ -446,6 +446,42 @@ class SetupTab(QtWidgets.QWidget):
 
         if scatter_plane:
             self.tabs.setCurrentIndex(self.tabs.indexOf(self.tw[dut_name]))
+
+    def _remove_dut(self, index):
+        """
+        Removes the dut at index from the QTabWidget and the plotting area. So far only needed
+        to remove scattering planes since actual DUTs are not removable.
+        
+        :param index: int of position of tab in QTabWidget 
+        """
+
+        # Get dut_name
+        dut_name = self.tabs.tabText(index)
+
+        # Removing stuff from tab area
+        # Delete entry in scatter dict to remove them from check_input procedure
+        if dut_name in self._scatter_widgets.keys():
+            del self._scatter_widgets[dut_name]
+
+        # Delete tab widget in from dict
+        del self.tw[dut_name]
+
+        # Remove respective tab from QTabWidget
+        self.tabs.removeTab(index)
+
+        # Removing stuff from plotter
+        self.top_view.scene.removeItem(self.top_view.names[dut_name])
+        self.top_view.scene.removeItem(self.top_view.planes[dut_name])
+        self.side_view.scene.removeItem(self.side_view.names[dut_name])
+        self.side_view.scene.removeItem(self.side_view.planes[dut_name])
+
+        # Remove respective QGraphicsItem from scenes
+        del self.top_view.planes[dut_name]
+        del self.top_view.names[dut_name]
+        del self.top_view.z_positions[dut_name]
+        del self.side_view.planes[dut_name]
+        del self.side_view.names[dut_name]
+        del self.side_view.z_positions[dut_name]
 
     def _handle_input(self, custom=None):
         """
@@ -920,7 +956,7 @@ class SetupPainter(QtWidgets.QGraphicsView):
         self.z_positions[dut_name] = factor
 
         self.scene.addItem(self.planes[dut_name])
-        self.scene.addItem(name)
+        self.scene.addItem(self.names[dut_name])
 
     def draw_coordinate_system(self, origin=None, axes=['x', 'y', 'z'], axis_length=40, arrow_length=4, offset=[80,20]):
 

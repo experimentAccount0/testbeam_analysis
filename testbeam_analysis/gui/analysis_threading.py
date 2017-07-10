@@ -84,11 +84,9 @@ class AnalysisWorker(QtCore.QObject):
         try:
 
             if self.funcs_args is not None:
-                pool = Pool()
+
                 for func, kwargs in self.funcs_args:
-                    pool.apply_async(self.main_func(func, kwargs))
-                pool.close()
-                pool.join()
+                    self.main_func(func, kwargs)
 
             else:
                 self.main_func(self.args)

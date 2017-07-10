@@ -4,17 +4,13 @@ import logging
 import math
 
 from subprocess import call, CalledProcessError
-from multiprocessing import Pool
 from collections import OrderedDict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 from testbeam_analysis.gui import option_widget
 from analysis_plotter import AnalysisPlotter
-from analysis_threading import AnalysisWorker, AnalysisThread
-
-# Set way analysis is done; Can be 'Worker', 'Thread' or 'Pool'
-THREADING_MODE = 'Pool'
+from analysis_threading import AnalysisWorker
 
 
 def get_default_args(func):
@@ -67,20 +63,11 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.option_widgets = {}
         self.splitter_size = [parent.width() / 2, parent.width() / 2]
         self._setup()
-
-        # FIXME: QThread + WorkerObject
-        if THREADING_MODE == 'Worker':
-            self.analysis_thread = QtCore.QThread()  # no parent
-            self.analysis_worker = None
-            self.vitables_thread = QtCore.QThread()  # no parent
-            self.vitables_worker = None
-
-        # FIXME: Subclassing QThread
-        elif THREADING_MODE == 'Thread':
-            # Provide additional thread to do analysis on
-            self.analysis_thread = None
-            self.vitables_thread = None
-
+        # Multi-threading related inits
+        self.analysis_thread = QtCore.QThread()  # no parent
+        self.analysis_worker = None
+        self.vitables_thread = QtCore.QThread()  # no parent
+        self.vitables_worker = None
         # Holds functions with kwargs
         self.calls = OrderedDict()
         # List of tabs which will be enabled after analysis
@@ -409,57 +396,25 @@ class AnalysisWidget(QtWidgets.QWidget):
         except RuntimeError:
             pass
 
-        # FIXME: This is the QThread + WorkerObject approach which is supposed to be the correct approach
-        if THREADING_MODE == 'Worker':
-            # Create worker for vitables and move to thread
-            self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
-            self.analysis_worker.moveToThread(self.analysis_thread)
+        # Create worker for vitables and move to thread
+        self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
+        self.analysis_worker.moveToThread(self.analysis_thread)
 
-            # Connect workers work method to the start of the thread, quit thread when worker finishes
-            self.analysis_worker.finished.connect(self.analysis_thread.quit)
-            self.analysis_thread.started.connect(self.analysis_worker.work)
+        # Connect workers work method to the start of the thread, quit thread when worker finishes
+        self.analysis_worker.finished.connect(self.analysis_thread.quit)
+        self.analysis_thread.started.connect(self.analysis_worker.work)
 
-            # Connect exceptions signal
-            self.analysis_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='analysis'))
+        # Connect exceptions signal
+        self.analysis_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='analysis'))
 
-            # When this method is not called from the ParallelAnalysisWidget
-            if not parallel:
-                self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
-                self.analysis_thread.finished.connect(lambda: self.p_bar.setRange(0, 1))
-                self.analysis_thread.finished.connect(lambda: self.p_bar.setValue(1))
+        # When this method is not called from the ParallelAnalysisWidget
+        if not parallel:
+            self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
+            self.analysis_thread.finished.connect(lambda: self.p_bar.setRange(0, 1))
+            self.analysis_thread.finished.connect(lambda: self.p_bar.setValue(1))
 
-            # Start thread
-            self.analysis_thread.start()
-
-        # FIXME: This is the approach of subclassing QThread which is controversial
-        elif THREADING_MODE == 'Thread':
-            self.analysis_thread = AnalysisThread(func=self._call_func, funcs_args=self.calls.iteritems())
-
-            # Connect exceptions signal
-            self.analysis_thread.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='analysis'))
-
-            if not parallel:
-                for x in [lambda: self.analysisDone.emit(self.tab_list),
-                          lambda: self.p_bar.setRange(0, 1),
-                          lambda: self.p_bar.setValue(1)]:
-                    self.analysis_thread.finished.connect(x)
-
-            # Start thread
-            self.analysis_thread.start()
-
-        # FIXME: This is the non-multi-threading approach
-        elif THREADING_MODE == 'Pool':
-
-            pool = Pool()
-            for func, kwargs in self.calls.iteritems():
-                pool.apply_async(self._call_func(func, kwargs))
-            pool.close()
-            pool.join()
-
-            if not parallel:
-                self.p_bar.setRange(0, 1)
-                self.p_bar.setValue(1)
-                self.analysisDone.emit(self.tab_list)
+        # Start thread
+        self.analysis_thread.start()
 
     def _connect_vitables(self, files):
         """
@@ -487,38 +442,20 @@ class AnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        # FIXME: This is the QThread + WorkerObject approach which should be the correct approach
-        if THREADING_MODE == 'Worker':
-            # Create worker for vitables and move to thread
-            self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
-            self.vitables_worker.moveToThread(self.vitables_thread)
+        # Create worker for vitables and move to thread
+        self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
+        self.vitables_worker.moveToThread(self.vitables_thread)
 
-            # Connect exceptions signal from worker on different thread to main thread
-            self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
-            self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
+        # Connect exceptions signal from worker on different thread to main thread
+        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+        self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
 
-            # Connect workers work method to the start of the thread, quit thread when worker finishes
-            self.vitables_worker.finished.connect(self.vitables_thread.quit)
-            self.vitables_thread.started.connect(self.vitables_worker.work)
+        # Connect workers work method to the start of the thread, quit thread when worker finishes
+        self.vitables_worker.finished.connect(self.vitables_thread.quit)
+        self.vitables_thread.started.connect(self.vitables_worker.work)
 
-            # Start thread
-            self.vitables_thread.start()
-
-        # FIXME: This is the approach of subclassing QThread which is controversial
-        elif THREADING_MODE == 'Thread':
-            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-
-            # Connect exceptions signal from worker on different thread to main thread
-            self.vitables_thread.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
-            self.vitables_thread.exceptionSignal.connect(self.vitables_thread.quit)
-
-            # Start thread
-            self.vitables_thread.start()
-
-        # FIXME: This is the non-multi-threading approach
-        elif THREADING_MODE == 'Pool':
-
-            call(vitables_paths)
+        # Start thread
+        self.vitables_thread.start()
 
     def plot(self, input_file, plot_func, figures=None, **kwargs):
         """
@@ -615,12 +552,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.threads_finished = False
 
         # Additional thread for vitables
-        if THREADING_MODE == 'Worker':
-            self.vitables_thread = QtCore.QThread()  # no parent
-            self.vitables_worker = None
-
-        elif THREADING_MODE == 'Thread':
-            self.vitables_thread = None
+        self.vitables_thread = QtCore.QThread()  # no parent
+        self.vitables_worker = None
 
         # List of tabs which will be enabled after analysis
         if isinstance(tab_list, list):
@@ -714,17 +647,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         for tab in self.tw.keys():
             self.tw[tab].container.setDisabled(True)
             self.tw[tab]._call_funcs(parallel=True)
-
-            if THREADING_MODE in ['Worker', 'Thread']:
-                self.tw[tab].analysis_thread.finished.connect(self._check_parallel_analysis_status)
-            else:
-                pass
-
-        # FIXME: This is the non-multi-threading approach
-        if THREADING_MODE == 'Pool':
-            self.p_bar.setRange(0, 1)
-            self.p_bar.setValue(1)
-            self.parallelAnalysisDone.emit(self.tab_list)
+            self.tw[tab].analysis_thread.finished.connect(lambda: self._check_parallel_analysis_status())
 
     def _check_parallel_analysis_status(self):
         """
@@ -776,38 +699,20 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         else:
             vitables_paths = ['vitables', str(files)]
 
-        # FIXME: This is the QThread + WorkerObject approach which should be the correct approach
-        if THREADING_MODE == 'Worker':
-            # Create worker for vitables and move to thread
-            self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
-            self.vitables_worker.moveToThread(self.vitables_thread)
+        # Create worker for vitables and move to thread
+        self.vitables_worker = AnalysisWorker(func=call, args=vitables_paths)
+        self.vitables_worker.moveToThread(self.vitables_thread)
 
-            # Connect exceptions signal from worker on different thread to main thread
-            self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
-            self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
+        # Connect exceptions signal from worker on different thread to main thread
+        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+        self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
 
-            # Connect workers work method to the start of the thread, quit thread when worker finishes
-            self.vitables_worker.finished.connect(self.vitables_thread.quit)
-            self.vitables_thread.started.connect(self.vitables_worker.work)
+        # Connect workers work method to the start of the thread, quit thread when worker finishes
+        self.vitables_worker.finished.connect(self.vitables_thread.quit)
+        self.vitables_thread.started.connect(self.vitables_worker.work)
 
-            # Start thread
-            self.vitables_thread.start()
-
-        # FIXME: This is the approach of subclassing QThread which is controversial
-        elif THREADING_MODE == 'Thread':
-            self.vitables_thread = AnalysisThread(func=call, args=vitables_paths)
-
-            # Connect exceptions signal from worker on different thread to main thread
-            self.vitables_thread.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
-            self.vitables_thread.exceptionSignal.connect(self.vitables_thread.quit)
-
-            # Start thread
-            self.vitables_thread.start()
-
-        # FIXME: This is the non-multi-threading approach
-        elif THREADING_MODE == 'Pool':
-
-            call(vitables_paths)
+        # Start thread
+        self.vitables_thread.start()
 
     def plot(self, input_files, plot_func, dut_names=None, **kwargs):
         """
