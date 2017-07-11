@@ -74,7 +74,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.main_splitter = QtWidgets.QSplitter()
         self.main_splitter.setOrientation(QtCore.Qt.Vertical)
         self.main_splitter.setChildrenCollapsible(False)
-        self.main_splitter.setSizes([int(0.75*self.height()), int(0.25*self.height())])
+        self.main_splitter.setSizes([int(0.8*self.height()), int(0.2*self.height())])
 
         self.main_layout.addWidget(self.main_splitter)
 
@@ -114,7 +114,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             self.handle_tabs(enable=False)
         else:
             self.handle_tabs(enable=True)
-            #self.update_tabs()
 
         # Add to main layout
         self.main_splitter.addWidget(self.tabs)
@@ -127,7 +126,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         """
 
         # Create logger instance
-        self.logger = AnalysisLogger(self)
+        self.logger = AnalysisLogger(self.main_widget)
         self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
         # Add custom logger
@@ -136,7 +135,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Add widget to display log and add it to dock
         # Widget to display log in, we only want to read log
-        self.logger_console = QtWidgets.QPlainTextEdit(self)
+        self.logger_console = QtWidgets.QPlainTextEdit(self.main_widget)
         self.logger_console.setReadOnly(True)
 
         # Dock in which text widget is placed to make it closable without losing log content
@@ -172,6 +171,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.settings_menu.addAction('&Global', self.global_settings)
         self.menuBar().addMenu(self.settings_menu)
 
+        self.run_menu = QtWidgets.QMenu('&Run', self)
+        self.run_menu.setToolTipsVisible(True)
+        self.run_menu.addAction('&Run consecutive analysis', self.run_cons_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
+        # Disable consecutive analysis until setup is done
+        self.run_menu.actions()[0].setEnabled(False)
+        self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
+        self.menuBar().addMenu(self.run_menu)
+
         self.appearance_menu = QtWidgets.QMenu('&Appearance', self)
         self.appearance_menu.addAction('&Show/hide logger', self.handle_logger, QtCore.Qt.CTRL + QtCore.Qt.Key_L)
         self.menuBar().addMenu(self.appearance_menu)
@@ -182,10 +189,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.menuBar().addMenu(self.session_menu)
 
         self.help_menu = QtWidgets.QMenu('&Help', self)
-        self.menuBar().addSeparator()
-        self.menuBar().addMenu(self.help_menu)
         self.help_menu.addAction('&About', self.about)
         self.help_menu.addAction('&Documentation', self.open_docu)
+        self.menuBar().addSeparator()
+        self.menuBar().addMenu(self.help_menu)
 
     def about(self):
         QtWidgets.QMessageBox.about(self, "About",
@@ -387,7 +394,12 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.connect_tabs(tabs)
 
     def setup_completed(self):
+
+        # Setup completed
         self.setup_done = True
+        # Enable consecutive analysis
+        self.run_menu.actions()[0].setEnabled(True)
+        self.run_menu.actions()[0].setToolTip('Run consecutive analysis with default options without user interaction')
 
     def tab_completed(self, tabs):
 
@@ -483,6 +495,33 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.connect_tabs()
         self._init_logger()
         self.tabs.setCurrentIndex(0)
+
+    def run_cons_analysis(self):
+
+        # Variable to store tab name from which consecutive analysis starts
+        starting_tab = None
+
+        for tab in self.tab_order:
+
+            tab_index = self.tab_order.index(tab)
+
+            if tab not in ['Files', 'Setup']:
+
+                # Get starting tab for consecutive analysis
+                if self.tabs.isTabEnabled(tab_index) and not self.tabs.isTabEnabled(tab_index + 1):
+
+                    starting_tab = tab
+
+                # Additional connections for consecutive analysis tabs
+                if starting_tab is not None:
+
+                    self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tabs.setCurrentIndex(self.tab_order.index(tab_list[0]) - 1))
+                    self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tw[tab_list[0]].btn_ok.click())
+                    # Block main thread to synchronize to sub thread
+                    self.tw[tab].proceedAnalysis.connect(lambda: self.thread().msleep(50))
+
+        # Start analysis by clicking ok button on starting tab
+        self.tw[starting_tab].btn_ok.click()
 
     def file_quit(self):
         self.close()

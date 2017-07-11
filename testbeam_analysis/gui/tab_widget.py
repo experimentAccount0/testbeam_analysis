@@ -418,7 +418,7 @@ class TrackFittingTab(AnalysisWidget):
 
         # Set and fix options
         self.add_option(option='fit_duts', func=fit_tracks,
-                        default_value=[0] * setup['n_duts'], optional=True)
+                        default_value=range(setup['n_duts']), optional=True)
         self.add_option(option='force_prealignment', func=fit_tracks,
                         default_value=options['skip_alignment'], fixed=True)
         self.add_option(option='exclude_dut_hit', func=fit_tracks,
@@ -428,9 +428,10 @@ class TrackFittingTab(AnalysisWidget):
         self.add_option(option='min_track_distance', func=fit_tracks,
                         default_value=[200] * setup['n_duts'], optional=False)
 
-        if setup['scatter_planes']:
+        # Check whether scatter planes in setup
+        if setup['scatter_planes']['sct_names']:
             self.add_option(option='add_scattering_plane',
-                            default_value=[setup['scatter_planes'][sct] for sct in setup['scatter_planes'].keys()],
+                            default_value=setup['scatter_planes'],
                             func=fit_tracks,
                             fixed=True)
         else:

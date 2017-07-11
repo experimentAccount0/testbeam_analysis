@@ -483,6 +483,9 @@ class SetupTab(QtWidgets.QWidget):
         del self.side_view.names[dut_name]
         del self.side_view.z_positions[dut_name]
 
+        # Check input after removal to enable proceed button
+        self._check_input()
+
     def _handle_input(self, custom=None):
         """
         Method to read input parameters of each dut from the UI. If custom is not None, only the specific
@@ -746,7 +749,7 @@ class SetupTab(QtWidgets.QWidget):
 
         # Make list of dut properties
         properties = list(self._dut_props)
-        dut_list = sorted(self.data['dut_names']) + sorted(self._scatter_widgets.keys())
+        dut_list = [self.tabs.tabText(i) for i in range(self.tabs.count())]
 
         # Skip checking properties in skip_props by removing them from list
         if skip_props is not None:
