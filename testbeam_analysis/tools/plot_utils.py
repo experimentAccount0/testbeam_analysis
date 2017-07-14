@@ -120,40 +120,121 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         output_pdf.savefig(fig)
 
 
-def plot_cluster_size(hight, n_hits, n_clusters, max_cluster_size, dut_name, output_pdf_file):
-    '''Plotting cluster size histogram.
+def plot_cluster_hists(input_cluster_file=None, input_tracks_file=None, output_pdf_file=None, dut_name=None, dut_names=None, select_duts=None, chunk_size=1000000):
+    if (input_cluster_file and input_tracks_file) or (not input_cluster_file and not input_tracks_file):
+        raise ValueError("A single input file must be given")
 
-    Parameters
-    ----------
-    hight : array like
-        Histogram entries
-    n_hits : number
-        Total number of hits
-    n_clusters : number
-        Total number of cluster
-    max_cluster_size : number
-        Maximum cluster size
-    '''
+    if input_cluster_file and dut_names:
+        raise ValueError("\"dut_name\" parameter must be used")
+
+    if input_tracks_file and dut_name:
+        raise ValueError("\"dut_names\" parameter must be used")
+
+    if input_tracks_file and not select_duts:
+        raise ValueError("\"select_duts\" parameter must be given")
+
+    if input_cluster_file:
+        input_file = input_cluster_file
+        select_duts = [None]
+    else:
+         input_file = input_tracks_file
+
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_file)[0] + '_cluster_hists.pdf'
 
     with PdfPages(output_pdf_file) as output_pdf:
-        left = np.arange(max_cluster_size + 1)
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        ax.bar(left, hight, align='center')
-        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
-        ax.set_xlabel('Cluster size')
-        ax.set_ylabel('#')
-        ax.grid()
-        ax.set_yscale('log')
-        ax.set_xlim(xmin=0.5)
-        ax.set_ylim(ymin=1e-1)
-        output_pdf.savefig(fig)
-        ax.set_yscale('linear')
-        ax.set_ylim(ymax=np.amax(hight))
-        ax.set_xlim(0.5, min(10, max_cluster_size) + 0.5)
-        output_pdf.savefig(fig)
+        with tb.open_file(input_file, "r") as in_file_h5:
+            for actual_dut in select_duts:
+                if actual_dut is None:
+                    node = in_file_h5.get_node(in_file_h5.root, 'Cluster')
+                else:
+                    node = in_file_h5.get_node(in_file_h5.root, 'Tracks_DUT_%d' % actual_dut)
 
+                    logging.info('Plotting cluster histograms for DUT%d', actual_dut)
+
+                    if dut_names is not None:
+                        dut_name = dut_names[actual_dut]
+                    else:
+                        dut_name = "DUT%d" % actual_dut
+
+                initialize = True  # initialize the histograms
+                n_hits = 0
+                n_clusters = 0
+                for chunk, _ in testbeam_analysis.tools.analysis_utils.data_aligned_at_events(node, chunk_size=chunk_size):
+
+                    if actual_dut is None:
+                        cluster_n_hits = chunk['n_hits']
+                        cluster_shape = chunk['cluster_shape']
+                    else:
+                        cluster_n_hits = chunk['n_hits_dut_%d' % actual_dut]
+                        cluster_shape = chunk['cluster_shape_dut_%d' % actual_dut]
+
+                    max_cluster_size = np.max(cluster_n_hits)
+                    n_hits += np.sum(cluster_n_hits)
+                    n_clusters += chunk.shape[0]
+                    edges = np.arange(2**16)
+                    if initialize:
+                        initialize = False
+
+                        cluster_size_hist = np.bincount(cluster_n_hits, minlength=max_cluster_size + 1)
+                        cluster_shapes_hist, _ = np.histogram(a=cluster_shape, bins=edges)
+                    else:
+                        if cluster_size_hist.size - 1 < max_cluster_size:
+                            max_cluster_size = np.max(cluster_n_hits)
+                            cluster_size_hist.resize(max_cluster_size + 1)
+                            cluster_size_hist += np.bincount(cluster_n_hits, minlength=max_cluster_size + 1)
+                        else:
+                            cluster_size_hist += np.bincount(cluster_n_hits, minlength=cluster_size_hist.size)
+                        cluster_shapes_hist += np.histogram(a=cluster_shape, bins=edges)[0]
+
+                x = np.arange(cluster_size_hist.size)
+                fig = Figure()
+                _ = FigureCanvas(fig)
+                ax = fig.add_subplot(111)
+                ax.bar(x, cluster_size_hist, align='center')
+                ax.set_title('Cluster sizes%s\n(%i hits in %i clusters)' % ((" of %s" % dut_name) if dut_name else "", n_hits, n_clusters))
+                ax.set_xlabel('Cluster size')
+                ax.set_ylabel('#')
+                ax.grid()
+                ax.set_yscale('log')
+                ax.set_xlim(xmin=0.5)
+                ax.set_ylim(ymin=1e-1)
+                output_pdf.savefig(fig)
+                ax.set_yscale('linear')
+                ax.set_ylim(ymin=0.0, ymax=np.max(cluster_size_hist))
+                ax.set_xlim(0.5, min(10.0, cluster_size_hist.size - 1) + 0.5)
+                output_pdf.savefig(fig)
+
+                x = np.arange(12)
+                fig = Figure()
+                _ = FigureCanvas(fig)
+                ax = fig.add_subplot(111)
+                selected_clusters = cluster_shapes_hist[[1, 3, 5, 6, 9, 13, 14, 7, 11, 19, 261, 15]]
+                ax.bar(x, selected_clusters, align='center')
+                ax.xaxis.set_ticks(x)
+                fig.subplots_adjust(bottom=0.2)
+                ax.set_xticklabels([u"\u2004\u2596",
+                                    u"\u2597\u2009\u2596", # 2 hit cluster, horizontal
+                                    u"\u2004\u2596\n\u2004\u2598", # 2 hit cluster, vertical
+                                    u"\u259e", # 2 hit cluster
+                                    u"\u259a", # 2 hit cluster
+                                    u"\u2599", # 3 hit cluster, L
+                                    u"\u259f", # 3 hit cluster
+                                    u"\u259b", # 3 hit cluster
+                                    u"\u259c", # 3 hit cluster
+                                    u"\u2004\u2596\u2596\u2596", # 3 hit cluster, horizontal
+                                    u"\u2004\u2596\n\u2004\u2596\n\u2004\u2596", # 3 hit cluster, vertical
+                                    u"\u2597\u2009\u2596\n\u259d\u2009\u2598"]) # 4 hit cluster
+                ax.set_title('Cluster shapes%s\n(%i hits in %i clusters)' % ((" of %s" % dut_name) if dut_name else "", n_hits, n_clusters))
+                ax.set_xlabel('Cluster shape')
+                ax.set_ylabel('#')
+                ax.grid()
+                ax.set_yscale('log')
+                ax.set_ylim(ymin=1e-1)
+                output_pdf.savefig(fig)
+                ax.set_yscale('linear')
+                ax.set_ylim(ymin=0.0, ymax=np.max(selected_clusters))
+                output_pdf.savefig(fig)
 
 def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf=None):
     if not output_pdf:
