@@ -16,7 +16,7 @@ typedef struct HitInfo{
   long int eventNumber; //event number value (long int: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807)
   unsigned char frame; //relative BCID value (unsigned char: 0 to 255)
   unsigned short int column; //column value (unsigned int: 0 to 255)
-  unsigned short int row; //row value (unsigned short int: 0 to 65.535)
+  unsigned short int row; //row value (unsigned short int: 0 to 65,535)
   unsigned short int charge; //tot value (unsigned int: 0 to 255)
 } HitInfo;
 
@@ -25,7 +25,7 @@ typedef struct ClusterHitInfo{
   long int eventNumber; //event number value (long int: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807)
   unsigned char frame; //relative BCID value (unsigned char: 0 to 255)
   unsigned short int column; //column value (unsigned char: 0 to 255)
-  unsigned short int row; //row value (unsigned short int: 0 to 65.535)
+  unsigned short int row; //row value (unsigned short int: 0 to 65,535)
   unsigned short int charge; //tot value (unsigned char: 0 to 255)
   unsigned short int clusterID; //the cluster id of the hit
   unsigned char isSeed; //flag to mark seed pixel
