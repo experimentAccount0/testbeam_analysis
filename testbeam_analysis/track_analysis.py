@@ -1243,8 +1243,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
             # If first dut is used in track building, take first dut hit as initial value and
             # its corresponding cluster position error as the error on the measurement.
             initial_state_mean[index] = np.array([actual_hits[0, 0], actual_hits[0, 1], 0., 0.])
-            initial_state_covariance[index, 0, 0] = np.square(x_err[0])  # np.square(pixel_resolution[0, 0])  # np.square(x_err[0])
-            initial_state_covariance[index, 1, 1] = np.square(y_err[0])  # np.square(pixel_resolution[0, 1])  # np.square(y_err[0])
+            initial_state_covariance[index, 0, 0] = np.square(x_err[0])
+            initial_state_covariance[index, 1, 1] = np.square(y_err[0])
         else:  # first dut is not in fit selction
             # Take hit from first dut which is in fit selection. Cannot take hit from first dut,
             # since do not want to pass measurement to kalman filter (unbiased).
@@ -1260,9 +1260,9 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
         # rotations of planes into account.
         transition_matrix[index, sel, :, 0] = np.array([1., 0., 0., 0.])
         transition_matrix[index, sel, :, 1] = np.array([0., 1., 0., 0.])
-        transition_matrix[index, sel, :, 2] = np.array([-(z_diff), np.zeros((len(sel),)),
+        transition_matrix[index, sel, :, 2] = np.array([(z_diff), np.zeros((len(sel),)),
                                                         np.ones((len(sel),)), np.zeros((len(sel),))]).T
-        transition_matrix[index, sel, :, 3] = np.array([np.zeros((len(sel),)), -(z_diff),
+        transition_matrix[index, sel, :, 3] = np.array([np.zeros((len(sel),)), (z_diff),
                                                         np.zeros((len(sel),)), np.ones((len(sel),))]).T
 
         # express transition covariance matrices, according to http://web-docs.gsi.de/~ikisel/reco/Methods/CovarianceMatrices-NIMA329-1993.pdf
