@@ -173,7 +173,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         self.run_menu = QtWidgets.QMenu('&Run', self)
         self.run_menu.setToolTipsVisible(True)
-        self.run_menu.addAction('&Run consecutive analysis', self.run_cons_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
+        self.run_menu.addAction('&Run consecutive analysis', self.run_consecutive_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
         # Disable consecutive analysis until setup is done
         self.run_menu.actions()[0].setEnabled(False)
         self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
@@ -367,7 +367,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.EfficiencyTab(parent=self.tabs,
                                                   setup=self.setup,
                                                   options=self.options,
-                                                  tab_list='Last')
+                                                  tab_list='Last')  # Random string for last tab, NOT in self.tab_order
             else:
                 continue
 
@@ -403,23 +403,28 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
     def tab_completed(self, tabs):
 
-        if 'Last' not in tabs:
+        tab = None
 
-            # Sender is the one completed so only first dut in tabs matters
-            if isinstance(tabs, list):
+        # Sender is the one completed so only first dut in tabs matters
+        if isinstance(tabs, list):
 
-                sorted_tabs = {}
-                for dut in tabs:
+            sorted_tabs = {}
+            for dut in tabs:
+                if dut in self.tab_order:
                     sorted_tabs[self.tab_order.index(dut)] = dut
+
+            if sorted_tabs:
                 tab = sorted_tabs[min(sorted_tabs.iterkeys())]
 
-            elif isinstance(tabs, unicode):
-                tab = tabs
+        elif isinstance(tabs, unicode):
+            tab = tabs
 
+        if tab in self.tab_order:
+            # Set icon for sender which is the one before tab
             self.tabs.setTabIcon(self.tab_order.index(tab) - 1, self.icon_complete)
 
         else:
-
+            # Set icon for last tab
             self.tabs.setTabIcon(len(self.tab_order) - 1, self.icon_complete)
 
     def global_settings(self):
@@ -496,10 +501,20 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self._init_logger()
         self.tabs.setCurrentIndex(0)
 
-    def run_cons_analysis(self):
+    def run_consecutive_analysis(self):
+
+        # Acronym rca==run constructive analysis
 
         # Variable to store tab name from which consecutive analysis starts
-        starting_tab = None
+        starting_tab_rca = None
+        # Make sub-layout for consecutive analysis progressbar with label
+        l_rca = QtWidgets.QHBoxLayout()
+        label_rca = QtWidgets.QLabel('Running consecutive analysis...')
+        p_bar_rca = QtWidgets.QProgressBar()
+        p_bar_rca.setRange(0, len(self.tab_order))
+        l_rca.addWidget(label_rca)
+        l_rca.addWidget(p_bar_rca)
+        self.main_layout.addLayout(l_rca)
 
         for tab in self.tab_order:
 
@@ -510,18 +525,53 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 # Get starting tab for consecutive analysis
                 if self.tabs.isTabEnabled(tab_index) and not self.tabs.isTabEnabled(tab_index + 1):
 
-                    starting_tab = tab
+                    starting_tab_rca = tab
 
                 # Additional connections for consecutive analysis tabs
-                if starting_tab is not None:
+                if starting_tab_rca is not None:
 
-                    self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tabs.setCurrentIndex(self.tab_order.index(tab_list[0]) - 1))
-                    self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tw[tab_list[0]].btn_ok.click())
-                    # Block main thread to synchronize to sub thread
+                    # Handle consecutive analysis
+                    self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
+
+                    # Block main thread after each analysis step to synchronize to worker thread
                     self.tw[tab].proceedAnalysis.connect(lambda: self.thread().msleep(50))
 
         # Start analysis by clicking ok button on starting tab
-        self.tw[starting_tab].btn_ok.click()
+        self.tw[starting_tab_rca].btn_ok.click()
+
+        def handle_rca(tab_list):
+
+            if isinstance(tab_list, list):
+                tab_name = tab_list[0]
+            else:
+                tab_name = tab_list
+
+            if tab_name in self.tab_order:
+
+                # Update progressbar
+                p_bar_rca.setFormat(tab_name)
+                p_bar_rca.setValue(self.tab_order.index(tab_name))
+
+                # Set current tab to last finished
+                # self.tabs.setCurrentIndex(self.tab_order.index(tab_name) - 1)
+
+                # Click proceed button
+                try:
+                    self.tw[tab_name].btn_ok.click()
+
+                except Exception as e:
+                    # Alignment is skipped
+                    if tab_name == 'Alignment':
+                        self.tw[tab_name].skipAlignment.emit()
+                        self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
+                    # Re-raise exception
+                    else:
+                        raise e
+
+            else:
+                # Last tab finished
+                p_bar_rca.setValue(len(self.tab_order))
+                label_rca.setText('Done!')
 
     def file_quit(self):
         self.close()

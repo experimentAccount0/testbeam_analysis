@@ -75,10 +75,27 @@ class SettingsWindow(QtWidgets.QMainWindow):
         label_plot = QtWidgets.QLabel('Plot:')
         self.rb_t = QtWidgets.QRadioButton('True')
         self.rb_f = QtWidgets.QRadioButton('False')
+        self.group_plot = QtWidgets.QButtonGroup()
+        self.group_plot.addButton(self.rb_t)
+        self.group_plot.addButton(self.rb_f)
+
         if self.options['plot']:
             self.rb_t.setChecked(True)
         else:
             self.rb_f.setChecked(True)
+
+        # Make widgets for skip alignment option
+        label_align = QtWidgets.QLabel('Skip alignment:')
+        self.rb_t_align = QtWidgets.QRadioButton('True')
+        self.rb_f_align = QtWidgets.QRadioButton('False')
+        self.group_align = QtWidgets.QButtonGroup()
+        self.group_align.addButton(self.rb_t_align)
+        self.group_align.addButton(self.rb_f_align)
+
+        if self.options['skip_alignment']:
+            self.rb_t_align.setChecked(True)
+        else:
+            self.rb_f_align.setChecked(True)
 
         # Make widgets for chunk size option
         label_chunk = QtWidgets.QLabel('Chunk size:')
@@ -100,9 +117,13 @@ class SettingsWindow(QtWidgets.QMainWindow):
         layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 0, 1, 1, 1)
         layout_options.addWidget(self.rb_t, 0, 2, 1, 1)
         layout_options.addWidget(self.rb_f, 0, 3, 1, 1)
-        layout_options.addWidget(label_chunk, 1, 0, 1, 1)
-        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 1, 1, 1, 1)
-        layout_options.addWidget(self.edit_chunk, 1, 2, 1, 2)
+        layout_options.addWidget(label_align, 1, 0, 1, 1)
+        layout_options.addItem(QtWidgets.QSpacerItem(7 * h_space, v_space), 1, 1, 1, 1)
+        layout_options.addWidget(self.rb_t_align, 1, 2, 1, 1)
+        layout_options.addWidget(self.rb_f_align, 1, 3, 1, 1)
+        layout_options.addWidget(label_chunk, 2, 0, 1, 1)
+        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
+        layout_options.addWidget(self.edit_chunk, 2, 2, 1, 2)
 #        layout_options.addWidget(label_suffix, 2, 0, 1, 1)
 #        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
 #        layout_options.addWidget(self.edit_noisy, 2, 2, 1, 2)
@@ -143,6 +164,7 @@ class SettingsWindow(QtWidgets.QMainWindow):
             return
 
         self.options['plot'] = self.rb_t.isChecked()
+        self.options['skip_alignment'] = self.rb_t_align.isChecked()
 
         self.settingsUpdated.emit()
         self.close()

@@ -357,7 +357,7 @@ class AlignmentTab(AnalysisWidget):
 
             self.btn_skip.setText('Alignment skipped')
             self.btn_ok.deleteLater()
-            self.right_widget.setDisabled(True)
+            self.container.setDisabled(True)
 
             if ask:
                 self.skipAlignment.emit()
