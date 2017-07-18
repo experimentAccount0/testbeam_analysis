@@ -88,7 +88,7 @@ class TestTrackAnalysis(unittest.TestCase):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_All_Iter.h5'),
-                                  selection_hit_duts=range(4),
+                                  select_hit_duts=range(4),
                                   exclude_dut_hit=False,
                                   selection_track_quality=1,
                                   use_prealignment=True)
@@ -98,7 +98,7 @@ class TestTrackAnalysis(unittest.TestCase):
         track_analysis.fit_tracks(input_track_candidates_file=os.path.join(tests_data_folder, 'TrackCandidates_result.h5'),
                                   input_alignment_file=os.path.join(tests_data_folder, r'Alignment_result.h5'),
                                   output_tracks_file=os.path.join(self.output_folder, 'Tracks_All_Iter_2.h5'),
-                                  selection_hit_duts=[range(4), range(4), range(4), range(4)],
+                                  select_hit_duts=[range(4), range(4), range(4), range(4)],
                                   exclude_dut_hit=False,
                                   selection_track_quality=1,
                                   use_prealignment=True)
