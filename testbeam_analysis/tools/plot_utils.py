@@ -731,7 +731,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 output_pdf.savefig(fig)
 
 
-def plot_events(input_tracks_file, input_alignment_file, event_range, use_prealignment, select_duts, dut_names=None, output_pdf_file=None):
+def plot_events(input_tracks_file, input_alignment_file, event_range, use_prealignment, select_duts, n_pixels, pixel_size, dut_names=None, output_pdf_file=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -763,18 +763,35 @@ def plot_events(input_tracks_file, input_alignment_file, event_range, use_preali
             for actual_dut in select_duts:
                 logging.info('Plotting events for DUT%d', actual_dut)
 
-                node = in_file_h5.get_node(in_file_h5.root, 'Tracks_DUT_%d' % actual_dut)
                 dut_name = dut_names[actual_dut] if dut_names else ("DUT" + str(actual_dut))
 
-                table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % actual_dut)
-                array = table[:]
+                array = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % actual_dut)[:]
                 tracks_chunk = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
                 if tracks_chunk.shape[0] == 0:
-                    raise ValueError('No events found, cannot plot events!')
+                    raise ValueError('No events found in the given range, cannot plot events!')
 
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111, projection='3d')
+
+                for dut_index in range(0, n_duts):
+                    sensor_size = np.array(pixel_size[actual_dut]) * n_pixels[actual_dut]
+                    x, y = np.meshgrid([-sensor_size[0] / 2.0, sensor_size[0] / 2.0], [-sensor_size[1] / 2.0, sensor_size[1] / 2.0])
+                    alignment_no_rot = alignment.copy()
+                    # change alpha, beta to 0 to make plotting of DUTs nicer
+                    alignment_no_rot['alpha'] = 0.0
+                    alignment_no_rot['beta'] = 0.0
+                    plane_x, plane_y, plane_z = testbeam_analysis.tools.geometry_utils.apply_alignment(x.flatten(), y.flatten(), np.zeros(x.size),
+                                                                                                       dut_index=dut_index,
+                                                                                                       alignment=alignment_no_rot,
+                                                                                                       inverse=False)
+                    plane_x = plane_x * 1.e-3  # in mm
+                    plane_y = plane_y * 1.e-3  # in mm
+                    plane_z = plane_z * 1.e-3  # in mm
+                    plane_x = plane_x.reshape(2, -1)
+                    plane_y = plane_y.reshape(2, -1)
+                    plane_z = plane_z.reshape(2, -1)
+                    ax.plot_surface(plane_x, plane_y, plane_z, color='lightgray', alpha=0.3, linewidth=1.0, zorder=-1)
 
                 colors = cycle('bgrcmyk')
                 for track in tracks_chunk:
@@ -816,7 +833,7 @@ def plot_events(input_tracks_file, input_alignment_file, event_range, use_preali
                     else:
                         ax.plot(x, y, z, 'x', color=color)
 
-                ax.set_zlim(min(z), max(z))
+#                 ax.set_zlim(min(z), max(z))
                 ax.set_xlabel('x [mm]')
                 ax.set_ylabel('y [mm]')
                 ax.set_zlabel('z [mm]')
