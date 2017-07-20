@@ -52,3 +52,40 @@ class AnalysisLogger(logging.Handler):
         msg = self.format(record)
         if msg:
             AnalysisStream.stdout().write(msg)
+
+
+class LogBuffer(object):
+    """
+    An object that listens to whatever is put in queue
+    """
+
+    def __init__(self, queue):
+        self.queue = queue
+
+    def flush(self):
+        pass
+
+    def fileno(self):
+        return -1
+
+    def write(self, log):
+        self.queue.put(log)
+
+
+class LogReceiver(QtCore.QObject):
+    """
+    A receiver that sits on its own thread and waits for input from a queue, then emits signal with input
+    """
+
+    sendLog = QtCore.pyqtSignal(str)
+
+    def __init__(self, queue, *args, **kwargs):
+
+        QtCore.QObject.__init__(self, *args, **kwargs)
+        self.queue = queue
+
+    @QtCore.pyqtSlot()
+    def start_receiver(self):
+        while True:
+            log = self.queue.get()
+            self.sendLog.emit(log)

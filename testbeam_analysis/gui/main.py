@@ -1,5 +1,7 @@
 import sys
 import logging
+
+from Queue import Queue
 from email import message_from_string
 from pkg_resources import get_distribution, DistributionNotFound
 
@@ -8,7 +10,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from data import DataTab
 from setup import SetupTab
 from settings import SettingsWindow
-from analysis_logger import AnalysisLogger, AnalysisStream
+from analysis_logger import AnalysisLogger, AnalysisStream, LogBuffer, LogReceiver
 
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
@@ -19,6 +21,11 @@ MINIMUM_RESOLUTION = (1366, 768)
 
 # Create all tabs at start up for debugging purpose
 _DEBUG = False
+
+# Temporarily have two options for logger; one with (0) and without (1) subclassing logging.Handler
+# to test if subclassing logging.Handler logging method is potentially thread-unsafe. Question is if sub-
+# classing a thread-safe method is thread-safe itself.
+LOG_METHOD = 1
 
 try:
     pkgInfo = get_distribution('testbeam_analysis').get_metadata('PKG-INFO')
@@ -125,29 +132,50 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         appearance menu in the GUI or closed button
         """
 
-        # Create logger instance
-        self.logger = AnalysisLogger(self.main_widget)
-        self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-
-        # Add custom logger
-        logging.getLogger().addHandler(self.logger)
+        # Set logging level
         logging.getLogger().setLevel(logging.INFO)
 
         # Add widget to display log and add it to dock
         # Widget to display log in, we only want to read log
-        self.logger_console = QtWidgets.QPlainTextEdit(self.main_widget)
+        self.logger_console = QtWidgets.QPlainTextEdit()
         self.logger_console.setReadOnly(True)
 
         # Dock in which text widget is placed to make it closable without losing log content
-        self.console_dock = QtWidgets.QDockWidget(self)
+        self.console_dock = QtWidgets.QDockWidget()
         self.console_dock.setWidget(self.logger_console)
         self.console_dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
         self.console_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable)
         self.console_dock.setWindowTitle('Logger')
 
-        # Connect logger signal to logger console
-        AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
-        AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+        if LOG_METHOD == 0:
+            # Create logger instance
+            self.logger = AnalysisLogger(self.main_widget)
+            self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+            # Add custom logger
+            logging.getLogger().addHandler(self.logger)
+
+            # Connect logger signal to logger console
+            AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+            AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+
+        elif LOG_METHOD == 1:
+            # Initialize a queue in which logging messages are stored and read from
+            # and make extra thread for LogReceiver to listen to logs
+            self.log_queue = Queue()
+            self.log_thread = QtCore.QThread()
+
+            # Redirect stdout and stderr to queue
+            sys.stdout = LogBuffer(self.log_queue)
+            sys.stderr = LogBuffer(self.log_queue)
+
+            # Make receiver instance and move to respective thread, connect signals
+            self.log_receiver = LogReceiver(self.log_queue)
+            self.log_receiver.moveToThread(self.log_thread)
+            self.log_receiver.sendLog.connect(lambda log: self.logger_console.moveCursor(QtGui.QTextCursor.End))
+            self.log_receiver.sendLog.connect(lambda log: self.logger_console.insertPlainText(log))
+            self.log_thread.started.connect(self.log_receiver.start_receiver)
+            self.log_thread.start()
 
         # Set visibility to false at init
         self.console_dock.setVisible(False)

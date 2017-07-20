@@ -12,7 +12,7 @@ from testbeam_analysis.track_analysis import find_tracks, fit_tracks
 from testbeam_analysis.result_analysis import calculate_efficiency, calculate_residuals
 
 # Plot related import
-from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size, plot_correlations, plot_events
+from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size, plot_correlations, plot_tracks_per_event
 
 
 class NoisyPixelsTab(ParallelAnalysisWidget):
@@ -271,7 +271,7 @@ class TrackFindingTab(AnalysisWidget):
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
-                  lambda: self.plot(input_file=output_file, plot_func=plot_events, dut=0, event_range=(0, 10))]:
+                  lambda: self.plot(input_file=output_file, plot_func=plot_tracks_per_event)]:
             self.analysisDone.connect(x)
 
 

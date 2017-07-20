@@ -253,6 +253,49 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
         output_pdf.savefig(fig)
 
 
+def plot_tracks_per_event(input_tracks_file, output_pdf_file=None, gui=False):
+    """Plotting tracks per event
+    Parameters
+    ----------
+    input_tracks_file : string
+        Filename of the input tracks file.
+    output_pdf_file : string
+        Filename of the output PDF file. If None, the filename is derived from the input file.
+    chunk_size : int
+        Chunk size of the data when reading from file.
+    gui: bool
+        Whether or not to plot directly into gui 
+    """
+    # FIXME: temporarily only plots track candidates per event into GUI
+
+    if gui:
+        with tb.open_file(input_tracks_file, 'r') as input_file_h5:
+            events, event_count = np.unique(input_file_h5.root.TrackCandidates[:]['event_number'], return_counts=True)
+            tracks_per_event, tracks_count = np.unique(event_count, return_counts=True)
+
+            fig = Figure()
+            _ = FigureCanvas(fig)
+            ax = fig.add_subplot(111)
+            ax.bar(tracks_per_event, tracks_count, align='center')
+            ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
+            ax.set_xlabel('Track candidates per event')
+            ax.set_ylabel('#')
+            ax.grid()
+            ax.set_yscale('log')
+
+            fig_1 = Figure()
+            _ = FigureCanvas(fig_1)
+            ax = fig_1.add_subplot(111)
+            ax.bar(tracks_per_event, tracks_count, align='center')
+            ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
+            ax.set_xlabel('Track candidates per event')
+            ax.set_ylabel('#')
+            ax.grid()
+            ax.set_yscale('linear')
+
+            return [fig, fig_1]
+
+
 def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf=None):
     if not output_pdf:
         return
