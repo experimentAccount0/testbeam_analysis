@@ -39,7 +39,7 @@ script:
     else
       touch $HOME/miniconda/lib/python3.6/site-packages/converage.pth && printf "import coverage; coverage.process_startup()" > $HOME/miniconda/lib/python3.6/site-packages/converage.pth;
     fi
-  - py.test --cov=testbeam_analysis
+  - travis_wait py.test --cov=testbeam_analysis
   - sphinx-build docs docs/_build/html
   
 after_success:
