@@ -180,7 +180,7 @@
 <h2>Methods<a class="headerlink" href="#methods" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="testbeam_analysis.result_analysis.calculate_residuals">
-<code class="descclassname">testbeam_analysis.result_analysis.</code><code class="descname">calculate_residuals</code><span class="sig-paren">(</span><em>input_tracks_file</em>, <em>input_alignment_file</em>, <em>n_pixels</em>, <em>pixel_size</em>, <em>output_residuals_file=None</em>, <em>dut_names=None</em>, <em>use_duts=None</em>, <em>max_chi2=None</em>, <em>nbins_per_pixel=None</em>, <em>npixels_per_bin=None</em>, <em>force_prealignment=False</em>, <em>plot=True</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/result_analysis.html#calculate_residuals"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.result_analysis.calculate_residuals" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">testbeam_analysis.result_analysis.</code><code class="descname">calculate_residuals</code><span class="sig-paren">(</span><em>input_tracks_file</em>, <em>input_alignment_file</em>, <em>n_pixels</em>, <em>pixel_size</em>, <em>output_residuals_file=None</em>, <em>dut_names=None</em>, <em>use_duts=None</em>, <em>max_chi2=None</em>, <em>nbins_per_pixel=None</em>, <em>npixels_per_bin=None</em>, <em>force_prealignment=False</em>, <em>use_fit_limits=True</em>, <em>plot=True</em>, <em>cluster_size_selection=None</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/result_analysis.html#calculate_residuals"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.result_analysis.calculate_residuals" title="Permalink to this definition">¶</a></dt>
 <dd><p>Takes the tracks and calculates residuals for selected DUTs in col, row direction.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -203,6 +203,7 @@ If None, no cut is applied.</li>
 <li><strong>npixels_per_bin</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Number of pixels per bin along the position axis. Number is a positive integer or None to automatically set the binning.</li>
 <li><strong>force_prealignment</strong> (<em>boolean</em>) &#8211; Take the prealignment, although if a coarse alignment is availale.</li>
 <li><strong>plot</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, create additional output plots.</li>
+<li><strong>cluster_size_selection</strong> (<em>uint</em>) &#8211; Select which cluster sizes should be included for residual calculation. If None all cluster sizes are taken.</li>
 <li><strong>chunk_size</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Chunk size of the data when reading from file.</li>
 </ul>
 </td>

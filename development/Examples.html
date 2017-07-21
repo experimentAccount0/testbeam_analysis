@@ -206,6 +206,7 @@ the center 3D CNM/FBK sensors.</p>
 <span id="eu-telescope"></span><h2>EU telescope<a class="headerlink" href="#module-testbeam_analysis.examples.eutelescope" title="Permalink to this headline">¶</a></h2>
 <p>Example script to run a full analysis on telescope data. The original data
 can be found in the example folder of the EUTelescope framework.</p>
+<p>Data in <a class="reference external" href="https://github.com/eutelescope/eutelescope/tree/v1.0-tag/jobsub/examples/datura-150mm-DAF">https://github.com/eutelescope/eutelescope/tree/v1.0-tag/jobsub/examples/datura-150mm-DAF</a></p>
 <p>The residuals are calculated with different cuts on prealigned and aligned data
 for demonstration purpose:</p>
 <ul class="simple">
@@ -220,11 +221,14 @@ The residuals and selected number of tracks are highly dependent on the
 chi2 cut and are at least 6 um and usually &lt; 10 um depending on the
 plane position. This is an effect of multiple scattering. The outer most plans
 have a rather high residual (~ 18 um)</li>
+<li>When using a Kalman Filter for track builing instead of an interpolation
+which takes no correlations between the measurements into account, the
+residuals can be improved by ~ 30 percent for the inner planes.</li>
 </ul>
 <div class="section" id="setup">
 <h3>Setup<a class="headerlink" href="#setup" title="Permalink to this headline">¶</a></h3>
 <p>The telescope consists of 6 planes with 15 cm clearance between the planes.
-The data was taken at Desy with ~ 3-4 GeV/c (to be checked).</p>
+The data was taken at Desy with ~ 5 GeV/c (Run number 36).</p>
 <p>The Mimosa26 has an active area of 21.2mm x 10.6mm and the pixel matrix
 consists of 1152 columns and 576 rows (18.4um x 18.4um pixel size).
 The total size of the chip is 21.5mm x 13.7mm x 0.036mm

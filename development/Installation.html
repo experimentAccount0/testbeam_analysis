@@ -190,20 +190,18 @@ Choose the 64-bit version of Python 2.7.x or Python 3.6.x.</p>
 <ul>
 <li><p class="first">Linux:
 Install <em>gcc</em> via package manager, e.g. on Ubuntu run:</p>
-<div class="highlight-bash"><div class="highlight"><pre><span></span>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>sudo apt-get install build-essential
 </pre></div>
 </div>
-<p>sudo apt-get install build-essential</p>
 </li>
 <li><p class="first">Windows:
 Install <a class="reference external" href="http://aka.ms/vcpython27">Microsoft Visual C++ Compiler for Python 2.7</a>.</p>
 </li>
 <li><p class="first">OS X:
 Install <a class="reference external" href="https://itunes.apple.com/us/app/xcode/id497799835">Xcode</a> from App Store and install Xcode Command Line Tools by running</p>
-<div class="highlight-bash"><div class="highlight"><pre><span></span>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>xcode-select install
 </pre></div>
 </div>
-<p>xcode-select install</p>
 </li>
 </ul>
 </div>
@@ -254,8 +252,8 @@ Everything is set up automatically. More details are given <a class="reference e
 <h2>Installing Required Python Packages<a class="headerlink" href="#installing-required-python-packages" title="Permalink to this headline">¶</a></h2>
 <p>Open a console and type one by one:</p>
 <div class="highlight-bash"><div class="highlight"><pre><span></span>conda update conda
-conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml
-pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock
+conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov
+pip install progressbar-latest pixel_clusterizer pykalman pylandau pytest
 </pre></div>
 </div>
 <p>On <em>Windows</em> additionally run:</p>
@@ -271,8 +269,9 @@ pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock
 <li><p class="first">Click clone URI and type the <em>testbeam analysis</em> repository (<a class="reference external" href="https://github.com/SiLab-Bonn/testbeam_analysis">https://github.com/SiLab-Bonn/testbeam_analysis</a>)
 If you have a <a class="reference external" href="https://github.com">GitHub</a> account you can add the credentials here</p>
 </li>
-<li><p class="first">Click next, select all branches, click next and specify the directory where <em>testbeam analysis</em> will be cloned to
-Wait until the download of the code is finished.</p>
+<li><p class="first">Click next, select all branches, click next and specify the directory where <em>testbeam analysis</em> will be cloned to.
+Wait until the download of the code is finished. <em>testbeam analysis</em> <em>master</em> branch and <em>releases</em> are tested best, but newest features and bugfixes
+are in the <em>development</em> branch. Generally the <em>development</em> branch is supposed to work without errors and can be used.</p>
 </li>
 <li><p class="first">Check <em>Check out as project configured using the New Project Wizard</em></p>
 </li>
@@ -281,10 +280,9 @@ Wait until the download of the code is finished.</p>
 <li><p class="first">Give the project a name, select the folder where the <em>testbeam analysis</em> was cloned to (e.g. <code class="code docutils literal"><span class="pre">/home/username/git/testbeam_analysis</span></code>) and click finish</p>
 </li>
 <li><p class="first">Open a shell and run the following command from the <em>testbeam analysis</em> folder:</p>
-<div class="highlight-bash"><div class="highlight"><pre><span></span>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>python setup.py develop
 </pre></div>
 </div>
-<p>python setup.py develop</p>
 <p>This will compile and install <em>testbeam analysis</em> to the environment.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>

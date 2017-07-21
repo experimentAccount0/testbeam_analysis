@@ -23,7 +23,7 @@ Installing C++ Compiler
 
   .. code-block:: bash
   
-  sudo apt-get install build-essential
+     sudo apt-get install build-essential
 
 - Windows:
   Install `Microsoft Visual C++ Compiler for Python 2.7 <http://aka.ms/vcpython27>`_.
@@ -32,7 +32,8 @@ Installing C++ Compiler
   Install `Xcode <https://itunes.apple.com/us/app/xcode/id497799835>`_ from App Store and install Xcode Command Line Tools by running
   
   .. code-block:: bash
-  xcode-select install
+     
+     xcode-select install
 
 Installing Eclipse with PyDev Plugin
 ************************************
@@ -79,8 +80,8 @@ Open a console and type one by one:
 .. code-block:: bash
 
    conda update conda
-   conda install numpy cython pytables scipy matplotlib pandas pyserial bitarray nose pyzmq pyyaml
-   pip install progressbar-latest pyvisa pyvisa-py pyqtgraph mock
+   conda install --yes numpy cython pytables scipy matplotlib nose numba mock pytest-cov
+   pip install progressbar-latest pixel_clusterizer pykalman pylandau pytest
 
 On *Windows* additionally run:
 
@@ -93,8 +94,9 @@ Installing testbeam analysis
 1. Goto *File -> Import -> Git* and select Projects from Git
 2. Click clone URI and type the *testbeam analysis* repository (`https://github.com/SiLab-Bonn/testbeam_analysis <https://github.com/SiLab-Bonn/testbeam_analysis>`_)
    If you have a `GitHub <https://github.com>`_ account you can add the credentials here
-3. Click next, select all branches, click next and specify the directory where *testbeam analysis* will be cloned to
-   Wait until the download of the code is finished.
+3. Click next, select all branches, click next and specify the directory where *testbeam analysis* will be cloned to.
+   Wait until the download of the code is finished. *testbeam analysis* *master* branch and *releases* are tested best, but newest features and bugfixes
+   are in the *development* branch. Generally the *development* branch is supposed to work without errors and can be used.
 4. Check *Check out as project configured using the New Project Wizard*
 5. Select *PyDev -> PyDevProject*
 6. Give the project a name, select the folder where the *testbeam analysis* was cloned to (e.g. :code:`/home/username/git/testbeam_analysis`) and click finish
@@ -102,7 +104,7 @@ Installing testbeam analysis
 
    .. code-block:: bash
    
-   python setup.py develop
+      python setup.py develop
 
    This will compile and install *testbeam analysis* to the environment.
    

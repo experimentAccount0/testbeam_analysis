@@ -179,7 +179,36 @@
 <p>All functions acting on the hits of one DUT are listed here</p>
 <div class="section" id="methods">
 <h2>Methods<a class="headerlink" href="#methods" title="Permalink to this headline">¶</a></h2>
-<p>#.. autofunction:: testbeam_analysis.hit_analysis.remove_noisy_pixels</p>
+<dl class="function">
+<dt id="testbeam_analysis.hit_analysis.generate_pixel_mask">
+<code class="descclassname">testbeam_analysis.hit_analysis.</code><code class="descname">generate_pixel_mask</code><span class="sig-paren">(</span><em>input_hits_file</em>, <em>n_pixel</em>, <em>pixel_mask_name='NoisyPixelMask'</em>, <em>output_mask_file=None</em>, <em>pixel_size=None</em>, <em>threshold=10.0</em>, <em>filter_size=3</em>, <em>dut_name=None</em>, <em>plot=True</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/hit_analysis.html#generate_pixel_mask"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.hit_analysis.generate_pixel_mask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generating pixel mask from the hit table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>input_hits_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; File name of the hit table.</li>
+<li><strong>n_pixel</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#tuple" title="(in Python v2.7)"><em>tuple</em></a>) &#8211; Tuple of the total number of pixels (column/row).</li>
+<li><strong>pixel_mask_name</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Name of the node containing the mask inside the output file.</li>
+<li><strong>output_mask_file</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; File name of the output mask file.</li>
+<li><strong>pixel_size</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#tuple" title="(in Python v2.7)"><em>tuple</em></a>) &#8211; Tuple of the pixel size (column/row). If None, assuming square pixels.</li>
+<li><strong>threshold</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#float" title="(in Python v2.7)"><em>float</em></a>) &#8211; The threshold for pixel masking. The threshold is given in units of
+sigma of the pixel noise (background subtracted). The lower the value
+the more pixels are masked.</li>
+<li><strong>filter_size</strong> (<em>scalar</em><em> or </em><a class="reference external" href="https://docs.python.org/2/library/functions.html#tuple" title="(in Python v2.7)"><em>tuple</em></a>) &#8211; Adjust the median filter size by giving the number of columns and rows.
+The higher the value the more the background is smoothed and more
+pixels are masked.</li>
+<li><strong>dut_name</strong> (<a class="reference external" href="https://docs.python.org/2/library/string.html#module-string" title="(in Python v2.7)"><em>string</em></a>) &#8211; Name of the DUT. If None, file name of the hit table will be printed.</li>
+<li><strong>plot</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, create additional output plots.</li>
+<li><strong>chunk_size</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Chunk size of the data when reading from file.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="function">
 <dt id="testbeam_analysis.hit_analysis.cluster_hits">
 <code class="descclassname">testbeam_analysis.hit_analysis.</code><code class="descname">cluster_hits</code><span class="sig-paren">(</span><em>input_hits_file</em>, <em>output_cluster_file=None</em>, <em>create_cluster_hits_table=False</em>, <em>input_disabled_pixel_mask_file=None</em>, <em>input_noisy_pixel_mask_file=None</em>, <em>min_hit_charge=0</em>, <em>max_hit_charge=None</em>, <em>column_cluster_distance=1</em>, <em>row_cluster_distance=1</em>, <em>frame_cluster_distance=1</em>, <em>dut_name=None</em>, <em>plot=True</em>, <em>chunk_size=1000000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/testbeam_analysis/hit_analysis.html#cluster_hits"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#testbeam_analysis.hit_analysis.cluster_hits" title="Permalink to this definition">¶</a></dt>
