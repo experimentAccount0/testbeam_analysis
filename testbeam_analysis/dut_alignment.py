@@ -180,13 +180,13 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                 merged_cluster_array = np.zeros(shape=(common_event_numbers.shape[0],), dtype=description)  # resulting array to be filled
                 for index, _ in enumerate(input_cluster_files):
                     # for no hit: column = row = charge = nan
-                    merged_cluster_array['x_dut_%d' % (dut_index)] = np.nan
-                    merged_cluster_array['y_dut_%d' % (dut_index)] = np.nan
-                    merged_cluster_array['z_dut_%d' % (dut_index)] = np.nan
-                    merged_cluster_array['charge_dut_%d' % (dut_index)] = np.nan
-                    merged_cluster_array['xerr_dut_%d' % (dut_index)] = np.nan
-                    merged_cluster_array['yerr_dut_%d' % (dut_index)] = np.nan
-                    merged_cluster_array['zerr_dut_%d' % (dut_index)] = np.nan
+                    merged_cluster_array['x_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['y_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['z_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['charge_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['xerr_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['yerr_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['zerr_dut_%d' % (index)] = np.nan
 
                 # Set the event number
                 merged_cluster_array['event_number'] = common_event_numbers[:]
