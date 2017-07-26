@@ -211,8 +211,8 @@ def _filter(alignment, transition_matrices, observation_matrices, transition_cov
                 z_diff = offsets_rotated[1][:, 2] - offsets_rotated[0][:, 2]
 
                 # update transition matrix, only need to change these value in case for rotated planes
-                transition_matrices[:, t - 1, 0, 2] = - z_diff
-                transition_matrices[:, t - 1, 1, 3] = - z_diff
+                transition_matrices[:, t - 1, 0, 2] = z_diff
+                transition_matrices[:, t - 1, 1, 3] = z_diff
 
             # store updated transition matrix for smoothing function
             transition_matrices_update[:, t - 1] = transition_matrices[:, t - 1]

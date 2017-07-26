@@ -163,7 +163,7 @@ if __name__ == '__main__':  # Main entry point is needed for multiprocessing und
             alignment=None,
             beam_energy=2500.,
             material_budget=[100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 100. / 125390., 250. / 93700],
-            add_scattering_plane=None)
+            add_scattering_plane=False)
         # interpolate hits with straight line
         fit_x, _ = curve_fit(straight_line, measurements_plot[0, :, -1][fit_selection] / 1000., measurements[0, :, 0][fit_selection])
         fit_y, _ = curve_fit(straight_line, measurements_plot[0, :, -1][fit_selection] / 1000., measurements[0, :, 1][fit_selection])

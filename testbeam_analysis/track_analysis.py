@@ -127,6 +127,7 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                                   y_err=y_err,
                                   z_err=z_err,
                                   charge=charge,
+                                  n_hits=n_hits,
                                   track_quality=track_quality,
                                   n_tracks=n_tracks,
                                   column_sigma=column_sigma,
@@ -198,12 +199,14 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
         devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um). Only needed for Kalman Filter.
     add_scattering_plane : dict
-        Specifies an additional scattering plane in case of additional DUTs which are not used.
-        The dictionary must contain:
+        Specifies additional scattering planes in case of additional DUTs which are not used.
+        The dictionary must contain the following keys:
             z_scatter: z position of scattering plane in um
             material_budget_scatter: material budget of scattering plane
             alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
                                If None, no rotation will be considered.
+        In case of multiple scattering planes, each value of a key is a list, with items corresponding to each scattering plane.
+        If add_scattering_plane is False, no scattering plane will be added.
     use_correlated : bool
         Use only events that are correlated. Can (at the moment) be applied only if function uses corrected Tracklets file.
     keep_data : bool
@@ -222,8 +225,6 @@ def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_
         If it is true the std setting of 200 um is used. Otherwise a distance in um for each DUT has to be given.
         e.g.: For two devices: min_track_distance = (50, 250)
         If False, the minimum track distance is not considered.
-    chunk_size : uint
-        Chunk size of the data when reading from file.
     '''
 
     logging.info('=== Fitting tracks (Method: %s) ===' % method)
@@ -796,15 +797,18 @@ def _get_first_dut_index(x, index):
 
 
 @njit
-def _swap_hits(x, y, z, charge, x_err, y_err, z_err, track_index, dut_index, hit_index, swap_x, swap_y, swap_z, swap_charge, swap_x_err, swap_y_err, swap_z_err):
+def _swap_hits(x, y, z, charge, n_hits, x_err, y_err, z_err, track_index, dut_index, hit_index, swap_x, swap_y, swap_z, swap_charge, swap_n_hits, swap_x_err, swap_y_err, swap_z_err):
     #     print 'Swap hits', x[track_index][dut_index], x[hit_index][dut_index]
-    tmp_x, tmp_y, tmp_z, tmp_charge = x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index], charge[track_index][dut_index]
+    tmp_x, tmp_y, tmp_z = x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index]
+    tmp_charge, tmp_n_hits = charge[track_index][dut_index], n_hits[track_index][dut_index]
     tmp_x_err, tmp_y_err, tmp_z_err = x_err[track_index][dut_index], y_err[track_index][dut_index], z_err[track_index][dut_index]
 
-    x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index], charge[track_index][dut_index] = swap_x, swap_y, swap_z, swap_charge
+    x[track_index][dut_index], y[track_index][dut_index], z[track_index][dut_index] = swap_x, swap_y, swap_z
+    charge[track_index][dut_index], n_hits[track_index][dut_index] = swap_charge, swap_n_hits
     x_err[track_index][dut_index], y_err[track_index][dut_index], z_err[track_index][dut_index] = swap_x_err, swap_y_err, swap_z_err
 
-    x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index], charge[hit_index][dut_index] = tmp_x, tmp_y, tmp_z, tmp_charge
+    x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index] = tmp_x, tmp_y, tmp_z
+    charge[hit_index][dut_index], n_hits[hit_index][dut_index] = tmp_charge, tmp_n_hits
     x_err[hit_index][dut_index], y_err[hit_index][dut_index], z_err[hit_index][dut_index] = tmp_x_err, tmp_y_err, tmp_z_err
 
 
@@ -832,7 +836,7 @@ def _set_n_tracks(x, y, start_index, stop_index, n_tracks, n_actual_tracks, min_
 
 
 @njit
-def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_quality, n_tracks, column_sigma, row_sigma, min_cluster_distance):
+def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, n_hits, track_quality, n_tracks, column_sigma, row_sigma, min_cluster_distance):
     ''' Complex loop to resort the tracklets array inplace to form track candidates. Each track candidate
     is given a quality identifier. Each hit is put to the best fitting track. Tracks are assumed to have
     no big angle, otherwise this approach does not work.
@@ -882,7 +886,8 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                 for hit_index in range(actual_hit_track_index, event_number.shape[0]):  # Loop over all not sorted hits of actual DUT
                     if event_number[hit_index] != actual_event_number:  # Abort condition
                         break
-                    curr_x, curr_y, curr_z, curr_charge = x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index], charge[hit_index][dut_index]
+                    curr_x, curr_y, curr_z = x[hit_index][dut_index], y[hit_index][dut_index], z[hit_index][dut_index]
+                    curr_charge, curr_n_hits = charge[hit_index][dut_index], n_hits[hit_index][dut_index]
                     curr_x_err, curr_y_err, curr_z_err = x_err[hit_index][dut_index], y_err[hit_index][dut_index], z_err[hit_index][dut_index]
                     if not np.isnan(curr_x):  # x = nan is no hit
                         # Calculate the hit distance of the actual DUT hit towards the actual reference hit
@@ -904,6 +909,7 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                                            y=y,
                                            z=z,
                                            charge=charge,
+                                           n_hits=n_hits,
                                            x_err=x_err,
                                            y_err=y_err,
                                            z_err=z_err,
@@ -914,6 +920,7 @@ def _find_tracks_loop(event_number, x, y, z, x_err, y_err, z_err, charge, track_
                                            swap_y=curr_y,
                                            swap_z=curr_z,
                                            swap_charge=curr_charge,
+                                           swap_n_hits=curr_n_hits,
                                            swap_x_err=curr_x_err,
                                            swap_y_err=curr_y_err,
                                            swap_z_err=curr_z_err)
@@ -1117,13 +1124,14 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
         Material budget of all DUTs. The material budget is defined as the thickness (sensor + other scattering materials)
         devided by the radiation length (Silicon: 93700 um, M26(50 um Si + 50 um Kapton): 125390 um).
     add_scattering_plane : dict
-        Specifies an additional scattering plane in case of additional DUTs which are not used.
-        The dictionary must contain:
+        Specifies additional scattering planes in case of additional DUTs which are not used.
+        The dictionary must contain the following keys:
             z_scatter: z position of scattering plane in um
             material_budget_scatter: material budget of scattering plane
             alignment_scatter: list which contains alpha, beta and gamma angles of scattering plane.
                                If None, no rotation will be considered.
-
+        In case of multiple scattering planes, each value of a key is a list, with items corresponding to each scattering plane.
+        If add_scattering_plane is False, no scattering plane will be added.
     Returns
     -------
     smoothed_state_estimates : array_like
@@ -1147,28 +1155,32 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     material_budget = np.array(material_budget)
 
     if add_scattering_plane:
-        n_duts = n_duts + 1
-        dut_selection = np.array(range(0, n_duts))
         # initialize scattering plane values
+        index_scatter = add_scattering_plane['index_scatter']
         z_scatter = add_scattering_plane['z_scatter']
-        index_scatter = np.argmax(z_positions > z_scatter) # return first index that meets condition
-        if index_scatter == 0:  # if index is 0, z_scatter is greater than z_positions[-1]
-            msg = 'z position of scatter plane not in telescope! (z_scatter=%d, z_positions=%s)' % (z_scatter, ''.join(str(z_positions)))
-            raise IndexError(msg)
+        index_scatter = [np.where(np.sort(np.append(z_positions, z_scatter)) == z_scatter[i])[0][0] for i in range(len(z_scatter))]
         material_budget_scatter = add_scattering_plane['material_budget_scatter']
-        if add_scattering_plane['alignment_scatter'] is not None:
-            alignment_scatter = [(index_scatter, 0., 0., z_scatter, add_scattering_plane['alignment_scatter'][0],
-                                 add_scattering_plane['alignment_scatter'][1], add_scattering_plane['alignment_scatter'][2], 0., 0.)]
-        else:
-            alignment_scatter = [(index_scatter, 0., 0., z_scatter, 0., 0., 0., 0., 0.)]
+        alignment_scatter_total = []
+        for i in range(len(add_scattering_plane['alignment_scatter'])):
+            if add_scattering_plane['alignment_scatter'][i] is not None:
+                alignment_scatter = [(index_scatter[i], 0., 0., z_scatter[i], add_scattering_plane['alignment_scatter'][i][0],
+                                     add_scattering_plane['alignment_scatter'][i][1], add_scattering_plane['alignment_scatter'][i][2], 0., 0.)]
+                alignment_scatter_total.append(alignment_scatter)
+            else:
+                alignment_scatter = [(index_scatter[i], 0., 0., z_scatter[i], 0., 0., 0., 0., 0.)]
+                alignment_scatter_total.append(alignment_scatter)
         # append new values
-        material_budget = np.insert(material_budget, index_scatter, material_budget_scatter)
-        z_positions = np.insert(z_positions, index_scatter, z_scatter)
-        alignment = np.insert(alignment, index_scatter, [alignment_scatter])
-        for index in range(index_scatter + 1, alignment.shape[0]):
-            alignment[index][0] = alignment[index][0] + 1
-        track_hits = np.insert(track_hits, index_scatter, np.full((track_hits.shape[0], track_hits.shape[2]), fill_value=np.nan), axis=1)
-
+        for i in range(len(z_scatter)):
+            material_budget = np.insert(material_budget, index_scatter[i], material_budget_scatter[i])
+            z_positions = np.insert(z_positions, index_scatter[i], z_scatter[i])
+            alignment = np.insert(alignment, index_scatter[i], alignment_scatter_total[i])
+            track_hits = np.insert(track_hits, index_scatter[i], np.full((track_hits.shape[0], track_hits.shape[2]), fill_value=np.nan), axis=1)
+        # fix dut number in alignment array
+        for index in range(alignment.shape[0]):
+            alignment[index][0] = index
+        # correct number of duts and update dut selection
+        n_duts = n_duts + len(z_scatter)
+        dut_selection = np.array(range(0, n_duts))
     # Calculate multiple scattering
     mass = 0.511  # mass in MeV (electrons)
     momentum = np.sqrt(beam_energy**2 - mass**2)
@@ -1218,8 +1230,9 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
     sel = dut_selection[:-1]
     z_diff = z_positions[sel + 1] - z_positions[sel]
 
-    if add_scattering_plane:  # need to shift dut fit selection in case of additional scattering plane
-        dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] = dut_fit_selection[np.where(dut_fit_selection > (index_scatter - 1))[0][0]:] + 1
+    if add_scattering_plane:
+        for i in range(len(index_scatter)):  # need to shift dut fit selection in case of additional scattering plane
+                dut_fit_selection[np.where(dut_fit_selection > (index_scatter[i] - 1))[0][0]:] = dut_fit_selection[np.where(dut_fit_selection > (index_scatter[i] - 1))[0][0]:] + 1
 
     for index, actual_hits in enumerate(track_hits):  # Loop over selected track candidate hits and fit
         # cluster hit position error
@@ -1235,8 +1248,8 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
             # If first dut is used in track building, take first dut hit as initial value and
             # its corresponding cluster position error as the error on the measurement.
             initial_state_mean[index] = np.array([actual_hits[0, 0], actual_hits[0, 1], 0., 0.])
-            initial_state_covariance[index, 0, 0] = np.square(x_err[0])  # np.square(pixel_resolution[0, 0])  # np.square(x_err[0])
-            initial_state_covariance[index, 1, 1] = np.square(y_err[0])  # np.square(pixel_resolution[0, 1])  # np.square(y_err[0])
+            initial_state_covariance[index, 0, 0] = np.square(x_err[0])
+            initial_state_covariance[index, 1, 1] = np.square(y_err[0])
         else:  # first dut is not in fit selction
             # Take hit from first dut which is in fit selection. Cannot take hit from first dut,
             # since do not want to pass measurement to kalman filter (unbiased).
@@ -1252,9 +1265,9 @@ def _fit_tracks_kalman_loop(track_hits, dut_fit_selection, pixel_size, n_pixels,
         # rotations of planes into account.
         transition_matrix[index, sel, :, 0] = np.array([1., 0., 0., 0.])
         transition_matrix[index, sel, :, 1] = np.array([0., 1., 0., 0.])
-        transition_matrix[index, sel, :, 2] = np.array([-(z_diff), np.zeros((len(sel),)),
+        transition_matrix[index, sel, :, 2] = np.array([(z_diff), np.zeros((len(sel),)),
                                                         np.ones((len(sel),)), np.zeros((len(sel),))]).T
-        transition_matrix[index, sel, :, 3] = np.array([np.zeros((len(sel),)), -(z_diff),
+        transition_matrix[index, sel, :, 3] = np.array([np.zeros((len(sel),)), (z_diff),
                                                         np.zeros((len(sel),)), np.ones((len(sel),))]).T
 
         # express transition covariance matrices, according to http://web-docs.gsi.de/~ikisel/reco/Methods/CovarianceMatrices-NIMA329-1993.pdf

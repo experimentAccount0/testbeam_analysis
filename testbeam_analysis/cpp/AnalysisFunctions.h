@@ -181,7 +181,7 @@ void in1d_sorted(int64_t*& rEventArrayOne, const unsigned int& rSizeArrayOne, in
 	}
 }
 
-// Fast 1d index histograming (bin size = 1, values starting from 0)
+// Fast 1d index histogramming (bin size = 1, values starting from 0)
 void histogram_1d(int*& x, const unsigned int& rSize, const unsigned int& rNbinsX, uint32_t*& rResult)
 {
 	for (unsigned int i = 0; i < rSize; ++i) {
@@ -197,7 +197,7 @@ void histogram_1d(int*& x, const unsigned int& rSize, const unsigned int& rNbins
 	}
 }
 
-// Fast 2d index histograming (bin size = 1, values starting from 0)
+// Fast 2d index histogramming (bin size = 1, values starting from 0)
 void histogram_2d(int*& x, int*& y, const unsigned int& rSize, const unsigned int& rNbinsX, const unsigned int& rNbinsY, uint32_t*& rResult)
 {
 	for (unsigned int i = 0; i < rSize; ++i) {
@@ -213,7 +213,7 @@ void histogram_2d(int*& x, int*& y, const unsigned int& rSize, const unsigned in
 	}
 }
 
-// Fast 3d index histograming (bin size = 1, values starting from 0)
+// Fast 3d index histogramming (bin size = 1, values starting from 0)
 void histogram_3d(int*& x, int*& y, int*& z, const unsigned int& rSize, const unsigned int& rNbinsX, const unsigned int& rNbinsY, const unsigned int& rNbinsZ, uint16_t*& rResult)
 {
 	for (unsigned int i = 0; i < rSize; ++i) {

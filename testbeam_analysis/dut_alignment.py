@@ -136,7 +136,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
     chunk_size : uint
         Chunk size of the data when reading from file.
     '''
-    logging.info('=== Merge cluster from %d DUTSs to merged hit file ===', len(input_cluster_files))
+    logging.info('=== Merge cluster files from %d DUTs to merged hit file ===', len(input_cluster_files))
 
     # Create result array description, depends on the number of DUTs
     description = [('event_number', np.int64)]
@@ -168,8 +168,8 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
         with tb.open_file(input_cluster_files[0], mode='r') as in_file_h5:  # Open DUT0 cluster file
             progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=in_file_h5.root.Cluster.shape[0], term_width=80)
             progress_bar.start()
-            for cluster_dut_0, start_indices_data_loop[0] in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, start_index=start_indices_data_loop[0], start_event_number=actual_start_event_number, stop_event_number=None, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
-                actual_event_numbers = cluster_dut_0[:]['event_number']
+            for actual_cluster_dut_0, start_indices_data_loop[0] in analysis_utils.data_aligned_at_events(in_file_h5.root.Cluster, start_index=start_indices_data_loop[0], start_event_number=actual_start_event_number, stop_event_number=None, chunk_size=chunk_size):  # Loop over the cluster of DUT0 in chunks
+                actual_event_numbers = actual_cluster_dut_0[:]['event_number']
 
                 # First loop: calculate the minimum event number indices needed to merge all cluster from all files to this event number index
                 common_event_numbers = actual_event_numbers
@@ -177,52 +177,61 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open DUT0 cluster file
                         for actual_cluster, start_indices_merging_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start_index=start_indices_merging_loop[dut_index], start_event_number=actual_start_event_number, stop_event_number=actual_event_numbers[-1] + 1, chunk_size=chunk_size, fail_on_missing_events=False):  # Loop over the cluster in the actual cluster file in chunks
                             common_event_numbers = analysis_utils.get_max_events_in_both_arrays(common_event_numbers, actual_cluster[:]['event_number'])
-                merged_cluster_array = np.full(shape=(common_event_numbers.shape[0],), fill_value=np.nan, dtype=description)  # Result array to be filled. For no hit: column = row = charge = NaN
+                merged_cluster_array = np.zeros(shape=(common_event_numbers.shape[0],), dtype=description)  # resulting array to be filled
+                for index, _ in enumerate(input_cluster_files):
+                    # for no hit: column = row = charge = nan
+                    merged_cluster_array['x_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['y_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['z_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['charge_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['xerr_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['yerr_dut_%d' % (index)] = np.nan
+                    merged_cluster_array['zerr_dut_%d' % (index)] = np.nan
 
                 # Set the event number
                 merged_cluster_array['event_number'] = common_event_numbers[:]
 
                 # Fill result array with DUT 0 data
-                actual_cluster = analysis_utils.map_cluster(common_event_numbers, cluster_dut_0)
+                actual_cluster_dut_0 = analysis_utils.map_cluster(common_event_numbers, actual_cluster_dut_0)
                 # Select real hits, values with nan are virtual hits
-                selection = ~np.isnan(actual_cluster['mean_column'])
+                selection = ~np.isnan(actual_cluster_dut_0['mean_column'])
                 # Convert indices to positions, origin defined in the center of the sensor
-                merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[0][0]))
-                merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[0][1]))
+                merged_cluster_array['x_dut_0'][selection] = pixel_size[0][0] * (actual_cluster_dut_0['mean_column'][selection] - 0.5 - (0.5 * n_pixels[0][0]))
+                merged_cluster_array['y_dut_0'][selection] = pixel_size[0][1] * (actual_cluster_dut_0['mean_row'][selection] - 0.5 - (0.5 * n_pixels[0][1]))
                 merged_cluster_array['z_dut_0'][selection] = 0.0
                 xerr = np.zeros(selection.shape)
                 yerr = np.zeros(selection.shape)
                 zerr = np.zeros(selection.shape)
-                xerr[selection] = actual_cluster['err_column'][selection] * pixel_size[0][0]
-                yerr[selection] = actual_cluster['err_row'][selection] * pixel_size[0][1]
+                xerr[selection] = actual_cluster_dut_0['err_column'][selection] * pixel_size[0][0]
+                yerr[selection] = actual_cluster_dut_0['err_row'][selection] * pixel_size[0][1]
                 merged_cluster_array['xerr_dut_0'][selection] = xerr[selection]
                 merged_cluster_array['yerr_dut_0'][selection] = yerr[selection]
                 merged_cluster_array['zerr_dut_0'][selection] = zerr[selection]
-                merged_cluster_array['charge_dut_0'][selection] = actual_cluster['charge'][selection]
-                merged_cluster_array['n_hits_dut_0'][selection] = actual_cluster['n_hits'][selection]
+                merged_cluster_array['charge_dut_0'][selection] = actual_cluster_dut_0['charge'][selection]
+                merged_cluster_array['n_hits_dut_0'][selection] = actual_cluster_dut_0['n_hits'][selection]
 
                 # Fill result array with other DUT data
                 # Second loop: get the cluster from all files and merge them to the common event number
                 for dut_index, cluster_file in enumerate(input_cluster_files[1:], start=1):  # Loop over the other cluster files
                     with tb.open_file(cluster_file, mode='r') as actual_in_file_h5:  # Open other DUT cluster file
-                        for actual_cluster, start_indices_data_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start_index=start_indices_data_loop[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size, fail_on_missing_events=False):  # Loop over the cluster in the actual cluster file in chunks
-                            actual_cluster = analysis_utils.map_cluster(common_event_numbers, actual_cluster)
+                        for actual_cluster_dut, start_indices_data_loop[dut_index] in analysis_utils.data_aligned_at_events(actual_in_file_h5.root.Cluster, start_index=start_indices_data_loop[dut_index], start_event_number=common_event_numbers[0], stop_event_number=common_event_numbers[-1] + 1, chunk_size=chunk_size, fail_on_missing_events=False):  # Loop over the cluster in the actual cluster file in chunks
+                            actual_cluster_dut = analysis_utils.map_cluster(common_event_numbers, actual_cluster_dut)
                             # Select real hits, values with nan are virtual hits
-                            selection = ~np.isnan(actual_cluster['mean_column'])
+                            selection = ~np.isnan(actual_cluster_dut['mean_column'])
                             # Convert indices to positions, origin in the center of the sensor, remaining DUTs
-                            merged_cluster_array['x_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][0] * (actual_cluster['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
-                            merged_cluster_array['y_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][1] * (actual_cluster['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
+                            merged_cluster_array['x_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][0] * (actual_cluster_dut['mean_column'][selection] - 0.5 - (0.5 * n_pixels[dut_index][0]))
+                            merged_cluster_array['y_dut_%d' % (dut_index)][selection] = pixel_size[dut_index][1] * (actual_cluster_dut['mean_row'][selection] - 0.5 - (0.5 * n_pixels[dut_index][1]))
                             merged_cluster_array['z_dut_%d' % (dut_index)][selection] = 0.0
                             xerr = np.zeros(selection.shape)
                             yerr = np.zeros(selection.shape)
                             zerr = np.zeros(selection.shape)
-                            xerr[selection] = actual_cluster['err_column'][selection] * pixel_size[dut_index][0]
-                            yerr[selection] = actual_cluster['err_row'][selection] * pixel_size[dut_index][1]
+                            xerr[selection] = actual_cluster_dut['err_column'][selection] * pixel_size[dut_index][0]
+                            yerr[selection] = actual_cluster_dut['err_row'][selection] * pixel_size[dut_index][1]
                             merged_cluster_array['xerr_dut_%d' % (dut_index)][selection] = xerr[selection]
                             merged_cluster_array['yerr_dut_%d' % (dut_index)][selection] = yerr[selection]
                             merged_cluster_array['zerr_dut_%d' % (dut_index)][selection] = zerr[selection]
-                            merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster['charge'][selection]
-                            merged_cluster_array['n_hits_dut_%d' % (dut_index)][selection] = actual_cluster['n_hits'][selection]
+                            merged_cluster_array['charge_dut_%d' % (dut_index)][selection] = actual_cluster_dut['charge'][selection]
+                            merged_cluster_array['n_hits_dut_%d' % (dut_index)][selection] = actual_cluster_dut['n_hits'][selection]
 
                 merged_cluster_table.append(merged_cluster_array)
                 actual_start_event_number = common_event_numbers[-1] + 1  # Set the starting event number for the next chunked read

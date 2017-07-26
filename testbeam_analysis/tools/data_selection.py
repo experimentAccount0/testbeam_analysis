@@ -183,4 +183,4 @@ def _select_hits_with_condition(hits_array, condition):
     for variable in set(re.findall(r'(\d*[a-zA-Z_]+\d*)', condition)):
         exec(variable + ' = hits_array[\'' + variable + '\']')  # expose variables; not a copy, this is just a reference
 
-    return hits_array[ne.evaluate(condition)]
+    return hits_array[ne.evaluate(condition, casting="safe")]

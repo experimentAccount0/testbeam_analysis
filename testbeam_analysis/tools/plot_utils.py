@@ -977,7 +977,7 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_pdf
         ax.set_ylabel('#')
 
         if plot_log:
-            ax.set_ylim(1, int(ceil(np.amax(histogram) / 10.0)) * 100)
+            ax.set_ylim(0.1, int(ceil(np.amax(histogram) / 10.0)) * 100)
 
         ax.bar(x, histogram, log=plot_log, align='center')
         if np.any(fit):
@@ -1366,7 +1366,9 @@ def plot_track_angle(input_track_angle_file, output_pdf_file=None, dut_names=Non
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
-                ax.bar(bin_center, track_angle_hist, label='Angular Distribution%s' % ((" for %s" % dut_name) if dut_name else ""), width=(edges[0]-edges[-1])/len(edges), color='b', align='center')
+                # fixing bin width in plotting
+                width = (edges[1:] - edges[:-1])
+                ax.bar(bin_center, track_angle_hist, label='Angular Distribution%s' % ((" for %s" % dut_name) if dut_name else ""), width=width, color='b', align='center')
                 x_gauss = np.arange(np.min(edges), np.max(edges), step=0.0001)
                 ax.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, amp, mean, sigma), color='r', label='Gauss-Fit:\nMean: %.5f mrad,\nSigma: %.5f mrad' % (mean, sigma))
                 ax.set_ylabel('#')
