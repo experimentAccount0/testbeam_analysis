@@ -233,9 +233,13 @@ If several tuples are given it is [(DUT0 size x, DUT0 size y), (DUT1 size x, DUT
 <li><strong>force_prealignment</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; Take the prealignment, although if a coarse alignment is availale.</li>
 <li><strong>cut_distance</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Use only distances (between DUT hit and track hit) smaller than cut_distance.</li>
 <li><strong>max_distance</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Defines binnig of distance values.</li>
-<li><strong>row_range</strong> (<em>col_range</em><em>,</em>) &#8211; Column / row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</li>
+<li><strong>col_range</strong> (<em>iterable</em>) &#8211; Column value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</li>
+<li><strong>row_range</strong> (<em>iterable</em>) &#8211; Row value to calculate efficiency for (to neglect noisy edge pixels for efficiency calculation).</li>
 <li><strong>plot</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; If True, create additional output plots.</li>
 <li><strong>chunk_size</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#int" title="(in Python v2.7)"><em>int</em></a>) &#8211; Chunk size of the data when reading from file.</li>
+<li><strong>pixel_size</strong> (<em>iterable</em>) &#8211; tuple or list of col/row pixel dimension</li>
+<li><strong>n_pixels</strong> (<em>iterable</em>) &#8211; tuple or list of amount of pixel in col/row dimension</li>
+<li><strong>show_inefficient_events</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; Whether to log inefficient events</li>
 </ul>
 </td>
 </tr>
