@@ -1,7 +1,6 @@
 import sys
 import logging
 
-from Queue import Queue
 from email import message_from_string
 from pkg_resources import get_distribution, DistributionNotFound
 
@@ -10,7 +9,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from data import DataTab
 from setup import SetupTab
 from settings import SettingsWindow
-from analysis_logger import AnalysisLogger, AnalysisStream, LogBuffer, LogReceiver
+from analysis_logger import AnalysisLogger, AnalysisStream
 
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
@@ -21,11 +20,6 @@ MINIMUM_RESOLUTION = (1366, 768)
 
 # Create all tabs at start up for debugging purpose
 _DEBUG = False
-
-# Temporarily have two options for logger; one with (0) and without (1) subclassing logging.Handler
-# to test if subclassing logging.Handler logging method is potentially thread-unsafe. Question is if sub-
-# classing a thread-safe method is thread-safe itself.
-LOG_METHOD = 1
 
 try:
     pkgInfo = get_distribution('testbeam_analysis').get_metadata('PKG-INFO')
@@ -91,6 +85,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self._init_logger()
         self.connect_tabs()
 
+        # Show welcome message
         self.handle_messages("Hello and welcome to a simple and easy to use testbeam analysis!", 4000)
 
     def _init_tabs(self):
@@ -147,35 +142,16 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.console_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable)
         self.console_dock.setWindowTitle('Logger')
 
-        if LOG_METHOD == 0:
-            # Create logger instance
-            self.logger = AnalysisLogger(self.main_widget)
-            self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        # Create logger instance
+        self.logger = AnalysisLogger(self.main_widget)
+        self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
-            # Add custom logger
-            logging.getLogger().addHandler(self.logger)
+        # Add custom logger
+        logging.getLogger().addHandler(self.logger)
 
-            # Connect logger signal to logger console
-            AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
-            AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
-
-        elif LOG_METHOD == 1:
-            # Initialize a queue in which logging messages are stored and read from
-            # and make extra thread for LogReceiver to listen to logs
-            self.log_queue = Queue()
-            self.log_thread = QtCore.QThread()
-
-            # Redirect stdout and stderr to queue
-            sys.stdout = LogBuffer(self.log_queue)
-            sys.stderr = LogBuffer(self.log_queue)
-
-            # Make receiver instance and move to respective thread, connect signals
-            self.log_receiver = LogReceiver(self.log_queue)
-            self.log_receiver.moveToThread(self.log_thread)
-            self.log_receiver.sendLog.connect(lambda log: self.logger_console.moveCursor(QtGui.QTextCursor.End))
-            self.log_receiver.sendLog.connect(lambda log: self.logger_console.insertPlainText(log))
-            self.log_thread.started.connect(self.log_receiver.start_receiver)
-            self.log_thread.start()
+        # Connect logger signal to logger console
+        AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+        AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
 
         # Set visibility to false at init
         self.console_dock.setVisible(False)
@@ -307,6 +283,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.tab_completed(tab_names))
+                self.tw[name].exceptionSignal.connect(lambda e, trc_bck, tab, cause: self.handle_exceptions(exception=e,
+                                                                                                            traceback=trc_bck,
+                                                                                                            tab=tab,
+                                                                                                            cause=cause))
                 self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
             except (AttributeError, KeyError):
@@ -358,43 +338,51 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 widget = tab_widget.NoisyPixelsTab(parent=self.tabs,
                                                    setup=self.setup,
                                                    options=self.options,
+                                                   name=name,
                                                    tab_list='Clustering')
             elif name == 'Clustering':
                 widget = tab_widget.ClusterPixelsTab(parent=self.tabs,
                                                      setup=self.setup,
                                                      options=self.options,
+                                                     name=name,
                                                      tab_list='Pre-alignment')
 
             elif name == 'Pre-alignment':
                 widget = tab_widget.PrealignmentTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options,
+                                                    name=name,
                                                     tab_list='Track finding')
 
             elif name == 'Track finding':
                 widget = tab_widget.TrackFindingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options,
+                                                    name=name,
                                                     tab_list='Alignment')
             elif name == 'Alignment':
                 widget = tab_widget.AlignmentTab(parent=self.tabs,
                                                  setup=self.setup,
                                                  options=self.options,
+                                                 name=name,
                                                  tab_list='Track fitting')
             elif name == 'Track fitting':
                 widget = tab_widget.TrackFittingTab(parent=self.tabs,
                                                     setup=self.setup,
                                                     options=self.options,
+                                                    name=name,
                                                     tab_list=['Residuals', 'Efficiency'])
             elif name == 'Residuals':
                 widget = tab_widget.ResidualTab(parent=self.tabs,
                                                 setup=self.setup,
                                                 options=self.options,
+                                                name=name,
                                                 tab_list='Efficiency')
             elif name == 'Efficiency':
                 widget = tab_widget.EfficiencyTab(parent=self.tabs,
                                                   setup=self.setup,
                                                   options=self.options,
+                                                  name=name,
                                                   tab_list='Last')  # Random string for last tab, NOT in self.tab_order
             else:
                 continue
@@ -539,7 +527,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         l_rca = QtWidgets.QHBoxLayout()
         label_rca = QtWidgets.QLabel('Running consecutive analysis...')
         p_bar_rca = QtWidgets.QProgressBar()
-        p_bar_rca.setRange(0, len(self.tab_order))
+        p_bar_rca.setRange(self.tabs.currentIndex()-2, len(self.tab_order))
         l_rca.addWidget(label_rca)
         l_rca.addWidget(p_bar_rca)
         self.main_layout.addLayout(l_rca)
@@ -566,6 +554,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Start analysis by clicking ok button on starting tab
         self.tw[starting_tab_rca].btn_ok.click()
+        p_bar_rca.setFormat(starting_tab_rca)
 
         def handle_rca(tab_list):
 
@@ -601,6 +590,55 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 p_bar_rca.setValue(len(self.tab_order))
                 label_rca.setText('Done!')
 
+    def handle_exceptions(self, exception, traceback, tab, cause):
+        """
+        Handles exceptions which are raised on sub-thread where "ViTables" or analysis is done.
+        Re-raises unexpected exceptions and and handles expected ones.
+
+        :param exception: Any Exception
+        :param traceback: traceback of exception
+        :param tab: analysis tab
+        :param cause: "vitables" or "analysis"
+        """
+
+        if cause == 'vitables':
+
+            if type(exception) in [OSError, ImportError]:
+                msg = 'ViTables not found. Try installing ViTables'
+                self.tw[tab].btn_ok.setToolTip('Try installing or re-installing ViTables')
+                self.tw[tab].btn_ok.setText('ViTables not found')
+                self.tw[tab].btn_ok.setDisabled(True)
+                logging.error(msg)
+            else:
+                raise exception
+
+        else:
+
+            exc = type(exception).__name__
+            text = "Try changing the parameters. %sTab will be reset!" % tab
+            msg_0 = "The following exception occurred during %s: %s.\n" % (cause, exc)
+            msg_1 = "Traceback:\n %s\n%s" % (traceback, text)
+            msg = msg_0 + msg_1
+            title = "Exception/Error"
+            msg_box = QtWidgets.QMessageBox.warning(self, title, msg, QtWidgets.QMessageBox.Ok)
+
+            self.update_tabs(tabs=tab)
+
+            # FIXME: Keep next tab from being enabled when exception occurs
+
+    def check_resolution(self):
+
+        # Show message box with warning if screen resolution is lower than required
+        if self.screen.width() < MINIMUM_RESOLUTION[0] or self.screen.height() < MINIMUM_RESOLUTION[1]:
+            msg = "Your screen resolution (%d x %d) is below the required minimum resolution of %d x %d." \
+                  " This may affect the appearance!" % (self.screen.width(), self.screen.height(),
+                                                        MINIMUM_RESOLUTION[0], MINIMUM_RESOLUTION[1])
+            title = "Screen resolution low"
+            msg_box = QtWidgets.QMessageBox.information(self, title, msg, QtWidgets.QMessageBox.Ok)
+
+        else:
+            pass
+
     def file_quit(self):
         self.close()
 
@@ -614,4 +652,5 @@ if __name__ == '__main__':
     app.setFont(font)
     aw = AnalysisWindow()
     aw.show()
+    aw.check_resolution()
     sys.exit(app.exec_())

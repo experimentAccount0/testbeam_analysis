@@ -20,8 +20,8 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(NoisyPixelsTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(NoisyPixelsTab, self).__init__(parent, setup, options, name, tab_list)
 
         # Make options and setup class variables
         self.options = options
@@ -120,8 +120,8 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(ClusterPixelsTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(ClusterPixelsTab, self).__init__(parent, setup, options, name, tab_list)
 
         output_files = [options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']]
 
@@ -165,8 +165,8 @@ class PrealignmentTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(PrealignmentTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(PrealignmentTab, self).__init__(parent, setup, options, name, tab_list)
 
         output_files = {'correlation': options['output_path'] + '/Correlation.h5',
                         'alignment': options['output_path'] + '/Alignment.h5',
@@ -247,8 +247,8 @@ class TrackFindingTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(TrackFindingTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(TrackFindingTab, self).__init__(parent, setup, options, name, tab_list)
 
         output_file = options['output_path'] + '/TrackCandidates_prealignment.h5'
 
@@ -281,8 +281,8 @@ class AlignmentTab(AnalysisWidget):
     proceedAnalysis = QtCore.pyqtSignal(list)
     skipAlignment = QtCore.pyqtSignal()
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(AlignmentTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(AlignmentTab, self).__init__(parent, setup, options, name, tab_list)
 
         if isinstance(tab_list, list):
             self.tl = tab_list
@@ -371,8 +371,8 @@ class TrackFittingTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(TrackFittingTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(TrackFittingTab, self).__init__(parent, setup, options, name, tab_list)
 
         if options['skip_alignment']:
             input_tracks = options['output_path'] + '/TrackCandidates_prealignment.h5'
@@ -450,8 +450,8 @@ class ResidualTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(ResidualTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(ResidualTab, self).__init__(parent, setup, options, name, tab_list)
 
         if options['skip_alignment']:
             input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
@@ -494,8 +494,8 @@ class EfficiencyTab(AnalysisWidget):
 
     proceedAnalysis = QtCore.pyqtSignal(list)
 
-    def __init__(self, parent, setup, options, tab_list):
-        super(EfficiencyTab, self).__init__(parent, setup, options, tab_list)
+    def __init__(self, parent, setup, options, name, tab_list):
+        super(EfficiencyTab, self).__init__(parent, setup, options, name, tab_list)
 
         if options['skip_alignment']:
             input_tracks = options['output_path'] + '/Tracks_prealigned.h5'

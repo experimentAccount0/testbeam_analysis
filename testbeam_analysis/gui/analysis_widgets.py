@@ -55,8 +55,10 @@ class AnalysisWidget(QtWidgets.QWidget):
 
     # Signal emitted after all funcs are called
     analysisDone = QtCore.pyqtSignal(list)
+    # Signal emitted if exceptions occur
+    exceptionSignal = QtCore.pyqtSignal(Exception, str, str, str)
 
-    def __init__(self, parent, setup, options, tab_list=None):
+    def __init__(self, parent, setup, options, name, tab_list=None):
         super(AnalysisWidget, self).__init__(parent)
         self.setup = setup
         self.options = options
@@ -75,6 +77,8 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.tab_list = tab_list
         else:
             self.tab_list = [tab_list]
+        # Name of this analysis widget
+        self.name = name
 
     def _setup(self):
         # Plot area
@@ -405,7 +409,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.analysis_thread.started.connect(self.analysis_worker.work)
 
         # Connect exceptions signal
-        self.analysis_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='analysis'))
+        self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                            traceback=trc_bck,
+                                                                                            name=self.name,
+                                                                                            cause='analysis'))
 
         # When this method is not called from the ParallelAnalysisWidget
         if not parallel:
@@ -419,7 +426,7 @@ class AnalysisWidget(QtWidgets.QWidget):
     def _connect_vitables(self, files):
         """
         Disconnects ok button from running analysis and connects to calling "ViTables".
-        
+
         :param files: HDF5-file or list of HDF5-files  
         """
 
@@ -431,7 +438,7 @@ class AnalysisWidget(QtWidgets.QWidget):
     def _call_vitables(self, files):
         """
         Calls "ViTables" using subprocess' call.
-        
+
         :param files: HDF5-file or list of HDF5-files
         """
 
@@ -447,7 +454,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.vitables_worker.moveToThread(self.vitables_thread)
 
         # Connect exceptions signal from worker on different thread to main thread
-        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+        self.vitables_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                            traceback=trc_bck,
+                                                                                            name=self.name,
+                                                                                            cause='vitables'))
         self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
 
         # Connect workers work method to the start of the thread, quit thread when worker finishes
@@ -461,50 +471,27 @@ class AnalysisWidget(QtWidgets.QWidget):
         """
         Function that creates the plot for the plotting area of the AnalysisWidget using AnalysisPlotter.
         See AnalysisPlotters docstring for info on how plots are created.
-        
+
         :param input_file: HDF5-file or dict with HDF5-files if plotting for multiple functions
         :param plot_func: function or dict of functions if plotting for multiple functions
         :param figures: None, matplotlib.Figure() or list of such figures or dict of both if plotting for multiple functions
         :param kwargs: keyword arguments or keyword from dicts keys with another dict as argument if plotting for multiple functions
         """
 
-        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget, **kwargs)
+        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget,
+                               **kwargs)
         self.plt.addWidget(plot)
 
-    def handle_exceptions(self, exception, cause=None):
+    def emit_exception(self, exception, traceback, name, cause):
         """
-        Handles exceptions which are raised on sub-thread where "ViTables" or analysis is done.
-        Re-raises unexpected exceptions and and handles expected ones.
-         
-        :param exception: Any Exception 
-        :param cause: "vitables" or "analysis"
+        Emits exception signal
+
+        :param exception: Any Exception
+        :param name: string of this widgets name
+        :param cause: "vitables" or "analysis" or None
         """
 
-        if cause is not None:
-
-            if cause == 'vitables':
-
-                if exception is CalledProcessError:
-                    msg = 'An error occurred during executing ViTables'
-                elif type(exception) in [OSError, ImportError]:
-                    msg = 'ViTables not found. Try installing ViTables'
-                    self.btn_ok.setToolTip('Try installing or re-installing ViTables')
-                    self.btn_ok.setText('ViTables not found')
-                    self.btn_ok.setDisabled(True)
-                else:
-                    raise exception
-
-            elif cause == 'analysis':
-
-                if exception is CalledProcessError:
-                    msg = 'An error occurred during analysis'
-                else:
-                    raise exception
-
-            logging.error(msg)
-
-        else:
-            raise exception
+        self.exceptionSignal.emit(exception, traceback, name, cause)
 
 
 class ParallelAnalysisWidget(QtWidgets.QWidget):
@@ -514,8 +501,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
     """
 
     parallelAnalysisDone = QtCore.pyqtSignal(list)
+    exceptionSignal = QtCore.pyqtSignal(Exception, str, str, str)
 
-    def __init__(self, parent, setup, options, tab_list=None):
+    def __init__(self, parent, setup, options, name, tab_list=None):
 
         super(ParallelAnalysisWidget, self).__init__(parent)
 
@@ -548,7 +536,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
 
-        # Flag to check if all analysis threads are finsihed
+        # Flag to check if all analysis threads are finished
         self.threads_finished = False
 
         # Additional thread for vitables
@@ -560,6 +548,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             self.tab_list = tab_list
         else:
             self.tab_list = [tab_list]
+        # Name of this parallel analysis widget
+        self.name = name
 
         self._init_tabs()
         self.connect_tabs()
@@ -595,7 +585,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                 elif isinstance(self.options[o_key], int) or isinstance(self.options[o_key], str):
                     tmp_options[o_key] = self.options[o_key]
 
-            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, tab_list=self.tab_list)
+            widget = AnalysisWidget(parent=self.tabs, setup=tmp_setup, options=tmp_options, name=self.name,
+                                    tab_list=self.tab_list)
             widget.btn_ok.deleteLater()
             widget.p_bar.deleteLater()
 
@@ -607,7 +598,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.tabs.currentChanged.connect(lambda tab: self.handle_sub_layout(tab=tab))
 
         for tab_name in self.tw.keys():
-            self.tw[tab_name].widget_splitter.splitterMoved.connect(lambda: self.handle_sub_layout(tab=self.tabs.currentIndex()))
+            self.tw[tab_name].widget_splitter.splitterMoved.connect(
+                lambda: self.handle_sub_layout(tab=self.tabs.currentIndex()))
 
     def resizeEvent(self, QResizeEvent):
         self.handle_sub_layout(tab=self.tabs.currentIndex())
@@ -627,7 +619,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_function(func=func)
 
-    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False, tooltip=None):
+    def add_parallel_option(self, option, default_value, func, name=None, dtype=None, optional=None, fixed=False,
+                            tooltip=None):
 
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_option(option=option, func=func, dtype=dtype, name=name,
@@ -646,6 +639,10 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         for tab in self.tw.keys():
             self.tw[tab].container.setDisabled(True)
+            self.tw[tab].exceptionSignal.connect(lambda e, trc_bck, name, cause: self.emit_exception(exception=e,
+                                                                                                     traceback=trc_bck,
+                                                                                                     name=name,
+                                                                                                     cause=cause))
             self.tw[tab]._call_funcs(parallel=True)
             self.tw[tab].analysis_thread.finished.connect(lambda: self._check_parallel_analysis_status())
 
@@ -704,7 +701,10 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.vitables_worker.moveToThread(self.vitables_thread)
 
         # Connect exceptions signal from worker on different thread to main thread
-        self.vitables_worker.exceptionSignal.connect(lambda e: self.handle_exceptions(exception=e, cause='vitables'))
+        self.vitables_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                            traceback=trc_bck,
+                                                                                            name=self.name,
+                                                                                            cause='vitables'))
         self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
 
         # Connect workers work method to the start of the thread, quit thread when worker finishes
@@ -733,40 +733,17 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             names.reverse()
 
         for dut in names:
-            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_name=dut, **kwargs)
+            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_name=dut,
+                                   **kwargs)
             self.tw[dut].plt.addWidget(plot)
 
-    def handle_exceptions(self, exception, cause=None):
+    def emit_exception(self, exception, traceback, name, cause):
         """
-        Handles exceptions which are raised on sub-thread where "ViTables" or analysis is done.
-        Re-raises unexpected exceptions and and handles expected ones.
+        Emits exception signal
 
-        :param exception: Any Exception 
-        :param cause: "vitables" or "analysis"
+        :param exception: Any Exception
+        :param name: string of this widgets name
+        :param cause: "vitables" or "analysis" or None
         """
 
-        if cause is not None:
-
-            if cause == 'vitables':
-
-                if exception is CalledProcessError:
-                    msg = 'An error occurred during executing ViTables'
-                elif type(exception) in [OSError, ImportError]:
-                    msg = 'ViTables not found. Try installing ViTables'
-                    self.btn_ok.setToolTip('Try installing or re-installing ViTables')
-                    self.btn_ok.setText('ViTables not found')
-                    self.btn_ok.setDisabled(True)
-                else:
-                    raise exception
-
-            elif cause == 'analysis':
-
-                if exception is CalledProcessError:
-                    msg = 'An error occurred during analysis'
-                else:
-                    raise exception
-
-            logging.error(msg)
-
-        else:
-            raise exception
+        self.exceptionSignal.emit(exception, traceback, name, cause)
