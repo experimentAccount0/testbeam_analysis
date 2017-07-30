@@ -416,9 +416,9 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # When this method is not called from the ParallelAnalysisWidget
         if not parallel:
-            self.analysis_thread.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
-            self.analysis_thread.finished.connect(lambda: self.p_bar.setRange(0, 1))
-            self.analysis_thread.finished.connect(lambda: self.p_bar.setValue(1))
+            self.analysis_worker.finished.connect(lambda: self.analysisDone.emit(self.tab_list))
+            self.analysis_worker.finished.connect(lambda: self.p_bar.setRange(0, 1))
+            self.analysis_worker.finished.connect(lambda: self.p_bar.setValue(1))
 
         # Start thread
         self.analysis_thread.start()
@@ -487,6 +487,7 @@ class AnalysisWidget(QtWidgets.QWidget):
         Emits exception signal
 
         :param exception: Any Exception
+        :param traceback: traceback of the exception or error
         :param name: string of this widgets name
         :param cause: "vitables" or "analysis" or None
         """
@@ -742,6 +743,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         Emits exception signal
 
         :param exception: Any Exception
+        :param traceback: traceback of the exception or error
         :param name: string of this widgets name
         :param cause: "vitables" or "analysis" or None
         """

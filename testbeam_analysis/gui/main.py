@@ -269,12 +269,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                               lambda: self.tw['Setup'].input_data(self.tw['Files'].data),
                               lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(x)
+                        self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
                 if name == 'Setup':
                     for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
                                lambda: self.setup_completed(),
                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(xx)
+                        self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
                 if name == 'Alignment':
                     for xxx in [lambda: self.update_tabs(data={'skip_alignment': True}, tabs='Track fitting'),
@@ -287,10 +289,12 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                                                                                             traceback=trc_bck,
                                                                                                             tab=tab,
                                                                                                             cause=cause))
-                self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
-            except (AttributeError, KeyError):
-                pass
+            except (AttributeError, KeyError) as e:
+                if _DEBUG:
+                    logging.warning(e.message)
+                else:
+                    pass
 
     def update_tabs(self, data=None, tabs=None, skip=None):
         """
@@ -527,7 +531,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         l_rca = QtWidgets.QHBoxLayout()
         label_rca = QtWidgets.QLabel('Running consecutive analysis...')
         p_bar_rca = QtWidgets.QProgressBar()
-        p_bar_rca.setRange(self.tabs.currentIndex()-2, len(self.tab_order))
+        p_bar_rca.setRange(0, len(self.tab_order))
         l_rca.addWidget(label_rca)
         l_rca.addWidget(p_bar_rca)
         self.main_layout.addLayout(l_rca)
@@ -554,6 +558,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Start analysis by clicking ok button on starting tab
         self.tw[starting_tab_rca].btn_ok.click()
+        p_bar_rca.setValue(self.tab_order.index(starting_tab_rca))
         p_bar_rca.setFormat(starting_tab_rca)
 
         def handle_rca(tab_list):
@@ -601,16 +606,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         :param cause: "vitables" or "analysis"
         """
 
-        if cause == 'vitables':
+        if type(exception) in [OSError, ImportError] and cause == 'vitables':
 
-            if type(exception) in [OSError, ImportError]:
-                msg = 'ViTables not found. Try installing ViTables'
-                self.tw[tab].btn_ok.setToolTip('Try installing or re-installing ViTables')
-                self.tw[tab].btn_ok.setText('ViTables not found')
-                self.tw[tab].btn_ok.setDisabled(True)
-                logging.error(msg)
-            else:
-                raise exception
+            msg = 'ViTables not found. Try installing ViTables'
+            self.tw[tab].btn_ok.setToolTip('Try installing or re-installing ViTables')
+            self.tw[tab].btn_ok.setText('ViTables not found')
+            self.tw[tab].btn_ok.setDisabled(True)
+            logging.error(msg)
 
         else:
 
@@ -624,7 +626,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
             self.update_tabs(tabs=tab)
 
-            # FIXME: Keep next tab from being enabled when exception occurs
+            # FIXME: Remove progressbar when exception occurs during consecutive analysis
 
     def check_resolution(self):
 
