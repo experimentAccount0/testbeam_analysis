@@ -641,13 +641,17 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             # Update tab in which exception occurred to allow new selection of input parameters
             self.update_tabs(tabs=tab)
 
-            # Remove progressbar
-            for i in reversed(range(self.widget_rca.layout().count())):
-                item = self.widget_rca.layout().itemAt(i)
-                item.widget().deleteLater()
+            # Remove progressbar of consecutive analysis if there is one
+            try:
+                for i in reversed(range(self.widget_rca.layout().count())):
+                    item = self.widget_rca.layout().itemAt(i)
+                    item.widget().deleteLater()
 
-            self.main_layout.removeWidget(self.widget_rca)
-            self.widget_rca.deleteLater()
+                self.main_layout.removeWidget(self.widget_rca)
+                self.widget_rca.deleteLater()
+
+            except AttributeError:
+                pass
 
     def check_resolution(self):
 
