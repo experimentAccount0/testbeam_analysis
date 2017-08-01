@@ -73,8 +73,6 @@ class AnalysisWorker(QtCore.QObject):
         # Functions and arguments to perform analysis function;
         # if not None, main function is then AnalysisWidget.call_funcs()
         self.funcs_args = funcs_args
-        # Indicator of worker working
-        self.isWorking = True
 
     def work(self):
         """ 
@@ -94,7 +92,6 @@ class AnalysisWorker(QtCore.QObject):
                 self.main_func(self.args)
 
             self.finished.emit()
-            self.isWorking = False
 
         except Exception as e:
 
@@ -104,5 +101,3 @@ class AnalysisWorker(QtCore.QObject):
                 yaml.dump(trc_bck, f_write, default_flow_style=False)
 
             self.exceptionSignal.emit(e, trc_bck)
-
-            self.isWorking = None

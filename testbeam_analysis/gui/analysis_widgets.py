@@ -420,8 +420,8 @@ class AnalysisWidget(QtWidgets.QWidget):
             self.analysis_worker.finished.connect(lambda: self.p_bar.setRange(0, 1))
             self.analysis_worker.finished.connect(lambda: self.p_bar.setValue(1))
 
-        # Start thread
-        self.analysis_thread.start()
+            # Start thread
+            self.analysis_thread.start()
 
     def _connect_vitables(self, files):
         """
@@ -538,7 +538,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.options = options
 
         # Flag to check if all analysis threads are finished
-        self.threads_finished = False
+        self.workers_finished = 0
+        self.work_finished = False
 
         # Additional thread for vitables
         self.vitables_thread = QtCore.QThread()  # no parent
@@ -644,8 +645,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                                                                      traceback=trc_bck,
                                                                                                      name=name,
                                                                                                      cause=cause))
-            self.tw[tab]._call_funcs(parallel=True)
-            self.tw[tab].analysis_thread.finished.connect(lambda: self._check_parallel_analysis_status())
+            self.tw[tab]._call_funcs(parallel=True)  # DOES NOT START ANALYSIS THREAD, MUST BE STARTED SEPARATELY
+            self.tw[tab].analysis_worker.finished.connect(lambda: self._check_parallel_analysis_status())
+            self.tw[tab].analysis_thread.start()
 
     def _check_parallel_analysis_status(self):
         """
@@ -657,20 +659,32 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         if self.p_bar.value() == -1:
             self.p_bar.setRange(0, len(self.tw.keys()))
 
-        # Make list of the status of all sub-threads; if thread is running append True else False
-        analysis_status = []
-        for tab in self.tw.keys():
-            status = self.tw[tab].analysis_thread.isRunning()
-            analysis_status.append(status)
+        # Add 1 every time a worker has finished
+        self.workers_finished += 1
 
         # Set progressbar to be value of all sub-threads that are finished
-        self.p_bar.setValue(analysis_status.count(False))
+        self.p_bar.setValue(self.workers_finished)
 
-        if True not in analysis_status:
-            # Due to timing, all analysis threads can be finished while some finished signals are still in queue
-            if not self.threads_finished:
+        if self.workers_finished == len(self.tw.keys()):
+            # Avoid emitting signal multiple times due to asynchronous handling of signals
+            if not self.work_finished:
                 self.parallelAnalysisDone.emit(self.tab_list)
-                self.threads_finished = True
+                self.work_finished = True
+
+#        # Make list of the status of all sub-threads; if thread is running append True else False
+#        analysis_status = []
+#        for tab in self.tw.keys():
+#            status = self.tw[tab].analysis_thread.isRunning()
+#            analysis_status.append(status)
+#
+#        # Set progressbar to be value of all sub-threads that are finished
+#        self.p_bar.setValue(analysis_status.count(False))
+#
+#        if True not in analysis_status:
+#            # Due to timing, all analysis threads can be finished while some finished signals are still in queue
+#            if not self.threads_finished:
+#                self.parallelAnalysisDone.emit(self.tab_list)
+#                self.threads_finished = True
 
     def _connect_vitables(self, files):
         """

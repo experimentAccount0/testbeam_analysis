@@ -71,13 +71,16 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.main_layout = QtWidgets.QVBoxLayout(self.main_widget)
         self.setCentralWidget(self.main_widget)
 
-        # main splitter
+        # Main splitter
         self.main_splitter = QtWidgets.QSplitter()
         self.main_splitter.setOrientation(QtCore.Qt.Vertical)
         self.main_splitter.setChildrenCollapsible(False)
         self.main_splitter.setSizes([int(0.8*self.height()), int(0.2*self.height())])
 
         self.main_layout.addWidget(self.main_splitter)
+
+        # Create variable for sub-layout for progressbar when running consecutive analysis
+        self.layout_rca = None
 
         # Init widgets and add to main window
         self._init_menu()
@@ -120,15 +123,28 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Add to main layout
         self.main_splitter.addWidget(self.tabs)
 
-    def _init_logger(self):
+    def _init_logger(self, init=True):
         """
         Initializes a custom logging handler for analysis and set its
         visibility to False. The logger can be shown/hidden via the 
         appearance menu in the GUI or closed button
         """
 
-        # Set logging level
-        logging.getLogger().setLevel(logging.INFO)
+        if init:
+
+            # Set logging level
+            logging.getLogger().setLevel(logging.INFO)
+
+            # Create logger instance
+            self.logger = AnalysisLogger(self.main_widget)
+            self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+            # Add custom logger
+            logging.getLogger().addHandler(self.logger)
+
+            # Connect logger signal to logger console
+            AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
+            AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
 
         # Add widget to display log and add it to dock
         # Widget to display log in, we only want to read log
@@ -141,17 +157,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.console_dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
         self.console_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable)
         self.console_dock.setWindowTitle('Logger')
-
-        # Create logger instance
-        self.logger = AnalysisLogger(self.main_widget)
-        self.logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-
-        # Add custom logger
-        logging.getLogger().addHandler(self.logger)
-
-        # Connect logger signal to logger console
-        AnalysisStream.stdout().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
-        AnalysisStream.stderr().messageWritten.connect(lambda msg: self.logger_console.appendPlainText(msg))
 
         # Set visibility to false at init
         self.console_dock.setVisible(False)
@@ -511,6 +516,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Add bool to indicate whether setup tab has been executed
         self.setup_done = False
 
+        # Disable consecutive analysis until setup is done
+        self.run_menu.actions()[0].setEnabled(False)
+        self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
+
         for i in reversed(range(self.main_splitter.count())):
             w = self.main_splitter.widget(i)
             w.hide()
@@ -518,7 +527,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         self._init_tabs()
         self.connect_tabs()
-        self._init_logger()
+        self._init_logger(init=False)
         self.tabs.setCurrentIndex(0)
 
     def run_consecutive_analysis(self):
@@ -527,14 +536,19 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Variable to store tab name from which consecutive analysis starts
         starting_tab_rca = None
+
         # Make sub-layout for consecutive analysis progressbar with label
-        l_rca = QtWidgets.QHBoxLayout()
+        self.widget_rca = QtWidgets.QWidget()
+        layout_rca = QtWidgets.QHBoxLayout()
+        self.widget_rca.setLayout(layout_rca)
+        self.main_layout.addWidget(self.widget_rca)
+
+        # Make widgets to fill rca layout
         label_rca = QtWidgets.QLabel('Running consecutive analysis...')
         p_bar_rca = QtWidgets.QProgressBar()
         p_bar_rca.setRange(0, len(self.tab_order))
-        l_rca.addWidget(label_rca)
-        l_rca.addWidget(p_bar_rca)
-        self.main_layout.addLayout(l_rca)
+        layout_rca.addWidget(label_rca)
+        layout_rca.addWidget(p_bar_rca)
 
         for tab in self.tab_order:
 
@@ -624,9 +638,16 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             title = "Exception/Error"
             msg_box = QtWidgets.QMessageBox.warning(self, title, msg, QtWidgets.QMessageBox.Ok)
 
+            # Update tab in which exception occurred to allow new selection of input parameters
             self.update_tabs(tabs=tab)
 
-            # FIXME: Remove progressbar when exception occurs during consecutive analysis
+            # Remove progressbar
+            for i in reversed(range(self.widget_rca.layout().count())):
+                item = self.widget_rca.layout().itemAt(i)
+                item.widget().deleteLater()
+
+            self.main_layout.removeWidget(self.widget_rca)
+            self.widget_rca.deleteLater()
 
     def check_resolution(self):
 
