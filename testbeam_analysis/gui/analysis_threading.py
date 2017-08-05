@@ -95,9 +95,7 @@ class AnalysisWorker(QtCore.QObject):
 
         except Exception as e:
 
-            # Save the latest traceback on sub thread to file
+            # Format traceback and send
             trc_bck = traceback.format_exc()
-            with open('traceback.yaml', 'w') as f_write:
-                yaml.dump(trc_bck, f_write, default_flow_style=False)
 
             self.exceptionSignal.emit(e, trc_bck)

@@ -8,7 +8,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 
 from data import DataTab
 from setup import SetupTab
-from settings import SettingsWindow
+from sub_windows import SettingsWindow, ExceptionWindow
 from analysis_logger import AnalysisLogger, AnalysisStream
 
 import testbeam_analysis
@@ -42,6 +42,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Make variable for SettingsWindow
         self.settings_window = None
+
+        # Make variable for ExceptionWindow
+        self.exception_window = None
 
         # Make dict to access tab widgets
         self.tw = {}
@@ -620,6 +623,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         :param cause: "vitables" or "analysis"
         """
 
+        # If vitables raises exception, only disable button and log
         if type(exception) in [OSError, ImportError] and cause == 'vitables':
 
             msg = 'ViTables not found. Try installing ViTables'
@@ -630,16 +634,14 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         else:
 
-            exc = type(exception).__name__
-            text = "Try changing the parameters. %sTab will be reset!" % tab
-            msg_0 = "The following exception occurred during %s: %s.\n" % (cause, exc)
-            msg_1 = "Traceback:\n %s\n%s" % (traceback, text)
-            msg = msg_0 + msg_1
-            title = "Exception/Error"
-            msg_box = QtWidgets.QMessageBox.warning(self, title, msg, QtWidgets.QMessageBox.Ok)
+            # Set index to tab where exception occurred
+            self.tabs.setCurrentIndex(self.tab_order.index(tab))
 
-            # Update tab in which exception occurred to allow new selection of input parameters
-            self.update_tabs(tabs=tab)
+            # Make instance of exceptionwindow
+            self.exception_window = ExceptionWindow(exception=exception, traceback=traceback,
+                                                    tab=tab, cause=cause, parent=self)
+            self.exception_window.show()
+            self.exception_window.exceptionRead.connect(lambda: self.update_tabs(tabs=tab))
 
             # Remove progressbar of consecutive analysis if there is one
             try:

@@ -1,3 +1,4 @@
+import yaml
 from PyQt5 import QtCore, QtWidgets, QtGui
 from copy import deepcopy
 
@@ -31,7 +32,7 @@ class SettingsWindow(QtWidgets.QMainWindow):
                                 'cluster_suffix': '_clustered.h5',  # fixed since fixed in function
                                 'skip_alignment': False}
 
-        # Make copy of defaults to change values but dont change defaults
+        # Make copy of defaults to change values but don't change defaults
         if setup is None:
             self.setup = deepcopy(self.default_setup)
         else:
@@ -105,13 +106,6 @@ class SettingsWindow(QtWidgets.QMainWindow):
         self.edit_chunk.setValidator(valid_chunk)
         self.edit_chunk.setText(str(self.options['chunk_size']))
 
-#        # Make widgets for input file suffixes
-#        label_suffix = QtWidgets.QLabel('Input file suffixes:')
-#        self.edit_noisy = QtWidgets.QLineEdit()
-#        self.edit_noisy.setPlaceholderText('NoisyPixelSuffix = %s' % self.options['noisy_suffix'])
-#        self.edit_cluster = QtWidgets.QLineEdit()
-#        self.edit_cluster.setPlaceholderText('ClusterSuffix = %s' % self.options['cluster_suffix'])
-
         # Add all  option widgets to layout_options, add spacers
         layout_options.addWidget(label_plot, 0, 0, 1, 1)
         layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 0, 1, 1, 1)
@@ -124,10 +118,6 @@ class SettingsWindow(QtWidgets.QMainWindow):
         layout_options.addWidget(label_chunk, 2, 0, 1, 1)
         layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
         layout_options.addWidget(self.edit_chunk, 2, 2, 1, 2)
-#        layout_options.addWidget(label_suffix, 2, 0, 1, 1)
-#        layout_options.addItem(QtWidgets.QSpacerItem(7*h_space, v_space), 2, 1, 1, 1)
-#        layout_options.addWidget(self.edit_noisy, 2, 2, 1, 2)
-#        layout_options.addWidget(self.edit_cluster, 3, 2, 1, 2)
 
         # Make buttons for apply settings and cancel and button layout
         layout_buttons = QtWidgets.QHBoxLayout()
@@ -168,3 +158,101 @@ class SettingsWindow(QtWidgets.QMainWindow):
 
         self.settingsUpdated.emit()
         self.close()
+
+
+class ExceptionWindow(QtWidgets.QMainWindow):
+
+    exceptionRead = QtCore.pyqtSignal()
+
+    def __init__(self, exception, traceback, tab=None, cause=None, parent=None):
+
+        super(ExceptionWindow, self).__init__(parent)
+
+        # Make this window blocking parent window
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+
+        # Get important information of the exception
+        self.exception = exception
+        self.traceback = traceback
+        self.exc_type = type(self.exception).__name__
+
+        # Make main message and label
+        msg = "The following exception occurred during %s: %s.\n" \
+              "Try changing the input parameters. %s tab will be reset!" % (cause, self.exc_type, tab)
+
+        self.label = QtWidgets.QLabel(msg)
+        self.label.setWordWrap(True)
+
+        self._init_UI()
+
+    def _init_UI(self):
+
+        # Exceptions window
+        self.setWindowTitle(self.exc_type)
+        self.screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.setMinimumSize(0.3 * self.screen.width(), 0.3 * self.screen.height())
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+
+        # Widgets and layout
+        # Spacing related
+        v_space = 30
+        h_space = 15
+
+        # Make central widget
+        main_widget = QtWidgets.QWidget()
+        main_layout = QtWidgets.QVBoxLayout()
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+        # Layout for buttons
+        layout_buttons = QtWidgets.QHBoxLayout()
+        layout_buttons.addStretch(1)
+
+        # Textbrowser to display traceback
+        browser_traceback = QtWidgets.QTextBrowser()
+        browser_traceback.setText(self.traceback)
+
+        # Button to safe traceback to file
+        btn_safe = QtWidgets.QPushButton('Save')
+        btn_safe.setToolTip('Safe traceback to file')
+        btn_safe.clicked.connect(self.safe_traceback)
+
+        # Ok button
+        btn_ok = QtWidgets.QPushButton('Ok')
+        btn_ok.setToolTip('Reset current tab')
+        btn_ok.clicked.connect(self.close)
+
+        # Add buttons to layout
+        layout_buttons.addWidget(btn_safe)
+        layout_buttons.addSpacing(h_space)
+        layout_buttons.addWidget(btn_ok)
+
+        # Dock in which text browser is placed
+        browser_dock = QtWidgets.QDockWidget()
+        browser_dock.setWidget(browser_traceback)
+        browser_dock.setAllowedAreas(QtCore.Qt.BottomDockWidgetArea)
+        browser_dock.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
+        browser_dock.setWindowTitle('Traceback:')
+
+        # Add to main layout
+        main_layout.addWidget(self.label)
+        main_layout.addSpacing(v_space)
+        main_layout.addWidget(browser_dock)
+        main_layout.addLayout(layout_buttons)
+
+    def safe_traceback(self):
+
+        caption = 'Save traceback to file'
+        trcbck_path = QtWidgets.QFileDialog.getSaveFileName(parent=self,
+                                                            caption=caption,
+                                                            directory='./',
+                                                            filter='*.yaml')[0]
+        if trcbck_path:
+            with open(trcbck_path, 'w') as f_write:
+                yaml.dump(self.traceback, f_write, default_flow_style=False)
+        else:
+            pass
+
+    def closeEvent(self, QCloseEvent):
+
+        self.exceptionRead.emit()

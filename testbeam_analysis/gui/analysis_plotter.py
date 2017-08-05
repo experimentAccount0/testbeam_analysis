@@ -1,4 +1,3 @@
-import logging
 import matplotlib
 import inspect
 
@@ -50,8 +49,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
         if isinstance(self.input_file, dict) and isinstance(self.plot_func, dict):
             if self.input_file.keys() != self.plot_func.keys():
                 msg = 'Different sets of keys! Can not assign input data to respective plotting function!'
-                logging.error(msg=msg)
-                raise KeyError
+                raise KeyError(msg)
             else:
                 if self.kwargs:
                     for key in self.kwargs.keys():
@@ -232,8 +230,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
                 pass
             else:
                 msg = 'Input figures must be in dictionary! Can not assign figure(s) to respective plotting function!'
-                logging.error(msg=msg)
-                raise KeyError
+                raise KeyError(msg)
 
         tabs = QtWidgets.QTabWidget()
 
