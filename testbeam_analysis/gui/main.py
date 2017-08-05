@@ -339,6 +339,15 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 if skip in update_tabs:
                     update_tabs.remove(skip)
 
+        # Remove tabs from being updated if they are already finished
+        for t in self.tab_order:
+            try:
+                if self.tw[t].isFinished:
+                    if t in update_tabs:
+                        update_tabs.remove(t)
+            except AttributeError:
+                pass
+
         # Make temporary dict for updated tabs
         tmp_tw = {}
         for name in update_tabs:

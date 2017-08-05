@@ -55,6 +55,9 @@ class SetupTab(QtWidgets.QWidget):
         # Counter for scatter planes
         self.n_sct_plns = 0
 
+        # Store state of setup
+        self.isFinished = False
+
         # TabIcon related variable
         self.style = QtWidgets.qApp.style()
 
@@ -576,6 +579,7 @@ class SetupTab(QtWidgets.QWidget):
             if self.scatter_data:
                 self.data['scatter_planes'] = self.scatter_data
 
+            self.isFinished = True
             self.proceedAnalysis.emit(self.tab_list)
             self._disable_tabs()
 
