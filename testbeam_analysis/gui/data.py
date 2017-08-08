@@ -256,7 +256,7 @@ class DataTable(QtWidgets.QTableWidget):
             event.accept()
             for url in event.mimeData().urls():
                 if '.h5' in url.toLocalFile():
-                    self.input_files.append(url.toLocalFile())
+                    self.input_files.append(os.path.join(url.toLocalFile()))
                 else:
                     msg = 'Files must be HDF5-format'
                     logging.warning(msg)
@@ -274,7 +274,7 @@ class DataTable(QtWidgets.QTableWidget):
                                                            caption=caption,
                                                            directory='./',
                                                            filter='*.h5')[0]:
-            self.input_files.append(path)
+            self.input_files.append(os.path.join(path))
 
         self.handle_data()
 

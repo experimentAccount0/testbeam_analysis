@@ -306,6 +306,16 @@ class AlignmentTab(AnalysisWidget):
                         func=alignment,
                         fixed=True)
 
+        self.add_option(option='align_duts',
+                        default_value=range(setup['n_duts']),
+                        func=alignment,
+                        fixed=False)
+
+        self.add_option(option='select_fit_duts',
+                        default_value=range(setup['n_duts']),
+                        func=alignment,
+                        fixed=False)
+
         self.add_option(option='initial_translation',
                         default_value=False,
                         func=alignment,

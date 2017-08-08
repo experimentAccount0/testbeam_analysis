@@ -266,7 +266,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         if tabs is None:
             tab_list = self.tab_order
         else:
-            tab_list = [tabs]
+            if isinstance(tabs, list):
+                tab_list = tabs
+            else:
+                tab_list = [tabs]
 
         for name in tab_list:
             try:
@@ -287,7 +290,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
                 if name == 'Alignment':
-                    for xxx in [lambda: self.update_tabs(data={'skip_alignment': True}, tabs='Track fitting'),
+                    for xxx in [lambda: self.update_tabs(data={'skip_alignment': True},
+                                                         tabs=['Track fitting', 'Residuals', 'Efficiency']),
                                 lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].skipAlignment.connect(xxx)
 
@@ -328,7 +332,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         if tabs is None:
             update_tabs = list(self.tab_order)
         else:
-            update_tabs = [tabs]
+            if isinstance(tabs, list):
+                update_tabs = tabs
+            else:
+                update_tabs = [tabs]
 
         if skip is not None:
             if isinstance(skip, list):
@@ -654,7 +661,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 self.main_layout.removeWidget(self.widget_rca)
                 self.widget_rca.deleteLater()
 
-            except AttributeError:
+            # RuntimeError if progressbar has been removed previously
+            except (AttributeError, RuntimeError):
                 pass
 
     def check_resolution(self):
