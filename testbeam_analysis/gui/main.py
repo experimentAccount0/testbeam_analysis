@@ -49,9 +49,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Make dict to access tab widgets
         self.tw = {}
 
-        # Add bool to indicate whether setup tab has been executed
-        self.setup_done = False
-
         # Icon do indicate tab completed
         self.icon_complete = QtWidgets.qApp.style().standardIcon(QtWidgets.qApp.style().SP_DialogApplyButton)
 
@@ -280,8 +277,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
                 if name == 'Setup':
+                    msg = 'Run consecutive analysis with default options without user interaction'
                     for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
-                               lambda: self.setup_completed(),
+                               lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
+                               lambda: self.run_menu.actions()[0].setToolTip(msg),
                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(xx)
                         self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
@@ -430,14 +429,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Connect updated tabs
         self.connect_tabs(tabs)
 
-    def setup_completed(self):
-
-        # Setup completed
-        self.setup_done = True
-        # Enable consecutive analysis
-        self.run_menu.actions()[0].setEnabled(True)
-        self.run_menu.actions()[0].setToolTip('Run consecutive analysis with default options without user interaction')
-
     def tab_completed(self, tabs):
 
         tab = None
@@ -480,8 +471,11 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.setup = self.settings_window.setup
         self.options = self.settings_window.options
 
-        if self.setup_done:
-            self.update_tabs(skip='Setup')
+        try:
+            if self.tw['Setup'].isFinished:
+                self.update_tabs()  # skip='Setup'
+        except AttributeError:
+            pass
 
     def save_session(self):
         """
@@ -524,9 +518,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Make dict to access tab widgets
         self.tw = {}
-
-        # Add bool to indicate whether setup tab has been executed
-        self.setup_done = False
 
         # Disable consecutive analysis until setup is done
         self.run_menu.actions()[0].setEnabled(False)
@@ -646,7 +637,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             # Set index to tab where exception occurred
             self.tabs.setCurrentIndex(self.tab_order.index(tab))
 
-            # Make instance of exceptionwindow
+            # Make instance of exception window
             self.exception_window = ExceptionWindow(exception=exception, traceback=traceback,
                                                     tab=tab, cause=cause, parent=self)
             self.exception_window.show()
