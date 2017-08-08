@@ -1,5 +1,6 @@
 import sys
 import logging
+import traceback
 
 from email import message_from_string
 from pkg_resources import get_distribution, DistributionNotFound
@@ -605,7 +606,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
                     # Re-raise exception
                     else:
-                        raise e
+                        self.handle_exceptions(exception=e, traceback=traceback.format_exc(),
+                                               tab=tab_name, cause='consecutive analysis')
 
             else:
                 # Last tab finished

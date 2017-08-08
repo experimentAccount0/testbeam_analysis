@@ -4,7 +4,9 @@
     gui options and plotting outputs
 """
 
-from PyQt5 import QtCore, QtWidgets, QtGui
+import os
+
+from PyQt5 import QtCore, QtWidgets
 from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
 from testbeam_analysis.dut_alignment import correlate_cluster, prealignment, merge_cluster_data, apply_alignment, alignment
@@ -28,7 +30,7 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
         self.setup = setup
 
         # Make variables for input of noisy pixel function
-        self.output_files = [options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']]
+        self.output_files = [os.path.join(options['output_path'], dut + options['noisy_suffix']) for dut in setup['dut_names']]
         self.input_files = options['input_files']
         self.n_pixels = setup['n_pixels']
         self.duts = setup['dut_names']
@@ -82,7 +84,7 @@ class NoisyPixelsTab(ParallelAnalysisWidget):
             if not self.check_boxes[dut].isChecked():
 
                 self.input_files.append(self.options['input_files'][self.setup['dut_names'].index(dut)])
-                self.output_files.append(self.options['output_path'] + '/' + dut + self.options['noisy_suffix'])
+                self.output_files.append(os.path.join(self.options['output_path'], dut + self.options['noisy_suffix']))
                 self.duts.append(dut)
                 self.n_pixels.append(self.setup['n_pixels'][self.setup['dut_names'].index(dut)])
 
@@ -123,7 +125,7 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
     def __init__(self, parent, setup, options, name, tab_list):
         super(ClusterPixelsTab, self).__init__(parent, setup, options, name, tab_list)
 
-        output_files = [options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']]
+        output_files = [os.path.join(options['output_path'], dut + options['cluster_suffix']) for dut in setup['dut_names']]
 
         self.add_parallel_function(func=cluster_hits)
 
@@ -133,7 +135,7 @@ class ClusterPixelsTab(ParallelAnalysisWidget):
                                  fixed=True)
 
         self.add_parallel_option(option='input_noisy_pixel_mask_file',
-                                 default_value=[options['output_path'] + '/' + dut + options['noisy_suffix'] for dut in setup['dut_names']],
+                                 default_value=[os.path.join(options['output_path'], dut + options['noisy_suffix']) for dut in setup['dut_names']],
                                  func=cluster_hits,
                                  fixed=True)
 
@@ -168,10 +170,10 @@ class PrealignmentTab(AnalysisWidget):
     def __init__(self, parent, setup, options, name, tab_list):
         super(PrealignmentTab, self).__init__(parent, setup, options, name, tab_list)
 
-        output_files = {'correlation': options['output_path'] + '/Correlation.h5',
-                        'alignment': options['output_path'] + '/Alignment.h5',
-                        'merged': options['output_path'] + '/Merged.h5',
-                        'tracklets': options['output_path'] + '/Tracklets_prealigned.h5'}
+        output_files = {'correlation': os.path.join(options['output_path'], 'Correlation.h5'),
+                        'alignment': os.path.join(options['output_path'], 'Alignment.h5'),
+                        'merged': os.path.join(options['output_path'], 'Merged.h5'),
+                        'tracklets': os.path.join(options['output_path'], 'Tracklets_prealigned.h5')}
 
         multiple_plotting_data = {'correlation': output_files['correlation']}
         multiple_plotting_func = {'correlation': plot_correlations}
@@ -182,7 +184,7 @@ class PrealignmentTab(AnalysisWidget):
         self.add_function(func=apply_alignment)
 
         self.add_option(option='input_cluster_files',
-                        default_value=[options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']],
+                        default_value=[os.path.join(options['output_path'], dut + options['cluster_suffix']) for dut in setup['dut_names']],
                         func=correlate_cluster,
                         fixed=True)
 
@@ -202,7 +204,7 @@ class PrealignmentTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_cluster_files',
-                        default_value=[options['output_path'] + '/' + dut + options['cluster_suffix'] for dut in setup['dut_names']],
+                        default_value=[os.path.join(options['output_path'], dut + options['cluster_suffix']) for dut in setup['dut_names']],
                         func=merge_cluster_data,
                         fixed=True)
 
@@ -250,17 +252,17 @@ class TrackFindingTab(AnalysisWidget):
     def __init__(self, parent, setup, options, name, tab_list):
         super(TrackFindingTab, self).__init__(parent, setup, options, name, tab_list)
 
-        output_file = options['output_path'] + '/TrackCandidates_prealignment.h5'
+        output_file = os.path.join(options['output_path'], 'TrackCandidates_prealignment.h5')
 
         self.add_function(func=find_tracks)
 
         self.add_option(option='input_tracklets_file',
-                        default_value=options['output_path'] + '/Tracklets_prealigned.h5',
+                        default_value=os.path.join(options['output_path'], 'Tracklets_prealigned.h5'),
                         func=find_tracks,
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                         func=find_tracks,
                         fixed=True)
 
@@ -289,18 +291,18 @@ class AlignmentTab(AnalysisWidget):
         else:
             self.tl = [tab_list]
 
-        output_file = options['output_path'] + '/Tracklets.h5'
+        output_file = os.path.join(options['output_path'], 'Tracklets.h5')
 
         self.add_function(func=alignment)
         self.add_function(func=apply_alignment)
 
         self.add_option(option='input_track_candidates_file',
-                        default_value=options['output_path'] + '/TrackCandidates_prealignment.h5',
+                        default_value=os.path.join(options['output_path'], 'TrackCandidates_prealignment.h5'),
                         func=alignment,
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                         func=alignment,
                         fixed=True)
 
@@ -315,12 +317,12 @@ class AlignmentTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_hit_file',
-                        default_value=options['output_path'] + '/Merged.h5',
+                        default_value=os.path.join(options['output_path'], 'Merged.h5'),
                         func=apply_alignment,
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                         func=apply_alignment,
                         fixed=True)
 
@@ -375,29 +377,29 @@ class TrackFittingTab(AnalysisWidget):
         super(TrackFittingTab, self).__init__(parent, setup, options, name, tab_list)
 
         if options['skip_alignment']:
-            input_tracks = options['output_path'] + '/TrackCandidates_prealignment.h5'
-            output_file = options['output_path'] + '/Tracks_prealigned.h5'
+            input_tracks = os.path.join(options['output_path'], 'TrackCandidates_prealignment.h5')
+            output_file = os.path.join(options['output_path'], 'Tracks_prealigned.h5')
         else:
-            output_file = options['output_path'] + '/Tracks_aligned.h5'
+            output_file = os.path.join(options['output_path'], 'Tracks_aligned.h5')
 
             self.add_function(func=find_tracks)
 
             self.add_option(option='input_tracklets_file',
-                            default_value=options['output_path'] + '/Tracklets.h5',  # from alignment
+                            default_value=os.path.join(options['output_path'], 'Tracklets.h5'),  # from alignment
                             func=find_tracks,
                             fixed=True)
 
             self.add_option(option='input_alignment_file',
-                            default_value=options['output_path'] + '/Alignment.h5',
+                            default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                             func=find_tracks,
                             fixed=True)
 
             self.add_option(option='output_track_candidates_file',
-                            default_value=options['output_path'] + '/TrackCandidates.h5',
+                            default_value=os.path.join(options['output_path'], 'TrackCandidates.h5'),
                             func=find_tracks,
                             fixed=True)
 
-            input_tracks = options['output_path'] + '/TrackCandidates.h5'
+            input_tracks = os.path.join(options['output_path'], 'TrackCandidates.h5')
 
         self.add_function(func=fit_tracks)
 
@@ -407,7 +409,7 @@ class TrackFittingTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                         func=fit_tracks,
                         fixed=True)
 
@@ -454,13 +456,13 @@ class ResidualTab(AnalysisWidget):
         super(ResidualTab, self).__init__(parent, setup, options, name, tab_list)
 
         if options['skip_alignment']:
-            input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
+            input_tracks = os.path.join(options['output_path'], 'Tracks_prealigned.h5')
         else:
-            input_tracks = options['output_path'] + '/Tracks_aligned.h5'
+            input_tracks = os.path.join(options['output_path'], 'Tracks_aligned.h5')
 
         self.add_function(func=calculate_residuals)
 
-        output_file = options['output_path'] + '/Residuals.h5'
+        output_file = os.path.join(options['output_path'], 'Residuals.h5')
 
         self.add_option(option='input_tracks_file',
                         default_value=input_tracks,
@@ -468,7 +470,7 @@ class ResidualTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                         func=calculate_residuals,
                         fixed=True)
 
@@ -498,13 +500,13 @@ class EfficiencyTab(AnalysisWidget):
         super(EfficiencyTab, self).__init__(parent, setup, options, name, tab_list)
 
         if options['skip_alignment']:
-            input_tracks = options['output_path'] + '/Tracks_prealigned.h5'
+            input_tracks = os.path.join(options['output_path'], 'Tracks_prealigned.h5')
         else:
-            input_tracks = options['output_path'] + '/Tracks_aligned.h5'
+            input_tracks = os.path.join(options['output_path'], 'Tracks_aligned.h5')
 
         self.add_function(func=calculate_efficiency)
 
-        output_file = options['output_path'] + '/Efficiency.h5'
+        output_file = os.path.join(options['output_path'], 'Efficiency.h5')
 
         self.add_option(option='input_tracks_file',
                         default_value=input_tracks,
@@ -512,7 +514,7 @@ class EfficiencyTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='input_alignment_file',
-                        default_value=options['output_path'] + '/Alignment.h5',
+                        default_value=os.path.join(options['output_path'], 'Alignment.h5'),
                         func=calculate_efficiency,
                         fixed=True)
 
