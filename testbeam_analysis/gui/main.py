@@ -435,7 +435,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.tabs.setCurrentIndex(current_tab)
 
         # Connect updated tabs
-        self.connect_tabs(tabs)
+        self.connect_tabs(update_tabs)  # tabs
 
     def tab_completed(self, tabs):
 
@@ -632,8 +632,15 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         :param cause: "vitables" or "analysis"
         """
 
+        # Make list of expected exceptions. Under Windows missing ViTables will produce WindowsError.
+        # WindowsError will raise NameError under Linux
+        try:
+            expected_exceptions = [OSError, ImportError, WindowsError]
+        except NameError:
+            expected_exceptions = [OSError, ImportError]
+
         # If vitables raises exception, only disable button and log
-        if type(exception) in [OSError, ImportError] and cause == 'vitables':
+        if type(exception) in expected_exceptions and cause == 'vitables':
 
             msg = 'ViTables not found. Try installing ViTables'
             self.tw[tab].btn_ok.setToolTip('Try installing or re-installing ViTables')

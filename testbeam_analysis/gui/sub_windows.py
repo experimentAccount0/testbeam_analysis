@@ -183,6 +183,12 @@ class ExceptionWindow(QtWidgets.QMainWindow):
         self.label = QtWidgets.QLabel(msg)
         self.label.setWordWrap(True)
 
+        # Make warning icon via pixmap on QLabel
+        self.pix_map = QtWidgets.qApp.style().standardIcon(QtWidgets.qApp.style().SP_MessageBoxWarning).pixmap(40, 40)
+        self.label_icon = QtWidgets.QLabel()
+        self.label_icon.setPixmap(self.pix_map)
+        self.label_icon.setFixedSize(40, 40)
+
         self._init_UI()
 
     def _init_UI(self):
@@ -203,6 +209,11 @@ class ExceptionWindow(QtWidgets.QMainWindow):
         main_layout = QtWidgets.QVBoxLayout()
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
+
+        # Layout for icon and label
+        layout_labels = QtWidgets.QHBoxLayout()
+        layout_labels.addWidget(self.label_icon)
+        layout_labels.addWidget(self.label)
 
         # Layout for buttons
         layout_buttons = QtWidgets.QHBoxLayout()
@@ -235,7 +246,7 @@ class ExceptionWindow(QtWidgets.QMainWindow):
         browser_dock.setWindowTitle('Traceback:')
 
         # Add to main layout
-        main_layout.addWidget(self.label)
+        main_layout.addLayout(layout_labels)
         main_layout.addSpacing(v_space)
         main_layout.addWidget(browser_dock)
         main_layout.addLayout(layout_buttons)
