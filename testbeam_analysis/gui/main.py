@@ -1,6 +1,7 @@
 import sys
 import logging
 import traceback
+import platform
 
 from email import message_from_string
 from pkg_resources import get_distribution, DistributionNotFound
@@ -164,6 +165,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Add to main layout
         self.main_splitter.addWidget(self.console_dock)
+
+        logging.info('Started "testbeam_analysis" on %s' % platform.system())
 
     def _init_menu(self):
         """

@@ -2,8 +2,9 @@ import os
 import inspect
 import logging
 import math
+import platform
 
-from subprocess import call, CalledProcessError
+from subprocess import call
 from collections import OrderedDict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -537,9 +538,20 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
 
-        # Multi-threading related inits
-        self.analysis_threads = {}  #QtCore.QThread()  # no parent
+        # Check if we're running on Windows, set flag and create corresponding multi-threading options
+        # Windows cannot spawn QThreads in a loop, use single thread instead.
+        # Create QThreads in a loop on other platforms since this is faster (Linux etc.)
+        if platform.system() == 'Windows':
+            self.WINDOWS = True
+            self.analysis_thread = QtCore.QThread()  # no parent
+        else:
+            self.WINDOWS = False
+            self.analysis_thread = {}
+
+        # Initialize worker dict
         self.analysis_workers = {}
+
+        # Vitables thread
         self.vitables_thread = QtCore.QThread()  # no parent
         self.vitables_worker = None
 
@@ -640,6 +652,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets 
         """
 
+        # Disable proceed button and make progressbar visible
         self.btn_ok.setDisabled(True)
         self.p_bar.setRange(0, 0)
         self.p_bar.setVisible(True)
@@ -649,14 +662,9 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             # Disable widgets
             self.tw[tab].container.setDisabled(True)
 
-            # Make thread and worker, make connections and move worker to thread
-            self.analysis_threads[tab] = QtCore.QThread()
+            # Make worker and connect its signals
             self.analysis_workers[tab] = AnalysisWorker(func=self.tw[tab]._call_func,
                                                         funcs_args=self.tw[tab].calls.iteritems())
-            self.analysis_workers[tab].moveToThread(self.analysis_threads[tab])
-
-            # Connect workers work method to the start of the thread, quit thread when worker finishes
-            self.analysis_threads[tab].started.connect(self.analysis_workers[tab].work)
 
             # Connect exceptions signal
             self.analysis_workers[tab].exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
@@ -664,12 +672,32 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                                                                       name=self.name,
                                                                                                       cause='analysis'))
 
+            # Connect finished signal of each worker to the check analysis status function
             self.analysis_workers[tab].finished.connect(lambda: self._check_parallel_analysis_status())
 
-            self.analysis_workers[tab].finished.connect(self.analysis_threads[tab].quit)
+            # Different threading approaches for Windows platform and others
+            # Platform is Windows
+            if self.WINDOWS:
+                # Move all workers to single QThread and connect to threads started signal
+                self.analysis_workers[tab].moveToThread(self.analysis_thread)
+                self.analysis_thread.started.connect(self.analysis_workers[tab].work)
 
-            # Start thread
-            self.analysis_threads[tab].start()
+            # Other platform
+            else:
+                # Make QThreads for each worker and move worker to its corresponding QThread, make connections
+                self.analysis_thread[tab] = QtCore.QThread()
+                self.analysis_workers[tab].moveToThread(self.analysis_thread[tab])
+                self.analysis_workers[tab].finished.connect(self.analysis_thread[tab].quit)
+                self.analysis_thread[tab].started.connect(self.analysis_workers[tab].work)
+
+                # Start corresponding thread from loop
+                self.analysis_thread[tab].start()
+
+        # Start QThread with collective workers if WINDOWS
+        if self.WINDOWS:
+            self.analysis_thread.start()
+        else:
+            logging.info('Spawned %d sub-threads for %s analysis' % (len(self.analysis_thread), self.name))
 
     def _check_parallel_analysis_status(self):
         """
@@ -692,6 +720,8 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             if not self.isFinished:
                 self.isFinished = True
                 self.parallelAnalysisDone.emit(self.tab_list)
+                if self.WINDOWS:
+                    self.analysis_thread.quit()
 
     def _connect_vitables(self, files):
         """
