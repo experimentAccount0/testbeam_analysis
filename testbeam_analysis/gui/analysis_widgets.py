@@ -387,20 +387,15 @@ class AnalysisWidget(QtWidgets.QWidget):
         # print(func.__name__, kwargs)
         func(**kwargs)
 
-    def _call_funcs(self, parallel=False):
+    def _call_funcs(self):
         """ 
         Call all functions in a row
         """
 
-        # Try to disable ok button and show progressbar
-        try:
-            self.btn_ok.setDisabled(True)
-            self.p_bar.setVisible(True)
-            self.p_bar.setRange(0, 0)
-
-        # AnalysisWidget is part of ParallelAnalysisWidget and ok button and progressbar have been removed
-        except RuntimeError:
-            pass
+        # Disable ok button and show progressbar
+        self.btn_ok.setDisabled(True)
+        self.p_bar.setVisible(True)
+        self.p_bar.setRange(0, 0)
 
         # Create worker for vitables and move to thread
         self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
@@ -416,14 +411,12 @@ class AnalysisWidget(QtWidgets.QWidget):
                                                                                             name=self.name,
                                                                                             cause='analysis'))
 
-        # When this method is not called from the ParallelAnalysisWidget
-        if not parallel:
-            self.analysis_worker.finished.connect(lambda: self.emit_analysis_done())
-            self.analysis_worker.finished.connect(lambda: self.p_bar.setRange(0, 1))
-            self.analysis_worker.finished.connect(lambda: self.p_bar.setValue(1))
+        self.analysis_worker.finished.connect(lambda: self.emit_analysis_done())
+        self.analysis_worker.finished.connect(lambda: self.p_bar.setRange(0, 1))
+        self.analysis_worker.finished.connect(lambda: self.p_bar.setValue(1))
 
-            # Start thread
-            self.analysis_thread.start()
+        # Start thread
+        self.analysis_thread.start()
 
     def _connect_vitables(self, files):
         """
@@ -544,6 +537,12 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
 
+        # Multi-threading related inits
+        self.analysis_threads = {}  #QtCore.QThread()  # no parent
+        self.analysis_workers = {}
+        self.vitables_thread = QtCore.QThread()  # no parent
+        self.vitables_worker = None
+
         # Flag to check if all analysis threads are finished
         self.workers_finished = 0
         self.isFinished = False
@@ -642,19 +641,35 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         """
 
         self.btn_ok.setDisabled(True)
-
         self.p_bar.setRange(0, 0)
         self.p_bar.setVisible(True)
 
         for tab in self.tw.keys():
+
+            # Disable widgets
             self.tw[tab].container.setDisabled(True)
-            self.tw[tab].exceptionSignal.connect(lambda e, trc_bck, name, cause: self.emit_exception(exception=e,
-                                                                                                     traceback=trc_bck,
-                                                                                                     name=name,
-                                                                                                     cause=cause))
-            self.tw[tab]._call_funcs(parallel=True)  # DOES NOT START ANALYSIS THREAD, MUST BE STARTED SEPARATELY
-            self.tw[tab].analysis_worker.finished.connect(lambda: self._check_parallel_analysis_status())
-            self.tw[tab].analysis_thread.start()
+
+            # Make thread and worker, make connections and move worker to thread
+            self.analysis_threads[tab] = QtCore.QThread()
+            self.analysis_workers[tab] = AnalysisWorker(func=self.tw[tab]._call_func,
+                                                        funcs_args=self.tw[tab].calls.iteritems())
+            self.analysis_workers[tab].moveToThread(self.analysis_threads[tab])
+
+            # Connect workers work method to the start of the thread, quit thread when worker finishes
+            self.analysis_threads[tab].started.connect(self.analysis_workers[tab].work)
+
+            # Connect exceptions signal
+            self.analysis_workers[tab].exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                                      traceback=trc_bck,
+                                                                                                      name=self.name,
+                                                                                                      cause='analysis'))
+
+            self.analysis_workers[tab].finished.connect(lambda: self._check_parallel_analysis_status())
+
+            self.analysis_workers[tab].finished.connect(self.analysis_threads[tab].quit)
+
+            # Start thread
+            self.analysis_threads[tab].start()
 
     def _check_parallel_analysis_status(self):
         """
