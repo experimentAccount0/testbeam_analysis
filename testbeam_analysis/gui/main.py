@@ -301,7 +301,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.tab_completed(tab_names))
                 self.tw[name].exceptionSignal.connect(lambda e, trc_bck, tab, cause: self.handle_exceptions(exception=e,
-                                                                                                            traceback=trc_bck,
+                                                                                                            trace_back=trc_bck,
                                                                                                             tab=tab,
                                                                                                             cause=cause))
 
@@ -616,7 +616,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
                     # Re-raise exception
                     else:
-                        self.handle_exceptions(exception=e, traceback=traceback.format_exc(),
+                        self.handle_exceptions(exception=e, trace_back=traceback.format_exc(),
                                                tab=tab_name, cause='consecutive analysis')
 
             else:
@@ -624,13 +624,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 p_bar_rca.setValue(len(self.tab_order))
                 label_rca.setText('Done!')
 
-    def handle_exceptions(self, exception, traceback, tab, cause):
+    def handle_exceptions(self, exception, trace_back, tab, cause):
         """
         Handles exceptions which are raised on sub-thread where "ViTables" or analysis is done.
         Re-raises unexpected exceptions and and handles expected ones.
 
         :param exception: Any Exception
-        :param traceback: traceback of exception
+        :param trace_back: traceback of exception
         :param tab: analysis tab
         :param cause: "vitables" or "analysis"
         """
@@ -657,7 +657,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             self.tabs.setCurrentIndex(self.tab_order.index(tab))
 
             # Make instance of exception window
-            self.exception_window = ExceptionWindow(exception=exception, traceback=traceback,
+            self.exception_window = ExceptionWindow(exception=exception, trace_back=trace_back,
                                                     tab=tab, cause=cause, parent=self)
             self.exception_window.show()
             self.exception_window.exceptionRead.connect(lambda: self.update_tabs(tabs=tab))

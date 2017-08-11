@@ -810,7 +810,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 output_pdf.savefig(fig)
 
 
-def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_file=None, gui=False):
+def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_file=None, gui=False, n_tracks=None):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -825,6 +825,10 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
         Plot events with track chi2 smaller than the gven number.
     output_pdf_file : string
         Filename of the output PDF file. If None, the filename is derived from the input file.
+    gui: bool
+        Determines whether to plot directly onto gui
+    n_tracks: uint
+        plots the first n_tracks
     '''
 
     if gui:
@@ -838,7 +842,16 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
 
             n_duts = sum(['charge' in col for col in table.dtype.names])
             array = table[:]
-            tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+            if n_tracks is not None:
+                if array.shape[0] >= n_tracks:
+                    event_begin = array['event_number'][0]
+                    event_end = array['event_number'][n_tracks]
+                    tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_begin, event_end)
+                else:
+                    logging.warning('Not enough tracks in event selection, cannot plot events!')
+                    return
+            else:
+                tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
             if tracks.shape[0] == 0:
                 logging.warning('No tracks in event selection, cannot plot events!')
                 return
@@ -892,7 +905,16 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
 
             n_duts = sum(['charge' in col for col in table.dtype.names])
             array = table[:]
-            tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+            if n_tracks is not None:
+                if array.shape[0] >= n_tracks:
+                    event_begin = array['event_number'][0]
+                    event_end = array['event_number'][n_tracks]
+                    tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_begin, event_end)
+                else:
+                    logging.warning('Not enough tracks in event selection, cannot plot events!')
+                    return
+            else:
+                tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
             if tracks.shape[0] == 0:
                 logging.warning('No tracks in event selection, cannot plot events!')
                 return

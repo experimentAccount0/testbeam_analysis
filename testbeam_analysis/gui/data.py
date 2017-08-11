@@ -1,3 +1,7 @@
+"""
+Implements a DataTab that allows to select and check test beam data for further analysis 
+"""
+
 import os
 import tables as tb
 import logging

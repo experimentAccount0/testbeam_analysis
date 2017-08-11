@@ -1,17 +1,23 @@
+"""
+Implements generic analysis widgets to apply analysis functions on test beam data. Two separate
+widgets to apply one analysis function in parallel to all input data and to apply multiple analysis functions
+to multiple input data
+"""
+
 import os
 import inspect
 import logging
 import math
-import platform
+import traceback
 
 from subprocess import call
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from numpydoc.docscrape import FunctionDoc
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 from testbeam_analysis.gui import option_widget
 from analysis_plotter import AnalysisPlotter
-from analysis_threading import AnalysisWorker
+from analysis_worker import AnalysisWorker
 
 
 def get_default_args(func):
@@ -408,13 +414,13 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # Connect exceptions signal
         self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
-                                                                                            traceback=trc_bck,
+                                                                                            trace_back=trc_bck,
                                                                                             name=self.name,
                                                                                             cause='analysis'))
 
         self.analysis_worker.finished.connect(lambda: self.emit_analysis_done())
-        self.analysis_worker.finished.connect(lambda: self.p_bar.setRange(0, 1))
-        self.analysis_worker.finished.connect(lambda: self.p_bar.setValue(1))
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.calls.keys())))
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
 
         # Start thread
         self.analysis_thread.start()
@@ -451,7 +457,7 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # Connect exceptions signal from worker on different thread to main thread
         self.vitables_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
-                                                                                            traceback=trc_bck,
+                                                                                            trace_back=trc_bck,
                                                                                             name=self.name,
                                                                                             cause='vitables'))
         self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
@@ -473,22 +479,25 @@ class AnalysisWidget(QtWidgets.QWidget):
         :param figures: None, matplotlib.Figure() or list of such figures or dict of both if plotting for multiple functions
         :param kwargs: keyword arguments or keyword from dicts keys with another dict as argument if plotting for multiple functions
         """
+        try:
+            plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget,
+                                   **kwargs)
+            self.plt.addWidget(plot)
+        except Exception as e:
+            self.emit_exception(exception=e, trace_back=traceback.format_exc(),
+                                name=self.name, cause='plotting')
 
-        plot = AnalysisPlotter(input_file=input_file, plot_func=plot_func, figures=figures, parent=self.left_widget,
-                               **kwargs)
-        self.plt.addWidget(plot)
-
-    def emit_exception(self, exception, traceback, name, cause):
+    def emit_exception(self, exception, trace_back, name, cause):
         """
         Emits exception signal
 
         :param exception: Any Exception
-        :param traceback: traceback of the exception or error
+        :param trace_back: traceback of the exception or error
         :param name: string of this widgets name
         :param cause: "vitables" or "analysis" or None
         """
 
-        self.exceptionSignal.emit(exception, traceback, name, cause)
+        self.exceptionSignal.emit(exception, trace_back, name, cause)
 
     def emit_analysis_done(self):
 
@@ -538,25 +547,14 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.setup = setup
         self.options = options
 
-        # Check if we're running on Windows, set flag and create corresponding multi-threading options
-        # Windows cannot spawn QThreads in a loop, use single thread instead.
-        # Create QThreads in a loop on other platforms since this is faster (Linux etc.)
-        if platform.system() == 'Windows':
-            self.WINDOWS = True
-            self.analysis_thread = QtCore.QThread()  # no parent
-        else:
-            self.WINDOWS = False
-            self.analysis_thread = {}
+        # Initialize thread and worker
+        self.analysis_thread = QtCore.QThread()  # no parent
+        self.analysis_worker = None
 
-        # Initialize worker dict
-        self.analysis_workers = {}
+        # Make dict to store all tabs calls.values() (dict) in a list with parallel function as key
+        self.parallel_calls = defaultdict(list)
 
-        # Vitables thread
-        self.vitables_thread = QtCore.QThread()  # no parent
-        self.vitables_worker = None
-
-        # Flag to check if all analysis threads are finished
-        self.workers_finished = 0
+        # Store state of ParallelAnalysisWidget
         self.isFinished = False
 
         # Additional thread for vitables
@@ -575,10 +573,6 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.connect_tabs()
 
     def _init_tabs(self):
-
-        # Clear widgets
-        self.tabs.clear()
-        self.tw = {}
 
         for i in range(self.setup['n_duts']):
 
@@ -636,6 +630,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         self.btn_ok.setFixedWidth(sub_widths[1] + offset)
 
     def add_parallel_function(self, func):
+
         for i in range(self.setup['n_duts']):
             self.tw[self.setup['dut_names'][i]].add_function(func=func)
 
@@ -652,76 +647,46 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
         Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets 
         """
 
-        # Disable proceed button and make progressbar visible
+        # Disable ok button and show progressbar
         self.btn_ok.setDisabled(True)
-        self.p_bar.setRange(0, 0)
         self.p_bar.setVisible(True)
+        self.p_bar.setRange(0, 0)
 
         for tab in self.tw.keys():
 
             # Disable widgets
             self.tw[tab].container.setDisabled(True)
 
-            # Make worker and connect its signals
-            self.analysis_workers[tab] = AnalysisWorker(func=self.tw[tab]._call_func,
-                                                        funcs_args=self.tw[tab].calls.iteritems())
+            # Fill parallel calls with function and all kwargs
+            for func, kwargs in self.tw[tab].calls.iteritems():
+                self.parallel_calls[func].append(kwargs)
 
-            # Connect exceptions signal
-            self.analysis_workers[tab].exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
-                                                                                                      traceback=trc_bck,
-                                                                                                      name=self.name,
-                                                                                                      cause='analysis'))
+        # Create worker for vitables and move to thread
+        self.analysis_worker = AnalysisWorker(func=self.tw[self.tw.keys()[0]]._call_func,  # FIXME: hackish
+                                              funcs_args=self.parallel_calls.iteritems())
+        self.analysis_worker.moveToThread(self.analysis_thread)
 
-            # Connect finished signal of each worker to the check analysis status function
-            self.analysis_workers[tab].finished.connect(lambda: self._check_parallel_analysis_status())
+        # Connect workers work method to the start of the thread, quit thread when worker finishes
+        self.analysis_worker.finished.connect(self.analysis_thread.quit)
+        self.analysis_thread.started.connect(self.analysis_worker.work)
 
-            # Different threading approaches for Windows platform and others
-            # Platform is Windows
-            if self.WINDOWS:
-                # Move all workers to single QThread and connect to threads started signal
-                self.analysis_workers[tab].moveToThread(self.analysis_thread)
-                self.analysis_thread.started.connect(self.analysis_workers[tab].work)
+        # Connect exceptions signal
+        self.analysis_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
+                                                                                            trace_back=trc_bck,
+                                                                                            name=self.name,
+                                                                                            cause='analysis'))
 
-            # Other platform
-            else:
-                # Make QThreads for each worker and move worker to its corresponding QThread, make connections
-                self.analysis_thread[tab] = QtCore.QThread()
-                self.analysis_workers[tab].moveToThread(self.analysis_thread[tab])
-                self.analysis_workers[tab].finished.connect(self.analysis_thread[tab].quit)
-                self.analysis_thread[tab].started.connect(self.analysis_workers[tab].work)
+        self.analysis_worker.finished.connect(lambda: self.emit_parallel_analysis_done())
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setRange(0, len(self.tw.keys())))
+        self.analysis_worker.statusSignal.connect(lambda i: self.p_bar.setValue(i))
 
-                # Start corresponding thread from loop
-                self.analysis_thread[tab].start()
+        # Start thread
+        self.analysis_thread.start()
 
-        # Start QThread with collective workers if WINDOWS
-        if self.WINDOWS:
-            self.analysis_thread.start()
-        else:
-            logging.info('Spawned %d sub-threads for %s analysis' % (len(self.analysis_thread), self.name))
+    def emit_parallel_analysis_done(self):
 
-    def _check_parallel_analysis_status(self):
-        """
-        Checks status of parallel analysis and emits the parallelAnalysisDone signal when all workers
-        or sub-threads on which the analysis runs have finished.
-        """
-
-        # Initialize the range of the progressbar
-        if self.p_bar.value() == -1:
-            self.p_bar.setRange(0, len(self.tw.keys()))
-
-        # Add 1 every time a worker has finished
-        self.workers_finished += 1
-
-        # Set progressbar to be value of all sub-threads that are finished
-        self.p_bar.setValue(self.workers_finished)
-
-        if self.workers_finished == len(self.tw.keys()):
-            # Avoid emitting signal multiple times due to asynchronous handling of signals
-            if not self.isFinished:
-                self.isFinished = True
-                self.parallelAnalysisDone.emit(self.tab_list)
-                if self.WINDOWS:
-                    self.analysis_thread.quit()
+        self.isFinished = True
+        self.parallelAnalysisDone.emit(self.tab_list)
 
     def _connect_vitables(self, files):
         """
@@ -754,7 +719,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
 
         # Connect exceptions signal from worker on different thread to main thread
         self.vitables_worker.exceptionSignal.connect(lambda e, trc_bck: self.emit_exception(exception=e,
-                                                                                            traceback=trc_bck,
+                                                                                            trace_back=trc_bck,
                                                                                             name=self.name,
                                                                                             cause='vitables'))
         self.vitables_worker.exceptionSignal.connect(self.vitables_thread.quit)
@@ -785,18 +750,22 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
             names.reverse()
 
         for dut in names:
-            plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func, dut_name=dut,
-                                   **kwargs)
-            self.tw[dut].plt.addWidget(plot)
+            try:
+                plot = AnalysisPlotter(input_file=input_files[names.index(dut)], plot_func=plot_func,
+                                       dut_name=dut, **kwargs)
+                self.tw[dut].plt.addWidget(plot)
+            except Exception as e:
+                self.emit_exception(exception=e, trace_back=traceback.format_exc(),
+                                    name=self.name, cause='plotting')
 
-    def emit_exception(self, exception, traceback, name, cause):
+    def emit_exception(self, exception, trace_back, name, cause):
         """
         Emits exception signal
 
         :param exception: Any Exception
-        :param traceback: traceback of the exception or error
+        :param trace_back: traceback of the exception or error
         :param name: string of this widgets name
         :param cause: "vitables" or "analysis" or None
         """
 
-        self.exceptionSignal.emit(exception, traceback, name, cause)
+        self.exceptionSignal.emit(exception, trace_back, name, cause)

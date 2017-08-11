@@ -1,5 +1,11 @@
+"""
+Implements a generic plotting interface which plots given figures or from plotting functions and respective data.
+AnalysisPlotter is a sub-class of QWidget and can be added to any QLayout.
+"""
+
 import matplotlib
 import inspect
+import logging
 
 from PyQt5 import QtWidgets, QtCore
 
@@ -120,6 +126,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
         else:
             fig = figures
 
+        if fig is None:
+            logging.warning('No figures returned by %s. No plotting possible' % self.plot_func.__name__)
+            return
+
         # Make list of figures if not already
         if isinstance(fig, list):
             fig_list = fig
@@ -234,7 +244,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         tabs = QtWidgets.QTabWidget()
 
-        for key in self.input_file.keys():
+        for key in sorted(self.input_file.keys()):
 
             dummy_widget = QtWidgets.QWidget()
             dummy_widget.setLayout(QtWidgets.QVBoxLayout())

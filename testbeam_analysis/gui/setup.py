@@ -618,7 +618,7 @@ class SetupTab(QtWidgets.QWidget):
             # Safe updated self._dut_types dict to file and reload
             try:
                 with open('dut_types.yaml', 'w') as f_write:
-                    yaml.dump(self._dut_types, f_write, default_flow_style=False)
+                    yaml.safe_dump(self._dut_types, f_write, default_flow_style=False)
                 with open('dut_types.yaml', 'r') as f_read:
                     self._dut_types = yaml.load(f_read)
                 if remove:

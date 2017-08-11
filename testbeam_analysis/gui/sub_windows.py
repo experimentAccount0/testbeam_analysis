@@ -1,4 +1,9 @@
+"""
+All sub-windows of the AnalysisWindow are implemented here. One for global settings and one for exceptions
+"""
+
 import yaml
+
 from PyQt5 import QtCore, QtWidgets, QtGui
 from copy import deepcopy
 
@@ -164,7 +169,7 @@ class ExceptionWindow(QtWidgets.QMainWindow):
 
     exceptionRead = QtCore.pyqtSignal()
 
-    def __init__(self, exception, traceback, tab=None, cause=None, parent=None):
+    def __init__(self, exception, trace_back, tab=None, cause=None, parent=None):
 
         super(ExceptionWindow, self).__init__(parent)
 
@@ -173,7 +178,7 @@ class ExceptionWindow(QtWidgets.QMainWindow):
 
         # Get important information of the exception
         self.exception = exception
-        self.traceback = traceback
+        self.traceback = trace_back
         self.exc_type = type(self.exception).__name__
 
         # Make main message and label
