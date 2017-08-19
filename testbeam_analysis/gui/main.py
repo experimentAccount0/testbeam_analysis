@@ -567,6 +567,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         as defined in tab_widget.py. Acronym rca==run constructive analysis
         """
 
+        # Whenever starting rca restore flag state
+        self.flag_interrupt = False
+
         # Make sub-layout for consecutive analysis progressbar with label
         self.widget_rca = QtWidgets.QWidget()
         self.layout_rca = QtWidgets.QHBoxLayout()
