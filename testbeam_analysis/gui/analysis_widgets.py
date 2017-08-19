@@ -109,13 +109,9 @@ class AnalysisWidget(QtWidgets.QWidget):
 
         # Proceed button and progressbar
         self.btn_ok = QtWidgets.QPushButton('Ok')
+        self.btn_ok.clicked.connect(lambda: self._call_funcs())
         self.p_bar = QtWidgets.QProgressBar()
         self.p_bar.setVisible(False)
-
-        for x in [lambda: self._call_funcs(),
-                  lambda: scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum()),
-                  lambda: self.container.setDisabled(True)]:
-            self.btn_ok.clicked.connect(x)
 
         # Container widget to disable all but ok button after perfoming analysis
         self.container = QtWidgets.QWidget()
@@ -130,16 +126,16 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.scroll_widget.layout().addWidget(self.btn_ok)
 
         # Make right widget scroll able
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setBackgroundRole(QtGui.QPalette.Light)
-        scroll.setWidget(self.scroll_widget)
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setBackgroundRole(QtGui.QPalette.Light)
+        self.scroll_area.setWidget(self.scroll_widget)
 
         # Make widget to hold scroll area and progressbar
         self.right_widget = QtWidgets.QWidget()
         self.right_widget.setLayout(QtWidgets.QVBoxLayout())
 
-        self.right_widget.layout().addWidget(scroll)
+        self.right_widget.layout().addWidget(self.scroll_area)
         self.right_widget.layout().addWidget(self.p_bar)
 
         # Split plot and option area
@@ -391,7 +387,7 @@ class AnalysisWidget(QtWidgets.QWidget):
                             'File I/O %s not defined in settings', arg)
                 else:
                     raise RuntimeError('Function argument %s not defined', arg)
-        # print(func.__name__, kwargs)
+
         func(**kwargs)
 
     def _call_funcs(self):
@@ -403,6 +399,10 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.btn_ok.setDisabled(True)
         self.p_bar.setVisible(True)
         self.p_bar.setRange(0, 0)
+
+        # Go to bottom of scroll area and disable widgets
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        self.container.setDisabled(True)
 
         # Create worker for vitables and move to thread
         self.analysis_worker = AnalysisWorker(func=self._call_func, funcs_args=self.calls.iteritems())
@@ -642,6 +642,10 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                                                            optional=optional, default_value=default_value[i],
                                                            fixed=fixed, tooltip=tooltip)
 
+    def _call_parallel_func(self, func, kwargs):
+        # TODO: check for correct and complete kwargs like in AnalysisWidget()._call_func. Works for now
+        func(**kwargs)
+
     def _call_parallel_funcs(self):
         """
         Calls the respective call_funcs method of each of the AnalysisWidgets and disables all input widgets 
@@ -662,7 +666,7 @@ class ParallelAnalysisWidget(QtWidgets.QWidget):
                 self.parallel_calls[func].append(kwargs)
 
         # Create worker for vitables and move to thread
-        self.analysis_worker = AnalysisWorker(func=self.tw[self.tw.keys()[0]]._call_func,  # FIXME: hackish
+        self.analysis_worker = AnalysisWorker(func=self._call_parallel_func,  # FIXME: hackish self.tw[tab]._call_func
                                               funcs_args=self.parallel_calls.iteritems())
         self.analysis_worker.moveToThread(self.analysis_thread)
 

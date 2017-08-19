@@ -68,8 +68,9 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
     if dut_name is None:
         dut_name = os.path.split(input_mask_file)[1]
 
+    # The gui parameter is used to plot from the respective plotting function directly into the graphical
+    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
     if gui:
-
         cmap = cm.get_cmap('viridis')
         cmap.set_bad('w')
         c_max = np.percentile(occupancy, 99)
@@ -165,8 +166,9 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
     if not dut_name:
         dut_name = os.path.split(input_cluster_file)[1]
 
+    # The gui parameter is used to plot from the respective plotting function directly into the graphical
+    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
     if gui:
-
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
             hight = None
             n_hits = 0
@@ -266,34 +268,69 @@ def plot_tracks_per_event(input_tracks_file, output_pdf_file=None, gui=False):
     gui: bool
         Whether or not to plot directly into gui 
     """
-    # FIXME: temporarily only plots track candidates per event into GUI
 
+    # The gui parameter is used to plot from the respective plotting function directly into the graphical
+    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
     if gui:
         with tb.open_file(input_tracks_file, 'r') as input_file_h5:
-            events, event_count = np.unique(input_file_h5.root.TrackCandidates[:]['event_number'], return_counts=True)
-            tracks_per_event, tracks_count = np.unique(event_count, return_counts=True)
+            fitted_tracks = False
+            try:  # data has track candidates
+                table_events = input_file_h5.root.TrackCandidates[:]['event_number']
+            except tb.NoSuchNodeError:  # data has fitted tracks
+                fitted_tracks = True
 
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.add_subplot(111)
-            ax.bar(tracks_per_event, tracks_count, align='center')
-            ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
-            ax.set_xlabel('Track candidates per event')
-            ax.set_ylabel('#')
-            ax.grid()
-            ax.set_yscale('log')
+            if not fitted_tracks:
+                events, event_count = np.unique(table_events, return_counts=True)
+                tracks_per_event, tracks_count = np.unique(event_count, return_counts=True)
 
-            fig_1 = Figure()
-            _ = FigureCanvas(fig_1)
-            ax = fig_1.add_subplot(111)
-            ax.bar(tracks_per_event, tracks_count, align='center')
-            ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
-            ax.set_xlabel('Track candidates per event')
-            ax.set_ylabel('#')
-            ax.grid()
-            ax.set_yscale('linear')
+                fig = Figure()
+                _ = FigureCanvas(fig)
+                ax = fig.add_subplot(111)
+                ax.bar(tracks_per_event, tracks_count, align='center')
+                ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
+                ax.set_xlabel('Track candidates per event')
+                ax.set_ylabel('#')
+                ax.grid()
+                ax.set_yscale('log')
 
-            return [fig, fig_1]
+                fig_1 = Figure()
+                _ = FigureCanvas(fig_1)
+                ax = fig_1.add_subplot(111)
+                ax.bar(tracks_per_event, tracks_count, align='center')
+                ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
+                ax.set_xlabel('Track candidates per event')
+                ax.set_ylabel('#')
+                ax.grid()
+                ax.set_yscale('linear')
+
+                return [fig, fig_1]
+
+            else:
+                figs = []
+                for node in input_file_h5.root:
+
+                    table_events = node[:]['event_number']
+
+                    events, event_count = np.unique(table_events, return_counts=True)
+                    tracks_per_event, tracks_count = np.unique(event_count, return_counts=True)
+
+                    fig = Figure()
+                    _ = FigureCanvas(fig)
+                    ax = fig.add_subplot(111)
+                    ax.bar(tracks_per_event, tracks_count, align='center')
+                    ax.set_title('Tracks per event number of Tel_%s\n for %d events' % (str(node.name).split('_')[-1],
+                                                                                        events.shape[0]))
+                    ax.set_xlabel('Tracks per event')
+                    ax.set_ylabel('#')
+                    ax.grid()
+                    ax.set_yscale('log')
+
+                    figs.append(fig)
+
+                return figs
+
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_tracks_per_event.pdf'
 
 
 def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf=None):
@@ -727,6 +764,8 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
 
+    # The gui parameter is used to plot from the respective plotting function directly into the graphical
+    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
     if gui:
         figs = []
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
@@ -810,7 +849,7 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 output_pdf.savefig(fig)
 
 
-def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_file=None, gui=False, n_tracks=None):
+def plot_events(input_tracks_file, dut=0, event_range=(0, 100), n_tracks=None, max_chi2=None, output_pdf_file=None, gui=False):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -828,68 +867,131 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
     gui: bool
         Determines whether to plot directly onto gui
     n_tracks: uint
-        plots the first n_tracks
+        plots all tracks from first to n_tracks, if amount of tracks less than n_tracks, plot all
+        if not None, event_range has no effect
     '''
 
+    # The gui parameter is used to plot from the respective plotting function directly into the graphical
+    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
     if gui:
         with tb.open_file(input_tracks_file, "r") as in_file_h5:
             fitted_tracks = False
             try:  # data has track candidates
                 table = in_file_h5.root.TrackCandidates
             except tb.NoSuchNodeError:  # data has fitted tracks
-                table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % dut)
                 fitted_tracks = True
-
-            n_duts = sum(['charge' in col for col in table.dtype.names])
-            array = table[:]
-            if n_tracks is not None:
-                if array.shape[0] >= n_tracks:
-                    event_begin = array['event_number'][0]
-                    event_end = array['event_number'][n_tracks]
-                    tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_begin, event_end)
+            if not fitted_tracks:
+                n_duts = sum(['charge' in col for col in table.dtype.names])
+                array = table[:]
+                if n_tracks is not None:
+                    if max_chi2:
+                        array = array[array['track_chi2'] <= max_chi2]
+                    index_stop = 0
+                    event_start = array['event_number'][0]
+                    while index_stop <= n_tracks:
+                        try:
+                            event_stop = array['event_number'][index_stop]
+                            index_stop += 1
+                        except IndexError:
+                            if index_stop:
+                                index_stop -= 1
+                            break
+                    tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_start, event_stop)
                 else:
-                    logging.warning('Not enough tracks in event selection, cannot plot events!')
+                    tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
+                if tracks.shape[0] == 0:
+                    logging.warning('No tracks in event selection, cannot plot events!')
                     return
-            else:
-                tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
-            if tracks.shape[0] == 0:
-                logging.warning('No tracks in event selection, cannot plot events!')
-                return
-            if max_chi2:
-                tracks = tracks[tracks['track_chi2'] <= max_chi2]
-            mpl.rcParams['legend.fontsize'] = 10
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.gca(projection='3d')
-            for track in tracks:
-                x, y, z = [], [], []
-                for dut_index in range(0, n_duts):
-                    if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
-                        x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
-                        y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
-                        z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
+                if max_chi2:
+                    tracks = tracks[tracks['track_chi2'] <= max_chi2]
+                mpl.rcParams['legend.fontsize'] = 10
+                fig = Figure()
+                _ = FigureCanvas(fig)
+                ax = fig.gca(projection='3d')
+                for track in tracks:
+                    x, y, z = [], [], []
+                    for dut_index in range(0, n_duts):
+                        if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
+                            x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
+                            y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
+                            z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
 
-                if fitted_tracks:
-                    offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
-                    slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
-                    linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
+                    n_hits = bin(track['track_quality'] & 0xFF).count('1')
+                    n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
 
-                n_hits = bin(track['track_quality'] & 0xFF).count('1')
-                n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
-
-                if n_hits > 2:  # only plot tracks with more than 2 hits
-                    if fitted_tracks:
-                        ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
-                        ax.plot3D(*linepts.T)
-                    else:
+                    if n_hits > 2:  # only plot tracks with more than 2 hits
                         ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
 
-            ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
-            ax.set_xlabel('x [mm]')
-            ax.set_ylabel('y [mm]')
-            ax.set_zlabel('z [mm]')
-            ax.set_title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
-            return fig
+                ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
+                ax.set_xlabel('x [mm]')
+                ax.set_ylabel('y [mm]')
+                ax.set_zlabel('z [mm]')
+                ax.set_title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
+                return fig
+
+            else:
+                figs = []
+                for node in in_file_h5.root:
+                    n_duts = sum(['charge' in col for col in node.dtype.names])
+                    array = node[:]
+                    if n_tracks is not None:
+                        if max_chi2:
+                            array = array[array['track_chi2'] <= max_chi2]
+                        index_stop = 0
+                        event_start = array['event_number'][0]
+                        while index_stop <= n_tracks:
+                            try:
+                                event_stop = array['event_number'][index_stop]
+                                index_stop += 1
+                            except IndexError:
+                                if index_stop:
+                                    index_stop -= 1
+                                else:
+                                    event_start = event_stop = None
+                                break
+                        tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_start,
+                                                                                                event_stop)
+                    else:
+                        tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0],
+                                                                                                event_range[-1])
+                    if tracks.shape[0] == 0:
+                        logging.warning('No tracks in event selection, cannot plot events!')
+                        return
+                    if max_chi2:
+                        tracks = tracks[tracks['track_chi2'] <= max_chi2]
+                    mpl.rcParams['legend.fontsize'] = 10
+                    fig = Figure()
+                    _ = FigureCanvas(fig)
+                    ax = fig.gca(projection='3d')
+                    for track in tracks:
+                        x, y, z = [], [], []
+                        for dut_index in range(0, n_duts):
+                            if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
+                                x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
+                                y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
+                                z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
+
+                                offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
+                                slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
+                                linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
+
+                        n_hits = bin(track['track_quality'] & 0xFF).count('1')
+                        n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
+
+                        if n_hits > 2:  # only plot tracks with more than 2 hits
+                            ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
+                            ax.plot3D(*linepts.T)
+
+                    ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
+                    ax.set_xlabel('x [mm]')
+                    ax.set_ylabel('y [mm]')
+                    ax.set_zlabel('z [mm]')
+                    ax.set_title('%d tracks of %d events of Tel_%s' % (tracks.shape[0],
+                                                                       np.unique(tracks['event_number']).shape[0],
+                                                                       str(node.name).split('_')[-1]))
+                    figs.append(fig)
+
+                return figs
 
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_events.pdf'
@@ -906,13 +1008,17 @@ def plot_events(input_tracks_file, event_range, dut, max_chi2=None, output_pdf_f
             n_duts = sum(['charge' in col for col in table.dtype.names])
             array = table[:]
             if n_tracks is not None:
-                if array.shape[0] >= n_tracks:
-                    event_begin = array['event_number'][0]
-                    event_end = array['event_number'][n_tracks]
-                    tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_begin, event_end)
-                else:
-                    logging.warning('Not enough tracks in event selection, cannot plot events!')
-                    return
+                index_stop = 0
+                event_start = array['event_number'][0]
+                while index_stop <= n_tracks:
+                    try:
+                        event_stop = array['event_number'][index_stop]
+                        index_stop += 1
+                    except IndexError:
+                        if index_stop:
+                            index_stop -= 1
+                        break
+                tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_start, event_stop)
             else:
                 tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
             if tracks.shape[0] == 0:

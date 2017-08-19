@@ -452,13 +452,15 @@ class TrackFittingTab(AnalysisWidget):
                             func=fit_tracks,
                             fixed=True)
 
-        output_files = dict(zip(setup['dut_names'], [output_file]*setup['n_duts']))
-        plot_funcs = dict(zip(setup['dut_names'], [plot_events]*setup['n_duts']))
-        kwargs = dict(zip(sorted(setup['dut_names']), [{'dut': i, 'event_range': (0,40), 'n_tracks': 20} for i in range(setup['n_duts'])]))
+        multiple_plotting_data = {'Tracks': output_file, 'Tracks_per_event': output_file}
+        multiple_plotting_func = {'Tracks': plot_events, 'Tracks_per_event': plot_tracks_per_event}
+        multiple_plotting_kwargs = {'Tracks': {'n_tracks': 20, 'max_chi2': 100000}}
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
-                  lambda: self.plot(input_file=output_files, plot_func=plot_funcs, **kwargs)]:
+                  lambda: self.plot(input_file=multiple_plotting_data,
+                                    plot_func=multiple_plotting_func,
+                                    **multiple_plotting_kwargs)]:
             self.analysisDone.connect(x)
 
 

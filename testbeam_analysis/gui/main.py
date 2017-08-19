@@ -12,7 +12,7 @@ from data import DataTab
 from setup import SetupTab
 from sub_windows import SettingsWindow, ExceptionWindow
 from analysis_logger import AnalysisLogger, AnalysisStream
-
+from analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
 
@@ -48,6 +48,12 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Make variable for ExceptionWindow
         self.exception_window = None
 
+        # Variable to store tab name from which consecutive analysis starts
+        self.starting_tab_rca = None
+
+        # Flag to interrupt consecutive analysis
+        self.flag_interrupt = False
+
         # Make dict to access tab widgets
         self.tw = {}
 
@@ -80,9 +86,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.main_splitter.setSizes([int(0.8*self.height()), int(0.2*self.height())])
 
         self.main_layout.addWidget(self.main_splitter)
-
-        # Create variable for sub-layout for progressbar when running consecutive analysis
-        self.layout_rca = None
 
         # Init widgets and add to main window
         self._init_menu()
@@ -519,6 +522,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         pass
 
     def new_analysis(self):
+        """
+        Restores the initial state of the AnalysisWindow to re-start analysis 
+        """
 
         # Get default settings
         self.setup = SettingsWindow().default_setup
@@ -526,6 +532,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         # Make variable for SettingsWindow
         self.settings_window = None
+
+        # Flag to interrupt consecutive analysis
+        self.flag_interrupt = False
 
         # Make dict to access tab widgets
         self.tw = {}
@@ -539,90 +548,123 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             w.hide()
             w.deleteLater()
 
+        # Remove progressbar of consecutive analysis if there is one
+        try:
+            self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
+
+        # RuntimeError if progressbar has been removed previously
+        except (AttributeError, RuntimeError):
+            pass
+
         self._init_tabs()
         self.connect_tabs()
         self._init_logger(init=False)
         self.tabs.setCurrentIndex(0)
 
     def run_consecutive_analysis(self):
-
-        # Acronym rca==run constructive analysis
-
-        # Variable to store tab name from which consecutive analysis starts
-        starting_tab_rca = None
+        """
+        Method to start a consecutive call of all analysis functions with their default values
+        as defined in tab_widget.py. Acronym rca==run constructive analysis
+        """
 
         # Make sub-layout for consecutive analysis progressbar with label
         self.widget_rca = QtWidgets.QWidget()
-        layout_rca = QtWidgets.QHBoxLayout()
-        self.widget_rca.setLayout(layout_rca)
+        self.layout_rca = QtWidgets.QHBoxLayout()
+        self.widget_rca.setLayout(self.layout_rca)
         self.main_layout.addWidget(self.widget_rca)
 
         # Make widgets to fill rca layout
-        label_rca = QtWidgets.QLabel('Running consecutive analysis...')
-        p_bar_rca = QtWidgets.QProgressBar()
-        p_bar_rca.setRange(0, len(self.tab_order))
-        layout_rca.addWidget(label_rca)
-        layout_rca.addWidget(p_bar_rca)
+        self.label_rca = QtWidgets.QLabel('Running consecutive analysis...')
+        self.p_bar_rca = QtWidgets.QProgressBar()
+        self.p_bar_rca.setRange(0, len(self.tab_order))
+        self.btn_interrupt_rca = QtWidgets.QPushButton('Interrupt')
+        self.btn_interrupt_rca.setToolTip('Interrupt consecutive analysis after finishing current analysis tab')
+        self.btn_interrupt_rca.clicked.connect(lambda: handle_rca(interrupt=True))
+        self.layout_rca.addWidget(self.label_rca)
+        self.layout_rca.addWidget(self.p_bar_rca)
+        self.layout_rca.addWidget(self.btn_interrupt_rca)
+
+        # Get starting tab
+        self.starting_tab_rca = self.current_analysis_tab()
 
         for tab in self.tab_order:
 
-            tab_index = self.tab_order.index(tab)
+            # Connect starting tab and all following
+            if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
 
-            if tab not in ['Files', 'Setup']:
+                # Handle consecutive analysis
+                self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
 
-                # Get starting tab for consecutive analysis
-                if self.tabs.isTabEnabled(tab_index) and not self.tabs.isTabEnabled(tab_index + 1):
-
-                    starting_tab_rca = tab
-
-                # Additional connections for consecutive analysis tabs
-                if starting_tab_rca is not None:
-
-                    # Handle consecutive analysis
-                    self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
-
-                    # Block main thread after each analysis step to synchronize to worker thread
-                    self.tw[tab].proceedAnalysis.connect(lambda: self.thread().msleep(50))
+                # Block main thread after each analysis step to synchronize to worker thread
+                self.tw[tab].proceedAnalysis.connect(lambda: self.thread().msleep(50))
 
         # Start analysis by clicking ok button on starting tab
-        self.tw[starting_tab_rca].btn_ok.click()
-        p_bar_rca.setValue(self.tab_order.index(starting_tab_rca))
-        p_bar_rca.setFormat(starting_tab_rca)
+        self.tw[self.starting_tab_rca].btn_ok.click()
+        self.p_bar_rca.setValue(self.tab_order.index(self.starting_tab_rca))
+        self.p_bar_rca.setFormat(self.starting_tab_rca)
 
-        def handle_rca(tab_list):
+        def handle_rca(tab_list=None, interrupt=False):
+            """
+            Helper function to run consecutive analysis
+            :param tab_list: list or str of tab name whichs analysis step is to be started
+            :param interrupt: bool whether interrupt btn was clicked 
+            """
 
-            if isinstance(tab_list, list):
-                tab_name = tab_list[0]
+            # If interrupt btn was clicked set flag
+            if interrupt:
+                self.flag_interrupt = True
+                self.btn_interrupt_rca.setDisabled(True)
+
+                # Get analysis tab that is currently doing analysis step
+                current_analysis = self.current_analysis_tab()
+
+                self.label_rca.setText('Finishing %s...' % current_analysis)
+                self.p_bar_rca.setDisabled(True)
+
             else:
-                tab_name = tab_list
 
-            if tab_name in self.tab_order:
+                if self.flag_interrupt:
 
-                # Update progressbar
-                p_bar_rca.setFormat(tab_name)
-                p_bar_rca.setValue(self.tab_order.index(tab_name))
+                    # Disconnect and re-connect tabs
+                    for tab_name in self.tw.keys():
+                        self.tw[tab_name].proceedAnalysis.disconnect()
+                    self.connect_tabs()
 
-                # Set current tab to last finished
-                # self.tabs.setCurrentIndex(self.tab_order.index(tab_name) - 1)
+                    # Remove consecutive analysis progressbar
+                    self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
 
-                # Click proceed button
-                try:
-                    self.tw[tab_name].btn_ok.click()
-
-                except Exception as e:
-                    # Alignment is skipped
-                    if tab_name == 'Alignment':
-                        self.tw[tab_name].skipAlignment.emit()
-                        self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
-                    # Re-raise exception
+                else:
+                    if isinstance(tab_list, list):
+                        tab_name = tab_list[0]
                     else:
-                        self.handle_exceptions(exception=e, trace_back=traceback.format_exc(),
-                                               tab=tab_name, cause='consecutive analysis')
+                        tab_name = tab_list
 
-            else:
-                # Last tab finished
-                p_bar_rca.setValue(len(self.tab_order))
-                label_rca.setText('Done!')
+                    if tab_name in self.tab_order:
+
+                        # Update progressbar
+                        self.p_bar_rca.setFormat(tab_name)
+                        self.p_bar_rca.setValue(self.tab_order.index(tab_name))
+
+                        # Set current tab to last finished
+                        # self.tabs.setCurrentIndex(self.tab_order.index(tab_name) - 1)
+
+                        # Click proceed button
+                        try:
+                            self.tw[tab_name].btn_ok.click()
+                        except Exception as e:
+                            # Alignment is skipped
+                            if tab_name == 'Alignment':
+                                self.tw[tab_name].skipAlignment.emit()
+                                self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
+                            # Re-raise exception
+                            else:
+                                self.handle_exceptions(exception=e, trace_back=traceback.format_exc(),
+                                                       tab=tab_name, cause='consecutive analysis')
+
+                    else:
+                        # Last tab finished
+                        self.p_bar_rca.setValue(len(self.tab_order))
+                        self.label_rca.setText('Done!')
 
     def handle_exceptions(self, exception, trace_back, tab, cause):
         """
@@ -664,18 +706,16 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
             # Remove progressbar of consecutive analysis if there is one
             try:
-                for i in reversed(range(self.widget_rca.layout().count())):
-                    item = self.widget_rca.layout().itemAt(i)
-                    item.widget().deleteLater()
-
-                self.main_layout.removeWidget(self.widget_rca)
-                self.widget_rca.deleteLater()
+                self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
 
             # RuntimeError if progressbar has been removed previously
             except (AttributeError, RuntimeError):
                 pass
 
     def check_resolution(self):
+        """
+        Checks for resolution and gives pop-up warning if too low 
+        """
 
         # Show message box with warning if screen resolution is lower than required
         if self.screen.width() < MINIMUM_RESOLUTION[0] or self.screen.height() < MINIMUM_RESOLUTION[1]:
@@ -687,6 +727,40 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
         else:
             pass
+
+    def remove_widget(self, widget, layout):
+        """
+        Removes a widget with all its child widgets from layout
+        :param widget: QtWidget.QWidget
+        :param layout: QtWidget.QLayout
+        """
+        for i in reversed(range(widget.layout().count())):
+            item = widget.layout().itemAt(i)
+            item.widget().deleteLater()
+
+        layout.removeWidget(widget)
+        widget.deleteLater()
+
+    def current_analysis_tab(self):
+        """
+        Returns the currently running or next to be running analysis tab
+        """
+
+        current_tab = None
+
+        for tab in self.tab_order:
+
+            tab_index = self.tab_order.index(tab)
+
+            if tab not in ['Files', 'Setup']:
+
+                # Get current tab of analysis
+                if self.tabs.isTabEnabled(tab_index) and not self.tabs.isTabEnabled(tab_index + 1):
+                    current_tab = tab
+                else:
+                    pass
+
+        return current_tab
 
     def file_quit(self):
         self.close()
