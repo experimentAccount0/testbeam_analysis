@@ -14,7 +14,7 @@ from testbeam_analysis.track_analysis import find_tracks, fit_tracks
 from testbeam_analysis.result_analysis import calculate_efficiency, calculate_residuals
 
 # Plot related import
-from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size, plot_correlations, plot_tracks_per_event, plot_events
+from testbeam_analysis.tools.plot_utils import plot_masked_pixels, plot_cluster_size, plot_correlations, plot_tracks_per_event, plot_events, plot_track_density
 
 
 class NoisyPixelsTab(ParallelAnalysisWidget):
@@ -452,9 +452,16 @@ class TrackFittingTab(AnalysisWidget):
                             func=fit_tracks,
                             fixed=True)
 
-        multiple_plotting_data = {'Tracks': output_file, 'Tracks_per_event': output_file}
-        multiple_plotting_func = {'Tracks': plot_events, 'Tracks_per_event': plot_tracks_per_event}
-        multiple_plotting_kwargs = {'Tracks': {'n_tracks': 20, 'max_chi2': 100000}}
+        multiple_plotting_data = {'Tracks': output_file, 'Tracks_per_event': output_file,
+                                  'Track_density': output_file}
+        multiple_plotting_func = {'Tracks': plot_events, 'Tracks_per_event': plot_tracks_per_event,
+                                  'Track_density': plot_track_density}
+        multiple_plotting_kwargs = {'Tracks': {'n_tracks': 20, 'max_chi2': 100000},
+                                    'Track_density': {'z_positions': setup['z_positions'],
+                                                      'dim_x': [setup['n_pixels'][i][0] for i in range(setup['n_duts'])],
+                                                      'dim_y': [setup['n_pixels'][i][1] for i in range(setup['n_duts'])],
+                                                      'pixel_size': setup['pixel_size'],
+                                                      'max_chi2': 100000}}
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),

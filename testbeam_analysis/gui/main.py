@@ -196,7 +196,12 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.menuBar().addMenu(self.run_menu)
 
         self.appearance_menu = QtWidgets.QMenu('&Appearance', self)
+        self.appearance_menu.setToolTipsVisible(True)
         self.appearance_menu.addAction('&Show/hide logger', self.handle_logger, QtCore.Qt.CTRL + QtCore.Qt.Key_L)
+        self.appearance_menu.addAction('&Show current analysis tab', self.view_current_tab, QtCore.Qt.CTRL + QtCore.Qt.Key_C)
+        # Disable until setup is done
+        self.appearance_menu.actions()[1].setEnabled(False)
+        self.appearance_menu.actions()[1].setToolTip('Finish data selection and testbeam setup to enable')
         self.menuBar().addMenu(self.appearance_menu)
 
         self.session_menu = QtWidgets.QMenu('&Session', self)
@@ -287,10 +292,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
                 if name == 'Setup':
-                    msg = 'Run consecutive analysis with default options without user interaction'
+                    msg_0 = 'Run consecutive analysis with default options without user interaction'
+                    msg_1 = 'Go to currently running or next to be running analysis tab'
                     for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
                                lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
-                               lambda: self.run_menu.actions()[0].setToolTip(msg),
+                               lambda: self.run_menu.actions()[0].setToolTip(msg_0),
+                               lambda: self.appearance_menu.actions()[1].setEnabled(True),
+                               lambda: self.appearance_menu.actions()[1].setToolTip(msg_1),
                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(xx)
                         self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
@@ -533,9 +541,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         # Make variable for SettingsWindow
         self.settings_window = None
 
-        # Flag to interrupt consecutive analysis
-        self.flag_interrupt = False
-
         # Make dict to access tab widgets
         self.tw = {}
 
@@ -598,9 +603,6 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 # Handle consecutive analysis
                 self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
 
-                # Block main thread after each analysis step to synchronize to worker thread
-                self.tw[tab].proceedAnalysis.connect(lambda: self.thread().msleep(50))
-
         # Start analysis by clicking ok button on starting tab
         self.tw[self.starting_tab_rca].btn_ok.click()
         self.p_bar_rca.setValue(self.tab_order.index(self.starting_tab_rca))
@@ -612,6 +614,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             :param tab_list: list or str of tab name whichs analysis step is to be started
             :param interrupt: bool whether interrupt btn was clicked 
             """
+            if tab_list is None and interrupt is None:
+                return
 
             # If interrupt btn was clicked set flag
             if interrupt:
@@ -641,6 +645,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         tab_name = tab_list[0]
                     else:
                         tab_name = tab_list
+
+                    # Synchronize to worker thread / wait for current analysis_thread to finish correctly
+                    #self.tw[self.tab_order[self.tab_order.index(tab_name) - 1]].analysis_thread.wait()
+                    self.tw[tab_name].analysis_thread.wait()
 
                     if tab_name in self.tab_order:
 
@@ -763,7 +771,17 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 else:
                     pass
 
+        # All tabs are finished
+        if not current_tab:
+            current_tab = self.tab_order[-1]
+
         return current_tab
+
+    def view_current_tab(self):
+        """
+        Goes to currently running or next to be running analysis tab
+        """
+        self.tabs.setCurrentIndex(self.tab_order.index(self.current_analysis_tab()))
 
     def file_quit(self):
         self.close()
