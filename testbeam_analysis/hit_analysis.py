@@ -272,7 +272,7 @@ def cluster_hits(input_hits_file, output_cluster_file=None, create_cluster_hits_
                 hight += analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
             n_hits += np.sum(cluster_n_hits)
 
-    # Calculate cluster size histogram
+    # Calculate effective resolution
     with tb.open_file(output_cluster_file, 'r+') as io_file_h5:
         for start_index in range(0, io_file_h5.root.Cluster.nrows, chunk_size):
             clusters = io_file_h5.root.Cluster[start_index:start_index + chunk_size]
