@@ -303,10 +303,15 @@ class AnalysisWidget(QtWidgets.QWidget):
                 default_value=default_value,
                 optional=optional, tooltip=tooltip, parent=self)
         elif 'iterable of iterable' in dtype:
+            # determine whether "iterable of iterable" or "iterable"
+            labels_y = self.setup['dut_names']
+            labels_x = self.setup['dut_names']
+            if name in ['Align duts']:
+                labels_x = ['Align %i.' % (i + 1) for i in range(self.setup['n_duts'])]
+
             widget = option_widget.OptionMultiBox(
-                name=name, labels_x=self.setup['dut_names'],
-                default_value=default_value,
-                optional=optional, tooltip=tooltip, labels_y=self.setup['dut_names'], parent=self)
+                name=name, labels_x=labels_x, default_value=default_value, optional=optional,
+                tooltip=tooltip, labels_y=labels_y, parent=self)
         elif 'str' in dtype:
             widget = option_widget.OptionText(
                 name, default_value, optional, tooltip, parent=self)

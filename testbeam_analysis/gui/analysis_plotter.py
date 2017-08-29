@@ -244,7 +244,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
 
         tabs = QtWidgets.QTabWidget()
 
-        for key in sorted(self.input_file.keys()):
+        for key in self.input_file.keys():
 
             dummy_widget = QtWidgets.QWidget()
             dummy_widget.setLayout(QtWidgets.QVBoxLayout())

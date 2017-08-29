@@ -600,6 +600,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             # Connect starting tab and all following
             if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
 
+                # Wait for analysis_thread to finish correctly
+                self.tw[tab].analysis_thread.wait()
+
                 # Handle consecutive analysis
                 self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
 
@@ -647,8 +650,8 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         tab_name = tab_list
 
                     # Synchronize to worker thread / wait for current analysis_thread to finish correctly
-                    #self.tw[self.tab_order[self.tab_order.index(tab_name) - 1]].analysis_thread.wait()
-                    self.tw[tab_name].analysis_thread.wait()
+                    # self.tw[self.tab_order[self.tab_order.index(tab_name) - 1]].analysis_thread.wait()
+                    # self.tw[tab_name].analysis_thread.wait()
 
                     if tab_name in self.tab_order:
 

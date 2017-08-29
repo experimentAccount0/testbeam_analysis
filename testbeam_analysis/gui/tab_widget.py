@@ -6,6 +6,7 @@
 
 import os
 
+from collections import OrderedDict
 from PyQt5 import QtCore, QtWidgets
 from testbeam_analysis.gui.analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 from testbeam_analysis.hit_analysis import generate_pixel_mask, cluster_hits
@@ -293,6 +294,11 @@ class AlignmentTab(AnalysisWidget):
 
         output_file = os.path.join(options['output_path'], 'Tracklets.h5')
 
+        def_matrix = [[i if i != j else None for i in range(setup['n_duts'])] for j in range(setup['n_duts'])]
+
+        for col in def_matrix:
+            col.remove(None)
+
         self.add_function(func=alignment)
         self.add_function(func=apply_alignment)
 
@@ -307,14 +313,19 @@ class AlignmentTab(AnalysisWidget):
                         fixed=True)
 
         self.add_option(option='align_duts',
-                        default_value=range(setup['n_duts']),
+                        default_value=[range(setup['n_duts'])],
                         func=alignment,
-                        fixed=False)
+                        optional=True)
 
-        self.add_option(option='select_fit_duts',
-                        default_value=range(setup['n_duts']),
+        self.add_option(option='selection_fit_duts',
+                        default_value=def_matrix,
                         func=alignment,
-                        fixed=False)
+                        optional=True)
+
+        self.add_option(option='selection_hit_duts',
+                        default_value=def_matrix,
+                        func=alignment,
+                        optional=True)
 
         self.add_option(option='initial_translation',
                         default_value=False,
@@ -452,10 +463,13 @@ class TrackFittingTab(AnalysisWidget):
                             func=fit_tracks,
                             fixed=True)
 
-        multiple_plotting_data = {'Tracks': output_file, 'Tracks_per_event': output_file,
-                                  'Track_density': output_file}
+        # Determine the order of plotting tabs with OrderedDict
+        multiple_plotting_data = OrderedDict([('Tracks', output_file), ('Tracks_per_event', output_file),
+                                              ('Track_density', output_file)])
+
         multiple_plotting_func = {'Tracks': plot_events, 'Tracks_per_event': plot_tracks_per_event,
                                   'Track_density': plot_track_density}
+
         multiple_plotting_kwargs = {'Tracks': {'n_tracks': 20, 'max_chi2': 100000},
                                     'Track_density': {'z_positions': setup['z_positions'],
                                                       'dim_x': [setup['n_pixels'][i][0] for i in range(setup['n_duts'])],

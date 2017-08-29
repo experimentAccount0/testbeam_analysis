@@ -290,31 +290,34 @@ class OptionMultiSlider(QtWidgets.QWidget):
 
 
 class OptionMultiBox(QtWidgets.QWidget):
-    ''' Option boxes in 2 dimensions
+    ''' Option boxes in 1(N) or 2(NxN) dimensions
     '''
 
     valueChanged = QtCore.pyqtSignal(list)
 
-    def __init__(self, name, labels_x, default_value, optional, tooltip,
-                 labels_y=None, parent=None):
+    def __init__(self, name, labels_x, default_value, optional, tooltip, labels_y=None, parent=None):
         super(OptionMultiBox, self).__init__(parent)
+
+        #TODO: separate dtype for iterable of iterables where order of duts is selected
+
+        # different color palettes to visualize disabled widgets
+        # disabled
+        self.palette_dis = QtGui.QPalette()
+        self.palette_dis.setColor(QtGui.QPalette.Base, QtCore.Qt.gray)
+        self.palette_dis.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
+        # enabled
+        self.palette_en = QtGui.QPalette()
+        self.palette_en.setColor(QtGui.QPalette.Base, QtCore.Qt.white)
+        self.palette_en.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
 
         nx = len(labels_x)
         ny = len(labels_y) if labels_y else 1
 
         # Check default value
         if default_value is None:  # None is only supported for all values
-            default_value = 0.
-        if not isinstance(default_value, collections.Iterable):
-            default_value = [default_value] * ny
-        if not isinstance(default_value[0], collections.Iterable):
-            default_value = [default_value * nx for i in range(len(labels_x))]
+            default_value = [[None] * ny] * nx
 
-        if nx != len(default_value):
-            raise ValueError(
-                'Number of default values does not match number of parameters')
-
-        # Option name with sliders below
+        # Option name name with boxes below
         layout = QtWidgets.QVBoxLayout(self)
         text = QtWidgets.QLabel(name)
         if tooltip:
@@ -323,56 +326,135 @@ class OptionMultiBox(QtWidgets.QWidget):
             layout_1 = QtWidgets.QHBoxLayout()
             layout_1.addWidget(text)
             layout_1.addStretch(0)
-            check_box = QtWidgets.QCheckBox()
-            layout_1.addWidget(check_box)
+            check_box_opt = QtWidgets.QCheckBox()
+            layout_1.addWidget(check_box_opt)
             layout.addLayout(layout_1)
         else:
             layout.addWidget(text)
 
+        # Layout for boxes
         layout_iter = QtWidgets.QGridLayout()
-        offset = 0
-        if labels_y:
-            offset = 1
-            for j, label in enumerate(labels_y):
-                layout_iter.addWidget(QtWidgets.QLabel(label), 0, j + 1,
-                                      alignment=QtCore.Qt.AlignCenter)
+        offset = 1 if labels_y else 0
 
-        for i, label in enumerate(labels_x):  # Create one slider per label
-            # Slider with textbox to the right
-            layout_iter.addWidget(QtWidgets.QLabel('  ' + label), i + offset, 0)
+        # Matrix with checkboxes
+        self.check_boxes = []
+
+        for i, label in enumerate(labels_x):
+            layout_iter.addWidget(QtWidgets.QLabel(label), 0, i + offset, alignment=QtCore.Qt.AlignCenter)
+            tmp = []
             for j in range(ny):
+                if labels_y and not i:
+                    layout_iter.addWidget(QtWidgets.QLabel('  ' + labels_y[j]), j + 1, 0)
                 check_box = QtWidgets.QCheckBox()
-                layout_iter.addWidget(check_box, i + offset, j + 1,
-                                      alignment=QtCore.Qt.AlignCenter)
-
+                check_box.stateChanged.connect(self._emit_value)
+                if name == 'Align duts':
+                    check_box.clicked.connect(lambda: self._evaluate_state())
+                if ny == 1:
+                    self.check_boxes.append(check_box)
+                else:
+                    tmp.append(check_box)
+                layout_iter.addWidget(check_box, j + 1, i + offset, alignment=QtCore.Qt.AlignCenter)
+            if ny != 1:
+                self.check_boxes.append(tmp)
         layout.addLayout(layout_iter)
 
-#         if optional:
-#             check_box.stateChanged.connect(
-#                 lambda v: self._set_readonly(v == 0))
-#             self._set_readonly()
+        # set default values
+        for i in range(len(default_value)):
+            if isinstance(default_value[i], collections.Iterable):
+                for j in range(len(default_value[i])):
+                    if default_value[i][j] is not None:
+                        self.check_boxes[i][default_value[i][j]].setChecked(True)
+            else:
+                if default_value[i] is not None:
+                    self.check_boxes[default_value[i]].setChecked(True)
+
+        if name == 'Align duts':
+            self._evaluate_state(init=True)
+
+        if optional:
+            check_box_opt.stateChanged.connect(lambda v: self._set_readonly(v == 0))
+            if name == 'Align duts':
+                check_box_opt.stateChanged.connect(lambda: self._evaluate_state(init=True))
+            self._set_readonly()
+
+    def _evaluate_state(self, init=False):
+
+        if init:
+            empty_rows = []
+            for i in range(len(self.check_boxes)):
+                tmp = []
+                for j in range(len(self.check_boxes[i])):
+                    if not self.check_boxes[j][i].isChecked():
+                        self.check_boxes[j][i].setDisabled(True)
+                        self.check_boxes[j][i].setPalette(self.palette_dis)
+                    else:
+                        tmp.append(j)
+
+                if not tmp:
+                    empty_rows.append(i)
+
+            for row in empty_rows:
+                self.check_boxes[0][row].setChecked(True)
+
+        else:
+            for i in range(len(self.check_boxes)):
+                    if self.sender() in self.check_boxes[i]:
+                        sender_col = i
+                        sender_row = self.check_boxes[i].index(self.sender())
+
+            for j in range(len(self.check_boxes)):
+                if j != sender_col:
+                    if self.check_boxes[j][sender_row].isEnabled():
+                        self.check_boxes[j][sender_row].setChecked(False)
+                        self.check_boxes[j][sender_row].setDisabled(True)
+                        self.check_boxes[j][sender_row].setPalette(self.palette_dis)
+                    else:
+                        self.check_boxes[j][sender_row].setDisabled(False)
+                        self.check_boxes[j][sender_row].setPalette(self.palette_en)
+
+    def _get_values(self):
+
+        values = []
+        for i in range(len(self.check_boxes)):
+            tmp = []
+            if isinstance(self.check_boxes[i], collections.Iterable):
+                for j in range(len(self.check_boxes[i])):
+                    if self.check_boxes[i][j].isChecked():
+                        tmp.append(j)
+            else:
+                if self.check_boxes[i].isChecked():
+                    values.append(i)
+                    continue
+            if tmp:
+                values.append(tmp)
+
+        if not values:
+            values = [None]
+
+        return values
 
     def _set_readonly(self, value=True):
         if value:
-            palette = QtGui.QPalette()
-            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.gray)
-            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.darkGray)
-            for edit in self.edits:
-                edit.setPalette(palette)
-                edit.setReadOnly(True)
+            for cb in self.check_boxes:
+                if isinstance(cb, collections.Iterable):
+                    for cb_1 in cb:
+                        cb_1.setPalette(self.palette_dis)
+                        cb_1.setDisabled(True)
+                else:
+                    cb.setPalette(self.palette_dis)
+                    cb.setDisabled(True)
             self._emit_value()
         else:
-            palette = QtGui.QPalette()
-            palette.setColor(QtGui.QPalette.Base, QtCore.Qt.white)
-            palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
-            for edit in self.edits:
-                edit.setPalette(palette)
-                edit.setReadOnly(False)
+            for cb in self.check_boxes:
+                if isinstance(cb, collections.Iterable):
+                    for cb_1 in cb:
+                        cb_1.setPalette(self.palette_en)
+                        cb_1.setDisabled(False)
+                else:
+                    cb.setPalette(self.palette_en)
+                    cb.setDisabled(False)
             self._emit_value()
 
     def _emit_value(self):
-        if not any([edit.isReadOnly() for edit in self.edits]):
-            values = [int(edit.text()) for edit in self.edits]
-        else:
-            values = [None]
+        values = self._get_values()
         self.valueChanged.emit(values)
