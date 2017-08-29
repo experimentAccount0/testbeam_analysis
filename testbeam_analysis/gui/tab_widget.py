@@ -231,7 +231,7 @@ class PrealignmentTab(AnalysisWidget):
 
         # Fix options that should not be changed
         self.add_option(option='use_duts', func=apply_alignment,
-                        default_value=[1] * setup['n_duts'], fixed=True)
+                        default_value=range(setup['n_duts']), fixed=True)
         self.add_option(option='inverse', func=apply_alignment, fixed=True)
         self.add_option(option='force_prealignment', func=apply_alignment,
                         default_value=True, fixed=True)
@@ -272,6 +272,11 @@ class TrackFindingTab(AnalysisWidget):
                         func=find_tracks,
                         fixed=True)
 
+        self.add_option(option='min_cluster_distance',
+                        default_value=[200.]*setup['n_duts'],
+                        func=find_tracks,
+                        fixed=False)
+
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
                   lambda: self.plot(input_file=output_file, plot_func=plot_tracks_per_event)]:
@@ -294,6 +299,7 @@ class AlignmentTab(AnalysisWidget):
 
         output_file = os.path.join(options['output_path'], 'Tracklets.h5')
 
+        # define default matrix for iterable of iterable dtype with tr(def_matrix) = 0
         def_matrix = [[i if i != j else None for i in range(setup['n_duts'])] for j in range(setup['n_duts'])]
 
         for col in def_matrix:
@@ -351,6 +357,11 @@ class AlignmentTab(AnalysisWidget):
                         default_value=output_file,
                         func=apply_alignment,
                         fixed=True)
+
+        #self.add_option(option='use_duts',
+                        #default_value=range(setup['n_duts']),
+                        #func=apply_alignment,
+                        #fixed=True)
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
@@ -420,9 +431,20 @@ class TrackFittingTab(AnalysisWidget):
                             func=find_tracks,
                             fixed=True)
 
+            self.add_option(option='min_cluster_distance',
+                            default_value=[200.] * setup['n_duts'],
+                            func=find_tracks,
+                            fixed=False)
+
             input_tracks = os.path.join(options['output_path'], 'TrackCandidates.h5')
 
         self.add_function(func=fit_tracks)
+
+        # define default matrix for iterable of iterable dtype with tr(def_matrix) = 0
+        def_matrix = [[i if i != j else None for i in range(setup['n_duts'])] for j in range(setup['n_duts'])]
+
+        for col in def_matrix:
+            col.remove(None)
 
         self.add_option(option='input_track_candidates_file',
                         default_value=input_tracks,
@@ -439,6 +461,16 @@ class TrackFittingTab(AnalysisWidget):
                         func=fit_tracks,
                         fixed=True)
 
+        self.add_option(option='selection_hit_duts',
+                        default_value=def_matrix,
+                        func=fit_tracks,
+                        optional=True)
+
+        self.add_option(option='selection_fit_duts',
+                        default_value=def_matrix,
+                        func=fit_tracks,
+                        optional=True)
+
         # Set and fix options
         self.add_option(option='fit_duts', func=fit_tracks,
                         default_value=range(setup['n_duts']), optional=True)
@@ -449,7 +481,7 @@ class TrackFittingTab(AnalysisWidget):
         self.add_option(option='use_correlated', func=fit_tracks,
                         default_value=False, fixed=True)
         self.add_option(option='min_track_distance', func=fit_tracks,
-                        default_value=[200] * setup['n_duts'], optional=False)
+                        default_value=[200.] * setup['n_duts'], optional=False)
 
         # Check whether scatter planes in setup
         if setup['scatter_planes']['sct_names']:
@@ -522,6 +554,11 @@ class ResidualTab(AnalysisWidget):
                         func=calculate_residuals,
                         fixed=True)
 
+        self.add_option(option='use_duts',
+                        default_value=range(setup['n_duts']),
+                        func=calculate_residuals,
+                        fixed=True)
+
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
             self.analysisDone.connect(x)
@@ -556,7 +593,7 @@ class EfficiencyTab(AnalysisWidget):
                         func=calculate_efficiency,
                         fixed=True)
 
-        self.add_option(option='output_residuals_file',
+        self.add_option(option='output_efficiency_file',
                         default_value=output_file,
                         func=calculate_efficiency,
                         fixed=True)
@@ -575,6 +612,11 @@ class EfficiencyTab(AnalysisWidget):
 
         self.add_option(option='force_prealignment',
                         default_value=options['skip_alignment'],
+                        func=calculate_efficiency,
+                        fixed=True)
+
+        self.add_option(option='use_duts',
+                        default_value=range(setup['n_duts']),
                         func=calculate_efficiency,
                         fixed=True)
 
