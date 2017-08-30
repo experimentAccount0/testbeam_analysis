@@ -54,4 +54,4 @@ testbeam_analysis/examples/data/*.h5
 # Temp files
 tmp*.*
 # Data files
-quilt_packages/*
+quilt_packages

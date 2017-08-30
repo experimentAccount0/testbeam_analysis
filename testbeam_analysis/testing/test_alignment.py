@@ -11,12 +11,6 @@ from testbeam_analysis.tools import test_tools
 from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
-# Get package path
-testing_path = os.path.dirname(__file__)  # Get the absoulte path of the online_monitor installation
-
-# # Set the converter script path
-# tests_data_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(testing_path)) + r'/testing/fixtures/dut_alignment/'))
-
 test_tools.install_quilt_data(package='DavidLP/tba_fixtures',
                               hash='ecc02538576cb905044222270674ef57e21e44c67d6bab36d4c0eb6ce08f4e66')
 from quilt.data.DavidLP import tba_fixtures
