@@ -3,7 +3,12 @@ python:
   - 2.7
   - 3.6
  
-sudo: false
+# TBA needs 8 Gb system, selecting sudo
+# Increases available RAM to 7.5 Gb
+# https://docs.travis-ci.com/user/reference/overview/
+sudo: true
+
+dist: trusty
 
 notifications:
   email:
