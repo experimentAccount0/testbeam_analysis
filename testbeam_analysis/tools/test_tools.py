@@ -1,6 +1,7 @@
 ''' Helper functions for the unittests are defined here.
 '''
 
+import logging
 import os
 import inspect
 import itertools
@@ -227,3 +228,40 @@ def check_with_fixture(function, **kwargs):
     data = _call_function_with_args(function, **kwargs)
 
     return np.allclose(data_fixture, data)
+
+
+def install_quilt_data(package, hash):
+    ''' Download data package from https://quiltdata.com and install
+
+        package : str
+        Package string in USER/PACKAGE format
+    '''
+
+    try:
+        import quilt
+        from quilt.tools import command, store
+    except ImportError:
+        logging.error('Install quilt to access data packa %s from https://quiltdata.com', package)
+
+    owner, pkg, _ = command._parse_package(package, allow_subpath=True)
+    s = store.PackageStore()
+    existing_pkg = s.get_package(owner, pkg)
+
+    if existing_pkg:
+        return True
+    quilt.install(package, hash=hash)
+    return s.get_package(owner, pkg)
+
+
+def get_quilt_data(root, name):
+    ''' Access quilt node data by name.
+
+        root: group node that has data node with name
+        name: name of node
+    '''
+
+    for n, node in root._items():
+        if n == name:
+            return node._data()
+
+    raise ValueError('Data %s not found', name)

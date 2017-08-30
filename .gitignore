@@ -53,3 +53,5 @@ data_clusterizer.cpp
 testbeam_analysis/examples/data/*.h5
 # Temp files
 tmp*.*
+# Data files
+quilt_packages/*
