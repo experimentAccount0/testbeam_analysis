@@ -20,7 +20,7 @@ class AnalysisWorker(QtCore.QObject):
     statusSignal = QtCore.pyqtSignal(int)
 
     def __init__(self, func, args=None, funcs_args=None):
-        QtCore.QObject.__init__(self)
+        super(AnalysisWorker, self).__init__(self)
 
         # Main function which will be executed on this thread
         self.main_func = func
