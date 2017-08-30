@@ -290,7 +290,7 @@ class OptionMultiSlider(QtWidgets.QWidget):
 
 
 class OptionMultiBox(QtWidgets.QWidget):
-    ''' Option boxes in 1(N) or 2(NxN) dimensions
+    ''' Option boxes 2(NxN) dimensions
     '''
 
     valueChanged = QtCore.pyqtSignal(list)
