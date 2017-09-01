@@ -19,7 +19,7 @@ from pybar_fei4_interpreter import data_struct
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - [%(levelname)-8s] (%(threadName)-10s) %(message)s")
 
 
-def analyze_raw_data(input_file):  # FE-I4 raw data analysis
+def analyze_raw_data(input_file, trigger_data_format):  # FE-I4 raw data analysis
     '''Std. raw data analysis of FE-I4 data. A hit table is created for further analysis.
 
     Parameters
@@ -30,6 +30,7 @@ def analyze_raw_data(input_file):  # FE-I4 raw data analysis
     with AnalyzeRawData(raw_data_file=input_file, create_pdf=True) as analyze_raw_data:
         #analyze_raw_data.align_at_trigger_number = True  # if trigger number is at the beginning of each event activate this for event alignment
         analyze_raw_data.use_trigger_time_stamp = False  # the trigger number is a time stamp
+        analyze_raw_data.trigger_data_format = trigger_data_format
         analyze_raw_data.use_tdc_word = False
         analyze_raw_data.create_hit_table = True
         analyze_raw_data.create_meta_event_index = True
@@ -51,7 +52,7 @@ def analyze_raw_data(input_file):  # FE-I4 raw data analysis
         analyze_raw_data.plot_histograms()
 
 
-def process_dut(raw_data_file, do_corrections=False):
+def process_dut(raw_data_file, trigger_data_format=0, do_corrections=False):
     ''' Process and format raw data.
     Parameters
     ----------
@@ -71,7 +72,7 @@ def process_dut(raw_data_file, do_corrections=False):
     else:
         fix_trigger_number, fix_event_number = False, False
 
-    analyze_raw_data(raw_data_file)
+    analyze_raw_data(raw_data_file, trigger_data_format=trigger_data_format)
     ret_value = align_events(raw_data_file[:-3] + '_interpreted.h5', raw_data_file[:-3] + '_event_aligned.h5', fix_trigger_number=fix_trigger_number, fix_event_number=fix_event_number)
     format_hit_table(raw_data_file[:-3] + '_event_aligned.h5', raw_data_file[:-3] + '_aligned.h5')
     return ret_value
