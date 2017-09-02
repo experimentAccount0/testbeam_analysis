@@ -601,13 +601,13 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
 
                 # Wait for analysis_thread to finish correctly
-                self.tw[tab].analysis_thread.wait()
+                # self.tw[tab].analysis_thread.wait()
 
                 # Handle consecutive analysis
                 self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
 
         # Start analysis by clicking ok button on starting tab
-        self.tw[self.starting_tab_rca].btn_ok.click()
+        self.tw[self.starting_tab_rca].btn_ok.clicked.emit()
         self.p_bar_rca.setValue(self.tab_order.index(self.starting_tab_rca))
         self.p_bar_rca.setFormat(self.starting_tab_rca)
 
@@ -664,7 +664,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
                         # Click proceed button
                         try:
-                            self.tw[tab_name].btn_ok.click()
+                            self.tw[tab_name].btn_ok.clicked.emit()
                         except Exception as e:
                             # Alignment is skipped
                             if tab_name == 'Alignment':
