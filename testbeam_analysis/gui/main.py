@@ -604,6 +604,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 # self.tw[tab].analysis_thread.wait()
 
                 # Handle consecutive analysis
+                self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tw[tab_list[0]].btn_ok.clicked.emit())
                 self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
 
         # Start analysis by clicking ok button on starting tab
@@ -663,17 +664,17 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                         # self.tabs.setCurrentIndex(self.tab_order.index(tab_name) - 1)
 
                         # Click proceed button
-                        try:
-                            self.tw[tab_name].btn_ok.clicked.emit()
-                        except Exception as e:
-                            # Alignment is skipped
-                            if tab_name == 'Alignment':
-                                self.tw[tab_name].skipAlignment.emit()
-                                self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
-                            # Re-raise exception
-                            else:
-                                self.handle_exceptions(exception=e, trace_back=traceback.format_exc(),
-                                                       tab=tab_name, cause='consecutive analysis')
+#                        try:
+#                            self.tw[tab_name].btn_ok.clicked.emit()
+#                        except Exception as e:
+#                            # Alignment is skipped
+#                            if tab_name == 'Alignment':
+#                                self.tw[tab_name].skipAlignment.emit()
+#                                self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
+#                            # Re-raise exception
+#                            else:
+#                                self.handle_exceptions(exception=e, trace_back=traceback.format_exc(),
+#                                                       tab=tab_name, cause='consecutive analysis')
 
                     else:
                         # Last tab finished
