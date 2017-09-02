@@ -16,6 +16,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from numpy import ma
 
 from testbeam_analysis.tools import plot_utils
+from testbeam_analysis.tools import smc
 from testbeam_analysis.tools import analysis_utils
 from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import kalman
@@ -75,70 +76,62 @@ def find_tracks(input_tracklets_file, input_alignment_file, output_track_candida
                 column_sigma[index] = correlations[index]['column_sigma']
                 row_sigma[index] = correlations[index]['row_sigma']
 
-    with tb.open_file(input_tracklets_file, mode='r') as in_file_h5:
-        try:  # First try:  normal tracklets assumed
-            tracklets_node = in_file_h5.root.Tracklets
-        except tb.exceptions.NoSuchNodeError:
-            try:  # Second try: normal track candidates assumed
-                tracklets_node = in_file_h5.root.TrackCandidates
-                logging.info('Additional find track run on track candidates file %s', input_tracklets_file)
-                logging.info('Output file with new track candidates file %s', output_track_candidates_file)
-            except tb.exceptions.NoSuchNodeError:  # Last try: not used yet
-                raise
-        with tb.open_file(output_track_candidates_file, mode='w') as out_file_h5:
-            track_candidates = out_file_h5.create_table(out_file_h5.root, name='TrackCandidates', description=tracklets_node.dtype, title='Track candidates', filters=tb.Filters(complib='blosc', complevel=5, fletcher32=False))
+    def work(tracklets_data_chunk):
+        ''' Track finding per cpu core '''
+        import numpy as np
+        # Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data
+        # This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format
+        x = tracklets_data_chunk['x_dut_0']
+        y = tracklets_data_chunk['y_dut_0']
+        z = tracklets_data_chunk['z_dut_0']
+        x_err = tracklets_data_chunk['xerr_dut_0']
+        y_err = tracklets_data_chunk['yerr_dut_0']
+        z_err = tracklets_data_chunk['zerr_dut_0']
+        charge = tracklets_data_chunk['charge_dut_0']
+        n_hits = tracklets_data_chunk['n_hits_dut_0']
+        for dut_index in range(1, n_duts):
+            x = np.column_stack((x, tracklets_data_chunk['x_dut_%d' % (dut_index)]))
+            y = np.column_stack((y, tracklets_data_chunk['y_dut_%d' % (dut_index)]))
+            z = np.column_stack((z, tracklets_data_chunk['z_dut_%d' % (dut_index)]))
+            x_err = np.column_stack((x_err, tracklets_data_chunk['xerr_dut_%d' % (dut_index)]))
+            y_err = np.column_stack((y_err, tracklets_data_chunk['yerr_dut_%d' % (dut_index)]))
+            z_err = np.column_stack((z_err, tracklets_data_chunk['zerr_dut_%d' % (dut_index)]))
+            charge = np.column_stack((charge, tracklets_data_chunk['charge_dut_%d' % (dut_index)]))
+            n_hits = np.column_stack((n_hits, tracklets_data_chunk['n_hits_dut_%d' % (dut_index)]))
 
-            progress_bar = progressbar.ProgressBar(widgets=['', progressbar.Percentage(), ' ', progressbar.Bar(marker='*', left='|', right='|'), ' ', progressbar.AdaptiveETA()], maxval=tracklets_node.shape[0], term_width=80)
-            progress_bar.start()
+        event_number = tracklets_data_chunk['event_number']
+        track_quality = np.zeros_like(tracklets_data_chunk['track_quality'])
+        n_tracks = tracklets_data_chunk['n_tracks']
 
-            for tracklets_data_chunk, index in analysis_utils.data_aligned_at_events(tracklets_node, chunk_size=chunk_size):
-                # Prepare hit data for track finding, create temporary arrays for x, y, z position and charge data
-                # This is needed to call a numba jitted function, since the number of DUTs is not fixed and thus the data format
-                x = tracklets_data_chunk['x_dut_0']
-                y = tracklets_data_chunk['y_dut_0']
-                z = tracklets_data_chunk['z_dut_0']
-                x_err = tracklets_data_chunk['xerr_dut_0']
-                y_err = tracklets_data_chunk['yerr_dut_0']
-                z_err = tracklets_data_chunk['zerr_dut_0']
-                charge = tracklets_data_chunk['charge_dut_0']
-                n_hits = tracklets_data_chunk['n_hits_dut_0']
-                for dut_index in range(1, n_duts):
-                    x = np.column_stack((x, tracklets_data_chunk['x_dut_%d' % (dut_index)]))
-                    y = np.column_stack((y, tracklets_data_chunk['y_dut_%d' % (dut_index)]))
-                    z = np.column_stack((z, tracklets_data_chunk['z_dut_%d' % (dut_index)]))
-                    x_err = np.column_stack((x_err, tracklets_data_chunk['xerr_dut_%d' % (dut_index)]))
-                    y_err = np.column_stack((y_err, tracklets_data_chunk['yerr_dut_%d' % (dut_index)]))
-                    z_err = np.column_stack((z_err, tracklets_data_chunk['zerr_dut_%d' % (dut_index)]))
-                    charge = np.column_stack((charge, tracklets_data_chunk['charge_dut_%d' % (dut_index)]))
-                    n_hits = np.column_stack((n_hits, tracklets_data_chunk['n_hits_dut_%d' % (dut_index)]))
+        # Perform the track finding with jitted loop
+        _find_tracks_loop(event_number=event_number,
+                          x=x,
+                          y=y,
+                          z=z,
+                          x_err=x_err,
+                          y_err=y_err,
+                          z_err=z_err,
+                          charge=charge,
+                          n_hits=n_hits,
+                          track_quality=track_quality,
+                          n_tracks=n_tracks,
+                          column_sigma=column_sigma,
+                          row_sigma=row_sigma,
+                          min_cluster_distance=min_cluster_distance)
 
-                event_number = tracklets_data_chunk['event_number']
-                track_quality = np.zeros_like(tracklets_data_chunk['track_quality'])
-                n_tracks = tracklets_data_chunk['n_tracks']
-
-                # Perform the track finding with jitted loop
-                _find_tracks_loop(event_number=event_number,
-                                  x=x,
-                                  y=y,
-                                  z=z,
-                                  x_err=x_err,
-                                  y_err=y_err,
-                                  z_err=z_err,
-                                  charge=charge,
-                                  n_hits=n_hits,
-                                  track_quality=track_quality,
-                                  n_tracks=n_tracks,
-                                  column_sigma=column_sigma,
-                                  row_sigma=row_sigma,
-                                  min_cluster_distance=min_cluster_distance)
-
-                # Merge result data from arrays into one recarray
-                combined = np.column_stack((event_number, x, y, z, charge, n_hits, track_quality, n_tracks, x_err, y_err, z_err))
-                combined = np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
-
-                track_candidates.append(combined)
-                progress_bar.update(index)
-            progress_bar.finish()
+        # Merge result data from arrays into one recarray
+        combined = np.column_stack((event_number, x, y, z, charge, n_hits, track_quality, n_tracks, x_err, y_err, z_err))
+        return np.core.records.fromarrays(combined.transpose(), dtype=tracklets_data_chunk.dtype)
+    
+    smc.SMC(table_file_in=input_tracklets_file,
+            table_file_out=output_track_candidates_file,
+            func=work,
+            table_desc={'name':'TrackCandidates',
+                        'title':'Track candidates'},
+            # Apply track finding on tracklets or track candidates
+            table=['Tracklets', 'TrackCandidates'],
+            align_at='event_number',
+            chunk_size=chunk_size)
 
 
 def fit_tracks(input_track_candidates_file, input_alignment_file, output_tracks_file, fit_duts=None, selection_hit_duts=None, selection_fit_duts=None, exclude_dut_hit=True, selection_track_quality=1, pixel_size=None, n_pixels=None, beam_energy=None, material_budget=None, add_scattering_plane=False, max_tracks=None, force_prealignment=False, use_correlated=False, min_track_distance=False, keep_data=False, method='Fit', full_track_info=False, chunk_size=1000000):
