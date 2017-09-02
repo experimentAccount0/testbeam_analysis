@@ -363,7 +363,10 @@ class OptionMultiBox(QtWidgets.QWidget):
             if isinstance(default_value[i], collections.Iterable):
                 for j in range(len(default_value[i])):
                     if default_value[i][j] is not None:
-                        self.check_boxes[i][default_value[i][j]].setChecked(True)
+                        try:
+                            self.check_boxes[i][default_value[i][j]].setChecked(True)
+                        except TypeError:
+                            self.check_boxes[default_value[i][j]].setChecked(True)
             else:
                 if default_value[i] is not None:
                     self.check_boxes[default_value[i]].setChecked(True)
@@ -383,7 +386,8 @@ class OptionMultiBox(QtWidgets.QWidget):
             empty_rows = []
             for i in range(len(self.check_boxes)):
                 tmp = []
-                for j in range(len(self.check_boxes[i])):
+                dim = 0 if isinstance(self.check_boxes[i], QtWidgets.QCheckBox) else len(self.check_boxes[i])
+                for j in range(dim):
                     if not self.check_boxes[j][i].isChecked():
                         self.check_boxes[j][i].setDisabled(True)
                         self.check_boxes[j][i].setPalette(self.palette_dis)
@@ -394,8 +398,10 @@ class OptionMultiBox(QtWidgets.QWidget):
                     empty_rows.append(i)
 
             for row in empty_rows:
-                self.check_boxes[0][row].setChecked(True)
-
+                try:
+                    self.check_boxes[0][row].setChecked(True)
+                except TypeError:
+                    self.check_boxes[row].setChecked(True)
         else:
             for i in range(len(self.check_boxes)):
                     if self.sender() in self.check_boxes[i]:
