@@ -9,3 +9,4 @@ pixel_clusterizer>=3.0  # to cluster pixel hits
 pylandau>2.0.0  # for charge deposition simulation
 progressbar-latest  # to show a progress bar
 numexpr  # for fast c compiled loops on numpy arrays
+pathos  # better multiprocessing library
