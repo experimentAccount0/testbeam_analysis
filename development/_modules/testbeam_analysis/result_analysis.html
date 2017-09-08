@@ -181,7 +181,7 @@
 <span class="kn">from</span> <span class="nn">testbeam_analysis.tools</span> <span class="k">import</span> <span class="n">analysis_utils</span>
 
 
-<div class="viewcode-block" id="calculate_residuals"><a class="viewcode-back" href="../../result_analysis.html#testbeam_analysis.result_analysis.calculate_residuals">[docs]</a><span class="k">def</span> <span class="nf">calculate_residuals</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">,</span> <span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">n_pixels</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">,</span> <span class="n">output_residuals_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dut_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_chi2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nbins_per_pixel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">npixels_per_bin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_prealignment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_fit_limits</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cluster_size_selection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+<div class="viewcode-block" id="calculate_residuals"><a class="viewcode-back" href="../../result_analysis.html#testbeam_analysis.result_analysis.calculate_residuals">[docs]</a><span class="k">def</span> <span class="nf">calculate_residuals</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">,</span> <span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">n_pixels</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">,</span> <span class="n">output_residuals_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dut_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_chi2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nbins_per_pixel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">npixels_per_bin</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_prealignment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_fit_limits</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cluster_size_selection</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gui</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;Takes the tracks and calculates residuals for selected DUTs in col, row direction.</span>
 
 <span class="sd">    Parameters</span>
@@ -236,10 +236,12 @@
     <span class="k">if</span> <span class="n">output_residuals_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">output_residuals_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_residuals.h5&#39;</span>
 
-    <span class="k">if</span> <span class="n">plot</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
-        <span class="n">output_pdf</span> <span class="o">=</span> <span class="n">PdfPages</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_residuals_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.pdf&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plot</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">gui</span><span class="p">:</span>
+        <span class="n">output_pdf</span> <span class="o">=</span> <span class="n">PdfPages</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_residuals_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.pdf&#39;</span><span class="p">,</span> <span class="n">keep_empty</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">output_pdf</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">figs</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">gui</span> <span class="k">else</span> <span class="kc">None</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_chi2</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
         <span class="n">max_chi2</span> <span class="o">=</span> <span class="p">[</span><span class="n">max_chi2</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_duts</span>
@@ -551,7 +553,9 @@
                     <span class="n">edges</span><span class="o">=</span><span class="n">hist_residual_x_xedges</span><span class="p">,</span>
                     <span class="n">label</span><span class="o">=</span><span class="s1">&#39;X residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_res_x</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                       <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ResidualsX_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -569,7 +573,9 @@
                     <span class="n">edges</span><span class="o">=</span><span class="n">hist_residual_y_yedges</span><span class="p">,</span>
                     <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Y residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_res_y</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                       <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ResidualsY_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -589,7 +595,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;X position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;X residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
 
                 <span class="n">out_x_res_x</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
@@ -611,7 +619,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Y position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Y residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_y_res_y</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                         <span class="n">name</span><span class="o">=</span><span class="s1">&#39;YResidualsY_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -632,7 +642,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;X position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Y residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_x_res_y</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                         <span class="n">name</span><span class="o">=</span><span class="s1">&#39;XResidualsY_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -653,7 +665,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Y position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;X residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_y_res_x</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                         <span class="n">name</span><span class="o">=</span><span class="s1">&#39;YResidualsX_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -673,7 +687,9 @@
                     <span class="n">edges</span><span class="o">=</span><span class="n">hist_residual_col_xedges</span><span class="p">,</span>
                     <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Column residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_res_col</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                         <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ResidualsCol_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -691,7 +707,9 @@
                     <span class="n">edges</span><span class="o">=</span><span class="n">hist_residual_row_yedges</span><span class="p">,</span>
                     <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Row residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_res_row</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                         <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ResidualsRow_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -711,7 +729,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Column position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Column residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_col_res_col</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                             <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ColResidualsCol_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -732,7 +752,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Row position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Row residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_row_res_row</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                             <span class="n">name</span><span class="o">=</span><span class="s1">&#39;RowResidualsRow_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -753,7 +775,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Column position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Row residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_col_res_row</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                             <span class="n">name</span><span class="o">=</span><span class="s1">&#39;ColResidualsRow_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -774,7 +798,9 @@
                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Row position [um]&#39;</span><span class="p">,</span>
                     <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Column residual [um]&#39;</span><span class="p">,</span>
                     <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Residuals for </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dut_name</span><span class="p">,),</span>
-                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span>
+                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span>
                 <span class="p">)</span>
                 <span class="n">out_row_res_col</span> <span class="o">=</span> <span class="n">out_file_h5</span><span class="o">.</span><span class="n">create_carray</span><span class="p">(</span><span class="n">out_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
                                                             <span class="n">name</span><span class="o">=</span><span class="s1">&#39;RowResidualsCol_DUT</span><span class="si">%d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">actual_dut</span><span class="p">),</span>
@@ -789,10 +815,13 @@
                 <span class="n">out_row_res_col</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">hist_row_residual_col_hist</span>
 
     <span class="k">if</span> <span class="n">output_pdf</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">output_pdf</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+        <span class="n">output_pdf</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">gui</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">figs</span></div>
 
 
-<div class="viewcode-block" id="calculate_efficiency"><a class="viewcode-back" href="../../result_analysis.html#testbeam_analysis.result_analysis.calculate_efficiency">[docs]</a><span class="k">def</span> <span class="nf">calculate_efficiency</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">,</span> <span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">bin_size</span><span class="p">,</span> <span class="n">sensor_size</span><span class="p">,</span> <span class="n">output_efficiency_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_pixels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">minimum_track_density</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_distance</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">use_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_chi2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_prealignment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">cut_distance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">col_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">row_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_inefficient_events</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
+<div class="viewcode-block" id="calculate_efficiency"><a class="viewcode-back" href="../../result_analysis.html#testbeam_analysis.result_analysis.calculate_efficiency">[docs]</a><span class="k">def</span> <span class="nf">calculate_efficiency</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">,</span> <span class="n">input_alignment_file</span><span class="p">,</span> <span class="n">bin_size</span><span class="p">,</span> <span class="n">sensor_size</span><span class="p">,</span> <span class="n">output_efficiency_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_pixels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">minimum_track_density</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_distance</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">use_duts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_chi2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_prealignment</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">cut_distance</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">col_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">row_range</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_inefficient_events</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gui</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000000</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.</span>
 
 <span class="sd">    Parameters</span>
@@ -840,8 +869,8 @@
     <span class="k">if</span> <span class="n">output_efficiency_file</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">output_efficiency_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_efficiency.h5&#39;</span>
 
-    <span class="k">if</span> <span class="n">plot</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
-        <span class="n">output_pdf</span> <span class="o">=</span> <span class="n">PdfPages</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_efficiency_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.pdf&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">plot</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">gui</span><span class="p">:</span>
+        <span class="n">output_pdf</span> <span class="o">=</span> <span class="n">PdfPages</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_efficiency_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.pdf&#39;</span><span class="p">,</span> <span class="n">keep_empty</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">output_pdf</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -865,6 +894,7 @@
     <span class="n">efficiencies</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">pass_tracks</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">total_tracks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">figs</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">gui</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_tracks_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">in_file_h5</span><span class="p">:</span>
         <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_efficiency_file</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_file_h5</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">in_file_h5</span><span class="o">.</span><span class="n">root</span><span class="p">):</span>
@@ -1005,7 +1035,7 @@
 <span class="c1">#                 distance_max_array = np.ma.masked_invalid(distance_max_array)</span>
 <span class="c1">#                 distance_min_array = np.ma.masked_invalid(distance_min_array)</span>
 <span class="c1">#                 plot_utils.plot_track_distances(distance_min_array, distance_max_array, distance_mean_array)</span>
-                <span class="n">plot_utils</span><span class="o">.</span><span class="n">efficiency_plots</span><span class="p">(</span><span class="n">total_hit_hist</span><span class="p">,</span> <span class="n">total_track_density</span><span class="p">,</span> <span class="n">total_track_density_with_DUT_hit</span><span class="p">,</span> <span class="n">efficiency</span><span class="p">,</span> <span class="n">actual_dut</span><span class="p">,</span> <span class="n">minimum_track_density</span><span class="p">,</span> <span class="n">plot_range</span><span class="o">=</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">cut_distance</span><span class="o">=</span><span class="n">cut_distance</span><span class="p">,</span> <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">)</span>
+                <span class="n">plot_utils</span><span class="o">.</span><span class="n">efficiency_plots</span><span class="p">(</span><span class="n">total_hit_hist</span><span class="p">,</span> <span class="n">total_track_density</span><span class="p">,</span> <span class="n">total_track_density_with_DUT_hit</span><span class="p">,</span> <span class="n">efficiency</span><span class="p">,</span> <span class="n">actual_dut</span><span class="p">,</span> <span class="n">minimum_track_density</span><span class="p">,</span> <span class="n">plot_range</span><span class="o">=</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">cut_distance</span><span class="o">=</span><span class="n">cut_distance</span><span class="p">,</span> <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span> <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span> <span class="n">figs</span><span class="o">=</span><span class="n">figs</span><span class="p">)</span>
 
                 <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Efficiency =  </span><span class="si">%1.4f</span><span class="s1"> +- </span><span class="si">%1.4f</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">efficiency</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">efficiency</span><span class="p">))</span>
                 <span class="n">efficiencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ma</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">efficiency</span><span class="p">))</span>
@@ -1040,6 +1070,9 @@
 
     <span class="k">if</span> <span class="n">output_pdf</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">output_pdf</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">gui</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">figs</span>
 
     <span class="k">return</span> <span class="n">efficiencies</span><span class="p">,</span> <span class="n">pass_tracks</span><span class="p">,</span> <span class="n">total_tracks</span></div>
 

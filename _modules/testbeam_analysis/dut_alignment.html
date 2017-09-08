@@ -403,7 +403,7 @@
             <span class="n">progress_bar</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span></div>
 
 
-<div class="viewcode-block" id="prealignment"><a class="viewcode-back" href="../../dut_alignment.html#testbeam_analysis.dut_alignment.prealignment">[docs]</a><span class="k">def</span> <span class="nf">prealignment</span><span class="p">(</span><span class="n">input_correlation_file</span><span class="p">,</span> <span class="n">output_alignment_file</span><span class="p">,</span> <span class="n">z_positions</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">,</span> <span class="n">s_n</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">fit_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">reduce_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dut_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">no_fit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">non_interactive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<div class="viewcode-block" id="prealignment"><a class="viewcode-back" href="../../dut_alignment.html#testbeam_analysis.dut_alignment.prealignment">[docs]</a><span class="k">def</span> <span class="nf">prealignment</span><span class="p">(</span><span class="n">input_correlation_file</span><span class="p">,</span> <span class="n">output_alignment_file</span><span class="p">,</span> <span class="n">z_positions</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">,</span> <span class="n">s_n</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">fit_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">reduce_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dut_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">no_fit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">non_interactive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">gui</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).</span>
 <span class="sd">       The user can define cuts on the fit error and straight line offset in an interactive way.</span>
 
@@ -451,10 +451,12 @@
             <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;reduce_background is True, setting fit_background to False&quot;</span><span class="p">)</span>
             <span class="n">fit_background</span> <span class="o">=</span> <span class="kc">False</span>
 
-    <span class="k">if</span> <span class="n">plot</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">plot</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">gui</span><span class="p">:</span>
         <span class="n">output_pdf</span> <span class="o">=</span> <span class="n">PdfPages</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">output_alignment_file</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_prealigned.pdf&#39;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">output_pdf</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">figs</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">gui</span> <span class="k">else</span> <span class="kc">None</span>
 
     <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">input_correlation_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">in_file_h5</span><span class="p">:</span>
         <span class="n">n_duts</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">in_file_h5</span><span class="o">.</span><span class="n">list_nodes</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">))</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span>  <span class="c1"># no correlation for reference DUT0</span>
@@ -548,7 +550,9 @@
                                       <span class="n">ref_name</span><span class="o">=</span><span class="n">ref_name</span><span class="p">,</span>
                                       <span class="n">dut_name</span><span class="o">=</span><span class="n">dut_name</span><span class="p">,</span>
                                       <span class="n">prefix</span><span class="o">=</span><span class="n">table_prefix</span><span class="p">,</span>
-                                      <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">)</span>
+                                      <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                                      <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                                      <span class="n">figs</span><span class="o">=</span><span class="n">figs</span><span class="p">)</span>
 
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># fill the arrays from above with values</span>
@@ -645,7 +649,9 @@
                                                     <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;Column&quot;</span> <span class="k">if</span> <span class="s2">&quot;column&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;Row&quot;</span><span class="p">,</span> <span class="n">ref_name</span><span class="p">),</span>
                                                     <span class="n">fit_label</span><span class="o">=</span><span class="n">fit_label</span><span class="p">,</span>
                                                     <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Correlation of </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2"> vs. </span><span class="si">%s</span><span class="s2"> at </span><span class="si">%s</span><span class="s2"> </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">table_prefix</span> <span class="o">+</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="n">ref_name</span><span class="p">,</span> <span class="n">dut_name</span><span class="p">,</span> <span class="n">table_prefix</span><span class="p">,</span> <span class="n">plot_index</span><span class="p">),</span>
-                                                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">)</span>
+                                                    <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                                                    <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                                                    <span class="n">figs</span><span class="o">=</span><span class="n">figs</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Cannot plot correlation fit, no fit data available&quot;</span><span class="p">)</span>
 
@@ -671,7 +677,9 @@
                                                  <span class="n">ref_name</span><span class="o">=</span><span class="n">ref_name</span><span class="p">,</span>
                                                  <span class="n">dut_name</span><span class="o">=</span><span class="n">dut_name</span><span class="p">,</span>
                                                  <span class="n">prefix</span><span class="o">=</span><span class="n">table_prefix</span><span class="p">,</span>
-                                                 <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">)</span>
+                                                 <span class="n">output_pdf</span><span class="o">=</span><span class="n">output_pdf</span><span class="p">,</span>
+                                                 <span class="n">gui</span><span class="o">=</span><span class="n">gui</span><span class="p">,</span>
+                                                 <span class="n">figs</span><span class="o">=</span><span class="n">figs</span><span class="p">)</span>
 
         <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Store pre-alignment data in </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">output_alignment_file</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">tb</span><span class="o">.</span><span class="n">open_file</span><span class="p">(</span><span class="n">output_alignment_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_file_h5</span><span class="p">:</span>
@@ -682,7 +690,10 @@
                 <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Coarse alignment table exists already. Do not create new.&#39;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">output_pdf</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">output_pdf</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+        <span class="n">output_pdf</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">gui</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">figs</span></div>
 
 
 <span class="k">def</span> <span class="nf">_fit_data</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">s_n</span><span class="p">,</span> <span class="n">coeff_fitted</span><span class="p">,</span> <span class="n">mean_fitted</span><span class="p">,</span> <span class="n">mean_error_fitted</span><span class="p">,</span> <span class="n">sigma_fitted</span><span class="p">,</span> <span class="n">chi2</span><span class="p">,</span> <span class="n">fit_background</span><span class="p">,</span> <span class="n">reduce_background</span><span class="p">):</span>
