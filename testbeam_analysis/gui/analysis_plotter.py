@@ -21,7 +21,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
     Also supports plotting from multiple functions at once and input of predefined figures
     """
 
-    def __init__(self, input_file, plot_func, figures=None, parent=None, **kwargs):
+    def __init__(self, input_file=None, plot_func=None, figures=None, parent=None, **kwargs):
 
         super(AnalysisPlotter, self).__init__(parent)
 
@@ -34,6 +34,10 @@ class AnalysisPlotter(QtWidgets.QWidget):
         self.plot_func = plot_func
         self.figures = figures
         self.kwargs = kwargs
+
+        if input_file is None and plot_func is None and figures is None:
+            msg = 'Need input file and plotting function or figures to do plotting!'
+            raise ValueError(msg)
 
         # Bool whether to plot from multiple functions at once
         multi_plot = False
@@ -53,7 +57,7 @@ class AnalysisPlotter(QtWidgets.QWidget):
         #    AnalysisPlotter(self.input_files, self.plot_func, event={'event_range': 40}, correlation={'pixel_size':(250,50), 'dut_names':'Tel_0'})
 
         if isinstance(self.input_file, dict) and isinstance(self.plot_func, dict):
-            if self.input_file.keys() != self.plot_func.keys():
+            if sorted(self.input_file.keys()) != sorted(self.plot_func.keys()):
                 msg = 'Different sets of keys! Can not assign input data to respective plotting function!'
                 raise KeyError(msg)
             else:
@@ -250,7 +254,13 @@ class AnalysisPlotter(QtWidgets.QWidget):
             dummy_widget.setLayout(QtWidgets.QVBoxLayout())
 
             if self.figures is not None and key in self.figures.keys():
-                fig = self.figures[key]
+                if self.figures[key] is not None:
+                    fig = self.figures[key]
+                else:
+                    if key in self.kwargs.keys():
+                        fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs[key])
+                    else:
+                        fig = self.plot_func[key](self.input_file[key], gui=True)
             else:
                 if key in self.kwargs.keys():
                     fig = self.plot_func[key](self.input_file[key], gui=True, **self.kwargs[key])

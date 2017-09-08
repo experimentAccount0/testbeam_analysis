@@ -88,6 +88,8 @@ class AnalysisWidget(QtWidgets.QWidget):
         self.name = name
         # Store state of analysis widget
         self.isFinished = False
+        # Store return values of functions
+        self.return_values = None
 
     def _setup(self):
         # Plot area
@@ -398,7 +400,12 @@ class AnalysisWidget(QtWidgets.QWidget):
                 else:
                     raise RuntimeError('Function argument %s not defined', arg)
 
-        func(**kwargs)
+        # Get functions return value
+        val = func(**kwargs)
+
+        # Most functions return None. If not None, store value
+        if val is not None:
+            self.return_values = val
 
     def _call_funcs(self):
         """ 
@@ -479,13 +486,13 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Start thread
         self.vitables_thread.start()
 
-    def plot(self, input_file, plot_func, figures=None, **kwargs):
+    def plot(self, input_file=None, plot_func=None, figures=None, **kwargs):
         """
         Function that creates the plot for the plotting area of the AnalysisWidget using AnalysisPlotter.
         See AnalysisPlotters docstring for info on how plots are created.
 
-        :param input_file: HDF5-file or dict with HDF5-files if plotting for multiple functions
-        :param plot_func: function or dict of functions if plotting for multiple functions
+        :param input_file: HDF5-file or dict with HDF5-files if plotting for multiple functions or None if figures not None
+        :param plot_func: function or dict of functions if plotting for multiple functions or None if figures not None
         :param figures: None, matplotlib.Figure() or list of such figures or dict of both if plotting for multiple functions
         :param kwargs: keyword arguments or keyword from dicts keys with another dict as argument if plotting for multiple functions
         """

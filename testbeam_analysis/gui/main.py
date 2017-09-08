@@ -307,8 +307,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
 
                 if name == 'Alignment':
                     for xxx in [lambda: self.update_tabs(data={'skip_alignment': True},
-                                                         tabs=['Track fitting', 'Residuals', 'Efficiency']),
-                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
+                                                         tabs=['Track fitting', 'Residuals', 'Efficiency'])]:
                         self.tw[name].skipAlignment.connect(xxx)
 
                 self.tw[name].proceedAnalysis.connect(lambda tab_names: self.handle_tabs(tabs=tab_names))
@@ -574,6 +573,10 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         Method to start a consecutive call of all analysis functions with their default values
         as defined in tab_widget.py. Acronym rca==run constructive analysis
         """
+        if self.tw[self.current_analysis_tab()].analysis_thread.isRunning():
+            msg = 'Can not start consecutive analysis while %s analysis is running.' % self.current_analysis_tab()
+            logging.warning(msg=msg)
+            return
 
         # Whenever starting rca restore flag state
         self.flag_interrupt = False

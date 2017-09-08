@@ -239,7 +239,7 @@ def merge_cluster_data(input_cluster_files, output_merged_file, n_pixels, pixel_
             progress_bar.finish()
 
 
-def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=3, plot=True):
+def prealignment(input_correlation_file, output_alignment_file, z_positions, pixel_size, s_n=0.1, fit_background=False, reduce_background=False, dut_names=None, no_fit=False, non_interactive=True, iterations=3, plot=True, gui=False):
     '''Deduce a pre-alignment from the correlations, by fitting the correlations with a straight line (gives offset, slope, but no tild angles).
        The user can define cuts on the fit error and straight line offset in an interactive way.
 
@@ -287,10 +287,12 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
             logging.warning("reduce_background is True, setting fit_background to False")
             fit_background = False
 
-    if plot is True:
+    if plot is True and not gui:
         output_pdf = PdfPages(os.path.splitext(output_alignment_file)[0] + '_prealigned.pdf')
     else:
         output_pdf = None
+
+    figs = [] if gui else None
 
     with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
         n_duts = len(in_file_h5.list_nodes("/")) // 2 + 1  # no correlation for reference DUT0
@@ -384,7 +386,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                       ref_name=ref_name,
                                       dut_name=dut_name,
                                       prefix=table_prefix,
-                                      output_pdf=output_pdf)
+                                      output_pdf=output_pdf,
+                                      gui=gui,
+                                      figs=figs)
 
             else:
                 # fill the arrays from above with values
@@ -481,7 +485,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                                     xlabel='%s %s' % ("Column" if "column" in node.name.lower() else "Row", ref_name),
                                                     fit_label=fit_label,
                                                     title="Correlation of %s: %s vs. %s at %s %d" % (table_prefix + "s", ref_name, dut_name, table_prefix, plot_index),
-                                                    output_pdf=output_pdf)
+                                                    output_pdf=output_pdf,
+                                                    gui=gui,
+                                                    figs=figs)
                 else:
                     logging.warning("Cannot plot correlation fit, no fit data available")
 
@@ -507,7 +513,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
                                                  ref_name=ref_name,
                                                  dut_name=dut_name,
                                                  prefix=table_prefix,
-                                                 output_pdf=output_pdf)
+                                                 output_pdf=output_pdf,
+                                                 gui=gui,
+                                                 figs=figs)
 
         logging.info('Store pre-alignment data in %s', output_alignment_file)
         with tb.open_file(output_alignment_file, mode="w") as out_file_h5:
@@ -519,6 +527,9 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
 
     if output_pdf is not None:
         output_pdf.close()
+
+    if gui:
+        return figs
 
 
 def _fit_data(x, data, s_n, coeff_fitted, mean_fitted, mean_error_fitted, sigma_fitted, chi2, fit_background, reduce_background):

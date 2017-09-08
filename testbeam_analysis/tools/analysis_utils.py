@@ -823,7 +823,7 @@ def get_rotation_from_residual_fit(m_xx, m_xy, m_yx, m_yy, alpha_inverted=None, 
     return alpha, beta, gamma
 
 
-def fit_residuals(hist, edges, label="", title="", output_pdf=None):
+def fit_residuals(hist, edges, label="", title="", output_pdf=None, gui=False, figs=None):
     bin_center = (edges[1:] + edges[:-1]) / 2.0
     hist_mean = get_mean_from_histogram(hist, bin_center)
     hist_std = get_rms_from_histogram(hist, bin_center)
@@ -839,13 +839,15 @@ def fit_residuals(hist, edges, label="", title="", output_pdf=None):
         fit_errors=cov,
         x_label=label,
         title=title,
-        output_pdf=output_pdf
+        output_pdf=output_pdf,
+        gui=gui,
+        figs=figs
     )
 
     return fit, cov
 
 
-def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_pdf=None):
+def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title="", output_pdf=None, gui=False, figs=None):
     xcenter = (xedges[1:] + xedges[:-1]) / 2.0
     ycenter = (yedges[1:] + yedges[:-1]) / 2.0
     y_sum = np.sum(hist, axis=1)
@@ -870,7 +872,9 @@ def fit_residuals_vs_position(hist, xedges, yedges, xlabel="", ylabel="", title=
         fit=fit,
         cov=cov,
         title=title,
-        output_pdf=output_pdf
+        output_pdf=output_pdf,
+        gui=gui,
+        figs=figs
     )
 
     return fit, cov

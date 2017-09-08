@@ -68,51 +68,13 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
     if dut_name is None:
         dut_name = os.path.split(input_mask_file)[1]
 
-    # The gui parameter is used to plot from the respective plotting function directly into the graphical
-    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
-    if gui:
-        cmap = cm.get_cmap('viridis')
-        cmap.set_bad('w')
-        c_max = np.percentile(occupancy, 99)
-
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        ax.set_title('%s' % (dut_name,))
-        # plot noisy pixels
-        if noisy_pixels is not None:
-            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='r', ms=15, mew=1.25, label='Noisy pixels')
-            ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (n_noisy_pixels,))
-        # plot disabled pixels
-        if disabled_pixels is not None:
-            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'x', mfc='none', mec='r', ms=15, mew=1.25, label='Disabled pixels')
-            ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
-        ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, interpolation='none', origin='lower',
-                  clim=(0, c_max))
-        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
-        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
-        ax.set_xlabel("Column")
-        ax.set_ylabel("Row")
-        leg = ax.legend(numpoints=1, bbox_to_anchor=(1.015, 1.135), loc='upper right')
-        leg.get_frame().set_facecolor('none')
-
-        fig_1 = Figure()
-        _ = FigureCanvas(fig_1)
-        ax = fig_1.add_subplot(111)
-        ax.set_title('%s\n occupancy' % (dut_name,))
-        ax.imshow(occupancy, aspect=aspect, cmap=cmap, interpolation='none', origin='lower', clim=(0, c_max))
-        #     np.ma.filled(occupancy, fill_value=0)
-        ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
-        ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
-        ax.set_xlabel("Column")
-        ax.set_ylabel("Row")
-
-        return [fig, fig_1]
-
     if output_pdf_file is None:
         output_pdf_file = os.path.splitext(input_mask_file)[0] + '_masked_pixels.pdf'
 
-    with PdfPages(output_pdf_file) as output_pdf:
+    if gui:
+        figs = []
+
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:  # if gui, we dont want to safe empty pdf
         cmap = cm.get_cmap('viridis')
         cmap.set_bad('w')
         c_max = np.percentile(occupancy, 99)
@@ -123,30 +85,41 @@ def plot_masked_pixels(input_mask_file, pixel_size=None, dut_name=None, output_p
         ax.set_title('%s' % (dut_name, ))
         # plot noisy pixels
         if noisy_pixels is not None:
-            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10)
+            ax.plot(noisy_pixels[:, 1], noisy_pixels[:, 0], 'ro', mfc='none', mec='c', ms=10, label='Noisy pixels')
             ax.set_title(ax.get_title() + ',\n%d noisy pixels' % (n_noisy_pixels,))
         # plot disabled pixels
         if disabled_pixels is not None:
-            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10)
+            ax.plot(disabled_pixels[:, 1], disabled_pixels[:, 0], 'ro', mfc='none', mec='r', ms=10, label='Disabled pixels')
             ax.set_title(ax.get_title() + ',\n%d disabled pixels' % (n_disabled_pixels,))
         ax.imshow(np.ma.getdata(occupancy), aspect=aspect, cmap=cmap, interpolation='none', origin='lower', clim=(0, c_max))
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
         ax.set_xlabel("Column")
         ax.set_ylabel("Row")
-        output_pdf.savefig(fig)
+        if gui:
+            leg = ax.legend(numpoints=1, bbox_to_anchor=(1.015, 1.135), loc='upper right')
+            leg.get_frame().set_facecolor('none')
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
 
         fig = Figure()
         _ = FigureCanvas(fig)
         ax = fig.add_subplot(111)
-        ax.set_title('%s' % (dut_name, ))
+        ax.set_title('%s\n occupancy' % (dut_name, ))
         ax.imshow(occupancy, aspect=aspect, cmap=cmap, interpolation='none', origin='lower', clim=(0, c_max))
     #     np.ma.filled(occupancy, fill_value=0)
         ax.set_xlim(-0.5, occupancy.shape[1] - 0.5)
         ax.set_ylim(-0.5, occupancy.shape[0] - 0.5)
         ax.set_xlabel("Column")
         ax.set_ylabel("Row")
-        output_pdf.savefig(fig)
+        if gui:
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
+
+    if gui:
+        return figs
 
 
 def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, chunk_size=1000000, gui=False):
@@ -166,58 +139,13 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
     if not dut_name:
         dut_name = os.path.split(input_cluster_file)[1]
 
-    # The gui parameter is used to plot from the respective plotting function directly into the graphical
-    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
-    if gui:
-        with tb.open_file(input_cluster_file, 'r') as input_file_h5:
-            hight = None
-            n_hits = 0
-            n_clusters = input_file_h5.root.Cluster.nrows
-            for start_index in range(0, n_clusters, chunk_size):
-                cluster_n_hits = input_file_h5.root.Cluster[start_index:start_index + chunk_size]['n_hits']
-                # calculate cluster size histogram
-                if hight is None:
-                    max_cluster_size = np.amax(cluster_n_hits)
-                    hight = testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                elif max_cluster_size < np.amax(cluster_n_hits):
-                    max_cluster_size = np.amax(cluster_n_hits)
-                    hight.resize(max_cluster_size + 1)
-                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                else:
-                    hight += testbeam_analysis.tools.analysis_utils.hist_1d_index(cluster_n_hits, shape=(max_cluster_size + 1,))
-                n_hits += np.sum(cluster_n_hits)
-
-        left = np.arange(max_cluster_size + 1)
-        fig = Figure()
-        _ = FigureCanvas(fig)
-        ax = fig.add_subplot(111)
-        ax.bar(left, hight, align='center')
-        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
-        ax.set_xlabel('Cluster size')
-        ax.set_ylabel('#')
-        ax.grid()
-        ax.set_yscale('log')
-        ax.set_xlim(xmin=0.5)
-        ax.set_ylim(ymin=1e-1)
-
-        fig_1 = Figure()
-        _ = FigureCanvas(fig_1)
-        ax = fig_1.add_subplot(111)
-        ax.bar(left, hight, align='center')
-        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
-        ax.set_xlabel('Cluster size')
-        ax.set_ylabel('#')
-        ax.grid()
-        ax.set_yscale('linear')
-        ax.set_ylim(ymax=np.amax(hight))
-        ax.set_xlim(0.5, min(10, max_cluster_size) + 0.5)
-
-        return [fig, fig_1]
-
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_cluster_file)[0] + '_cluster_size.pdf'
 
-    with PdfPages(output_pdf_file) as output_pdf:
+    if gui:
+        figs = []
+
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:  # if gui, we dont want to safe empty pdf
         with tb.open_file(input_cluster_file, 'r') as input_file_h5:
             hight = None
             n_hits = 0
@@ -248,11 +176,31 @@ def plot_cluster_size(input_cluster_file, dut_name=None, output_pdf_file=None, c
         ax.set_yscale('log')
         ax.set_xlim(xmin=0.5)
         ax.set_ylim(ymin=1e-1)
-        output_pdf.savefig(fig)
+
+        if gui:
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
+
+        fig = Figure()
+        _ = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        ax.bar(left, hight, align='center')
+        ax.set_title('Cluster size of %s\n(%i hits in %i clusters)' % (dut_name, n_hits, n_clusters))
+        ax.set_xlabel('Cluster size')
+        ax.set_ylabel('#')
+        ax.grid()
         ax.set_yscale('linear')
         ax.set_ylim(ymax=np.amax(hight))
         ax.set_xlim(0.5, min(10, max_cluster_size) + 0.5)
-        output_pdf.savefig(fig)
+
+        if gui:
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
+
+    if gui:
+        return figs
 
 
 def plot_tracks_per_event(input_tracks_file, output_pdf_file=None, gui=False):
@@ -268,73 +216,71 @@ def plot_tracks_per_event(input_tracks_file, output_pdf_file=None, gui=False):
     gui: bool
         Whether or not to plot directly into gui 
     """
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_tracks_per_event.pdf'
 
-    # The gui parameter is used to plot from the respective plotting function directly into the graphical
-    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
     if gui:
+        figs = []
+
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:  # if gui, we dont want to safe empty pdf
         with tb.open_file(input_tracks_file, 'r') as input_file_h5:
             fitted_tracks = False
             try:  # data has track candidates
-                table_events = input_file_h5.root.TrackCandidates[:]['event_number']
+                _ = input_file_h5.root.TrackCandidates[:]
             except tb.NoSuchNodeError:  # data has fitted tracks
                 fitted_tracks = True
 
-            if not fitted_tracks:
+            for node in input_file_h5.root:
+
+                table_events = node[:]['event_number']
+
                 events, event_count = np.unique(table_events, return_counts=True)
                 tracks_per_event, tracks_count = np.unique(event_count, return_counts=True)
+
+                if not fitted_tracks:
+                    title = 'Track candidates per event number\n for %d events' % events.shape[0]
+                else:
+                    title = 'Tracks per event number of Tel_%s\n for %d events' % \
+                            (str(node.name).split('_')[-1], events.shape[0])
+
+                xlabel = 'Track candidates per event' if not fitted_tracks else 'Tracks per event'
 
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
                 ax.bar(tracks_per_event, tracks_count, align='center')
-                ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
-                ax.set_xlabel('Track candidates per event')
+                ax.set_title(title)
+                ax.set_xlabel(xlabel)
                 ax.set_ylabel('#')
                 ax.grid()
                 ax.set_yscale('log')
 
-                fig_1 = Figure()
-                _ = FigureCanvas(fig_1)
-                ax = fig_1.add_subplot(111)
+                if gui:
+                    figs.append(fig)
+                else:
+                    output_pdf.savefig(fig)
+
+                fig = Figure()
+                _ = FigureCanvas(fig)
+                ax = fig.add_subplot(111)
                 ax.bar(tracks_per_event, tracks_count, align='center')
-                ax.set_title('Track candidates per event number\n for %d events' % events.shape[0])
-                ax.set_xlabel('Track candidates per event')
+                ax.set_title(title)
+                ax.set_xlabel(xlabel)
                 ax.set_ylabel('#')
                 ax.grid()
                 ax.set_yscale('linear')
 
-                return [fig, fig_1]
-
-            else:
-                figs = []
-                for node in input_file_h5.root:
-
-                    table_events = node[:]['event_number']
-
-                    events, event_count = np.unique(table_events, return_counts=True)
-                    tracks_per_event, tracks_count = np.unique(event_count, return_counts=True)
-
-                    fig = Figure()
-                    _ = FigureCanvas(fig)
-                    ax = fig.add_subplot(111)
-                    ax.bar(tracks_per_event, tracks_count, align='center')
-                    ax.set_title('Tracks per event number of Tel_%s\n for %d events' % (str(node.name).split('_')[-1],
-                                                                                        events.shape[0]))
-                    ax.set_xlabel('Tracks per event')
-                    ax.set_ylabel('#')
-                    ax.grid()
-                    ax.set_yscale('log')
-
+                if gui:
                     figs.append(fig)
+                else:
+                    output_pdf.savefig(fig)
 
-                return figs
-
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_tracks_per_event.pdf'
+    if gui:
+        return figs
 
 
-def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf=None):
-    if not output_pdf:
+def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pdf=None, gui=False, figs=None):
+    if not output_pdf and not gui:
         return
     fig = Figure()
     _ = FigureCanvas(fig)
@@ -347,7 +293,11 @@ def plot_correlation_fit(x, y, x_fit, y_fit, xlabel, fit_label, title, output_pd
     ax.set_xlim((np.min(x), np.max(x)))
     ax.grid()
     ax.legend(loc=0)
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
 
 def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, dut_name, prefix, non_interactive=False):
@@ -676,8 +626,8 @@ def plot_prealignments(x, mean_fitted, mean_error_fitted, n_cluster, ref_name, d
     return selected_data, fit, do_refit  # Return cut data for further processing
 
 
-def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf=None):
-    if not output_pdf:
+def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_error_fitted, n_cluster, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf=None, gui=False, figs=None):
+    if not output_pdf and not gui:
         return
     fig = Figure()
     _ = FigureCanvas(fig)
@@ -714,11 +664,15 @@ def plot_prealignment_fit(x, mean_fitted, mask, fit_fn, fit, pcov, chi2, mean_er
     # put ax in front of ax2
     ax1.set_zorder(ax2.get_zorder() + 1)
     ax1.patch.set_visible(False)  # hide the canvas
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
 
-def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf=None):
-    if not output_pdf:
+def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pixel_ref, n_pixel_dut, pixel_size_ref, pixel_size_dut, ref_name, dut_name, prefix, output_pdf=None, gui=False, figs=None):
+    if not output_pdf and not gui:
         return
     capital_prefix = prefix
     if prefix:
@@ -738,7 +692,11 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     ax.set_title("Accumulator plot of %s correlations: %s vs. %s" % (prefix, ref_name, dut_name))
     ax.set_xlabel(r'$\theta$ [degree]')
     ax.set_ylabel(r'$\rho$ [um]')
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
@@ -750,7 +708,12 @@ def plot_hough(x, data, accumulator, offset, slope, theta_edges, rho_edges, n_pi
     ax.set_xlabel("%s %s" % (capital_prefix, dut_name))
     ax.set_ylabel("%s %s" % (capital_prefix, ref_name))
     ax.legend(loc=0)
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
+
 
 
 def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=None, dut_names=None, gui=False):
@@ -764,52 +727,13 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
         Filename of the output PDF file. If None, the filename is derived from the input file.
     '''
 
-    # The gui parameter is used to plot from the respective plotting function directly into the graphical
-    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
-    if gui:
-        figs = []
-        with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
-            for node in in_file_h5.root:
-                try:
-                    indices = re.findall(r'\d+', node.name)
-                    dut_idx = int(indices[0])
-                    ref_idx = int(indices[1])
-                    if "column" in node.name.lower():
-                        column = True
-                    else:
-                        column = False
-                except AttributeError:
-                    continue
-                data = node[:]
-
-                if np.all(data <= 0):
-                    logging.warning('All correlation entries for %s are zero, do not create plots', str(node.name))
-                    continue
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
-                cmap = cm.get_cmap('viridis')
-                cmap.set_bad('w')
-                norm = colors.LogNorm()
-                if pixel_size:
-                    aspect = pixel_size[ref_idx][0 if column else 1] / (pixel_size[dut_idx][0 if column else 1])
-                else:
-                    aspect = "auto"
-                im = ax.imshow(data.T, origin="lower", cmap=cmap, norm=norm, aspect=aspect, interpolation='none')
-                dut_name = dut_names[dut_idx] if dut_names else ("DUT " + str(dut_idx))
-                ref_name = dut_names[ref_idx] if dut_names else ("DUT " + str(ref_idx))
-                ax.set_title("Correlation of %s: %s vs. %s" % ("columns" if "column" in node.title.lower() else "rows", ref_name, dut_name))
-                ax.set_xlabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", dut_name))
-                ax.set_ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
-                # do not append to axis to preserve aspect ratio
-                fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
-                figs.append(fig)
-            return figs
-
     if not output_pdf_file:
         output_pdf_file = os.path.splitext(input_correlation_file)[0] + '_correlation.pdf'
 
-    with PdfPages(output_pdf_file) as output_pdf:
+    if gui:
+        figs = []
+
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:  # if gui, we dont want to safe empty pdf
         with tb.open_file(input_correlation_file, mode="r") as in_file_h5:
             for node in in_file_h5.root:
                 try:
@@ -846,10 +770,17 @@ def plot_correlations(input_correlation_file, output_pdf_file=None, pixel_size=N
                 ax.set_ylabel('%s %s' % ("Column" if "column" in node.title.lower() else "Row", ref_name))
                 # do not append to axis to preserve aspect ratio
                 fig.colorbar(im, cmap=cmap, norm=norm, fraction=0.04, pad=0.05)
-                output_pdf.savefig(fig)
+
+                if gui:
+                    figs.append(fig)
+                else:
+                    output_pdf.savefig(fig)
+
+    if gui:
+        return figs
 
 
-def plot_events(input_tracks_file, dut=0, event_range=(0, 100), n_tracks=None, max_chi2=None, output_pdf_file=None, gui=False):
+def plot_events(input_tracks_file, event_range=(0, 100), dut=None, n_tracks=None, max_chi2=None, output_pdf_file=None, gui=False):
     '''Plots the tracks (or track candidates) of the events in the given event range.
 
     Parameters
@@ -859,7 +790,7 @@ def plot_events(input_tracks_file, dut=0, event_range=(0, 100), n_tracks=None, m
     event_range : iterable
         Tuple of start event number and stop event number (excluding), e.g. (0, 100).
     dut : uint
-        Take data from DUT with the given number.
+        Take data from DUT with the given number. If None, plot all DUTs
     max_chi2 : uint
         Plot events with track chi2 smaller than the gven number.
     output_pdf_file : string
@@ -871,21 +802,32 @@ def plot_events(input_tracks_file, dut=0, event_range=(0, 100), n_tracks=None, m
         if not None, event_range has no effect
     '''
 
-    # The gui parameter is used to plot from the respective plotting function directly into the graphical
-    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_events.pdf'
+
     if gui:
+        figs = []
+
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:  # if gui, we dont want to safe empty pdf
         with tb.open_file(input_tracks_file, "r") as in_file_h5:
             fitted_tracks = False
             try:  # data has track candidates
-                table = in_file_h5.root.TrackCandidates
+                _ = in_file_h5.root.TrackCandidates
             except tb.NoSuchNodeError:  # data has fitted tracks
                 fitted_tracks = True
-            if not fitted_tracks:
+
+            for node in in_file_h5.root:
+
+                # If a DUT is given skip others
+                if dut and fitted_tracks:
+                    if node.name != 'Tracks_DUT_%d' % dut:
+                        continue
+
+                table = node[:]
+
                 n_duts = sum(['charge' in col for col in table.dtype.names])
                 array = table[:]
                 if n_tracks is not None:
-                    if max_chi2:
-                        array = array[array['track_chi2'] <= max_chi2]
                     index_stop = 0
                     event_start = array['event_number'][0]
                     while index_stop <= n_tracks:
@@ -916,149 +858,36 @@ def plot_events(input_tracks_file, dut=0, event_range=(0, 100), n_tracks=None, m
                             y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
                             z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
 
+                    if fitted_tracks:
+                        offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
+                        slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
+                        linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
+
                     n_hits = bin(track['track_quality'] & 0xFF).count('1')
                     n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
 
                     if n_hits > 2:  # only plot tracks with more than 2 hits
-                        ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
+                        if fitted_tracks:
+                            ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
+                            ax.plot3D(*linepts.T)
+                        else:
+                            ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
 
                 ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
                 ax.set_xlabel('x [mm]')
                 ax.set_ylabel('y [mm]')
                 ax.set_zlabel('z [mm]')
-                ax.set_title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
-                return fig
+                title_prefix = '%d tracks of %d events' if fitted_tracks else '%d track candidates of %d events'
+                title_prefix += ' of DUT %d' % dut if dut else ''
+                ax.set_title(title_prefix % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
 
-            else:
-                figs = []
-                for node in in_file_h5.root:
-                    n_duts = sum(['charge' in col for col in node.dtype.names])
-                    array = node[:]
-                    if n_tracks is not None:
-                        if max_chi2:
-                            array = array[array['track_chi2'] <= max_chi2]
-                        index_stop = 0
-                        event_start = array['event_number'][0]
-                        while index_stop <= n_tracks:
-                            try:
-                                event_stop = array['event_number'][index_stop]
-                                index_stop += 1
-                            except IndexError:
-                                if index_stop:
-                                    index_stop -= 1
-                                else:
-                                    event_start = event_stop = None
-                                break
-                        tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_start,
-                                                                                                event_stop)
-                    else:
-                        tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0],
-                                                                                                event_range[-1])
-                    if tracks.shape[0] == 0:
-                        logging.warning('No tracks in event selection, cannot plot events!')
-                        return
-                    if max_chi2:
-                        tracks = tracks[tracks['track_chi2'] <= max_chi2]
-                    mpl.rcParams['legend.fontsize'] = 10
-                    fig = Figure()
-                    _ = FigureCanvas(fig)
-                    ax = fig.gca(projection='3d')
-                    for track in tracks:
-                        x, y, z = [], [], []
-                        for dut_index in range(0, n_duts):
-                            if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
-                                x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
-                                y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
-                                z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
-
-                                offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
-                                slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
-                                linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
-
-                        n_hits = bin(track['track_quality'] & 0xFF).count('1')
-                        n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
-
-                        if n_hits > 2:  # only plot tracks with more than 2 hits
-                            ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
-                            ax.plot3D(*linepts.T)
-
-                    ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
-                    ax.set_xlabel('x [mm]')
-                    ax.set_ylabel('y [mm]')
-                    ax.set_zlabel('z [mm]')
-                    ax.set_title('%d tracks of %d events of Tel_%s' % (tracks.shape[0],
-                                                                       np.unique(tracks['event_number']).shape[0],
-                                                                       str(node.name).split('_')[-1]))
+                if gui:
                     figs.append(fig)
+                else:
+                    output_pdf.savefig(fig)
 
-                return figs
-
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_events.pdf'
-
-    with PdfPages(output_pdf_file) as output_pdf:
-        with tb.open_file(input_tracks_file, "r") as in_file_h5:
-            fitted_tracks = False
-            try:  # data has track candidates
-                table = in_file_h5.root.TrackCandidates
-            except tb.NoSuchNodeError:  # data has fitted tracks
-                table = in_file_h5.get_node(in_file_h5.root, name='Tracks_DUT_%d' % dut)
-                fitted_tracks = True
-
-            n_duts = sum(['charge' in col for col in table.dtype.names])
-            array = table[:]
-            if n_tracks is not None:
-                index_stop = 0
-                event_start = array['event_number'][0]
-                while index_stop <= n_tracks:
-                    try:
-                        event_stop = array['event_number'][index_stop]
-                        index_stop += 1
-                    except IndexError:
-                        if index_stop:
-                            index_stop -= 1
-                        break
-                tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_start, event_stop)
-            else:
-                tracks = testbeam_analysis.tools.analysis_utils.get_data_in_event_range(array, event_range[0], event_range[-1])
-            if tracks.shape[0] == 0:
-                logging.warning('No tracks in event selection, cannot plot events!')
-                return
-            if max_chi2:
-                tracks = tracks[tracks['track_chi2'] <= max_chi2]
-            mpl.rcParams['legend.fontsize'] = 10
-            fig = Figure()
-            _ = FigureCanvas(fig)
-            ax = fig.gca(projection='3d')
-            for track in tracks:
-                x, y, z = [], [], []
-                for dut_index in range(0, n_duts):
-                    if track['x_dut_%d' % dut_index] != 0:  # No hit has x = 0
-                        x.append(track['x_dut_%d' % dut_index] * 1.e-3)  # in mm
-                        y.append(track['y_dut_%d' % dut_index] * 1.e-3)  # in mm
-                        z.append(track['z_dut_%d' % dut_index] * 1.e-3)  # in mm
-
-                if fitted_tracks:
-                    offset = np.array((track['offset_0'], track['offset_1'], track['offset_2']))
-                    slope = np.array((track['slope_0'], track['slope_1'], track['slope_2']))
-                    linepts = offset * 1.e-3 + slope * 1.e-3 * np.mgrid[-150000:150000:2000j][:, np.newaxis]
-
-                n_hits = bin(track['track_quality'] & 0xFF).count('1')
-                n_very_good_hits = bin(track['track_quality'] & 0xFF0000).count('1')
-
-                if n_hits > 2:  # only plot tracks with more than 2 hits
-                    if fitted_tracks:
-                        ax.plot(x, y, z, '.' if n_hits == n_very_good_hits else 'o')
-                        ax.plot3D(*linepts.T)
-                    else:
-                        ax.plot(x, y, z, '.-' if n_hits == n_very_good_hits else '.--')
-
-            ax.set_zlim(np.amin(np.array(z)), np.amax(np.array(z)))
-            ax.set_xlabel('x [mm]')
-            ax.set_ylabel('y [mm]')
-            ax.set_zlabel('z [mm]')
-            ax.set_title('%d tracks of %d events' % (tracks.shape[0], np.unique(tracks['event_number']).shape[0]))
-            output_pdf.savefig(fig)
+    if gui:
+        return figs
 
 
 def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
@@ -1087,9 +916,10 @@ def plot_track_chi2(chi2s, fit_dut, output_pdf=None):
         output_pdf.savefig(fig)
 
 
-def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_pdf=None):
-    if not output_pdf:
+def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_pdf=None, gui=False, figs=None):
+    if not output_pdf and not gui:
         return
+
     for plot_log in [False, True]:  # plot with log y or not
         fig = Figure()
         _ = FigureCanvas(fig)
@@ -1115,14 +945,19 @@ def plot_residuals(histogram, edges, fit, fit_errors, x_label, title, output_pdf
             ax.plot(x_gauss, testbeam_analysis.tools.analysis_utils.gauss(x_gauss, *fit), 'r--', label=gauss_fit_legend_entry, linewidth=2)
             ax.legend(loc=0)
         ax.set_xlim([edges[0], edges[-1]])
-        output_pdf.savefig(fig)
+
+        if gui:
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
 
 
-def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, fit=None, cov=None, output_pdf=None):
+def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=None, res_pos=None, selection=None, title=None, fit=None, cov=None, output_pdf=None, gui=False, figs=None):
     '''Plot the residuals as a function of the position.
     '''
-    if not output_pdf:
+    if not output_pdf and not gui:
         return
+
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
@@ -1145,7 +980,11 @@ def plot_residuals_vs_position(hist, xedges, yedges, xlabel, ylabel, res_mean=No
     ax.set_xlim([xedges[0], xedges[-1]])
     ax.set_ylim([yedges[0], yedges[-1]])
     ax.legend(loc=0)
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
 
 def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, max_chi2=None, output_pdf_file=None, gui=False):
@@ -1172,12 +1011,16 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
     gui: bool
         Determines whether to plot directly onto gui
     '''
+
     logging.info('Plotting track density')
 
-    # The gui parameter is used to plot from the respective plotting function directly into the graphical
-    # user interface of test_beam analysis. The code is partially hard-coded but works for now.
+    if not output_pdf_file:
+        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_track_density.pdf'
+
     if gui:
         figs = []
+
+    with PdfPages(output_pdf_file, keep_empty=False) as output_pdf:  # if gui, we dont want to safe empty pdf
         with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
             plot_ref_dut = False
             dimensions = []
@@ -1215,7 +1058,7 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                     ax = fig.add_subplot(111)
                     plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
                     fig.tight_layout()
-                    figs.append(fig)
+                    output_pdf.savefig(fig)
 
                     plot_ref_dut = False
 
@@ -1239,90 +1082,25 @@ def plot_track_density(input_tracks_file, z_positions, dim_x, dim_y, pixel_size,
                 ax = fig.add_subplot(111)
                 plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT%d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
-                figs.append(fig)
 
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
-                fig.tight_layout()
-                figs.append(fig)
-
-        return figs
-
-    if not output_pdf_file:
-        output_pdf_file = os.path.splitext(input_tracks_file)[0] + '_track_density.pdf'
-
-    with PdfPages(output_pdf_file) as output_pdf:
-        with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
-            plot_ref_dut = False
-            dimensions = []
-
-            for index, node in enumerate(in_file_h5.root):
-                # Bins define (virtual) pixel size for histogramming
-                bin_x, bin_y = dim_x, dim_y
-
-                # Calculate dimensions in um for every plane
-                dimensions.append((dim_x * pixel_size[index][0], dim_y * pixel_size[index][1]))
-
-                plot_range = (dimensions[index][0], dimensions[index][1])
-
-                actual_dut = int(re.findall(r'\d+', node.name)[-1])
-                if use_duts and actual_dut not in use_duts:
-                    continue
-                logging.info('Plot track density for DUT%d', actual_dut)
-
-                track_array = node[:]
-
-                # If set, select only converged fits
-                if max_chi2:
-                    track_array = track_array[track_array['track_chi2'] <= max_chi2]
-
-                if plot_ref_dut:  # Plot first and last device
-                    heatmap_ref_hits, _, _ = np.histogram2d(track_array['column_dut_0'], track_array['row_dut_0'], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-                    if mask_zero:
-                        heatmap_ref_hits = np.ma.array(heatmap_ref_hits, mask=(heatmap_ref_hits == 0))
-
-                    # Get number of hits in DUT0
-                    n_ref_hits = np.count_nonzero(heatmap_ref_hits)
-
-                    fig = Figure()
-                    _ = FigureCanvas(fig)
-                    ax = fig.add_subplot(111)
-                    plot_2d_pixel_hist(fig, ax, heatmap_ref_hits.T, plot_range, title='Hit density for DUT 0 (%d Hits)' % n_ref_hits, x_axis_title="column [um]", y_axis_title="row [um]")
-                    fig.tight_layout()
+                if gui:
+                    figs.append(fig)
+                else:
                     output_pdf.savefig(fig)
 
-                    plot_ref_dut = False
-
-                offset, slope = np.column_stack((track_array['offset_0'], track_array['offset_1'], track_array['offset_2'])), np.column_stack((track_array['slope_0'], track_array['slope_1'], track_array['slope_2']))
-                intersection = offset + slope / slope[:, 2, np.newaxis] * (z_positions[actual_dut] - offset[:, 2, np.newaxis])  # intersection track with DUT plane
-
-                heatmap, _, _ = np.histogram2d(intersection[:, 0], intersection[:, 1], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-                heatmap_hits, _, _ = np.histogram2d(track_array['column_dut_%d' % actual_dut], track_array['row_dut_%d' % actual_dut], bins=(bin_x, bin_y), range=[[1.5, dimensions[index][0] + 0.5], [1.5, dimensions[index][1] + 0.5]])
-
-                # For better readability allow masking of entries that are zero
-                if mask_zero:
-                    heatmap = np.ma.array(heatmap, mask=(heatmap == 0))
-                    heatmap_hits = np.ma.array(heatmap_hits, mask=(heatmap_hits == 0))
-
-                # Get number of hits / tracks
-                n_hits_heatmap = np.count_nonzero(heatmap)
-                n_hits_heatmap_hits = np.count_nonzero(heatmap_hits)
-
-                fig = Figure()
-                _ = FigureCanvas(fig)
-                ax = fig.add_subplot(111)
-                plot_2d_pixel_hist(fig, ax, heatmap.T, plot_range, title='Track density for DUT%d tracks (%d Tracks)' % (actual_dut, n_hits_heatmap), x_axis_title="column [um]", y_axis_title="row [um]")
-                fig.tight_layout()
-                output_pdf.savefig(fig)
-
                 fig = Figure()
                 _ = FigureCanvas(fig)
                 ax = fig.add_subplot(111)
                 plot_2d_pixel_hist(fig, ax, heatmap_hits.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_heatmap_hits), x_axis_title="column [um]", y_axis_title="row [um]")
                 fig.tight_layout()
-                output_pdf.savefig(fig)
+
+                if gui:
+                    figs.append(fig)
+                else:
+                    output_pdf.savefig(fig)
+
+    if gui:
+        return figs
 
 
 def plot_charge_distribution(input_track_candidates_file, dim_x, dim_y, pixel_size, mask_zero=True, use_duts=None, output_pdf_file=None):
@@ -1421,9 +1199,10 @@ def plot_track_distances(distance_min_array, distance_max_array, distance_mean_a
     output_pdf.savefig(fig)
 
 
-def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, mask_zero=True, output_pdf=None):
-    if not output_pdf:
+def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range, cut_distance, mask_zero=True, output_pdf=None, gui=False, figs=None):
+    if not output_pdf and not gui:
         return
+
     # get number of entries for every histogram
     n_hits_hit_hist = np.count_nonzero(hit_hist)
     n_tracks_track_density = np.count_nonzero(track_density)
@@ -1442,21 +1221,33 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, hit_hist.T, plot_range, title='Hit density for DUT%d (%d Hits)' % (actual_dut, n_hits_hit_hist), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density.T, plot_range, title='Track density for DUT%d (%d Tracks)' % (actual_dut, n_tracks_track_density), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
     fig = Figure()
     _ = FigureCanvas(fig)
     ax = fig.add_subplot(111)
     plot_2d_pixel_hist(fig, ax, track_density_with_DUT_hit.T, plot_range, title='Density of tracks with DUT hit for DUT%d (%d Tracks)' % (actual_dut, n_tracks_track_density_with_DUT_hit), x_axis_title="column [um]", y_axis_title="row [um]")
     fig.tight_layout()
-    output_pdf.savefig(fig)
+
+    if gui:
+        figs.append(fig)
+    else:
+        output_pdf.savefig(fig)
 
     if np.any(~efficiency.mask):
         fig = Figure()
@@ -1467,7 +1258,11 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
             z_min = 90.
         plot_2d_pixel_hist(fig, ax, efficiency.T, plot_range, title='Efficiency for DUT%d (%d Entries)' % (actual_dut, n_hits_efficiency), x_axis_title="column [um]", y_axis_title="row [um]", z_min=z_min, z_max=100.)
         fig.tight_layout()
-        output_pdf.savefig(fig)
+
+        if gui:
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
 
         fig = Figure()
         _ = FigureCanvas(fig)
@@ -1480,7 +1275,12 @@ def efficiency_plots(hit_hist, track_density, track_density_with_DUT_hit, effici
         ax.set_xlim([-0.5, 101.5])
         ax.hist(efficiency.ravel()[efficiency.ravel().mask != 1], bins=101, range=(0, 100))  # Histogram not masked pixel efficiency
         fig.tight_layout()
-        output_pdf.savefig(fig)
+
+        if gui:
+            figs.append(fig)
+        else:
+            output_pdf.savefig(fig)
+
     else:
         logging.warning('Cannot create efficiency plots, all pixels are masked')
 

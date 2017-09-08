@@ -17,7 +17,7 @@ from testbeam_analysis.tools import geometry_utils
 from testbeam_analysis.tools import analysis_utils
 
 
-def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=True, plot=True, cluster_size_selection=None, chunk_size=1000000):
+def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel_size, output_residuals_file=None, dut_names=None, use_duts=None, max_chi2=None, nbins_per_pixel=None, npixels_per_bin=None, force_prealignment=False, use_fit_limits=True, plot=True, cluster_size_selection=None, gui=False, chunk_size=1000000):
     '''Takes the tracks and calculates residuals for selected DUTs in col, row direction.
 
     Parameters
@@ -72,10 +72,12 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
     if output_residuals_file is None:
         output_residuals_file = os.path.splitext(input_tracks_file)[0] + '_residuals.h5'
 
-    if plot is True:
-        output_pdf = PdfPages(os.path.splitext(output_residuals_file)[0] + '.pdf')
+    if plot is True and not gui:
+        output_pdf = PdfPages(os.path.splitext(output_residuals_file)[0] + '.pdf', keep_empty=False)
     else:
         output_pdf = None
+
+    figs = [] if gui else None
 
     if not isinstance(max_chi2, Iterable):
         max_chi2 = [max_chi2] * n_duts
@@ -387,7 +389,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     edges=hist_residual_x_xedges,
                     label='X residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_res_x = out_file_h5.create_carray(out_file_h5.root,
                                                       name='ResidualsX_DUT%d' % (actual_dut),
@@ -405,7 +409,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     edges=hist_residual_y_yedges,
                     label='Y residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_res_y = out_file_h5.create_carray(out_file_h5.root,
                                                       name='ResidualsY_DUT%d' % (actual_dut),
@@ -425,7 +431,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='X position [um]',
                     ylabel='X residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
 
                 out_x_res_x = out_file_h5.create_carray(out_file_h5.root,
@@ -447,7 +455,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='Y position [um]',
                     ylabel='Y residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_y_res_y = out_file_h5.create_carray(out_file_h5.root,
                                                         name='YResidualsY_DUT%d' % (actual_dut),
@@ -468,7 +478,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='X position [um]',
                     ylabel='Y residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_x_res_y = out_file_h5.create_carray(out_file_h5.root,
                                                         name='XResidualsY_DUT%d' % (actual_dut),
@@ -489,7 +501,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='Y position [um]',
                     ylabel='X residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_y_res_x = out_file_h5.create_carray(out_file_h5.root,
                                                         name='YResidualsX_DUT%d' % (actual_dut),
@@ -509,7 +523,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     edges=hist_residual_col_xedges,
                     label='Column residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_res_col = out_file_h5.create_carray(out_file_h5.root,
                                                         name='ResidualsCol_DUT%d' % (actual_dut),
@@ -527,7 +543,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     edges=hist_residual_row_yedges,
                     label='Row residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_res_row = out_file_h5.create_carray(out_file_h5.root,
                                                         name='ResidualsRow_DUT%d' % (actual_dut),
@@ -547,7 +565,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='Column position [um]',
                     ylabel='Column residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_col_res_col = out_file_h5.create_carray(out_file_h5.root,
                                                             name='ColResidualsCol_DUT%d' % (actual_dut),
@@ -568,7 +588,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='Row position [um]',
                     ylabel='Row residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_row_res_row = out_file_h5.create_carray(out_file_h5.root,
                                                             name='RowResidualsRow_DUT%d' % (actual_dut),
@@ -589,7 +611,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='Column position [um]',
                     ylabel='Row residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_col_res_row = out_file_h5.create_carray(out_file_h5.root,
                                                             name='ColResidualsRow_DUT%d' % (actual_dut),
@@ -610,7 +634,9 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
                     xlabel='Row position [um]',
                     ylabel='Column residual [um]',
                     title='Residuals for %s' % (dut_name,),
-                    output_pdf=output_pdf
+                    output_pdf=output_pdf,
+                    gui=gui,
+                    figs=figs
                 )
                 out_row_res_col = out_file_h5.create_carray(out_file_h5.root,
                                                             name='RowResidualsCol_DUT%d' % (actual_dut),
@@ -627,8 +653,11 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
     if output_pdf is not None:
         output_pdf.close()
 
+    if gui:
+        return figs
 
-def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sensor_size, output_efficiency_file=None, pixel_size=None, n_pixels=None, minimum_track_density=1, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, plot=True, chunk_size=1000000):
+
+def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sensor_size, output_efficiency_file=None, pixel_size=None, n_pixels=None, minimum_track_density=1, max_distance=500, use_duts=None, max_chi2=None, force_prealignment=False, cut_distance=None, col_range=None, row_range=None, show_inefficient_events=False, plot=True, gui=False, chunk_size=1000000):
     '''Takes the tracks and calculates the hit efficiency and hit/track hit distance for selected DUTs.
 
     Parameters
@@ -676,8 +705,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     if output_efficiency_file is None:
         output_efficiency_file = os.path.splitext(input_tracks_file)[0] + '_efficiency.h5'
 
-    if plot is True:
-        output_pdf = PdfPages(os.path.splitext(output_efficiency_file)[0] + '.pdf')
+    if plot is True and not gui:
+        output_pdf = PdfPages(os.path.splitext(output_efficiency_file)[0] + '.pdf', keep_empty=False)
     else:
         output_pdf = None
 
@@ -701,6 +730,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
     efficiencies = []
     pass_tracks = []
     total_tracks = []
+    figs = [] if gui else None
     with tb.open_file(input_tracks_file, mode='r') as in_file_h5:
         with tb.open_file(output_efficiency_file, 'w') as out_file_h5:
             for index, node in enumerate(in_file_h5.root):
@@ -841,7 +871,7 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
 #                 distance_max_array = np.ma.masked_invalid(distance_max_array)
 #                 distance_min_array = np.ma.masked_invalid(distance_min_array)
 #                 plot_utils.plot_track_distances(distance_min_array, distance_max_array, distance_mean_array)
-                plot_utils.efficiency_plots(total_hit_hist, total_track_density, total_track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_pdf=output_pdf)
+                plot_utils.efficiency_plots(total_hit_hist, total_track_density, total_track_density_with_DUT_hit, efficiency, actual_dut, minimum_track_density, plot_range=dimensions, cut_distance=cut_distance, output_pdf=output_pdf, gui=gui, figs=figs)
 
                 logging.info('Efficiency =  %1.4f +- %1.4f', np.ma.mean(efficiency), np.ma.std(efficiency))
                 efficiencies.append(np.ma.mean(efficiency))
@@ -876,6 +906,9 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
 
     if output_pdf is not None:
         output_pdf.close()
+
+    if gui:
+        return figs
 
     return efficiencies, pass_tracks, total_tracks
 
