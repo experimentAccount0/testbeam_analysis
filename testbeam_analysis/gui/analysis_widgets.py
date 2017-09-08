@@ -297,15 +297,20 @@ class AnalysisWidget(QtWidgets.QWidget):
         # Create widget according to data type
         if ('scalar' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
                         'int' in dtype and ('tuple' in dtype or 'iterable' in dtype) or
-                ('iterable' in dtype and 'iterable of iterable' not in dtype)):
+                ('iterable' in dtype and 'iterable of iterable' not in dtype and 'duts' not in name)):
             widget = option_widget.OptionMultiSlider(
                 name=name, labels=self.setup['dut_names'],
                 default_value=default_value,
                 optional=optional, tooltip=tooltip, parent=self)
-        elif 'iterable of iterable' in dtype:
-            # determine whether "iterable of iterable" or "iterable"
-            labels_y = self.setup['dut_names']
+        elif 'iterable of iterable' in dtype or 'iterable' in dtype and 'duts' in name:
+
             labels_x = self.setup['dut_names']
+            labels_y = self.setup['dut_names']
+
+            # determine whether "iterable of iterable" or "iterable of duts"
+            if 'iterable of iterable' not in dtype and 'duts' in name:
+                labels_y = None
+
             if name in ['Align duts']:
                 labels_x = ['Align %i.' % (i + 1) for i in range(self.setup['n_duts'])]
 

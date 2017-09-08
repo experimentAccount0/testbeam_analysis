@@ -187,13 +187,15 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.settings_menu.addAction('&Global', self.global_settings)
         self.menuBar().addMenu(self.settings_menu)
 
-        self.run_menu = QtWidgets.QMenu('&Run', self)
-        self.run_menu.setToolTipsVisible(True)
-        self.run_menu.addAction('&Run consecutive analysis', self.run_consecutive_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
-        # Disable consecutive analysis until setup is done
-        self.run_menu.actions()[0].setEnabled(False)
-        self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
-        self.menuBar().addMenu(self.run_menu)
+        # FIXME: Don't support this feature for Windows now, since it causes crashes
+        if platform.system() != 'Windows':
+            self.run_menu = QtWidgets.QMenu('&Run', self)
+            self.run_menu.setToolTipsVisible(True)
+            self.run_menu.addAction('&Run consecutive analysis', self.run_consecutive_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
+            # Disable consecutive analysis until setup is done
+            self.run_menu.actions()[0].setEnabled(False)
+            self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
+            self.menuBar().addMenu(self.run_menu)
 
         self.appearance_menu = QtWidgets.QMenu('&Appearance', self)
         self.appearance_menu.setToolTipsVisible(True)
@@ -545,8 +547,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.tw = {}
 
         # Disable consecutive analysis until setup is done
-        self.run_menu.actions()[0].setEnabled(False)
-        self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
+        if platform.system() != 'Windows':
+            self.run_menu.actions()[0].setEnabled(False)
+            self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
 
         for i in reversed(range(self.main_splitter.count())):
             w = self.main_splitter.widget(i)
@@ -600,12 +603,18 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             # Connect starting tab and all following
             if self.tab_order.index(tab) >= self.tab_order.index(self.starting_tab_rca):
 
-                # Wait for analysis_thread to finish correctly
-                # self.tw[tab].analysis_thread.wait()
-
                 # Handle consecutive analysis
-                self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tw[tab_list[0]].btn_ok.clicked.emit())
                 self.tw[tab].proceedAnalysis.connect(lambda tab_list: handle_rca(tab_list))
+
+                # Check whether or not alignment is skipped
+                if tab == 'Track finding' and self.options['skip_alignment']:
+                    for x in [lambda tab_list: self.tw[tab_list[0]].skipAlignment.emit(),
+                              lambda tab_list: self.tw[tab_list[0]].proceedAnalysis.emit(self.tw[tab_list[0]].tl)]:
+                        self.tw[tab].proceedAnalysis.connect(x)
+
+                else:
+                    if tab != self.tab_order[-1]:
+                        self.tw[tab].proceedAnalysis.connect(lambda tab_list: self.tw[tab_list[0]].btn_ok.clicked.emit())
 
         # Start analysis by clicking ok button on starting tab
         self.tw[self.starting_tab_rca].btn_ok.clicked.emit()
@@ -650,36 +659,18 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                     else:
                         tab_name = tab_list
 
-                    # Synchronize to worker thread / wait for current analysis_thread to finish correctly
-                    # self.tw[self.tab_order[self.tab_order.index(tab_name) - 1]].analysis_thread.wait()
-                    # self.tw[tab_name].analysis_thread.wait()
-
                     if tab_name in self.tab_order:
 
                         # Update progressbar
                         self.p_bar_rca.setFormat(tab_name)
                         self.p_bar_rca.setValue(self.tab_order.index(tab_name))
 
-                        # Set current tab to last finished
-                        # self.tabs.setCurrentIndex(self.tab_order.index(tab_name) - 1)
-
-                        # Click proceed button
-#                        try:
-#                            self.tw[tab_name].btn_ok.clicked.emit()
-#                        except Exception as e:
-#                            # Alignment is skipped
-#                            if tab_name == 'Alignment':
-#                                self.tw[tab_name].skipAlignment.emit()
-#                                self.tw[tab_name].proceedAnalysis.emit(self.tw[tab_name].tl)
-#                            # Re-raise exception
-#                            else:
-#                                self.handle_exceptions(exception=e, trace_back=traceback.format_exc(),
-#                                                       tab=tab_name, cause='consecutive analysis')
-
                     else:
                         # Last tab finished
                         self.p_bar_rca.setValue(len(self.tab_order))
                         self.label_rca.setText('Done!')
+                        # Remove consecutive analysis progressbar
+                        self.remove_widget(widget=self.widget_rca, layout=self.main_layout)
 
     def handle_exceptions(self, exception, trace_back, tab, cause):
         """

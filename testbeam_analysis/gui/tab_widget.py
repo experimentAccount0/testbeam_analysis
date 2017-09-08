@@ -229,9 +229,12 @@ class PrealignmentTab(AnalysisWidget):
                         func=apply_alignment,
                         fixed=True)
 
+        self.add_option(option='use_duts',
+                        func=apply_alignment,
+                        default_value=range(setup['n_duts']),
+                        optional=True)
+
         # Fix options that should not be changed
-        self.add_option(option='use_duts', func=apply_alignment,
-                        default_value=range(setup['n_duts']), fixed=True)
         self.add_option(option='inverse', func=apply_alignment, fixed=True)
         self.add_option(option='force_prealignment', func=apply_alignment,
                         default_value=True, fixed=True)
@@ -361,7 +364,7 @@ class AlignmentTab(AnalysisWidget):
         self.add_option(option='use_duts',
                         default_value=range(setup['n_duts']),
                         func=apply_alignment,
-                        fixed=True)
+                        optional=True)
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file),
@@ -471,9 +474,12 @@ class TrackFittingTab(AnalysisWidget):
                         func=fit_tracks,
                         optional=True)
 
+        self.add_option(option='fit_duts',
+                        func=fit_tracks,
+                        default_value=range(setup['n_duts']),
+                        optional=True)
+
         # Set and fix options
-        self.add_option(option='fit_duts', func=fit_tracks,
-                        default_value=range(setup['n_duts']), fixed=True)
         self.add_option(option='force_prealignment', func=fit_tracks,
                         default_value=options['skip_alignment'], fixed=True)
         self.add_option(option='exclude_dut_hit', func=fit_tracks,
@@ -557,7 +563,7 @@ class ResidualTab(AnalysisWidget):
         self.add_option(option='use_duts',
                         default_value=range(setup['n_duts']),
                         func=calculate_residuals,
-                        fixed=True)
+                        optional=True)
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
@@ -618,7 +624,7 @@ class EfficiencyTab(AnalysisWidget):
         self.add_option(option='use_duts',
                         default_value=range(setup['n_duts']),
                         func=calculate_efficiency,
-                        fixed=True)
+                        optional=True)
 
         for x in [lambda _tab_list: self.proceedAnalysis.emit(_tab_list),
                   lambda: self._connect_vitables(files=output_file)]:
