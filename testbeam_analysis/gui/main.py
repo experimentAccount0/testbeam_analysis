@@ -291,19 +291,21 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                               lambda: self.tw['Setup'].input_data(self.tw['Files'].data),
                               lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(x)
-                        self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
+                    self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
 
                 if name == 'Setup':
                     msg_0 = 'Run consecutive analysis with default options without user interaction'
                     msg_1 = 'Go to currently running or next to be running analysis tab'
                     for xx in [lambda: self.update_tabs(data=self.tw['Setup'].data, skip='Setup'),
-                               lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
-                               lambda: self.run_menu.actions()[0].setToolTip(msg_0),
                                lambda: self.appearance_menu.actions()[1].setEnabled(True),
                                lambda: self.appearance_menu.actions()[1].setToolTip(msg_1),
                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(xx)
-                        self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
+                    self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
+                    if platform.system() != 'Windows':
+                        for xx_x in [lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
+                                     lambda: self.run_menu.actions()[0].setToolTip(msg_0)]:
+                            self.tw[name].proceedAnalysis.connect(xx_x)
 
                 if name == 'Alignment':
                     for xxx in [lambda: self.update_tabs(data={'skip_alignment': True},

@@ -274,6 +274,8 @@ def prealignment(input_correlation_file, output_alignment_file, z_positions, pix
         The number of iterations in non-interactive mode.
     plot : bool
         If True, create additional output plots.
+    gui : bool
+        If True, this function is excecuted from GUI and returns figures
     '''
     logging.info('=== Pre-alignment ===')
 

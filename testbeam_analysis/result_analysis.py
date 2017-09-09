@@ -54,6 +54,8 @@ def calculate_residuals(input_tracks_file, input_alignment_file, n_pixels, pixel
         Select which cluster sizes should be included for residual calculation. If None all cluster sizes are taken.
     chunk_size : int
         Chunk size of the data when reading from file.
+    gui : bool
+        If True, this function is excecuted from GUI and returns figures
     '''
     logging.info('=== Calculating residuals ===')
 
@@ -699,6 +701,8 @@ def calculate_efficiency(input_tracks_file, input_alignment_file, bin_size, sens
         tuple or list of amount of pixel in col/row dimension
     show_inefficient_events : bool
         Whether to log inefficient events
+    gui : bool
+        If True, this function is excecuted from GUI and returns figures
     '''
     logging.info('=== Calculating efficiency ===')
 
