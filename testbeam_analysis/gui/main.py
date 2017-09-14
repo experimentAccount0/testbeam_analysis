@@ -1,6 +1,6 @@
 import sys
 import logging
-import traceback
+import time
 import platform
 
 from email import message_from_string
@@ -12,7 +12,6 @@ from data import DataTab
 from setup import SetupTab
 from sub_windows import SettingsWindow, ExceptionWindow
 from analysis_logger import AnalysisLogger, AnalysisStream
-from analysis_widgets import AnalysisWidget, ParallelAnalysisWidget
 import testbeam_analysis
 from testbeam_analysis.gui import tab_widget
 
@@ -188,7 +187,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.menuBar().addMenu(self.settings_menu)
 
         # FIXME: Don't support this feature for Windows now, since it causes crashes
-        if platform.system() != 'Windows':
+        if platform.system() != 'Windows' or _DEBUG:
             self.run_menu = QtWidgets.QMenu('&Run', self)
             self.run_menu.setToolTipsVisible(True)
             self.run_menu.addAction('&Run consecutive analysis', self.run_consecutive_analysis, QtCore.Qt.CTRL + QtCore.Qt.Key_R)
@@ -302,7 +301,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                                lambda: self.tabs.setCurrentIndex(self.tabs.currentIndex() + 1)]:
                         self.tw[name].proceedAnalysis.connect(xx)
                     self.tw[name].statusMessage.connect(lambda message: self.handle_messages(message, 4000))
-                    if platform.system() != 'Windows':
+                    if platform.system() != 'Windows' or _DEBUG:
                         for xx_x in [lambda: self.run_menu.actions()[0].setEnabled(True),  # Enable consecutive analysis
                                      lambda: self.run_menu.actions()[0].setToolTip(msg_0)]:
                             self.tw[name].proceedAnalysis.connect(xx_x)
@@ -548,7 +547,7 @@ class AnalysisWindow(QtWidgets.QMainWindow):
         self.tw = {}
 
         # Disable consecutive analysis until setup is done
-        if platform.system() != 'Windows':
+        if platform.system() != 'Windows' or _DEBUG:
             self.run_menu.actions()[0].setEnabled(False)
             self.run_menu.actions()[0].setToolTip('Finish data selection and testbeam setup to enable')
 
@@ -632,7 +631,9 @@ class AnalysisWindow(QtWidgets.QMainWindow):
             :param tab_list: list or str of tab name whichs analysis step is to be started
             :param interrupt: bool whether interrupt btn was clicked 
             """
-            if tab_list is None and interrupt is None:
+
+            # Redundant call
+            if tab_list is None and not interrupt:
                 return
 
             # If interrupt btn was clicked set flag
@@ -647,6 +648,32 @@ class AnalysisWindow(QtWidgets.QMainWindow):
                 self.p_bar_rca.setDisabled(True)
 
             else:
+                # Get thread status of every analysis thread
+                analysis_threads = [self.tw[key].analysis_thread.isRunning() for key in self.tab_order[2:]]
+
+                # If any of them is still running, wait for them to finish before starting next tab
+                if any(analysis_threads):
+
+                    # Get running threads
+                    running_threads = []
+                    for i, thread in enumerate(analysis_threads):
+                        if thread and self.tab_order[i + 2] not in running_threads:
+                            running_threads.append(self.tab_order[i + 2])
+                        else:
+                            pass
+
+                    msg = "Waiting for %s analysis thread to finish" % (', '.join(running_threads))
+                    logging.info(msg=msg)
+
+                    # Wait until every thread has finished
+                    wait_begin = time.time()
+                    while any(analysis_threads):
+                        analysis_threads = [self.tw[key].analysis_thread.isRunning() for key in self.tab_order[2:]]
+                    wait_end = time.time()
+
+                    msg = "Waited %f seconds for %s analysis thread to finish" % (wait_end-wait_begin,
+                                                                                  ', '.join(running_threads))
+                    logging.info(msg=msg)
 
                 if self.flag_interrupt:
 
